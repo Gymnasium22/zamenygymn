@@ -3,13 +3,13 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "homepage": "https://Gymnasium22.github.io/zamenyVStest/",
+  "homepage": "https://Gymnasium22.github.io/zamenygymn/",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
     "predeploy": "npm run build",
-    "deploy": "gh-pages -d dist -r https://github.com/Gymnasium22/zamenyVStest.git"
+    "deploy": "gh-pages -d dist -r https://github.com/Gymnasium22/zamenygymn.git"
   },
   "dependencies": {
     "firebase": "^10.12.2",
