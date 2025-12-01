@@ -324,13 +324,14 @@ export const ExportPage = () => {
                                             </div>
                                         )}
                                     </td>
-                                    <td className={`py-3 px-2 text-right font-mono font-black text-lg ${newRoomId ? 'text-indigo-600' : 'text-slate-700'}`}>
+                                    <td className={`py-3 px-2 text-right font-mono font-black ${newRoomId ? 'text-indigo-600' : 'text-slate-700'}`}>
                                         {newRoomId && newRoomId !== s.roomId ? (
-                                            <span>
-                                                <span className="text-slate-400 line-through mr-1 decoration-slate-300 decoration-2 opacity-70 text-xs">{oldRoomName}</span>
-                                                <span className="text-indigo-600 text-xl">&rarr; {newRoomName}</span>
-                                            </span>
-                                        ) : oldRoomName}
+                                            <div className="flex items-center justify-end gap-2 text-xl whitespace-nowrap">
+                                                <span className="text-slate-400 decoration-4">{oldRoomName}</span>
+                                                <span className="text-indigo-600 font-black text-2xl">&rarr;</span>
+                                                <span className="text-indigo-600 font-black text-2xl">{newRoomName}</span>
+                                            </div>
+                                        ) : <span className="text-lg">{oldRoomName}</span>}
                                     </td>
                                 </tr>
                             ) 
