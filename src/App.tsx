@@ -60,9 +60,9 @@ const Layout = () => {
         // Dashboard: Только Админ и Учитель
         { to: '/dashboard', label: 'Рабочий стол', icon: 'Home', roles: ['admin', 'teacher'] },
         // Schedule: Все роли (1 полугодие)
-        { to: '/schedule', label: 'Расписание', icon: 'Calendar', roles: ['admin', 'teacher', 'guest'] },
+        { to: '/schedule', label: 'Расписание 1 полугодие', icon: 'Calendar', roles: ['admin', 'teacher', 'guest'] },
         // Schedule 2: Все роли (2 полугодие)
-        { to: '/schedule2', label: 'Расписание 2-е полугодие', icon: 'Calendar', roles: ['admin', 'teacher', 'guest'] },
+        { to: '/schedule2', label: 'Расписание 2 полугодие', icon: 'Calendar', roles: ['admin', 'teacher', 'guest'] },
         // Substitutions (Назначение замен): Только Админ
         { to: '/substitutions', label: 'Замены', icon: 'Repeat', roles: ['admin'] }, 
         // Остальные: Только Админ

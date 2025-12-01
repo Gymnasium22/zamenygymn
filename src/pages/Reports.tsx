@@ -6,15 +6,28 @@ import { DAYS } from '../types';
 
 export const ReportsPage = () => {
     const { subjects, teachers, classes } = useStaticData();
-    const { schedule, substitutions } = useScheduleData();
+    // Получаем оба расписания
+    const { schedule1, schedule2, substitutions } = useScheduleData();
     
     const [reportTab, setReportTab] = useState('load');
     const [selectedClassId, setSelectedClassId] = useState(classes[0]?.id || '');
     
+    // Состояние для выбора полугодия (по умолчанию текущее)
+    const [selectedSemester, setSelectedSemester] = useState<1 | 2>(() => {
+        const month = new Date().getMonth();
+        return (month >= 0 && month <= 4) ? 2 : 1;
+    });
+
+    // Выбираем расписание на основе селектора
+    const activeSchedule = useMemo(() => {
+        return selectedSemester === 2 ? schedule2 : schedule1;
+    }, [selectedSemester, schedule1, schedule2]);
+    
     const tariffData = useMemo(() => { 
         const weeks = 4; 
         return teachers.map(t => { 
-            const weeklyLessons = schedule.filter(s => s.teacherId === t.id); 
+            // Используем activeSchedule вместо schedule
+            const weeklyLessons = activeSchedule.filter(s => s.teacherId === t.id); 
             const weeklyHours = weeklyLessons.length; 
             const monthlyPlan = weeklyHours * weeks; 
             const subsTaken = substitutions.filter(s => s.replacementTeacherId === t.id).length; 
@@ -27,19 +40,20 @@ export const ReportsPage = () => {
             }); 
             return { id: t.id, name: t.name, weeklyHours, subsTaken, subsMissed, actualHours, subjectBreakdown }; 
         }).sort((a,b) => b.actualHours - a.actualHours); 
-    }, [teachers, schedule, substitutions, subjects]);
+    }, [teachers, activeSchedule, substitutions, subjects]);
 
     const sanPinData = useMemo(() => { 
         if(!selectedClassId) return []; 
         return DAYS.map(day => { 
-            const lessons = schedule.filter(s => s.classId === selectedClassId && s.day === day); 
+            // Используем activeSchedule вместо schedule
+            const lessons = activeSchedule.filter(s => s.classId === selectedClassId && s.day === day); 
             const score = lessons.reduce((acc, curr) => { 
                 const subj = subjects.find(s => s.id === curr.subjectId); 
                 return acc + (subj?.difficulty || 5); 
             }, 0); 
             return { label: day, value: score }; 
         }); 
-    }, [schedule, subjects, selectedClassId]);
+    }, [activeSchedule, subjects, selectedClassId]);
 
     const ratings = useMemo(() => { 
         const heroes = teachers.map(t => ({ 
@@ -65,7 +79,7 @@ export const ReportsPage = () => {
         const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement("a"); 
         link.href = URL.createObjectURL(blob);
-        link.download = `report_${reportTab}.csv`; 
+        link.download = `report_${reportTab}_${selectedSemester}sem.csv`; 
         document.body.appendChild(link); 
         link.click(); 
         document.body.removeChild(link); 
@@ -78,9 +92,24 @@ export const ReportsPage = () => {
                     <h1 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
                         <Icon name="BarChart2" className="text-indigo-600 dark:text-indigo-400" /> Аналитика
                     </h1>
-                    <button onClick={downloadReport} className="px-4 py-2 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-lg text-sm font-bold flex items-center gap-2">
-                        <Icon name="FileSpreadsheet" size={16}/> Скачать CSV
-                    </button>
+                    
+                    <div className="flex gap-4 items-center">
+                        <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl p-1.5 pl-3">
+                            <span className="text-xs font-bold text-slate-500 dark:text-slate-400">Полугодие:</span>
+                            <select
+                                value={selectedSemester}
+                                onChange={(e) => setSelectedSemester(Number(e.target.value) as 1 | 2)}
+                                className="bg-transparent text-sm font-bold text-slate-700 dark:text-slate-200 outline-none cursor-pointer"
+                            >
+                                <option value={1}>1-е (Сен-Дек)</option>
+                                <option value={2}>2-е (Янв-Май)</option>
+                            </select>
+                        </div>
+
+                        <button onClick={downloadReport} className="px-4 py-2 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors hover:bg-emerald-100 dark:hover:bg-emerald-900/50">
+                            <Icon name="FileSpreadsheet" size={16}/> Скачать CSV
+                        </button>
+                    </div>
                 </div>
                 <div className="flex gap-2 bg-slate-100 dark:bg-slate-700 p-1 rounded-xl w-fit overflow-x-auto max-w-full">
                     <button onClick={() => setReportTab('load')} className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all ${reportTab === 'load' ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>Тарификация (Нагрузка)</button>
