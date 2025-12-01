@@ -306,7 +306,12 @@ export const ExportPage = () => {
                                     <td className="py-3 px-2">
                                         {!isRoomChangeOnly && (
                                             <>
-                                                <div className="text-red-400 line-through text-sm font-medium decoration-red-200">{t1?.name}</div>
+                                                {/* FIX: Use relative div with absolute line for reliable strikethrough in html2canvas */}
+                                                <div className="relative inline-block text-red-400 text-sm font-medium">
+                                                    {t1?.name}
+                                                    {/* Adjusted top position to fix html2canvas rendering issue where line appears too high. top-[60%] pushes it down. */}
+                                                    <div className="absolute left-0 top-[85%] w-full h-px bg-red-300"></div>
+                                                </div>
                                                 {displayReason && <span className="text-[10px] text-slate-500 block font-bold uppercase mt-0.5">{displayReason}</span>}
                                             </>
                                         )}
@@ -327,11 +332,12 @@ export const ExportPage = () => {
                                     <td className={`py-3 px-2 text-right font-mono font-black ${newRoomId ? 'text-indigo-600' : 'text-slate-700'}`}>
                                         {newRoomId && newRoomId !== s.roomId ? (
                                             <div className="flex items-center justify-end gap-2 text-xl whitespace-nowrap">
-                                                <span className="text-slate-400 decoration-4">{oldRoomName}</span>
+                                                {/* Re-applying room change styles as requested in previous turns, ensuring font-black and text-xl */}
+                                                <span className="text-slate-400 decoration-4 text-xl">{oldRoomName}</span>
                                                 <span className="text-indigo-600 font-black text-2xl">&rarr;</span>
                                                 <span className="text-indigo-600 font-black text-2xl">{newRoomName}</span>
                                             </div>
-                                        ) : <span className="text-lg">{oldRoomName}</span>}
+                                        ) : <span className="text-xl">{oldRoomName}</span>}
                                     </td>
                                 </tr>
                             ) 
