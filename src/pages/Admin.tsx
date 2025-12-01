@@ -5,7 +5,8 @@ import { Shift, SHIFT_PERIODS, DAYS } from '../types';
 
 export const AdminPage = () => {
     const { subjects, teachers, classes, rooms, settings, saveStaticData } = useStaticData(); 
-    const { schedule } = useScheduleData();
+    // Получаем оба расписания, чтобы выбирать нужное в зависимости от даты
+    const { schedule1, schedule2 } = useScheduleData();
 
     const [activeTab, setActiveTab] = useState('teachers');
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -17,6 +18,14 @@ export const AdminPage = () => {
 
     const [telegramToken, setTelegramToken] = useState('');
     const [feedbackChatId, setFeedbackChatId] = useState('');
+
+    // Определяем актуальное расписание на основе выбранной даты
+    const activeSchedule = useMemo(() => {
+        const month = new Date(selectedDate).getMonth();
+        // Январь(0) - Май(4) = 2 полугодие. Остальное = 1 полугодие
+        const isSecondSemester = month >= 0 && month <= 4;
+        return isSecondSemester ? schedule2 : schedule1;
+    }, [selectedDate, schedule1, schedule2]);
 
     useEffect(() => {
         if (settings) {
@@ -46,7 +55,8 @@ export const AdminPage = () => {
         return teachers.filter(teacher => {
             if (teacher.shifts && !teacher.shifts.includes(teacherShift)) return false;
             if (teacher.unavailableDates.includes(selectedDate)) return false;
-            const hasLateLessons = schedule.some(s => 
+            // Используем activeSchedule вместо schedule
+            const hasLateLessons = activeSchedule.some(s => 
                 s.teacherId === teacher.id && 
                 s.day === selectedDayOfWeek && 
                 s.period > afterPeriod && 
@@ -54,19 +64,20 @@ export const AdminPage = () => {
             );
             return !hasLateLessons;
         }).sort((a, b) => a.name.localeCompare(b.name));
-    }, [teachers, selectedDate, selectedDayOfWeek, afterPeriod, teacherShift, schedule]);
+    }, [teachers, selectedDate, selectedDayOfWeek, afterPeriod, teacherShift, activeSchedule]);
 
     const freeRooms = useMemo(() => {
         if (!selectedDayOfWeek) return [];
         const occupiedRoomIds = new Set();
-        schedule.forEach(s => {
+        // Используем activeSchedule вместо schedule
+        activeSchedule.forEach(s => {
             if (s.day === selectedDayOfWeek && s.period === roomPeriod && s.shift === roomShift && s.roomId) {
                 occupiedRoomIds.add(s.roomId);
             }
         });
         const availableDictRooms = rooms.filter(r => !occupiedRoomIds.has(r.id)).map(r => r.name);
         return availableDictRooms;
-    }, [schedule, rooms, selectedDayOfWeek, roomPeriod, roomShift]);
+    }, [activeSchedule, rooms, selectedDayOfWeek, roomPeriod, roomShift]);
 
     const saveSettings = async () => {
         await saveStaticData({ settings: { ...settings, telegramToken, feedbackChatId } });

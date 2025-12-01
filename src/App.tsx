@@ -62,7 +62,7 @@ const Layout = () => {
         // Schedule: Все роли (1 полугодие)
         { to: '/schedule', label: 'Расписание', icon: 'Calendar', roles: ['admin', 'teacher', 'guest'] },
         // Schedule 2: Все роли (2 полугодие)
-        { to: '/schedule2', label: 'Расписание 2-полугодие', icon: 'Calendar', roles: ['admin', 'teacher', 'guest'] },
+        { to: '/schedule2', label: 'Расписание 2-е полугодие', icon: 'Calendar', roles: ['admin', 'teacher', 'guest'] },
         // Substitutions (Назначение замен): Только Админ
         { to: '/substitutions', label: 'Замены', icon: 'Repeat', roles: ['admin'] }, 
         // Остальные: Только Админ
