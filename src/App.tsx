@@ -59,8 +59,10 @@ const Layout = () => {
     const menuItems = [
         // Dashboard: Только Админ и Учитель
         { to: '/dashboard', label: 'Рабочий стол', icon: 'Home', roles: ['admin', 'teacher'] },
-        // Schedule: Все роли
+        // Schedule: Все роли (1 полугодие)
         { to: '/schedule', label: 'Расписание', icon: 'Calendar', roles: ['admin', 'teacher', 'guest'] },
+        // Schedule 2: Все роли (2 полугодие)
+        { to: '/schedule2', label: 'Расписание 2-полугодие', icon: 'Calendar', roles: ['admin', 'teacher', 'guest'] },
         // Substitutions (Назначение замен): Только Админ
         { to: '/substitutions', label: 'Замены', icon: 'Repeat', roles: ['admin'] }, 
         // Остальные: Только Админ
@@ -200,9 +202,14 @@ export default function App() {
                                         </ProtectedRoute>
                                     } />
                                     
-                                    {/* Schedule: Доступно всем. readOnly, если не админ */}
+                                    {/* Schedule: Доступно всем. readOnly, если не админ (1 полугодие) */}
                                     <Route path="schedule" element={
-                                        <SchedulePageWrapper />
+                                        <SchedulePageWrapper semester={1} />
+                                    } />
+
+                                    {/* Schedule 2: Доступно всем (2 полугодие) */}
+                                    <Route path="schedule2" element={
+                                        <SchedulePageWrapper semester={2} />
                                     } />
                                     
                                     {/* Остальные страницы: Только Admin */}
@@ -223,8 +230,8 @@ export default function App() {
 }
 
 // Вспомогательный компонент для передачи пропса readOnly
-const SchedulePageWrapper = () => {
+const SchedulePageWrapper = ({ semester = 1 }: { semester?: 1 | 2 }) => {
     const { role } = useAuth();
     // Редактировать может только админ
-    return <SchedulePage readOnly={role !== 'admin'} />;
+    return <SchedulePage readOnly={role !== 'admin'} semester={semester} />;
 };

@@ -7,7 +7,8 @@ import { DAYS, Shift } from '../types';
 
 export const SubstitutionsPage = () => {
     const { subjects, teachers, classes, rooms, settings, saveStaticData } = useStaticData(); 
-    const { schedule, substitutions, saveScheduleData } = useScheduleData();
+    // Получаем оба расписания, чтобы выбирать нужное в зависимости от даты
+    const { schedule1, schedule2, substitutions, saveScheduleData } = useScheduleData();
 
     const location = useLocation();
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
@@ -26,13 +27,21 @@ export const SubstitutionsPage = () => {
     const [manualLessonSearch, setManualLessonSearch] = useState('');
 
     const [selectedRoomId, setSelectedRoomId] = useState<string>('');
-    const [lessonAbsenceReason, setLessonAbsenceReason] = useState<string>(''); // NEW STATE
+    const [lessonAbsenceReason, setLessonAbsenceReason] = useState<string>('');
+
+    // Определяем актуальное расписание на основе выбранной даты
+    const activeSchedule = useMemo(() => {
+        const month = new Date(selectedDate).getMonth();
+        // Январь(0) - Май(4) = 2 полугодие. Остальное (включая лето по дефолту) = 1 полугодие
+        const isSecondSemester = month >= 0 && month <= 4;
+        return isSecondSemester ? schedule2 : schedule1;
+    }, [selectedDate, schedule1, schedule2]);
 
     useEffect(() => {
         if(location.state?.subParams) {
             setCurrentSubParams(location.state.subParams);
             setSelectedRoomId(''); 
-            setLessonAbsenceReason(''); // Reset lesson absence reason
+            setLessonAbsenceReason(''); 
             setIsModalOpen(true);
             window.history.replaceState({}, document.title);
         }
@@ -58,11 +67,12 @@ export const SubstitutionsPage = () => {
         if (!selectedDayOfWeek) return []; 
         
         const absentIds = absentTeachers.map(t => t.id); 
-        const lessonsOfAbsent = schedule.filter(s => s.day === selectedDayOfWeek && absentIds.includes(s.teacherId));
+        // Используем activeSchedule вместо schedule
+        const lessonsOfAbsent = activeSchedule.filter(s => s.day === selectedDayOfWeek && absentIds.includes(s.teacherId));
 
         const subsOnDate = substitutions.filter(s => s.date === selectedDate);
         const subScheduleIds = subsOnDate.map(s => s.scheduleItemId);
-        const lessonsWithSubs = schedule.filter(s => subScheduleIds.includes(s.id));
+        const lessonsWithSubs = activeSchedule.filter(s => subScheduleIds.includes(s.id));
 
         const merged = [...lessonsOfAbsent];
         lessonsWithSubs.forEach(l => {
@@ -70,7 +80,7 @@ export const SubstitutionsPage = () => {
         });
 
         return merged.sort((a, b) => a.period - b.period); 
-    }, [schedule, selectedDayOfWeek, absentTeachers, substitutions, selectedDate]);
+    }, [activeSchedule, selectedDayOfWeek, absentTeachers, substitutions, selectedDate]);
 
     const openAbsenceModal = (id: string) => { 
         const teacher = teachers.find(t => t.id === id);
@@ -111,16 +121,15 @@ export const SubstitutionsPage = () => {
     const assignSubstitution = useCallback(async (replacementId: string, isMerger: boolean = false) => { 
         if (!currentSubParams) {
             alert("Ошибка: Невозможно назначить замену. Параметры урока не определены. Пожалуйста, попробуйте еще раз.");
-            console.error("assignSubstitution: currentSubParams is null, returning.");
             return;
         }
 
         const newSubs = [...substitutions];
 
-        const item = schedule.find(s => s.id === currentSubParams.scheduleItemId);
+        // Используем activeSchedule для поиска урока
+        const item = activeSchedule.find(s => s.id === currentSubParams.scheduleItemId);
         if (!item) {
-            alert("Ошибка: Урок не найден в расписании. Возможно, он был удален.");
-            console.error("assignSubstitution: Schedule item not found for ID:", currentSubParams.scheduleItemId);
+            alert("Ошибка: Урок не найден в расписании. Возможно, он был удален или вы переключили полугодие.");
             return;
         }
         
@@ -132,7 +141,7 @@ export const SubstitutionsPage = () => {
             originalTeacherId: item.teacherId, 
             replacementTeacherId: replacementId,
             replacementRoomId: selectedRoomId || undefined, 
-            isMerger: isMerger, // Save merger status
+            isMerger: isMerger,
             lessonAbsenceReason: (replacementId !== 'conducted' && replacementId !== 'cancelled' && lessonAbsenceReason)
                 ? lessonAbsenceReason
                 : undefined
@@ -147,7 +156,7 @@ export const SubstitutionsPage = () => {
         setSelectedRoomId('');
         setLessonAbsenceReason(''); 
         setCurrentSubParams(null);
-    }, [currentSubParams, selectedDate, selectedRoomId, schedule, substitutions, teachers, lessonAbsenceReason, saveScheduleData]);
+    }, [currentSubParams, selectedDate, selectedRoomId, activeSchedule, substitutions, teachers, lessonAbsenceReason, saveScheduleData]);
     
     const removeSubstitution = useCallback(async (id: string) => { 
         const newSubs = substitutions.filter(s => !(s.scheduleItemId === id && s.date === selectedDate)); 
@@ -221,7 +230,8 @@ export const SubstitutionsPage = () => {
         let icalContent = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Gymnasium//Manager//RU\n";
         const subs = substitutions.filter(s => s.date === selectedDate);
         subs.forEach(sub => {
-            const item = schedule.find(s => s.id === sub.scheduleItemId);
+            // Используем activeSchedule
+            const item = activeSchedule.find(s => s.id === sub.scheduleItemId);
             if(!item) return;
             let repName = "Unknown";
             if(sub.replacementTeacherId === 'cancelled') repName = "УРОК СНЯТ";
@@ -251,7 +261,7 @@ export const SubstitutionsPage = () => {
         const link = document.createElement('a');
         link.href = url; link.download = 'substitutions.ics';
         document.body.appendChild(link); link.click(); document.body.removeChild(link);
-    }, [selectedDate, substitutions, schedule, teachers, subjects, classes]);
+    }, [selectedDate, substitutions, activeSchedule, teachers, subjects, classes]);
 
     const sendToTelegram = useCallback(async () => {
         if (!settings?.telegramToken) {
@@ -374,16 +384,15 @@ export const SubstitutionsPage = () => {
         }
     }, [selectedDate, affectedLessons, substitutions, classes, subjects, teachers, rooms, absentTeachers, settings?.telegramToken]);
     
-    // NEW: Memoize active substitutions to correctly mark teachers as busy even if they have no regular lessons
+    // activeSubstitutionsForSlot теперь использует activeSchedule
     const activeSubstitutionsForSlot = useMemo(() => {
         if (!currentSubParams) return new Set<string>();
         
         return new Set(substitutions
             .filter(s => s.date === selectedDate && s.replacementTeacherId !== 'conducted' && s.replacementTeacherId !== 'cancelled')
             .map(s => {
-                // Find the original lesson this substitution is for
-                const item = schedule.find(i => i.id === s.scheduleItemId);
-                // Check if this substituted lesson clashes with the lesson we are currently trying to assign a sub for
+                // Ищем оригинальный урок в activeSchedule
+                const item = activeSchedule.find(i => i.id === s.scheduleItemId);
                 if (item && item.period === currentSubParams.period && item.shift === currentSubParams.shift) {
                     return s.replacementTeacherId;
                 }
@@ -391,7 +400,7 @@ export const SubstitutionsPage = () => {
             })
             .filter((id): id is string => !!id)
         );
-    }, [substitutions, schedule, selectedDate, currentSubParams]);
+    }, [substitutions, activeSchedule, selectedDate, currentSubParams]);
 
     const candidates = useMemo(() => { 
         if (!currentSubParams || !selectedDayOfWeek) return [];
@@ -400,9 +409,8 @@ export const SubstitutionsPage = () => {
             .filter(t => t.name.toLowerCase().includes(candidateSearch.toLowerCase()))
             .map(t => { 
             const isAbsent = t.unavailableDates.includes(selectedDate); 
-            // Check if busy in regular schedule
-            const isBusyRegular = schedule.some(s => s.teacherId === t.id && s.day === selectedDayOfWeek && s.period === currentSubParams.period && s.shift === currentSubParams.shift); 
-            // Check if busy due to another substitution (Merged Logic Fix)
+            // Используем activeSchedule для проверки занятости
+            const isBusyRegular = activeSchedule.some(s => s.teacherId === t.id && s.day === selectedDayOfWeek && s.period === currentSubParams.period && s.shift === currentSubParams.shift); 
             const isBusySub = activeSubstitutionsForSlot.has(t.id);
             const isBusy = isBusyRegular || isBusySub;
 
@@ -414,11 +422,11 @@ export const SubstitutionsPage = () => {
             if (isSpecialist) score += 50; 
             return { teacher: t, isAbsent, isBusy, isSpecialist, score, subsCount }; 
         }).sort((a, b) => b.score - a.score); 
-    }, [teachers, currentSubParams, selectedDate, candidateSearch, selectedDayOfWeek, schedule, substitutions, activeSubstitutionsForSlot]);
+    }, [teachers, currentSubParams, selectedDate, candidateSearch, selectedDayOfWeek, activeSchedule, substitutions, activeSubstitutionsForSlot]);
     
     const modalContext = useMemo(() => {
         if(!currentSubParams) return null;
-        const s = schedule.find(i => i.id === currentSubParams.scheduleItemId);
+        const s = activeSchedule.find(i => i.id === currentSubParams.scheduleItemId);
         if(!s) return null;
         const c = classes.find(cls => cls.id === s.classId);
         const sub = subjects.find(subj => subj.id === s.subjectId);
@@ -435,7 +443,7 @@ export const SubstitutionsPage = () => {
             roomId: s.roomId,
             isTeacherAbsent
         };
-    }, [currentSubParams, schedule, classes, subjects, teachers, selectedDate]);
+    }, [currentSubParams, activeSchedule, classes, subjects, teachers, selectedDate]);
 
     const manualSearchResults = useMemo(() => {
         if (!selectedDayOfWeek || manualLessonSearch.length < 2) return [];
@@ -447,7 +455,7 @@ export const SubstitutionsPage = () => {
         const results: any[] = [];
 
         foundTeachers.forEach(t => {
-            const lessons = schedule.filter(s => s.teacherId === t.id && s.day === selectedDayOfWeek);
+            const lessons = activeSchedule.filter(s => s.teacherId === t.id && s.day === selectedDayOfWeek);
             lessons.forEach(l => {
                 const c = classes.find(cls => cls.id === l.classId);
                 const subj = subjects.find(s => s.id === l.subjectId);
@@ -456,7 +464,7 @@ export const SubstitutionsPage = () => {
         });
 
         foundClasses.forEach(c => {
-            const lessons = schedule.filter(s => s.classId === c.id && s.day === selectedDayOfWeek);
+            const lessons = activeSchedule.filter(s => s.classId === c.id && s.day === selectedDayOfWeek);
             lessons.forEach(l => {
                 if (results.find(r => r.id === l.id)) return;
                 const t = teachers.find(tch => tch.id === l.teacherId);
@@ -466,7 +474,7 @@ export const SubstitutionsPage = () => {
         });
 
         return results.sort((a, b) => a.period - b.period);
-    }, [manualLessonSearch, selectedDayOfWeek, teachers, classes, schedule, subjects]);
+    }, [manualLessonSearch, selectedDayOfWeek, teachers, classes, activeSchedule, subjects]);
 
     const notifyTeacherFunction = useCallback(async (replacementTeacher: any, lessonInfo: any, classInfo: any, subjectInfo: any, roomInfo: any, dateStr: string) => {
         const dateObj = new Date(dateStr);

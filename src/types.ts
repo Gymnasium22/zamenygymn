@@ -93,11 +93,19 @@ export interface StaticAppData {
 }
 
 export interface ScheduleAndSubstitutionData {
-  schedule: ScheduleItem[];
+  schedule: ScheduleItem[]; // АВТОМАТИЧЕСКИ ВЫБРАННОЕ ТЕКУЩЕЕ РАСПИСАНИЕ (зависит от месяца)
+  schedule1: ScheduleItem[]; // Явное 1 полугодие
+  schedule2: ScheduleItem[]; // Явное 2 полугодие
   substitutions: Substitution[];
+  saveSemesterSchedule: (semester: 1 | 2, newData: ScheduleItem[]) => Promise<void>;
+  saveScheduleData: (newData: Partial<ScheduleAndSubstitutionData>, addToHistory?: boolean) => Promise<void>; // Legacy support
 }
 
-export interface AppData extends StaticAppData, ScheduleAndSubstitutionData {}
+export interface AppData extends StaticAppData {
+    schedule: ScheduleItem[]; // 1 полугодие
+    schedule2ndHalf: ScheduleItem[]; // 2 полугодие
+    substitutions: Substitution[];
+}
 
 export const DAYS = [DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday];
 export const SHIFT_PERIODS = { [Shift.First]: [1, 2, 3, 4, 5, 6, 7], [Shift.Second]: [0, 1, 2, 3, 4, 5, 6] };

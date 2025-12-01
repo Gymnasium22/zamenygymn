@@ -1,5 +1,6 @@
+
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import { AppData, Shift, StaticAppData, ScheduleAndSubstitutionData } from '../types';
+import { AppData, Shift, StaticAppData, ScheduleAndSubstitutionData, ScheduleItem } from '../types';
 import { INITIAL_DATA, DEFAULT_BELLS } from '../constants';
 import { dbService } from '../services/db';
 import { useAuth } from './AuthContext';
@@ -62,6 +63,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                 fixedData.teachers = fixedData.teachers.map(t => ({ shifts: [Shift.First, Shift.Second], telegramChatId: '', ...t }));
 
                 if (!fixedData.schedule) fixedData.schedule = [];
+                if (!fixedData.schedule2ndHalf) fixedData.schedule2ndHalf = []; // Инициализация 2 полугодия
                 if (!fixedData.substitutions) fixedData.substitutions = [];
                 if (!fixedData.bellSchedule) fixedData.bellSchedule = DEFAULT_BELLS;
                 
@@ -205,14 +207,39 @@ export const StaticDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 export const ScheduleDataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { data, saveData } = useFullData();
 
-    const scheduleData: ScheduleAndSubstitutionData = useMemo(() => ({
-        schedule: data.schedule,
-        substitutions: data.substitutions,
-    }), [data.schedule, data.substitutions]);
+    // Логика определения текущего семестра
+    // 1 полугодие: Сентябрь (8) - Декабрь (11)
+    // 2 полугодие: Январь (0) - Май (4)
+    // Лето (5,6,7): Можно настроить по умолчанию на 1 или 2. Пусть будет 1.
+    const currentMonth = new Date().getMonth();
+    const isSecondSemester = currentMonth >= 0 && currentMonth <= 4;
+
+    // Выбираем активное расписание для отображения в "Рабочем столе", "Заменах" и т.д.
+    const activeSchedule = isSecondSemester ? (data.schedule2ndHalf || []) : data.schedule;
+
+    const saveSemesterSchedule = useCallback(async (semester: 1 | 2, newData: ScheduleItem[]) => {
+        if (semester === 1) {
+            await saveData({ schedule: newData });
+        } else {
+            await saveData({ schedule2ndHalf: newData });
+        }
+    }, [saveData]);
 
     const saveScheduleData = useCallback(async (newData: Partial<ScheduleAndSubstitutionData>, addToHistory?: boolean) => {
-        await saveData(newData, addToHistory);
+        // Этот метод используется для обратной совместимости, если кто-то вызывает saveScheduleData({schedule: ...})
+        // Он сохранит в "текущий" (1 полугодие в структуре данных, так как 'schedule' мапится туда)
+        // Но лучше использовать saveSemesterSchedule
+        await saveData(newData as any, addToHistory);
     }, [saveData]);
+
+    const scheduleData: ScheduleAndSubstitutionData = useMemo(() => ({
+        schedule: activeSchedule, // Автоматическое "активное" расписание
+        schedule1: data.schedule,
+        schedule2: data.schedule2ndHalf || [],
+        substitutions: data.substitutions,
+        saveSemesterSchedule,
+        saveScheduleData
+    }), [activeSchedule, data.schedule, data.schedule2ndHalf, data.substitutions, saveSemesterSchedule, saveScheduleData]);
 
     const contextValue = useMemo(() => ({
         ...scheduleData,

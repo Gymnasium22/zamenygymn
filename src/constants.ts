@@ -1,5 +1,4 @@
 
-
 import { AppData, Shift } from './types';
 
 export const DEFAULT_BELLS = [
@@ -32,7 +31,8 @@ export const INITIAL_DATA: AppData = {
     rooms: [
         { id: 'r1', name: '101', capacity: 30, type: 'Обычный' },
     ],
-    schedule: [],
+    schedule: [], // 1 полугодие
+    schedule2ndHalf: [], // 2 полугодие
     substitutions: [],
     bellSchedule: DEFAULT_BELLS,
     settings: {

@@ -7,9 +7,17 @@ import { Shift, DayOfWeek, DAYS, SHIFT_PERIODS } from '../types';
 import useMedia from 'use-media';
 
 
-export const SchedulePage = ({ readOnly = false }) => {
+export const SchedulePage = ({ readOnly = false, semester = 1 }: { readOnly?: boolean, semester?: 1 | 2 }) => {
     const { subjects, teachers, classes, rooms } = useStaticData();
-    const { schedule, saveScheduleData, canUndo, canRedo, undo, redo } = useScheduleData();
+    const { schedule1, schedule2, saveSemesterSchedule, canUndo, canRedo, undo, redo } = useScheduleData();
+    
+    // Выбираем нужный массив данных в зависимости от пропса semester
+    const schedule = semester === 2 ? schedule2 : schedule1;
+
+    // Вспомогательная функция для сохранения, которая знает о текущем семестре
+    const saveCurrentSchedule = async (newScheduleData: any[]) => {
+        await saveSemesterSchedule(semester, newScheduleData);
+    };
     
     const [selectedShift, setSelectedShift] = useState(Shift.First);
     const [selectedDay, setSelectedDay] = useState<DayOfWeek>(DayOfWeek.Monday);
@@ -147,12 +155,12 @@ export const SchedulePage = ({ readOnly = false }) => {
         let newSchedule = [...schedule];
         const idx = newSchedule.findIndex(s => s.id === tempItem.id);
         if (idx >= 0) newSchedule[idx] = tempItem; else newSchedule.push(tempItem);
-        await saveScheduleData({ schedule: newSchedule });
+        await saveCurrentSchedule(newSchedule);
         setIsEditorOpen(false);
     };
     const handleDeleteItem = async (id?: string) => {
         const newSchedule = schedule.filter(s => s.id !== (id || tempItem.id));
-        await saveScheduleData({ schedule: newSchedule });
+        await saveCurrentSchedule(newSchedule);
         setIsEditorOpen(false);
     };
 
@@ -201,7 +209,7 @@ export const SchedulePage = ({ readOnly = false }) => {
         }
 
         let newSchedule = schedule.map(s => s.id === newItem.id ? newItem : s);
-        await saveScheduleData({ schedule: newSchedule });
+        await saveCurrentSchedule(newSchedule);
         setDraggedItem(null);
         setDragOverCell(null);
     };
@@ -222,7 +230,7 @@ export const SchedulePage = ({ readOnly = false }) => {
                  else if (viewMode === 'subject') newItem.subjectId = contextMenu.cell.rowId;
                  
                  let newSchedule = [...schedule, newItem];
-                 await saveScheduleData({ schedule: newSchedule });
+                 await saveCurrentSchedule(newSchedule);
                  setClipboard(null);
             }});
         }
@@ -233,14 +241,15 @@ export const SchedulePage = ({ readOnly = false }) => {
     const otherTeachers = tempItem.subjectId ? teachers.filter(t => !t.subjectIds.includes(tempItem.subjectId)) : teachers;
 
     const printTitle = useMemo(() => {
+        const semesterSuffix = semester === 2 ? ' (2-е полугодие)' : '';
         if (filterId) { 
-            if (viewMode === 'teacher') return teachers.find(t=>t.id===filterId)?.name; 
-            if (viewMode === 'class') return classes.find(c=>c.id===filterId)?.name; 
-            if (viewMode === 'subject') return subjects.find(s=>s.id===filterId)?.name;
-            if (viewMode === 'week') return classes.find(c=>c.id===filterId)?.name;
+            if (viewMode === 'teacher') return teachers.find(t=>t.id===filterId)?.name + semesterSuffix; 
+            if (viewMode === 'class') return classes.find(c=>c.id===filterId)?.name + semesterSuffix; 
+            if (viewMode === 'subject') return subjects.find(s=>s.id===filterId)?.name + semesterSuffix;
+            if (viewMode === 'week') return classes.find(c=>c.id===filterId)?.name + semesterSuffix;
         }
-        return `Расписание на ${selectedDay}`;
-    }, [filterId, viewMode, teachers, classes, subjects, selectedDay]);
+        return `Расписание на ${selectedDay}` + semesterSuffix;
+    }, [filterId, viewMode, teachers, classes, subjects, selectedDay, semester]);
     
     // --- PRINT LOGIC START ---
     const isWeeklyPrint = !!filterId;
@@ -289,7 +298,7 @@ export const SchedulePage = ({ readOnly = false }) => {
         } else if (massOpConfirm.type === 'clearClass' && massOpConfirm.classId) {
             newSchedule = newSchedule.filter(item => item.classId !== massOpConfirm.classId);
         }
-        await saveScheduleData({ schedule: newSchedule });
+        await saveCurrentSchedule(newSchedule);
         setMassOpConfirm({ isOpen: false, type: '', day: '', classId: '' });
         setIsMassOperationsModalOpen(false); 
     };
@@ -399,6 +408,12 @@ export const SchedulePage = ({ readOnly = false }) => {
 
     return (
         <div className="h-full flex flex-col">
+            <div className="flex items-center gap-2 mb-4 px-4 pt-2">
+                <h2 className="text-xl font-bold text-slate-800 dark:text-white">
+                    {semester === 1 ? 'Расписание (1-е полугодие)' : 'Расписание (2-е полугодие)'}
+                </h2>
+            </div>
+            
             {contextMenu.visible && <ContextMenu x={contextMenu.x} y={contextMenu.y} onClose={()=>setContextMenu({...contextMenu, visible:false})} actions={contextActions} />}
             <div className="bg-white dark:bg-dark-800 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 mb-6 flex flex-col xl:flex-row gap-4 items-start xl:items-center justify-between no-print">
                  <div className="flex gap-4 items-center flex-wrap">

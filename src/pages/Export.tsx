@@ -11,11 +11,18 @@ import { Modal } from '../components/UI';
 
 export const ExportPage = () => {
     const { subjects, teachers, classes, rooms, settings, bellSchedule, saveStaticData } = useStaticData();
-    const { schedule, substitutions, saveScheduleData } = useScheduleData();
+    const { schedule1, schedule2, substitutions, saveScheduleData } = useScheduleData();
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const printRef = useRef<HTMLDivElement>(null);
     const [exportDate, setExportDate] = useState(new Date().toISOString().split('T')[0]);
+    
+    // Выбор полугодия для ручного экспорта (по умолчанию текущее)
+    const [exportSemester, setExportSemester] = useState<1 | 2>(() => {
+        const month = new Date().getMonth();
+        return (month >= 0 && month <= 4) ? 2 : 1;
+    });
+
     const [isGenerating, setIsGenerating] = useState(false);
     const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
     const [publicScheduleUrl, setPublicScheduleUrl] = useState('');
@@ -23,9 +30,19 @@ export const ExportPage = () => {
 
     const fullAppData: AppData = useMemo(() => ({
         subjects, teachers, classes, rooms, settings, bellSchedule,
-        schedule, substitutions
-    }), [subjects, teachers, classes, rooms, settings, bellSchedule, schedule, substitutions]);
+        schedule: schedule1,
+        schedule2ndHalf: schedule2,
+        substitutions
+    }), [subjects, teachers, classes, rooms, settings, bellSchedule, schedule1, schedule2, substitutions]);
 
+    // Получаем расписание для экспорта (Excel, Матрица) на основе селектора
+    const getScheduleForExport = () => exportSemester === 2 ? schedule2 : schedule1;
+
+    // Получаем расписание для PNG (Замены) на основе выбранной даты
+    const getScheduleForDate = (date: string) => {
+        const month = new Date(date).getMonth();
+        return (month >= 0 && month <= 4) ? schedule2 : schedule1;
+    };
 
     const handleImport = (e: any) => { 
         const file = e.target.files?.[0]; 
@@ -34,7 +51,7 @@ export const ExportPage = () => {
         reader.onload = async (ev: any) => { 
             try { 
                 const json = JSON.parse(ev.target.result); 
-                if (json.teachers && json.schedule) { 
+                if (json.teachers && (json.schedule || json.schedule2ndHalf)) { 
                     if(window.confirm("Это перезапишет текущую базу данных. Продолжить?")) { 
                         const mergedData = {
                             ...INITIAL_DATA,
@@ -42,13 +59,14 @@ export const ExportPage = () => {
                             rooms: json.rooms || INITIAL_DATA.rooms,
                             classes: json.classes || [],
                             schedule: json.schedule || [],
+                            schedule2ndHalf: json.schedule2ndHalf || [],
                             teachers: json.teachers || [],
                             subjects: json.subjects || [],
                             substitutions: json.substitutions || [],
                             settings: { ...INITIAL_DATA.settings, ...json.settings }
                         };
-                        await saveStaticData(mergedData);
-                        await saveScheduleData(mergedData);
+                        await saveStaticData(mergedData as any);
+                        await saveScheduleData(mergedData as any);
                         alert("База успешно восстановлена!"); 
                     } 
                 } else alert("Неверный формат файла."); 
@@ -58,6 +76,8 @@ export const ExportPage = () => {
     };
     
     const exportStyledExcel = () => {
+        const currentSchedule = getScheduleForExport();
+        
         let html = `
             <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
             <head><meta charset="UTF-8"><style>
@@ -84,7 +104,7 @@ export const ExportPage = () => {
                 filteredClasses.forEach(c => {
                     html += `<tr><td class="class-cell">${c.name}</td>`;
                     SHIFT_PERIODS[shift].forEach(p => {
-                        const items = schedule.filter(s => s.classId === c.id && s.day === day && s.shift === shift && s.period === p);
+                        const items = currentSchedule.filter(s => s.classId === c.id && s.day === day && s.shift === shift && s.period === p);
                         html += `<td style="height: 60px;">`;
                         items.forEach(item => {
                             const sub = subjects.find(s => s.id === item.subjectId);
@@ -108,13 +128,14 @@ export const ExportPage = () => {
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.href = url;
-        link.download = `Расписание_Гимназия22.xls`;
+        link.download = `Расписание_Гимназия22_${exportSemester}пол.xls`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
     };
 
     const exportMatrixExcel = () => {
+        const currentSchedule = getScheduleForExport();
         let html = `
             <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
             <head><meta charset="UTF-8"><style>
@@ -173,7 +194,7 @@ export const ExportPage = () => {
 
                     DAYS.forEach(day => {
                         periods.forEach(p => {
-                            const item = schedule.find(s => 
+                            const item = currentSchedule.find(s => 
                                 s.teacherId === teacher.id && 
                                 s.subjectId === subject.id && 
                                 s.day === day && 
@@ -206,20 +227,21 @@ export const ExportPage = () => {
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.href = url;
-        link.download = `Матрица_Расписания.xls`;
+        link.download = `Матрица_Расписания_${exportSemester}пол.xls`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
     };
 
     const copyForGoogleSheets = () => {
+        const currentSchedule = getScheduleForExport();
         let tsv = "День\tСмена\tКласс\tУрок\tПредмет\tУчитель\tКабинет\tГруппа\n";
         DAYS.forEach(day => {
             [Shift.First, Shift.Second].forEach(shift => {
                 const filteredClasses = classes.filter(c => c.shift === shift);
                 filteredClasses.forEach(cls => {
                     SHIFT_PERIODS[shift].forEach(period => {
-                        const items = schedule.filter(s => s.classId === cls.id && s.day === day && s.shift === shift && s.period === period);
+                        const items = currentSchedule.filter(s => s.classId === cls.id && s.day === day && s.shift === shift && s.period === period);
                         items.forEach(item => {
                             const sub = subjects.find(s => s.id === item.subjectId);
                             const teach = teachers.find(t => t.id === item.teacherId);
@@ -252,8 +274,10 @@ export const ExportPage = () => {
     const subsForDate = useMemo(() => substitutions.filter(s => s.date === exportDate), [substitutions, exportDate]);
     
     const renderTableForShift = (shift: string) => {
+        const currentSchedule = getScheduleForDate(exportDate);
+
         const shiftSubs = subsForDate.filter(sub => {
-            const s = schedule.find(x => x.id === sub.scheduleItemId);
+            const s = currentSchedule.find(x => x.id === sub.scheduleItemId);
             return s && s.shift === shift;
         }).filter(sub => sub.replacementTeacherId !== 'conducted');
         
@@ -275,7 +299,7 @@ export const ExportPage = () => {
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                         {shiftSubs.map(sub => { 
-                            const s: any = schedule.find(x => x.id === sub.scheduleItemId); 
+                            const s: any = currentSchedule.find(x => x.id === sub.scheduleItemId); 
                             if (!s) return null;
                             const cls = classes.find(c => c.id === s.classId); 
                             const subj = subjects.find(x => x.id === s.subjectId); 
@@ -442,7 +466,18 @@ export const ExportPage = () => {
                 <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
                     <Icon name="FileSpreadsheet" className="text-emerald-600 dark:text-emerald-400"/> Экспорт данных
                 </h2>
-                <div className="flex flex-wrap gap-4">
+                <div className="flex flex-wrap gap-4 items-center">
+                    <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl p-1.5 pl-3">
+                        <span className="text-xs font-bold text-slate-500 dark:text-slate-400">Полугодие:</span>
+                        <select
+                            value={exportSemester}
+                            onChange={(e) => setExportSemester(Number(e.target.value) as 1 | 2)}
+                            className="bg-transparent text-sm font-bold text-slate-700 dark:text-slate-200 outline-none cursor-pointer"
+                        >
+                            <option value={1}>1-е (Сен-Дек)</option>
+                            <option value={2}>2-е (Янв-Май)</option>
+                        </select>
+                    </div>
                     <button onClick={exportStyledExcel} className="px-6 py-3 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900 rounded-xl font-bold hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition flex items-center gap-2">
                         <Icon name="FileSpreadsheet" size={20}/> Скачать Excel (XLS)
                     </button>
