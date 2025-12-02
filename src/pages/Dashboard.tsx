@@ -179,7 +179,9 @@ export const DashboardPage = () => {
                     sub.scheduleItemId === lesson.id && sub.date === todayStr
                 );
 
-                if (!substitution || substitution.replacementTeacherId === 'cancelled' || substitution.replacementTeacherId === 'conducted') {
+                // FIX: Если есть ЛЮБАЯ запись в заменах (отменен, проведен, заменен), то ситуация разрешена.
+                // Считаем только если записи вообще нет.
+                if (!substitution) {
                     count++;
                 }
             }
