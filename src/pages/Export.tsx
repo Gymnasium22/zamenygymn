@@ -233,6 +233,106 @@ export const ExportPage = () => {
         document.body.removeChild(link);
     };
 
+    const exportMonthlySubstitutionsExcel = () => {
+        const targetDate = new Date(exportDate);
+        const targetMonth = targetDate.getMonth();
+        const targetYear = targetDate.getFullYear();
+
+        // Фильтруем замены за выбранный месяц
+        const monthlySubs = substitutions.filter(s => {
+            const sDate = new Date(s.date);
+            return sDate.getMonth() === targetMonth && sDate.getFullYear() === targetYear;
+        }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+        if (monthlySubs.length === 0) {
+            alert("Нет данных о заменах за выбранный месяц.");
+            return;
+        }
+
+        let html = `
+            <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+            <head><meta charset="UTF-8"><style>
+                table { border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; font-size: 12px; }
+                td, th { border: 1px solid #999; padding: 4px; vertical-align: middle; text-align: left; }
+                .header { background-color: #e0e7ff; font-weight: bold; text-align: center; }
+                .date-row { background-color: #f3f4f6; font-weight: bold; }
+            </style></head><body>
+            <h3>Отчет по заменам за ${targetDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}</h3>
+            <table>
+            <thead>
+                <tr class="header">
+                    <th>Дата</th>
+                    <th>Урок</th>
+                    <th>Смена</th>
+                    <th>Класс</th>
+                    <th>Предмет</th>
+                    <th>Кого заменяют</th>
+                    <th>Кто заменяет</th>
+                    <th>Кабинет</th>
+                    <th>Причина / Тип</th>
+                </tr>
+            </thead>
+            <tbody>
+        `;
+
+        monthlySubs.forEach(sub => {
+            // Ищем урок в обоих расписаниях, так как замена может быть в любом полугодии
+            const scheduleItem = schedule1.find(s => s.id === sub.scheduleItemId) || schedule2.find(s => s.id === sub.scheduleItemId);
+            
+            if (!scheduleItem) return; // Пропускаем, если урок удален из расписания
+
+            const dateStr = new Date(sub.date).toLocaleDateString('ru-RU');
+            const cls = classes.find(c => c.id === scheduleItem.classId);
+            const subj = subjects.find(s => s.id === scheduleItem.subjectId);
+            const origTeacher = teachers.find(t => t.id === sub.originalTeacherId);
+            
+            let repTeacherName = '';
+            if (sub.replacementTeacherId === 'conducted') repTeacherName = 'Урок проведен';
+            else if (sub.replacementTeacherId === 'cancelled') repTeacherName = 'Урок снят';
+            else {
+                const t = teachers.find(x => x.id === sub.replacementTeacherId);
+                repTeacherName = t ? t.name : 'Неизвестно';
+                if (sub.isMerger) repTeacherName += ' (Объединение)';
+            }
+
+            // Кабинет
+            const originalRoomId = scheduleItem.roomId;
+            const replacementRoomId = sub.replacementRoomId;
+            const actualRoomId = replacementRoomId || originalRoomId;
+            const roomObj = rooms.find(r => r.id === actualRoomId);
+            const roomName = roomObj ? roomObj.name : (actualRoomId || '-');
+            const roomDisplay = replacementRoomId ? `${roomName} (Замена каб.)` : roomName;
+
+            // Причина
+            let reason = sub.lessonAbsenceReason || origTeacher?.absenceReasons?.[sub.date] || '';
+            if (sub.replacementTeacherId === sub.originalTeacherId && replacementRoomId) reason = 'Смена кабинета';
+
+            html += `
+                <tr>
+                    <td>${dateStr}</td>
+                    <td>${scheduleItem.period}</td>
+                    <td>${scheduleItem.shift}</td>
+                    <td>${cls?.name || '?'}</td>
+                    <td>${subj?.name || '?'}</td>
+                    <td>${origTeacher?.name || '?'}</td>
+                    <td>${repTeacherName}</td>
+                    <td>${roomDisplay}</td>
+                    <td>${reason}</td>
+                </tr>
+            `;
+        });
+
+        html += `</tbody></table></body></html>`;
+        const blob = new Blob([html], { type: "application/vnd.ms-excel" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `Отчет_Замены_${targetDate.getMonth()+1}_${targetDate.getFullYear()}.xls`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     const copyForGoogleSheets = () => {
         const currentSchedule = getScheduleForExport();
         let tsv = "День\tСмена\tКласс\tУрок\tПредмет\tУчитель\tКабинет\tГруппа\n";
@@ -486,6 +586,9 @@ export const ExportPage = () => {
                     </button>
                     <button onClick={copyForGoogleSheets} className="px-6 py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition shadow-lg shadow-green-200 dark:shadow-none flex items-center gap-2">
                         <Icon name="Clipboard" size={20}/> Копировать для Google Sheets
+                    </button>
+                    <button onClick={exportMonthlySubstitutionsExcel} className="px-6 py-3 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 border border-purple-100 dark:border-purple-900 rounded-xl font-bold hover:bg-purple-100 dark:hover:bg-purple-900/50 transition flex items-center gap-2">
+                        <Icon name="List" size={20}/> Отчет по заменам (XLS)
                     </button>
                 </div>
             </section>
