@@ -66,6 +66,7 @@ export interface Substitution {
   replacementRoomId?: string; // New field for room substitution
   lessonAbsenceReason?: string; // NEW: Reason for lesson-specific absence
   isMerger?: boolean; // NEW: Flag for merged classes
+  refusals?: string[]; // IDs of teachers who refused
 }
 
 export interface Bell {

@@ -1,3 +1,4 @@
+
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useStaticData, useScheduleData } from '../context/DataContext'; 
@@ -28,6 +29,9 @@ export const SubstitutionsPage = () => {
 
     const [selectedRoomId, setSelectedRoomId] = useState<string>('');
     const [lessonAbsenceReason, setLessonAbsenceReason] = useState<string>('');
+    
+    // State to track refusals in the current modal session
+    const [refusedTeacherIds, setRefusedTeacherIds] = useState<string[]>([]);
 
     // Определяем актуальное расписание на основе выбранной даты
     const activeSchedule = useMemo(() => {
@@ -42,10 +46,24 @@ export const SubstitutionsPage = () => {
             setCurrentSubParams(location.state.subParams);
             setSelectedRoomId(''); 
             setLessonAbsenceReason(''); 
+            setRefusedTeacherIds([]);
             setIsModalOpen(true);
             window.history.replaceState({}, document.title);
         }
     }, [location.state]);
+
+    // When opening modal manually, try to load existing refusals if a substitution already exists
+    useEffect(() => {
+        if (isModalOpen && currentSubParams) {
+            const existingSub = substitutions.find(s => s.scheduleItemId === currentSubParams.scheduleItemId && s.date === selectedDate);
+            if (existingSub && existingSub.refusals) {
+                setRefusedTeacherIds(existingSub.refusals);
+            } else {
+                setRefusedTeacherIds([]);
+            }
+        }
+    }, [isModalOpen, currentSubParams, substitutions, selectedDate]);
+
 
     const selectedDayOfWeek = useMemo(() => { 
         const idx = new Date(selectedDate).getDay(); 
@@ -144,7 +162,8 @@ export const SubstitutionsPage = () => {
             isMerger: isMerger,
             lessonAbsenceReason: (replacementId !== 'conducted' && replacementId !== 'cancelled' && lessonAbsenceReason)
                 ? lessonAbsenceReason
-                : undefined
+                : undefined,
+            refusals: refusedTeacherIds // Save the list of refusals
         }; 
         
         if (existingSubIndex >= 0) newSubs[existingSubIndex] = subData; else newSubs.push(subData); 
@@ -155,8 +174,9 @@ export const SubstitutionsPage = () => {
         setCandidateSearch('');
         setSelectedRoomId('');
         setLessonAbsenceReason(''); 
+        setRefusedTeacherIds([]);
         setCurrentSubParams(null);
-    }, [currentSubParams, selectedDate, selectedRoomId, activeSchedule, substitutions, teachers, lessonAbsenceReason, saveScheduleData]);
+    }, [currentSubParams, selectedDate, selectedRoomId, activeSchedule, substitutions, teachers, lessonAbsenceReason, refusedTeacherIds, saveScheduleData]);
     
     const removeSubstitution = useCallback(async (id: string) => { 
         const newSubs = substitutions.filter(s => !(s.scheduleItemId === id && s.date === selectedDate)); 
@@ -519,6 +539,15 @@ export const SubstitutionsPage = () => {
         assignSubstitution(teacherId, isMerger);
     };
 
+    const toggleRefusal = (teacherId: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (refusedTeacherIds.includes(teacherId)) {
+            setRefusedTeacherIds(refusedTeacherIds.filter(id => id !== teacherId));
+        } else {
+            setRefusedTeacherIds([...refusedTeacherIds, teacherId]);
+        }
+    };
+
 
     return (
         <div className="h-full flex flex-col md:flex-row gap-6">
@@ -739,13 +768,12 @@ export const SubstitutionsPage = () => {
                     <input autoFocus placeholder="Найти другого учителя..." value={candidateSearch} onChange={e => setCandidateSearch(e.target.value)} className="w-full pl-8 pr-3 py-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-sm outline-none focus:border-indigo-500 dark:text-white"/>
                 </div>
                 <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
-                    {candidates.map(({ teacher, isAbsent, isBusy, isSpecialist, subsCount }) => (
-                        <button 
+                    {candidates.map(({ teacher, isAbsent, isBusy, isSpecialist, subsCount }) => {
+                        const isRefused = refusedTeacherIds.includes(teacher.id);
+                        return (
+                        <div 
                             key={teacher.id} 
-                            disabled={isAbsent} 
-                            onClick={() => handleCandidateClick(teacher.id, isBusy)} 
-                            title={isAbsent ? 'Учитель отсутствует' : isBusy ? 'Учитель занят' : ''} // Dynamic title for disabled state
-                            className={`w-full p-3 rounded-xl border flex items-center justify-between transition-all text-left ${isAbsent ? 'bg-red-50 dark:bg-red-900/20 border-red-100 dark:border-red-900 opacity-60' : isBusy ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-100 dark:border-orange-900 hover:shadow-md cursor-pointer' : 'bg-white dark:bg-dark-800 border-slate-100 dark:border-slate-700 hover:border-indigo-500 hover:shadow-md'}`}
+                            className={`w-full p-3 rounded-xl border flex items-center justify-between transition-all text-left ${isAbsent ? 'bg-red-50 dark:bg-red-900/20 border-red-100 dark:border-red-900 opacity-60' : isRefused ? 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-600 opacity-70' : isBusy ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-100 dark:border-orange-900 hover:shadow-md' : 'bg-white dark:bg-dark-800 border-slate-100 dark:border-slate-700 hover:border-indigo-500 hover:shadow-md'}`}
                         >
                             <div className="flex items-center gap-3">
                                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${isSpecialist ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300'}`}>{isSpecialist ? <Icon name="Star" size={14} fill="currentColor"/> : teacher.name[0]}</div>
@@ -755,16 +783,30 @@ export const SubstitutionsPage = () => {
                                         {isSpecialist && <span className="text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-1.5 rounded">Профиль</span>}
                                         {isBusy && <span className="text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 px-1.5 rounded font-bold">Занят</span>}
                                         {isAbsent && <span className="text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-1.5 rounded">Отсутствует</span>}
+                                        {isRefused && <span className="text-slate-600 dark:text-slate-400 bg-slate-200 dark:bg-slate-700 px-1.5 rounded font-bold">Отказался</span>}
                                         <span className={`px-1.5 rounded font-medium ${subsCount > 5 ? 'text-amber-600 bg-amber-50 dark:bg-amber-900/20' : 'text-blue-600 bg-blue-50 dark:bg-blue-900/20'}`}>
                                             В этом мес: {subsCount}
                                         </span>
                                     </div>
                                 </div>
                             </div>
-                            {!isAbsent && !isBusy && <div className="px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded text-xs font-bold">Выбрать</div>}
-                            {isBusy && !isAbsent && <div className="px-3 py-1 bg-orange-100 dark:bg-orange-800/30 text-orange-700 dark:text-orange-300 rounded text-xs font-bold">Объединить?</div>}
-                        </button>
-                    ))}
+                            
+                            {!isAbsent && (
+                                <div className="flex gap-2">
+                                    <button 
+                                        onClick={(e) => toggleRefusal(teacher.id, e)}
+                                        className={`px-3 py-1 text-xs font-bold rounded border ${isRefused ? 'bg-slate-300 text-slate-600 border-slate-300' : 'bg-white dark:bg-slate-700 text-slate-500 border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600'}`}
+                                        title="Отметить отказ"
+                                    >
+                                        {isRefused ? 'Вернуть' : 'Отказ'}
+                                    </button>
+                                    
+                                    {!isRefused && !isBusy && <button onClick={() => handleCandidateClick(teacher.id, isBusy)} className="px-3 py-1 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 rounded text-xs font-bold">Выбрать</button>}
+                                    {!isRefused && isBusy && <button onClick={() => handleCandidateClick(teacher.id, isBusy)} className="px-3 py-1 bg-orange-100 dark:bg-orange-800/30 text-orange-700 dark:text-orange-300 rounded text-xs font-bold">Объединить?</button>}
+                                </div>
+                            )}
+                        </div>
+                    )})}
                     {candidates.length === 0 && <div className="text-center text-slate-400 text-xs py-4">Нет подходящих учителей</div>}
                 </div>
             </Modal>

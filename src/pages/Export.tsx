@@ -1,3 +1,4 @@
+
 import { useState, useRef, useMemo } from 'react';
 import { useStaticData, useScheduleData } from '../context/DataContext';
 import { Icon } from '../components/Icons';
@@ -333,6 +334,95 @@ export const ExportPage = () => {
         document.body.removeChild(link);
     };
 
+    const exportRefusalsExcel = () => {
+        const targetDate = new Date(exportDate);
+        const targetMonth = targetDate.getMonth();
+        const targetYear = targetDate.getFullYear();
+
+        // Фильтруем замены за выбранный месяц, у которых есть отказы
+        const refusalsData = substitutions.filter(s => {
+            const sDate = new Date(s.date);
+            const inMonth = sDate.getMonth() === targetMonth && sDate.getFullYear() === targetYear;
+            const hasRefusals = s.refusals && s.refusals.length > 0;
+            return inMonth && hasRefusals;
+        }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+        if (refusalsData.length === 0) {
+            alert("Нет данных об отказах за выбранный месяц.");
+            return;
+        }
+
+        let html = `
+            <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+            <head><meta charset="UTF-8"><style>
+                table { border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; font-size: 12px; }
+                td, th { border: 1px solid #999; padding: 4px; vertical-align: middle; text-align: left; }
+                .header { background-color: #fca5a5; font-weight: bold; text-align: center; } 
+            </style></head><body>
+            <h3>Отчет об отказах за ${targetDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}</h3>
+            <table>
+            <thead>
+                <tr class="header">
+                    <th>Дата</th>
+                    <th>Урок</th>
+                    <th>Смена</th>
+                    <th>Класс</th>
+                    <th>Предмет</th>
+                    <th>Основной учитель</th>
+                    <th>Кто в итоге заменил</th>
+                    <th>Учителя, которые отказались</th>
+                </tr>
+            </thead>
+            <tbody>
+        `;
+
+        refusalsData.forEach(sub => {
+            const scheduleItem = schedule1.find(s => s.id === sub.scheduleItemId) || schedule2.find(s => s.id === sub.scheduleItemId);
+            if (!scheduleItem) return;
+
+            const dateStr = new Date(sub.date).toLocaleDateString('ru-RU');
+            const cls = classes.find(c => c.id === scheduleItem.classId);
+            const subj = subjects.find(s => s.id === scheduleItem.subjectId);
+            const origTeacher = teachers.find(t => t.id === sub.originalTeacherId);
+            
+            let repTeacherName = '';
+            if (sub.replacementTeacherId === 'conducted') repTeacherName = 'Урок проведен';
+            else if (sub.replacementTeacherId === 'cancelled') repTeacherName = 'Урок снят';
+            else {
+                const t = teachers.find(x => x.id === sub.replacementTeacherId);
+                repTeacherName = t ? t.name : 'Неизвестно';
+            }
+
+            const refusedNames = (sub.refusals || []).map(id => {
+                const t = teachers.find(x => x.id === id);
+                return t ? t.name : 'Неизвестно';
+            }).join(', ');
+
+            html += `
+                <tr>
+                    <td>${dateStr}</td>
+                    <td>${scheduleItem.period}</td>
+                    <td>${scheduleItem.shift}</td>
+                    <td>${cls?.name || '?'}</td>
+                    <td>${subj?.name || '?'}</td>
+                    <td>${origTeacher?.name || '?'}</td>
+                    <td>${repTeacherName}</td>
+                    <td>${refusedNames}</td>
+                </tr>
+            `;
+        });
+
+        html += `</tbody></table></body></html>`;
+        const blob = new Blob([html], { type: "application/vnd.ms-excel" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `Отчет_Отказы_${targetDate.getMonth()+1}_${targetDate.getFullYear()}.xls`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     const copyForGoogleSheets = () => {
         const currentSchedule = getScheduleForExport();
         let tsv = "День\tСмена\tКласс\tУрок\tПредмет\tУчитель\tКабинет\tГруппа\n";
@@ -534,7 +624,7 @@ export const ExportPage = () => {
                         <div className="flex justify-between items-end border-b-2 border-slate-800 pb-4 mb-6">
                             <div>
                                 <h1 className="text-3xl font-black uppercase tracking-tight mb-1 text-slate-800">Замена Учителей</h1>
-                                <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">Гимназия • Официальный документ</p>
+                                <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">Гимназия №22 • Официальный документ</p>
                             </div>
                             <div className="text-right">
                                 <div className="text-xs text-slate-400 uppercase font-bold tracking-wider mb-1">Дата</div>
@@ -589,6 +679,9 @@ export const ExportPage = () => {
                     </button>
                     <button onClick={exportMonthlySubstitutionsExcel} className="px-6 py-3 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 border border-purple-100 dark:border-purple-900 rounded-xl font-bold hover:bg-purple-100 dark:hover:bg-purple-900/50 transition flex items-center gap-2">
                         <Icon name="List" size={20}/> Отчет по заменам (XLS)
+                    </button>
+                    <button onClick={exportRefusalsExcel} className="px-6 py-3 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 border border-red-100 dark:border-red-900 rounded-xl font-bold hover:bg-red-100 dark:hover:bg-red-900/50 transition flex items-center gap-2">
+                        <Icon name="UserX" size={20}/> Отчет об отказах (XLS)
                     </button>
                 </div>
             </section>
