@@ -250,18 +250,101 @@ export const ExportPage = () => {
             return;
         }
 
+        const mainSubs: any[] = [];
+        const noRecordSubs: any[] = [];
+
+        // Helper to determine reason
+        const getSubstitutionDetails = (sub: any) => {
+            // Ищем урок в обоих расписаниях
+            const scheduleItem = schedule1.find(s => s.id === sub.scheduleItemId) || schedule2.find(s => s.id === sub.scheduleItemId);
+            if (!scheduleItem) return null;
+
+            const cls = classes.find(c => c.id === scheduleItem.classId);
+            const subj = subjects.find(s => s.id === scheduleItem.subjectId);
+            const origTeacher = teachers.find(t => t.id === sub.originalTeacherId);
+
+            let reason = sub.lessonAbsenceReason || origTeacher?.absenceReasons?.[sub.date] || '';
+            
+            // Logic overrides for display (same as in UI/Copy)
+            if (sub.replacementTeacherId === sub.originalTeacherId && sub.replacementRoomId && !sub.replacementClassId) reason = 'Смена кабинета';
+            if (sub.replacementClassId && sub.replacementSubjectId) reason = 'Обмен уроками';
+
+            return { scheduleItem, cls, subj, origTeacher, reason };
+        };
+
+        // Split into lists
+        monthlySubs.forEach(sub => {
+            const details = getSubstitutionDetails(sub);
+            if (!details) return;
+
+            // Если причина "Без записи", то в отдельный список
+            if (details.reason === 'Без записи') {
+                noRecordSubs.push({ sub, ...details });
+            } else {
+                mainSubs.push({ sub, ...details });
+            }
+        });
+
+        // HTML Header and Style
         let html = `
             <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
             <head><meta charset="UTF-8"><style>
                 table { border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; font-size: 12px; }
                 td, th { border: 1px solid #999; padding: 4px; vertical-align: middle; text-align: left; }
                 .header { background-color: #e0e7ff; font-weight: bold; text-align: center; }
+                .header-warning { background-color: #fee2e2; font-weight: bold; text-align: center; }
                 .date-row { background-color: #f3f4f6; font-weight: bold; }
             </style></head><body>
             <h3>Отчет по заменам за ${targetDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}</h3>
+        `;
+
+        const renderRows = (items: any[]) => {
+            return items.map(item => {
+                const { sub, scheduleItem, cls, subj, origTeacher, reason } = item;
+                const dateStr = new Date(sub.date).toLocaleDateString('ru-RU');
+                
+                let repTeacherName = '';
+                if (sub.replacementTeacherId === 'conducted') repTeacherName = 'Урок проведен';
+                else if (sub.replacementTeacherId === 'cancelled') repTeacherName = 'Урок снят';
+                else {
+                    const t = teachers.find(x => x.id === sub.replacementTeacherId);
+                    repTeacherName = t ? t.name : 'Неизвестно';
+                    if (sub.isMerger) repTeacherName += ' (Объединение)';
+                    
+                    if (sub.replacementClassId && sub.replacementSubjectId) {
+                        const swappedClass = classes.find(c => c.id === sub.replacementClassId);
+                        const swappedSubj = subjects.find(s => s.id === sub.replacementSubjectId);
+                        repTeacherName += ` (Урок ${swappedClass?.name || '?'} ${swappedSubj?.name || '?'})`;
+                    }
+                }
+
+                const originalRoomId = scheduleItem.roomId;
+                const replacementRoomId = sub.replacementRoomId;
+                const actualRoomId = replacementRoomId || originalRoomId;
+                const roomObj = rooms.find(r => r.id === actualRoomId);
+                const roomName = roomObj ? roomObj.name : (actualRoomId || '-');
+                const roomDisplay = replacementRoomId ? `${roomName} (Замена каб.)` : roomName;
+
+                return `
+                    <tr>
+                        <td>${dateStr}</td>
+                        <td>${scheduleItem.period}</td>
+                        <td>${scheduleItem.shift}</td>
+                        <td>${cls?.name || '?'}</td>
+                        <td>${subj?.name || '?'}</td>
+                        <td>${origTeacher?.name || '?'}</td>
+                        <td>${repTeacherName}</td>
+                        <td>${roomDisplay}</td>
+                        <td>${reason}</td>
+                    </tr>
+                `;
+            }).join('');
+        };
+
+        const renderTable = (items: any[], isWarning = false) => `
             <table>
             <thead>
-                <tr class="header">
+                <tr class="${isWarning ? 'header-warning' : 'header'}">
                     <th>Дата</th>
                     <th>Урок</th>
                     <th>Смена</th>
@@ -274,64 +357,26 @@ export const ExportPage = () => {
                 </tr>
             </thead>
             <tbody>
+                ${renderRows(items)}
+            </tbody>
+            </table>
         `;
 
-        monthlySubs.forEach(sub => {
-            // Ищем урок в обоих расписаниях, так как замена может быть в любом полугодии
-            const scheduleItem = schedule1.find(s => s.id === sub.scheduleItemId) || schedule2.find(s => s.id === sub.scheduleItemId);
-            
-            if (!scheduleItem) return; // Пропускаем, если урок удален из расписания
+        // Render Main Table
+        if (mainSubs.length > 0) {
+            html += renderTable(mainSubs);
+        } else {
+             html += `<p>Замен с подтвержденной причиной не найдено.</p>`;
+        }
 
-            const dateStr = new Date(sub.date).toLocaleDateString('ru-RU');
-            const cls = classes.find(c => c.id === scheduleItem.classId);
-            const subj = subjects.find(s => s.id === scheduleItem.subjectId);
-            const origTeacher = teachers.find(t => t.id === sub.originalTeacherId);
-            
-            let repTeacherName = '';
-            if (sub.replacementTeacherId === 'conducted') repTeacherName = 'Урок проведен';
-            else if (sub.replacementTeacherId === 'cancelled') repTeacherName = 'Урок снят';
-            else {
-                const t = teachers.find(x => x.id === sub.replacementTeacherId);
-                repTeacherName = t ? t.name : 'Неизвестно';
-                if (sub.isMerger) repTeacherName += ' (Объединение)';
-                
-                // Add Swap details to the replacement name for the export
-                if (sub.replacementClassId && sub.replacementSubjectId) {
-                    const swappedClass = classes.find(c => c.id === sub.replacementClassId);
-                    const swappedSubj = subjects.find(s => s.id === sub.replacementSubjectId);
-                    repTeacherName += ` (Урок ${swappedClass?.name || '?'} ${swappedSubj?.name || '?'})`;
-                }
-            }
+        // Render No Record Table (if any)
+        if (noRecordSubs.length > 0) {
+            html += `<br/><br/>`;
+            html += `<h3 style="color: #b91c1c;">Замены без записи (Не подтверждена причина)</h3>`;
+            html += renderTable(noRecordSubs, true);
+        }
 
-            // Кабинет
-            const originalRoomId = scheduleItem.roomId;
-            const replacementRoomId = sub.replacementRoomId;
-            const actualRoomId = replacementRoomId || originalRoomId;
-            const roomObj = rooms.find(r => r.id === actualRoomId);
-            const roomName = roomObj ? roomObj.name : (actualRoomId || '-');
-            const roomDisplay = replacementRoomId ? `${roomName} (Замена каб.)` : roomName;
-
-            // Причина
-            let reason = sub.lessonAbsenceReason || origTeacher?.absenceReasons?.[sub.date] || '';
-            if (sub.replacementTeacherId === sub.originalTeacherId && replacementRoomId && !sub.replacementClassId) reason = 'Смена кабинета';
-            if (sub.replacementClassId && sub.replacementSubjectId) reason = 'Обмен уроками';
-
-            html += `
-                <tr>
-                    <td>${dateStr}</td>
-                    <td>${scheduleItem.period}</td>
-                    <td>${scheduleItem.shift}</td>
-                    <td>${cls?.name || '?'}</td>
-                    <td>${subj?.name || '?'}</td>
-                    <td>${origTeacher?.name || '?'}</td>
-                    <td>${repTeacherName}</td>
-                    <td>${roomDisplay}</td>
-                    <td>${reason}</td>
-                </tr>
-            `;
-        });
-
-        html += `</tbody></table></body></html>`;
+        html += `</body></html>`;
         const blob = new Blob([html], { type: "application/vnd.ms-excel" });
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
