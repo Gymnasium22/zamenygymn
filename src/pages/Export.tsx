@@ -294,6 +294,13 @@ export const ExportPage = () => {
                 const t = teachers.find(x => x.id === sub.replacementTeacherId);
                 repTeacherName = t ? t.name : 'Неизвестно';
                 if (sub.isMerger) repTeacherName += ' (Объединение)';
+                
+                // Add Swap details to the replacement name for the export
+                if (sub.replacementClassId && sub.replacementSubjectId) {
+                    const swappedClass = classes.find(c => c.id === sub.replacementClassId);
+                    const swappedSubj = subjects.find(s => s.id === sub.replacementSubjectId);
+                    repTeacherName += ` (Урок ${swappedClass?.name || '?'} ${swappedSubj?.name || '?'})`;
+                }
             }
 
             // Кабинет
@@ -306,7 +313,8 @@ export const ExportPage = () => {
 
             // Причина
             let reason = sub.lessonAbsenceReason || origTeacher?.absenceReasons?.[sub.date] || '';
-            if (sub.replacementTeacherId === sub.originalTeacherId && replacementRoomId) reason = 'Смена кабинета';
+            if (sub.replacementTeacherId === sub.originalTeacherId && replacementRoomId && !sub.replacementClassId) reason = 'Смена кабинета';
+            if (sub.replacementClassId && sub.replacementSubjectId) reason = 'Обмен уроками';
 
             html += `
                 <tr>
@@ -510,7 +518,13 @@ export const ExportPage = () => {
                             // Prioritize lesson reason if it exists and is 'Без записи', otherwise fall back to day reason if 'Без записи'.
                             const displayReason = (lessonReason === 'Без записи') ? lessonReason : ((dayReason === 'Без записи') ? dayReason : '');
                             
-                            const isRoomChangeOnly = sub.replacementTeacherId === sub.originalTeacherId && newRoomId;
+                            // Check if content was swapped
+                            const swappedClass = sub.replacementClassId ? classes.find(c => c.id === sub.replacementClassId) : null;
+                            const swappedSubj = sub.replacementSubjectId ? subjects.find(s => s.id === sub.replacementSubjectId) : null;
+
+                            const isRoomChangeOnly = sub.replacementTeacherId === sub.originalTeacherId && newRoomId && !swappedClass;
+                            const isSwap = swappedClass && swappedSubj;
+                            const isTeacherPresent = sub.replacementTeacherId === sub.originalTeacherId;
 
                             return (
                                 <tr key={sub.id}>
@@ -518,7 +532,7 @@ export const ExportPage = () => {
                                     <td className="py-3 px-2 font-bold text-slate-700">{cls?.name}</td>
                                     <td className="py-3 px-2"><div className="font-semibold text-slate-800">{subj?.name}</div>{s.direction && <div className="text-[10px] text-slate-500 bg-slate-100 inline-block px-1 rounded mt-0.5">{s.direction}</div>}</td>
                                     <td className="py-3 px-2">
-                                        {!isRoomChangeOnly && (
+                                        {!isTeacherPresent && !isRoomChangeOnly && !isSwap && (
                                             <>
                                                 {/* FIX: Use relative div with absolute line for reliable strikethrough in html2canvas */}
                                                 <div className="relative inline-block text-red-400 text-sm font-medium">
@@ -536,6 +550,11 @@ export const ExportPage = () => {
                                                 <span className="text-slate-800">{t1?.name}</span>
                                                 <span className="text-[10px] text-indigo-600 font-bold uppercase tracking-wide mt-0.5">Смена кабинета</span>
                                             </div>
+                                        ) : isSwap ? (
+                                            <div className="flex flex-col">
+                                                <span className="text-slate-800">{t1?.name}</span>
+                                                <span className="text-[10px] text-purple-600 font-bold uppercase tracking-wide mt-0.5">Обмен уроками: {swappedClass?.name}</span>
+                                            </div>
                                         ) : (
                                             <div className="flex flex-col">
                                                 <span>{t2?.name}</span>
@@ -546,7 +565,6 @@ export const ExportPage = () => {
                                     <td className={`py-3 px-2 text-right font-mono font-black ${newRoomId ? 'text-indigo-600' : 'text-slate-700'}`}>
                                         {newRoomId && newRoomId !== s.roomId ? (
                                             <div className="flex items-center justify-end gap-2 text-xl whitespace-nowrap">
-                                                {/* Re-applying room change styles as requested in previous turns, ensuring font-black and text-xl */}
                                                 <span className="text-slate-400 decoration-4 text-xl">{oldRoomName}</span>
                                                 <span className="text-indigo-600 font-black text-2xl">&rarr;</span>
                                                 <span className="text-indigo-600 font-black text-2xl">{newRoomName}</span>

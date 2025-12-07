@@ -67,6 +67,8 @@ export interface Substitution {
   lessonAbsenceReason?: string; // NEW: Reason for lesson-specific absence
   isMerger?: boolean; // NEW: Flag for merged classes
   refusals?: string[]; // IDs of teachers who refused
+  replacementClassId?: string; // NEW: For swapping lessons (target class)
+  replacementSubjectId?: string; // NEW: For swapping lessons (target subject)
 }
 
 export interface Bell {

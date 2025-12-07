@@ -32,6 +32,9 @@ export const SubstitutionsPage = () => {
     
     // State to track refusals in the current modal session
     const [refusedTeacherIds, setRefusedTeacherIds] = useState<string[]>([]);
+    const [showSwapOptions, setShowSwapOptions] = useState(false);
+    // State for swap configuration
+    const [swapKeepRooms, setSwapKeepRooms] = useState(false);
 
     // Определяем актуальное расписание на основе выбранной даты
     const activeSchedule = useMemo(() => {
@@ -47,6 +50,8 @@ export const SubstitutionsPage = () => {
             setSelectedRoomId(''); 
             setLessonAbsenceReason(''); 
             setRefusedTeacherIds([]);
+            setShowSwapOptions(false);
+            setSwapKeepRooms(false);
             setIsModalOpen(true);
             window.history.replaceState({}, document.title);
         }
@@ -56,11 +61,13 @@ export const SubstitutionsPage = () => {
     useEffect(() => {
         if (isModalOpen && currentSubParams) {
             const existingSub = substitutions.find(s => s.scheduleItemId === currentSubParams.scheduleItemId && s.date === selectedDate);
-            if (existingSub && existingSub.refusals) {
-                setRefusedTeacherIds(existingSub.refusals);
+            if (existingSub) {
+                setRefusedTeacherIds(existingSub.refusals || []);
             } else {
                 setRefusedTeacherIds([]);
             }
+            setShowSwapOptions(false);
+            setSwapKeepRooms(false);
         }
     }, [isModalOpen, currentSubParams, substitutions, selectedDate]);
 
@@ -177,8 +184,87 @@ export const SubstitutionsPage = () => {
         setRefusedTeacherIds([]);
         setCurrentSubParams(null);
     }, [currentSubParams, selectedDate, selectedRoomId, activeSchedule, substitutions, teachers, lessonAbsenceReason, refusedTeacherIds, saveScheduleData]);
+
+    const swapLessons = useCallback(async (targetLessonId: string) => {
+        if (!currentSubParams) return;
+
+        // Source Lesson
+        const sourceLesson = activeSchedule.find(s => s.id === currentSubParams.scheduleItemId);
+        // Target Lesson
+        const targetLesson = activeSchedule.find(s => s.id === targetLessonId);
+
+        if (!sourceLesson || !targetLesson) {
+             alert("Ошибка: Не найден урок для обмена.");
+             return;
+        }
+
+        const newSubs = [...substitutions];
+
+        // Logic for room assignment:
+        // By default (swapKeepRooms = false), lessons trade places. 
+        //   - Source Lesson (teaching Target Subject) goes to Target Room.
+        //   - Target Lesson (teaching Source Subject) goes to Source Room.
+        // If swapKeepRooms = true, teachers stay in their own rooms.
+        //   - Source Lesson (teaching Target Subject) stays in Source Room.
+        //   - Target Lesson (teaching Source Subject) stays in Target Room.
+        // Manual override: selectedRoomId overrides Source Lesson's room.
+
+        // Calculate specific room ID for source substitution
+        let effectiveRoomForSource: string | undefined;
+        if (selectedRoomId) {
+            effectiveRoomForSource = selectedRoomId;
+        } else {
+            effectiveRoomForSource = swapKeepRooms ? sourceLesson.roomId : targetLesson.roomId;
+        }
+
+        // Calculate specific room ID for target substitution
+        // If keeping rooms, Target stays in Target Room. If swapping (default), Target takes Source Room.
+        const effectiveRoomForTarget = swapKeepRooms ? targetLesson.roomId : sourceLesson.roomId;
+
+
+        // 1. Create Sub for Source Lesson
+        const sourceSubIndex = newSubs.findIndex(s => s.scheduleItemId === sourceLesson.id && s.date === selectedDate);
+        const sourceSubData = {
+            id: sourceSubIndex >= 0 ? newSubs[sourceSubIndex].id : Math.random().toString(36).substr(2, 9),
+            date: selectedDate,
+            scheduleItemId: sourceLesson.id,
+            originalTeacherId: sourceLesson.teacherId,
+            replacementTeacherId: sourceLesson.teacherId, // Same teacher
+            replacementClassId: targetLesson.classId,
+            replacementSubjectId: targetLesson.subjectId,
+            replacementRoomId: effectiveRoomForSource !== sourceLesson.roomId ? effectiveRoomForSource : undefined, 
+        };
+        if (sourceSubIndex >= 0) newSubs[sourceSubIndex] = sourceSubData; else newSubs.push(sourceSubData);
+
+        // 2. Create Sub for Target Lesson
+        const targetSubIndex = newSubs.findIndex(s => s.scheduleItemId === targetLesson.id && s.date === selectedDate);
+        const targetSubData = {
+            id: targetSubIndex >= 0 ? newSubs[targetSubIndex].id : Math.random().toString(36).substr(2, 9),
+            date: selectedDate,
+            scheduleItemId: targetLesson.id,
+            originalTeacherId: targetLesson.teacherId,
+            replacementTeacherId: targetLesson.teacherId, // Same teacher
+            replacementClassId: sourceLesson.classId,
+            replacementSubjectId: sourceLesson.subjectId,
+            replacementRoomId: effectiveRoomForTarget !== targetLesson.roomId ? effectiveRoomForTarget : undefined,
+        };
+        if (targetSubIndex >= 0) newSubs[targetSubIndex] = targetSubData; else newSubs.push(targetSubData);
+
+        await saveScheduleData({ substitutions: newSubs });
+        
+        setIsModalOpen(false); 
+        setCurrentSubParams(null);
+        setSelectedRoomId(''); // Reset room selection
+        setShowSwapOptions(false);
+        setSwapKeepRooms(false);
+
+    }, [currentSubParams, activeSchedule, substitutions, selectedDate, saveScheduleData, selectedRoomId, swapKeepRooms]);
     
     const removeSubstitution = useCallback(async (id: string) => { 
+        // If it was a swap, we technically should check if the "other half" exists, 
+        // but user might want to cancel just one side or both. 
+        // For simplicity, we just delete the selected one. The other one will remain as a "substitution" 
+        // (Teacher X teaches Class Y at Period Z) which is still valid state.
         const newSubs = substitutions.filter(s => !(s.scheduleItemId === id && s.date === selectedDate)); 
         await saveScheduleData({ substitutions: newSubs }); 
     }, [substitutions, selectedDate, saveScheduleData]);
@@ -217,13 +303,19 @@ export const SubstitutionsPage = () => {
                     const origName = orig?.name + (effectiveReasonDisplay ? ` (${effectiveReasonDisplay})` : '');
                     
                     const newRoom = sub?.replacementRoomId ? rooms.find(r => r.id === sub.replacementRoomId)?.name || sub.replacementRoomId : null;
+                    
+                    // Logic for swapped content
+                    const swappedClass = sub?.replacementClassId ? classes.find(c => c.id === sub.replacementClassId) : null;
+                    const swappedSubj = sub?.replacementSubjectId ? subjects.find(s => s.id === sub.replacementSubjectId) : null;
 
                     if (sub) {
                         if (sub.replacementTeacherId === 'cancelled') {
                             text += `❗ ${cls?.name} (${l.period} ур): ${subj?.name} (${origName}) -> УРОК СНЯТ\n`;
                         } else {
-                            if (sub.replacementTeacherId === sub.originalTeacherId && newRoom) {
+                            if (sub.replacementTeacherId === sub.originalTeacherId && newRoom && !swappedClass) {
                                 text += `🚪 ${cls?.name} (${l.period} ур): ${subj?.name} (${orig?.name}) -> Кабинет ${origRoom} → ${newRoom}\n`;
+                            } else if (swappedClass && swappedSubj) {
+                                text += `🔄 ${cls?.name} (${l.period} ур): ${subj?.name} -> Урок ${swappedClass.name} ${swappedSubj.name} (Обмен уроками)${newRoom ? ` в каб. ${newRoom}` : ''}\n`;
                             } else {
                                 let line = `✅ ${cls?.name} (${l.period} ур): ${subj?.name} -> ${rep?.name} ${sub.isMerger ? '(ОБЪЕДИНЕНИЕ) ' : ''}(вместо ${origName})`;
                                 if (newRoom) line += ` в каб. ${newRoom}`;
@@ -278,7 +370,7 @@ export const SubstitutionsPage = () => {
         icalContent += "END:VCALENDAR";
         const blob = new Blob([icalContent], { type: 'text/calendar' });
         const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
+        const link = document.createElement("a");
         link.href = url; link.download = 'substitutions.ics';
         document.body.appendChild(link); link.click(); document.body.removeChild(link);
     }, [selectedDate, substitutions, activeSchedule, teachers, subjects, classes]);
@@ -326,10 +418,17 @@ export const SubstitutionsPage = () => {
                     const oldRoomName = rooms.find(r => r.id === l.roomId)?.name || l.roomId || '—';
                     const newRoomName = sub.replacementRoomId ? (rooms.find(r => r.id === sub.replacementRoomId)?.name || sub.replacementRoomId) : oldRoomName;
                     
+                    // Logic for swapped content
+                    const swappedClass = sub.replacementClassId ? classes.find(c => c.id === sub.replacementClassId) : null;
+                    const swappedSubj = sub.replacementSubjectId ? subjects.find(s => s.id === sub.replacementSubjectId) : null;
+
                     let lessonLine = `${l.period} урок (${cls?.name} ${subj?.name}${l.direction ? ` ${l.direction}` : ''}): `;
                     
                     if (sub.replacementTeacherId === 'cancelled') {
                         lessonLine += `*УРОК СНЯТ* (вместо ${origTeacherNameWithReason})`;
+                    } else if (swappedClass && swappedSubj) {
+                        lessonLine += `🔄 Обмен уроками: ${swappedClass.name} ${swappedSubj.name} (вместо ${cls?.name} ${subj?.name})`;
+                        if (newRoomName !== oldRoomName) lessonLine += ` в каб. ${newRoomName}`;
                     } else if (sub.replacementTeacherId === sub.originalTeacherId) { 
                         lessonLine += `Учитель: ${origTeacherNameWithReason}. Смена кабинета: ${oldRoomName} → ${newRoomName}`;
                     } else { 
@@ -464,6 +563,15 @@ export const SubstitutionsPage = () => {
             isTeacherAbsent
         };
     }, [currentSubParams, activeSchedule, classes, subjects, teachers, selectedDate]);
+    
+    const otherLessonsForTeacher = useMemo(() => {
+        if (!modalContext?.teacherId || !selectedDayOfWeek) return [];
+        return activeSchedule.filter(s => 
+            s.teacherId === modalContext.teacherId && 
+            s.day === selectedDayOfWeek && 
+            s.id !== currentSubParams?.scheduleItemId
+        ).sort((a,b) => a.period - b.period);
+    }, [activeSchedule, modalContext, selectedDayOfWeek, currentSubParams]);
 
     const manualSearchResults = useMemo(() => {
         if (!selectedDayOfWeek || manualLessonSearch.length < 2) return [];
@@ -654,21 +762,26 @@ export const SubstitutionsPage = () => {
                         const newRoomId = sub?.replacementRoomId;
                         const newRoomName = newRoomId ? (rooms.find(r => r.id === newRoomId)?.name || newRoomId) : null;
                         
+                        // Check if content was swapped
+                        const swappedClass = sub?.replacementClassId ? classes.find(c => c.id === sub.replacementClassId) : null;
+                        const swappedSubj = sub?.replacementSubjectId ? subjects.find(s => s.id === sub.replacementSubjectId) : null;
+
                         let statusEl = null;
                         if (sub?.replacementTeacherId === 'conducted') {
                             statusEl = <div className="flex items-center gap-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900 pl-4 pr-2 py-2 rounded-xl"><div className="text-blue-700 dark:text-blue-400 font-bold text-sm">Урок проведен</div><button onClick={() => removeSubstitution(l.id)} className="p-2 bg-white dark:bg-dark-800 rounded-lg text-blue-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors shadow-sm"><Icon name="X" size={16}/></button></div>;
                         } else if (sub?.replacementTeacherId === 'cancelled') {
                             statusEl = <div className="flex items-center gap-3 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900 pl-4 pr-2 py-2 rounded-xl"><div className="text-red-700 dark:text-red-400 font-bold text-sm">УРОК СНЯТ</div><button onClick={() => removeSubstitution(l.id)} className="p-2 bg-white dark:bg-dark-800 rounded-lg text-red-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors shadow-sm"><Icon name="X" size={16}/></button></div>;
                         } else if (rep || newRoomId) {
-                            const isRoomChangeOnly = sub?.replacementTeacherId === sub?.originalTeacherId && newRoomId;
+                            const isRoomChangeOnly = sub?.replacementTeacherId === sub?.originalTeacherId && newRoomId && !swappedClass;
+                            const isSwap = swappedClass && swappedSubj;
                             
                             statusEl = <div className="flex items-center gap-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-900 pl-4 pr-2 py-2 rounded-xl">
                                 <div>
                                     <div className="text-[10px] uppercase font-bold text-emerald-600 dark:text-emerald-400 tracking-wider">
-                                        {isRoomChangeOnly ? 'Замена кабинета' : 'Замена назначена'}
+                                        {isRoomChangeOnly ? 'Замена кабинета' : isSwap ? 'Обмен уроками' : 'Замена назначена'}
                                     </div>
                                     <div className="font-bold text-emerald-900 dark:text-emerald-200 text-sm">
-                                        {isRoomChangeOnly ? 'Учитель тот же' : rep?.name}
+                                        {isRoomChangeOnly ? 'Учитель тот же' : isSwap ? `Урок ${swappedClass?.name}` : rep?.name}
                                     </div>
                                     {sub.isMerger && (
                                         <div className="text-[10px] font-black text-purple-600 dark:text-purple-400 uppercase tracking-widest mt-0.5">ОБЪЕДИНЕНИЕ</div>
@@ -700,6 +813,11 @@ export const SubstitutionsPage = () => {
                                         {roomName && <span className="text-xs bg-white dark:bg-slate-700 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-600 flex items-center gap-1">{roomName} {newRoomName && <span className="text-indigo-600 font-bold">→ {newRoomName}</span>}</span>}
                                         {sub?.lessonAbsenceReason && ( // Always show lesson-specific reason
                                             <span className="text-xs bg-red-50 dark:bg-red-900/20 px-1.5 py-0.5 rounded border border-red-100 dark:border-red-900 text-red-500 dark:text-red-400 font-medium">({sub.lessonAbsenceReason})</span>
+                                        )}
+                                        {swappedClass && swappedSubj && (
+                                            <span className="text-xs bg-purple-50 dark:bg-purple-900/20 px-1.5 py-0.5 rounded border border-purple-100 dark:border-purple-900 text-purple-600 dark:text-purple-400 font-bold">
+                                                Меняется на: {swappedClass.name}
+                                            </span>
                                         )}
                                     </div>
                                 </div>
@@ -758,9 +876,57 @@ export const SubstitutionsPage = () => {
                 </div>
                 
                 {modalContext?.teacherId && !modalContext.isTeacherAbsent && (
-                    <button onClick={() => assignSubstitution(modalContext.teacherId)} className="w-full p-3 mb-4 rounded-xl bg-emerald-50 text-emerald-700 font-bold text-sm hover:bg-emerald-100 transition border border-emerald-200">
-                        Оставить текущего учителя (Только замена кабинета)
-                    </button>
+                    <>
+                        <button onClick={() => assignSubstitution(modalContext.teacherId)} className="w-full p-3 mb-2 rounded-xl bg-emerald-50 text-emerald-700 font-bold text-sm hover:bg-emerald-100 transition border border-emerald-200">
+                            Оставить текущего учителя (Только замена кабинета)
+                        </button>
+                        
+                        {otherLessonsForTeacher.length > 0 && (
+                            <div className="mb-4">
+                                <button 
+                                    onClick={() => setShowSwapOptions(!showSwapOptions)} 
+                                    className="w-full p-3 rounded-xl bg-purple-50 text-purple-700 font-bold text-sm hover:bg-purple-100 transition border border-purple-200 flex items-center justify-center gap-2"
+                                >
+                                    <Icon name="RotateCw" size={16}/> Поменять местами с другим уроком
+                                </button>
+                                
+                                {showSwapOptions && (
+                                    <div className="mt-2 space-y-2 bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-slate-100 dark:border-slate-700">
+                                        <div className="mb-3">
+                                            <label className="flex items-center gap-2 cursor-pointer p-2 bg-white dark:bg-slate-700 rounded-lg border border-slate-200 dark:border-slate-600">
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={swapKeepRooms} 
+                                                    onChange={(e) => setSwapKeepRooms(e.target.checked)} 
+                                                    className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
+                                                />
+                                                <span className="text-sm text-slate-700 dark:text-slate-300 font-medium">Оставить учителей в своих кабинетах</span>
+                                            </label>
+                                            <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1 pl-1">
+                                                Если включено: Учителя меняются классами, но не меняют кабинеты.<br/>
+                                                Если выключено: Учителя переходят в кабинет урока, который они заменяют.
+                                            </p>
+                                        </div>
+
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 text-center mb-1 font-bold">Выберите урок для обмена:</p>
+                                        {otherLessonsForTeacher.map(lesson => {
+                                             const c = classes.find(cl => cl.id === lesson.classId);
+                                             const s = subjects.find(sub => sub.id === lesson.subjectId);
+                                             return (
+                                                 <button 
+                                                    key={lesson.id} 
+                                                    onClick={() => swapLessons(lesson.id)}
+                                                    className="w-full p-2 text-left bg-white dark:bg-slate-700 rounded-lg border border-slate-200 dark:border-slate-600 hover:border-purple-500 transition-colors text-sm"
+                                                 >
+                                                    <span className="font-bold">{lesson.period} урок</span>: {c?.name} - {s?.name}
+                                                 </button>
+                                             )
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </>
                 )}
 
                 <div className="relative mb-4">
