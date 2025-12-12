@@ -69,22 +69,50 @@ export const StatusWidget = () => {
                 return;
             }
 
-            const minutesNow = now.getHours() * 60 + now.getMinutes();
-            let dailyBells = bellSchedule.filter(b => b.day === todayName);
-            if (dailyBells.length === 0) dailyBells = bellSchedule.filter(b => b.day === 'default');
-
-            let activeLesson = null;
             const timeToMin = (t: string) => {
                 const [h, m] = t.split(':').map(Number);
                 return h * 60 + m;
             };
+            const minutesNow = now.getHours() * 60 + now.getMinutes();
+            let dailyBells = bellSchedule.filter(b => b.day === todayName);
+            if (dailyBells.length === 0) dailyBells = bellSchedule.filter(b => b.day === 'default');
+            
+            // Sort bells by start time to make finding prev/next reliable
+            dailyBells.sort((a, b) => timeToMin(a.start) - timeToMin(b.start));
 
-            for (const bell of dailyBells) {
-                const start = timeToMin(bell.start);
-                const end = timeToMin(bell.end);
+            let activeLesson = null;
+            let breakInfo = null;
+
+            for (let i = 0; i < dailyBells.length; i++) {
+                const currentBell = dailyBells[i];
+                const start = timeToMin(currentBell.start);
+                const end = timeToMin(currentBell.end);
+
+                // Check if it's currently lesson time
                 if (minutesNow >= start && minutesNow < end) {
-                    activeLesson = { ...bell, duration: end - start, passed: minutesNow - start };
+                    activeLesson = { ...currentBell, duration: end - start, passed: minutesNow - start };
                     break;
+                }
+
+                // Check if it's currently break time (between this lesson and the next)
+                if (i < dailyBells.length - 1) {
+                    const nextBell = dailyBells[i+1];
+                    const nextStart = timeToMin(nextBell.start);
+                    // Don't treat long gaps between shifts as a break (e.g. > 60 mins)
+                    if (minutesNow >= end && minutesNow < nextStart) {
+                        const breakDuration = nextStart - end;
+                        if (breakDuration > 0 && breakDuration < 60) {
+                             const breakPassed = minutesNow - end;
+                             const breakRemaining = nextStart - minutesNow;
+                             breakInfo = {
+                                 nextLesson: nextBell,
+                                 duration: breakDuration,
+                                 passed: breakPassed,
+                                 remaining: breakRemaining,
+                             };
+                             break;
+                        }
+                    }
                 }
             }
 
@@ -93,28 +121,17 @@ export const StatusWidget = () => {
                 setDetails(`${activeLesson.shift === Shift.First ? '1 смена' : '2 смена'} • ост. ${activeLesson.duration - activeLesson.passed} мин`);
                 setProgress((activeLesson.passed / activeLesson.duration) * 100);
                 setColor("bg-indigo-600");
+            } else if (breakInfo) {
+                setStatus("Перемена");
+                setDetails(`через ${breakInfo.remaining} мин ${breakInfo.nextLesson.period} урок`);
+                setColor("bg-amber-500");
+                setProgress((breakInfo.passed / breakInfo.duration) * 100);
             } else {
-                let minDiff = Infinity;
-                let next = null;
-                for (const bell of dailyBells) {
-                    const start = timeToMin(bell.start);
-                    if (start > minutesNow && (start - minutesNow) < minDiff) {
-                        minDiff = start - minutesNow;
-                        next = bell;
-                    }
-                }
-
-                if (next && minDiff < 30) {
-                    setStatus("Перемена");
-                    setDetails(`через ${minDiff} мин ${next.period} урок`);
-                    setColor("bg-amber-500");
-                    setProgress(100 - (minDiff / 20 * 100));
-                } else {
-                    setStatus("Уроков нет");
-                    setDetails("Свободное время");
-                    setColor("bg-slate-400");
-                    setProgress(0);
-                }
+                // Before first lesson or after last lesson or in a long gap
+                setStatus("Уроков нет");
+                setDetails("Свободное время");
+                setColor("bg-slate-400");
+                setProgress(0);
             }
         };
         updateStatus();
