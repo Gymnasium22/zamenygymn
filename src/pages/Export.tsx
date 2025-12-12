@@ -15,7 +15,8 @@ export const ExportPage = () => {
     const { schedule1, schedule2, substitutions, saveScheduleData } = useScheduleData();
 
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const printRef = useRef<HTMLDivElement>(null);
+    const printRef1 = useRef<HTMLDivElement>(null);
+    const printRef2 = useRef<HTMLDivElement>(null);
     const [exportDate, setExportDate] = useState(new Date().toISOString().split('T')[0]);
     
     // Выбор полугодия для ручного экспорта (по умолчанию текущее)
@@ -502,21 +503,66 @@ export const ExportPage = () => {
         });
     };
 
-    const handleDownloadPng = async () => { 
-        if (!printRef.current) return; 
-        setIsGenerating(true); 
-        try { 
-            const canvas = await html2canvas(printRef.current, { scale: 2, backgroundColor: '#ffffff', logging: false }); 
-            const link = document.createElement('a'); 
-            link.download = `Замены_${exportDate}.png`; 
-            link.href = canvas.toDataURL('image/png'); 
-            link.click(); 
-        } catch (e) { console.error(e); alert("Ошибка при создании изображения"); } 
-        setIsGenerating(false); 
+    const handleDownloadPng = async () => {
+        setIsGenerating(true);
+        try {
+            const downloads = [];
+            // Process first shift
+            if (printRef1.current) {
+                const canvas1 = await html2canvas(printRef1.current, { scale: 2, backgroundColor: '#ffffff', logging: false });
+                downloads.push({
+                    href: canvas1.toDataURL('image/png'),
+                    download: `Замены_${exportDate}_1смена.png`
+                });
+            }
+            // Process second shift
+            if (printRef2.current) {
+                const canvas2 = await html2canvas(printRef2.current, { scale: 2, backgroundColor: '#ffffff', logging: false });
+                downloads.push({
+                    href: canvas2.toDataURL('image/png'),
+                    download: `Замены_${exportDate}_2смена.png`
+                });
+            }
+
+            if (downloads.length === 0) {
+                alert('Нет замен для скачивания.');
+            } else {
+                downloads.forEach(({ href, download }) => {
+                    const link = document.createElement('a');
+                    link.href = href;
+                    link.download = download;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                });
+            }
+        } catch (e) {
+            console.error(e);
+            alert("Ошибка при создании изображений");
+        } finally {
+            setIsGenerating(false);
+        }
     };
 
     const subsForDate = useMemo(() => substitutions.filter(s => s.date === exportDate), [substitutions, exportDate]);
     
+    const subsForShift1 = useMemo(() => {
+        const currentSchedule = getScheduleForDate(exportDate);
+        return subsForDate.filter(sub => {
+            const s = currentSchedule.find(x => x.id === sub.scheduleItemId);
+            return s && s.shift === Shift.First;
+        }).filter(sub => sub.replacementTeacherId !== 'conducted').length > 0;
+    }, [subsForDate, getScheduleForDate, exportDate]);
+
+    const subsForShift2 = useMemo(() => {
+        const currentSchedule = getScheduleForDate(exportDate);
+        return subsForDate.filter(sub => {
+            const s = currentSchedule.find(x => x.id === sub.scheduleItemId);
+            return s && s.shift === Shift.Second;
+        }).filter(sub => sub.replacementTeacherId !== 'conducted').length > 0;
+    }, [subsForDate, getScheduleForDate, exportDate]);
+
+
     const renderTableForShift = (shift: string) => {
         const currentSchedule = getScheduleForDate(exportDate);
 
@@ -528,7 +574,7 @@ export const ExportPage = () => {
         if (shiftSubs.length === 0) return null;
 
         return (
-            <div className="mb-8">
+            <div>
                 <div className="text-xl font-bold bg-slate-100 text-slate-700 p-2 mb-2 uppercase tracking-wide border-l-4 border-indigo-500">{shift}</div>
                 <table className="w-full text-left border-collapse">
                     <thead>
@@ -648,6 +694,31 @@ export const ExportPage = () => {
         setPublicScheduleUrl('');
         setPublicScheduleId('');
     };
+
+    const ReportHeader = () => (
+        <div className="flex justify-between items-end border-b-2 border-slate-800 pb-4 mb-6">
+            <div>
+                <h1 className="text-3xl font-black uppercase tracking-tight mb-1 text-slate-800">Замена Учителей</h1>
+                <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">
+                    Гимназия №22 • Официальный документ
+                </p>
+            </div>
+            <div className="text-right">
+                <div className="text-xs text-slate-400 uppercase font-bold tracking-wider mb-1">Дата</div>
+                <div className="text-xl font-bold text-slate-800">{new Date(exportDate).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+            </div>
+        </div>
+    );
+
+    const ReportFooter = () => (
+        <div className="mt-8 pt-4 border-t border-slate-100 flex justify-between items-end text-[10px] text-slate-400">
+            <div>Сформировано автоматически</div>
+            <div className="flex flex-col items-end gap-2">
+                <div className="h-px w-32 bg-slate-300"></div>
+                <div>Подпись администрации</div>
+            </div>
+        </div>
+    );
     
     return (
         <div className="max-w-5xl mx-auto space-y-8 pb-20">
@@ -683,36 +754,33 @@ export const ExportPage = () => {
                         </button>
                     </div>
                 </div>
-                <div className="overflow-auto bg-slate-100 dark:bg-slate-900 p-8 rounded-xl border border-slate-200 dark:border-slate-700 flex justify-center">
-                    <div ref={printRef} className="bg-white p-8 min-w-[800px] max-w-[1000px] shadow-xl text-slate-900">
-                        <div className="flex justify-between items-end border-b-2 border-slate-800 pb-4 mb-6">
-                            <div>
-                                <h1 className="text-3xl font-black uppercase tracking-tight mb-1 text-slate-800">Замена Учителей</h1>
-                                <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">Гимназия №22 • Официальный документ</p>
-                            </div>
-                            <div className="text-right">
-                                <div className="text-xs text-slate-400 uppercase font-bold tracking-wider mb-1">Дата</div>
-                                <div className="text-xl font-bold text-slate-800">{new Date(exportDate).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
-                            </div>
-                        </div>
-                        {subsForDate.length === 0 ? (
+                <div className="overflow-auto bg-slate-100 dark:bg-slate-900 p-8 rounded-xl border border-slate-200 dark:border-slate-700 flex justify-start">
+                    {subsForDate.length === 0 ? (
+                        <div className="bg-white p-8 min-w-[800px] max-w-[1000px] shadow-xl text-slate-900">
+                            <ReportHeader />
                             <div className="py-12 text-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50">
                                 <p className="text-slate-400 font-medium italic">Замен на этот день нет</p>
                             </div>
-                        ) : (
-                            <>
-                                {renderTableForShift(Shift.First)}
-                                {renderTableForShift(Shift.Second)}
-                            </>
-                        )}
-                        <div className="mt-8 pt-4 border-t border-slate-100 flex justify-between items-end text-[10px] text-slate-400">
-                            <div>Сформировано автоматически</div>
-                            <div className="flex flex-col items-end gap-2">
-                                <div className="h-px w-32 bg-slate-300"></div>
-                                <div>Подпись администрации</div>
-                            </div>
+                            <ReportFooter />
                         </div>
-                    </div>
+                    ) : (
+                        <div className="flex flex-col lg:flex-row gap-8">
+                            {subsForShift1 && (
+                                <div ref={printRef1} className="bg-white p-8 min-w-[800px] max-w-[1000px] shadow-xl text-slate-900">
+                                    <ReportHeader />
+                                    {renderTableForShift(Shift.First)}
+                                    <ReportFooter />
+                                </div>
+                            )}
+                            {subsForShift2 && (
+                                <div ref={printRef2} className="bg-white p-8 min-w-[800px] max-w-[1000px] shadow-xl text-slate-900">
+                                    <ReportHeader />
+                                    {renderTableForShift(Shift.Second)}
+                                    <ReportFooter />
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             </section>
 
