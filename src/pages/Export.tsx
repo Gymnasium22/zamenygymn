@@ -289,7 +289,8 @@ export const ExportPage = () => {
         let html = `
             <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
             <head><meta charset="UTF-8"><style>
-                table { border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; font-size: 12px; }
+                body { font-family: Arial, sans-serif; font-size: 12px; }
+                table { border-collapse: collapse; width: 100%; }
                 td, th { border: 1px solid #999; padding: 4px; vertical-align: middle; text-align: left; }
                 .header { background-color: #e0e7ff; font-weight: bold; text-align: center; }
                 .header-warning { background-color: #fee2e2; font-weight: bold; text-align: center; }
