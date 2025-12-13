@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Генератор иконок PWA</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        canvas {
+            border: 1px solid #ddd;
+            margin: 20px 0;
+        }
+        button {
+            background: #4f46e5;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #4338ca;
+        }
+        .preview {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 Генератор иконок для PWA</h1>
+        <p>Нажмите кнопки ниже, чтобы создать иконки нужных размеров:</p>
+        
+        <canvas id="canvas192" width="192" height="192"></canvas>
+        <canvas id="canvas512" width="512" height="512"></canvas>
+        
+        <div class="preview">
+            <div>
+                <p><strong>192x192</strong></p>
+                <a id="download192" download="icon-192.png">
+                    <button>Скачать 192x192</button>
+                </a>
+            </div>
+            <div>
+                <p><strong>512x512</strong></p>
+                <a id="download512" download="icon-512.png">
+                    <button>Скачать 512x512</button>
+                </a>
+            </div>
+        </div>
+        
+        <p style="margin-top: 30px; color: #666;">
+            <strong>Инструкция:</strong><br>
+            1. Нажмите кнопки "Скачать" для каждого размера<br>
+            2. Сохраните файлы в папку <code>public/</code> вашего проекта<br>
+            3. Пересоберите проект: <code>npm run build</code>
+        </p>
+    </div>
+
+    <script>
+        function drawIcon(canvas, size) {
+            const ctx = canvas.getContext('2d');
+            
+            // Фон с закругленными углами
+            ctx.fillStyle = '#4f46e5';
+            ctx.beginPath();
+            const radius = size * 0.15;
+            ctx.moveTo(radius, 0);
+            ctx.lineTo(size - radius, 0);
+            ctx.quadraticCurveTo(size, 0, size, radius);
+            ctx.lineTo(size, size - radius);
+            ctx.quadraticCurveTo(size, size, size - radius, size);
+            ctx.lineTo(radius, size);
+            ctx.quadraticCurveTo(0, size, 0, size - radius);
+            ctx.lineTo(0, radius);
+            ctx.quadraticCurveTo(0, 0, radius, 0);
+            ctx.closePath();
+            ctx.fill();
+            
+            // Академическая шапочка
+            const centerX = size / 2;
+            const hatY = size * 0.35;
+            const hatWidth = size * 0.5;
+            const hatHeight = size * 0.15;
+            
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(centerX - hatWidth/2, hatY, hatWidth, hatHeight);
+            
+            // Полосы на шапочке
+            ctx.fillStyle = '#4f46e5';
+            const stripeHeight = hatHeight / 4;
+            for (let i = 0; i < 3; i++) {
+                ctx.fillRect(centerX - hatWidth/2, hatY + stripeHeight * (i + 1), hatWidth, 2);
+            }
+            
+            // Кисточка
+            ctx.fillStyle = '#fbbf24';
+            ctx.beginPath();
+            ctx.arc(centerX + hatWidth/2 - size*0.05, hatY + hatHeight/2, size*0.03, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = size * 0.015;
+            ctx.beginPath();
+            ctx.moveTo(centerX + hatWidth/2 - size*0.05, hatY + hatHeight);
+            ctx.lineTo(centerX + hatWidth/2 - size*0.05, hatY + hatHeight * 2);
+            ctx.stroke();
+            
+            // Текст "Г22"
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `bold ${size * 0.25}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('Г22', centerX, size * 0.65);
+        }
+        
+        // Рисуем иконки
+        const canvas192 = document.getElementById('canvas192');
+        const canvas512 = document.getElementById('canvas512');
+        
+        drawIcon(canvas192, 192);
+        drawIcon(canvas512, 512);
+        
+        // Настраиваем скачивание
+        function setupDownload(canvas, linkId, filename) {
+            const link = document.getElementById(linkId);
+            link.href = canvas.toDataURL('image/png');
+            link.addEventListener('click', () => {
+                link.href = canvas.toDataURL('image/png');
+            });
+        }
+        
+        setupDownload(canvas192, 'download192', 'icon-192.png');
+        setupDownload(canvas512, 'download512', 'icon-512.png');
+    </script>
+</body>
+</html>
+
