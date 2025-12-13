@@ -47,9 +47,9 @@ export const LoginPage = () => {
             await auth.signInWithEmailAndPassword(loginEmail, password);
             // Навигация произойдет автоматически через useEffect после смены 'role'
             
-        } catch (err: any) {
+        } catch (err) {
             console.error("Firebase Auth Error:", err);
-            const errorCode = err.code;
+            const errorCode = (err as { code?: string })?.code;
             
             let friendlyMessage = 'Произошла неизвестная ошибка входа.';
             switch (errorCode) {

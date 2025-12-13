@@ -3,7 +3,7 @@ import { useState, useRef, useMemo } from 'react';
 import { useStaticData, useScheduleData } from '../context/DataContext';
 import { Icon } from '../components/Icons';
 import { dbService } from '../services/db'; 
-import { DAYS, Shift, SHIFT_PERIODS, AppData } from '../types';
+import { DAYS, Shift, SHIFT_PERIODS, AppData, Substitution, ScheduleItem, ClassEntity, Subject, Teacher } from '../types';
 import { INITIAL_DATA } from '../constants';
 import html2canvas from 'html2canvas';
 
@@ -46,13 +46,13 @@ export const ExportPage = () => {
         return (month >= 0 && month <= 4) ? schedule2 : schedule1;
     };
 
-    const handleImport = (e: any) => { 
+    const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => { 
         const file = e.target.files?.[0]; 
         if (!file) return; 
         const reader = new FileReader(); 
-        reader.onload = async (ev: any) => { 
+        reader.onload = async (ev: ProgressEvent<FileReader>) => { 
             try { 
-                const json = JSON.parse(ev.target.result); 
+                const json = JSON.parse(ev.target?.result as string); 
                 if (json.teachers && (json.schedule || json.schedule2ndHalf)) { 
                     if(window.confirm("Это перезапишет текущую базу данных. Продолжить?")) { 
                         const mergedData = {
@@ -251,11 +251,20 @@ export const ExportPage = () => {
             return;
         }
 
-        const mainSubs: any[] = [];
-        const noRecordSubs: any[] = [];
+        interface SubstitutionDetail {
+            sub: Substitution;
+            scheduleItem: ScheduleItem;
+            cls: ClassEntity | undefined;
+            subj: Subject | undefined;
+            origTeacher: Teacher | undefined;
+            reason: string;
+        }
+
+        const mainSubs: SubstitutionDetail[] = [];
+        const noRecordSubs: SubstitutionDetail[] = [];
 
         // Helper to determine reason
-        const getSubstitutionDetails = (sub: any) => {
+        const getSubstitutionDetails = (sub: Substitution): SubstitutionDetail | null => {
             // Ищем урок в обоих расписаниях
             const scheduleItem = schedule1.find(s => s.id === sub.scheduleItemId) || schedule2.find(s => s.id === sub.scheduleItemId);
             if (!scheduleItem) return null;
@@ -300,7 +309,7 @@ export const ExportPage = () => {
             <h3>Отчет по заменам за ${targetDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}</h3>
         `;
 
-        const renderRows = (items: any[]) => {
+        const renderRows = (items: SubstitutionDetail[]) => {
             return items.map(item => {
                 const { sub, scheduleItem, cls, subj, origTeacher, reason } = item;
                 const dateStr = new Date(sub.date).toLocaleDateString('ru-RU');
@@ -343,7 +352,7 @@ export const ExportPage = () => {
             }).join('');
         };
 
-        const renderTable = (items: any[], isWarning = false) => `
+        const renderTable = (items: SubstitutionDetail[], isWarning = false) => `
             <table>
             <thead>
                 <tr class="${isWarning ? 'header-warning' : 'header'}">
@@ -589,11 +598,11 @@ export const ExportPage = () => {
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                         {shiftSubs.map(sub => { 
-                            const s: any = currentSchedule.find(x => x.id === sub.scheduleItemId); 
+                            const s = currentSchedule.find(x => x.id === sub.scheduleItemId); 
                             if (!s) return null;
                             const cls = classes.find(c => c.id === s.classId); 
                             const subj = subjects.find(x => x.id === s.subjectId); 
-                            const t1: any = teachers.find(t => t.id === sub.originalTeacherId); 
+                            const t1 = teachers.find(t => t.id === sub.originalTeacherId); 
                             
                             const newRoomId = sub.replacementRoomId;
                             const oldRoomObj = s.roomId ? rooms.find(r => r.id === s.roomId) : null;

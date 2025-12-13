@@ -5,6 +5,34 @@ import { DayOfWeek, DAYS, ScheduleItem } from '../types';
 import { useNavigate } from 'react-router-dom'; 
 import { Modal } from '../components/UI';
 
+interface SearchItem {
+    room: string;
+    subject: string;
+    entityName: string;
+    direction?: string;
+    isSubstitution: boolean;
+    originalTeacherName: string | null;
+}
+
+interface SearchResult {
+    status: string;
+    detail?: string;
+    color: string;
+    icon?: string;
+    items?: SearchItem[];
+}
+
+interface AbsentTeacher {
+    id: string;
+    name: string;
+    displayReason: string;
+}
+
+interface ProblemZone {
+    class: string;
+    issue: string;
+}
+
 export const DashboardPage = () => {
     const { subjects, teachers, classes, rooms, bellSchedule, settings } = useStaticData();
     const { schedule, substitutions } = useScheduleData();
@@ -13,7 +41,7 @@ export const DashboardPage = () => {
     const [notes, setNotes] = useState(localStorage.getItem('gym_notes') || '');
     const [currentDate] = useState(new Date());
     const [searchQuery, setSearchQuery] = useState("");
-    const [searchResult, setSearchResult] = useState<any>(null);
+    const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
     const [showAbsentList, setShowAbsentList] = useState(false);
     const [saveStatus, setSaveStatus] = useState('');
     
@@ -110,18 +138,18 @@ export const DashboardPage = () => {
             });
         });
 
-        const combinedList: any[] = Array.from(fullDayAbsenteesMap.values());
+        const combinedList: AbsentTeacher[] = Array.from(fullDayAbsenteesMap.values());
 
         // Process partial absentees
         partialAbsenceMap.forEach((data, teacherId) => {
-            const lessons = data.lessons.sort((a: any, b: any) => a.period - b.period);
-            const periods = lessons.map((l: any) => l.period).join(', ');
+            const lessons = data.lessons.sort((a: { period: number; reason?: string }, b: { period: number; reason?: string }) => a.period - b.period);
+            const periods = lessons.map((l) => l.period).join(', ');
             
             // Determine reason text. 
             // If ANY of the substituted lessons has "Без записи", we show "Без записи"? 
             // Or strictly "Отсутствует" unless specifically "Без записи".
             // Let's check if there is at least one "Без записи".
-            const hasBezZapisi = lessons.some((l: any) => l.reason === 'Без записи');
+            const hasBezZapisi = lessons.some((l) => l.reason === 'Без записи');
             const reasonText = hasBezZapisi ? 'Без записи' : 'Отсутствует';
 
             combinedList.push({
@@ -148,7 +176,7 @@ export const DashboardPage = () => {
         const dayMap = [null, 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', null];
         const nextDayName = dayMap[nextDay.getDay()];
         if (!nextDayName) return [];
-        const problems: any[] = [];
+        const problems: ProblemZone[] = [];
         classes.forEach(cls => {
             const lessons = schedule.filter(s => s.classId === cls.id && s.day === nextDayName);
             if (lessons.length === 0) problems.push({ class: cls.name, issue: `Нет уроков на ${nextDayName}` });
@@ -231,7 +259,7 @@ export const DashboardPage = () => {
                 .map(sub => schedule.find(s => s.id === sub.scheduleItemId))
                 .filter((lesson): lesson is ScheduleItem => !!lesson && lesson.day === dayName && lesson.period === bell.period && lesson.shift === bell.shift); // Fix: Added shift check
             
-            let activeItems: any[] = [];
+            let activeItems: SearchItem[] = [];
 
             ownLessons.forEach(ownLesson => {
                 const ownLessonSub = substitutions.find(s => s.date === todayStr && s.scheduleItemId === ownLesson.id);
@@ -381,8 +409,8 @@ export const DashboardPage = () => {
                             <div className={`text-xs font-bold uppercase mb-2 flex items-center gap-2 ${searchResult.color}`}><Icon name={searchResult.icon || 'Info'} size={14}/> {searchResult.status}</div>
                             {searchResult.items && searchResult.items.length > 0 ? (
                                 <div className="space-y-2">
-                                    {searchResult.items.map((item: any, idx: number) => (
-                                        <div key={idx} className="bg-white dark:bg-dark-800 p-2 rounded-lg border border-slate-100 dark:border-slate-600 text-xs shadow-sm">
+                                    {searchResult.items.map((item, idx) => (
+                                        <div key={`${item.room}-${item.subject}-${item.entityName}-${idx}`} className="bg-white dark:bg-dark-800 p-2 rounded-lg border border-slate-100 dark:border-slate-600 text-xs shadow-sm">
                                             {item.direction && <div className="text-[10px] font-bold text-indigo-500 mb-0.5">{item.direction}</div>}
                                             <div className="font-bold text-slate-700 dark:text-slate-200">{item.subject}</div>
                                             {item.isSubstitution && (
@@ -467,7 +495,7 @@ export const DashboardPage = () => {
                 {/* Widget 4: Conflicts */}
                 <div className="bg-white dark:bg-dark-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col h-full">
                     <div className="flex items-center gap-3 mb-4"><div className="bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 p-2 rounded-lg"><Icon name="AlertTriangle" size={20}/></div><h3 className="font-bold text-lg dark:text-white">Конфликты</h3></div>
-                    <div className="flex-1 overflow-y-auto max-h-40 custom-scrollbar space-y-2">{problemZones.length ? problemZones.map((p,i) => <div key={i} className="flex justify-between text-sm text-slate-700 dark:text-slate-300"><span>{p.class}</span><span className="text-amber-600 text-xs font-bold">{p.issue}</span></div>) : <div className="text-slate-400 text-sm text-center">Расписание в порядке</div>}</div>
+                    <div className="flex-1 overflow-y-auto max-h-40 custom-scrollbar space-y-2">{problemZones.length ? problemZones.map((p) => <div key={`${p.class}-${p.issue}`} className="flex justify-between text-sm text-slate-700 dark:text-slate-300"><span>{p.class}</span><span className="text-amber-600 text-xs font-bold">{p.issue}</span></div>) : <div className="text-slate-400 text-sm text-center">Расписание в порядке</div>}</div>
                 </div>
 
                 {/* Notes */}

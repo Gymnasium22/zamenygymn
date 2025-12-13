@@ -4,7 +4,7 @@ import { useLocation } from 'react-router-dom';
 import { useStaticData, useScheduleData } from '../context/DataContext'; 
 import { Icon } from '../components/Icons';
 import { Modal } from '../components/UI';
-import { DAYS, Shift } from '../types';
+import { DAYS, Shift, Teacher, ScheduleItem, ClassEntity, Subject, Room } from '../types';
 
 export const SubstitutionsPage = () => {
     const { subjects, teachers, classes, rooms, settings, saveStaticData } = useStaticData(); 
@@ -580,7 +580,12 @@ export const SubstitutionsPage = () => {
         const foundTeachers = teachers.filter(t => t.name.toLowerCase().includes(searchLower));
         const foundClasses = classes.filter(c => c.name.toLowerCase().includes(searchLower));
         
-        const results: any[] = [];
+        interface SearchResult extends ScheduleItem {
+            entityName: string;
+            subInfo?: string;
+            subjectName?: string;
+        }
+        const results: SearchResult[] = [];
 
         foundTeachers.forEach(t => {
             const lessons = activeSchedule.filter(s => s.teacherId === t.id && s.day === selectedDayOfWeek);
@@ -604,7 +609,7 @@ export const SubstitutionsPage = () => {
         return results.sort((a, b) => a.period - b.period);
     }, [manualLessonSearch, selectedDayOfWeek, teachers, classes, activeSchedule, subjects]);
 
-    const notifyTeacherFunction = useCallback(async (replacementTeacher: any, lessonInfo: any, classInfo: any, subjectInfo: any, roomInfo: any, dateStr: string) => {
+    const notifyTeacherFunction = useCallback(async (replacementTeacher: Teacher, lessonInfo: ScheduleItem, classInfo: ClassEntity | undefined, subjectInfo: Subject | undefined, roomInfo: Room | string | undefined, dateStr: string) => {
         const dateObj = new Date(dateStr);
         const formattedDate = dateObj.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
         const shiftText = lessonInfo.shift === Shift.First ? '1 смена' : '2 смена';
@@ -987,7 +992,7 @@ export const SubstitutionsPage = () => {
                     </div>
                 </div>
                 <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar">
-                    {manualSearchResults.map((item: any) => (
+                    {manualSearchResults.map((item) => (
                         <button key={item.id} onClick={() => { setManualSearchModalOpen(false); setCurrentSubParams({ scheduleItemId: item.id, subjectId: item.subjectId, period: item.period, shift: item.shift, classId: item.classId, teacherId: item.teacherId, roomId: item.roomId, day: item.day }); setIsModalOpen(true); }} className="w-full p-3 rounded-xl border border-slate-100 dark:border-slate-700 hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors text-left group">
                             <div className="flex justify-between items-center mb-1">
                                 <span className="font-bold text-slate-800 dark:text-slate-200">{item.entityName} <span className="font-normal text-slate-500">({item.subInfo})</span></span>

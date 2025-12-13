@@ -29,9 +29,9 @@ export const dbService = {
             // Firestore не любит undefined, JSON.parse(JSON.stringify(data)) - быстрый способ очистить их
             const cleanData = JSON.parse(JSON.stringify(data));
             await firestoreDB.collection(MAIN_COLLECTION).doc(MAIN_DOC_ID).set(cleanData);
-        } catch (error: any) {
+        } catch (error) {
             console.error("Ошибка сохранения в Firebase:", error);
-            if (error.code === 'permission-denied') {
+            if ((error as { code?: string })?.code === 'permission-denied') {
                 alert("Ошибка доступа: Недостаточно прав для сохранения данных в облаке.");
             }
             throw error;
@@ -61,9 +61,9 @@ export const dbService = {
                 // Если документа нет в облаке, возвращаем начальные данные
                 return INITIAL_DATA;
             }
-        } catch (error: any) {
+        } catch (error) {
             console.error("Ошибка загрузки из Firebase:", error);
-            if (error.code === 'permission-denied') {
+            if ((error as { code?: string })?.code === 'permission-denied') {
                 console.error("Нет прав на чтение. Проверьте правила (allow read: if true).");
             }
             // В случае ошибки (например, нет прав или интернета) возвращаем начальные данные, чтобы приложение не падало
@@ -73,7 +73,7 @@ export const dbService = {
 
     subscribe: (
         onNext: (data: AppData) => void,
-        onError: (error: any) => void
+        onError: (error: Error) => void
     ) => {
         if (!firestoreDB) {
             console.warn("Database not initialized. Cannot subscribe.");

@@ -3,7 +3,13 @@ import { useState } from 'react';
 import { useStaticData } from '../context/DataContext'; 
 import { Icon } from '../components/Icons';
 import { Modal, StaggerContainer } from '../components/UI';
-import { Shift, ROOM_TYPES, SHIFT_PERIODS, Teacher, Subject, ClassEntity, Room } from '../types';
+import { Shift, ROOM_TYPES, SHIFT_PERIODS, Teacher, Subject, ClassEntity, Room, Bell } from '../types';
+
+interface BellWithInheritance extends Partial<Bell> {
+    start: string;
+    end: string;
+    isInherited: boolean;
+}
 
 export const DirectoryPage = () => {
     const { subjects, teachers, classes, rooms, bellSchedule, saveStaticData } = useStaticData();
@@ -49,7 +55,7 @@ export const DirectoryPage = () => {
         
         if (!form.name) return;
 
-        let newList: any[] = [...list];
+        let newList: (Teacher | Subject | ClassEntity | Room)[] = [...list];
         if (editingId) {
             newList = newList.map(item => (item.id === editingId ? { ...item, ...form } : item));
         } else {
@@ -72,12 +78,12 @@ export const DirectoryPage = () => {
     };
     
     // Drag & Drop
-    const onDragStart = (e: any, index: number) => { setDraggedIdx(index); e.dataTransfer.effectAllowed = "move"; };
-    const onDragOver = (e: any) => { e.preventDefault(); };
+    const onDragStart = (e: React.DragEvent, index: number) => { setDraggedIdx(index); e.dataTransfer.effectAllowed = "move"; };
+    const onDragOver = (e: React.DragEvent) => { e.preventDefault(); };
     // Fix: Refactored onDrop to use a switch statement for type safety.
     // This allows TypeScript to correctly infer the types for each list (teachers, subjects, etc.)
     // and the item being moved, resolving the previous type mismatch error.
-    const onDrop = async (e: any, index: number) => { 
+    const onDrop = async (e: React.DragEvent, index: number) => { 
         if (draggedIdx === null || draggedIdx === index) return; 
         
         switch (activeTab) {
@@ -122,7 +128,7 @@ export const DirectoryPage = () => {
              const defaultBell = bellSchedule.find(b => b.shift === shift && b.period === period && b.day === 'default');
              return defaultBell ? { ...defaultBell, start: '', end: '', isInherited: true } : { start: '', end: '', isInherited: false };
         }
-        return bell || { start: '', end: '' };
+        return bell ? { ...bell, isInherited: false } : { start: '', end: '', isInherited: false };
     };
 
     const handleBellChange = async (shift: string, period: number, field: string, value: string) => {
@@ -187,7 +193,7 @@ export const DirectoryPage = () => {
                                     <div className={`p-4 font-bold text-lg text-white ${shift === Shift.First ? 'bg-indigo-600' : 'bg-purple-600'}`}>{shift}</div>
                                     <div className="p-6 space-y-3">
                                         {SHIFT_PERIODS[shift].map(period => {
-                                            const bell: any = getActiveBells(shift, period);
+                                            const bell = getActiveBells(shift, period);
                                             return (
                                                 <div key={period} className={`flex items-center gap-4 p-2 rounded-xl transition-colors ${bell.isInherited ? 'bg-slate-50/50 dark:bg-slate-800/50 opacity-60' : 'bg-slate-50 dark:bg-slate-700/50'}`}>
                                                     <div className="w-10 h-10 rounded-lg bg-white dark:bg-slate-600 flex items-center justify-center font-black text-slate-500 dark:text-slate-300 shadow-sm">{period}</div>

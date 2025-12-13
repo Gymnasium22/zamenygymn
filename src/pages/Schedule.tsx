@@ -3,11 +3,28 @@ import { useState, useMemo, useEffect } from 'react';
 import { useStaticData, useScheduleData } from '../context/DataContext'; 
 import { Icon } from '../components/Icons';
 import { Modal, SearchableSelect, ContextMenu } from '../components/UI';
-import { Shift, DayOfWeek, DAYS, SHIFT_PERIODS } from '../types';
+import { Shift, DayOfWeek, DAYS, SHIFT_PERIODS, ScheduleItem } from '../types';
 import useMedia from 'use-media';
 
+interface SchedulePageProps {
+    readOnly?: boolean;
+    semester?: 1 | 2;
+}
 
-export const SchedulePage = ({ readOnly = false, semester = 1 }: { readOnly?: boolean, semester?: 1 | 2 }) => {
+interface ContextMenuState {
+    visible: boolean;
+    x: number;
+    y: number;
+    item: ScheduleItem | null;
+    cell: { rowId: string; colKey: string | number } | null;
+}
+
+interface CellInfo {
+    rowId: string;
+    colKey: string | number;
+}
+
+export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePageProps) => {
     const { subjects, teachers, classes, rooms } = useStaticData();
     const { schedule1, schedule2, saveSemesterSchedule, canUndo, canRedo, undo, redo } = useScheduleData();
     
@@ -15,25 +32,25 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: { readOnly?: bo
     const schedule = semester === 2 ? schedule2 : schedule1;
 
     // Вспомогательная функция для сохранения, которая знает о текущем семестре
-    const saveCurrentSchedule = async (newScheduleData: any[]) => {
+    const saveCurrentSchedule = async (newScheduleData: ScheduleItem[]) => {
         await saveSemesterSchedule(semester, newScheduleData);
     };
     
     const [selectedShift, setSelectedShift] = useState(Shift.First);
     const [selectedDay, setSelectedDay] = useState<DayOfWeek>(DayOfWeek.Monday);
     const [isEditorOpen, setIsEditorOpen] = useState(false);
-    const [tempItem, setTempItem] = useState<any>({});
+    const [tempItem, setTempItem] = useState<Partial<ScheduleItem>>({});
     const [viewMode, setViewMode] = useState<'class'|'teacher'|'subject'|'week'>('class');
     const [filterId, setFilterId] = useState('');
     const [filterRoom, setFilterRoom] = useState('');
     const [filterDirection, setFilterDirection] = useState('');
     const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
-    const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0, item: null as any, cell: null as any });
-    const [clipboard, setClipboard] = useState<any>(null);
+    const [contextMenu, setContextMenu] = useState<ContextMenuState>({ visible: false, x: 0, y: 0, item: null, cell: null });
+    const [clipboard, setClipboard] = useState<ScheduleItem | null>(null);
     
     const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
     
-    const [draggedItem, setDraggedItem] = useState<any>(null);
+    const [draggedItem, setDraggedItem] = useState<ScheduleItem | null>(null);
     const [dragOverCell, setDragOverCell] = useState<string|null>(null);
 
     const isMobile = useMedia({ maxWidth: 767 });
@@ -56,8 +73,8 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: { readOnly?: bo
         return [];
     };
 
-    const getScheduleItems = (rowId: string, colKey: any) => {
-        let items: any[] = [];
+    const getScheduleItems = (rowId: string, colKey: string | number): ScheduleItem[] => {
+        let items: ScheduleItem[] = [];
         if (viewMode === 'week') {
              const period = parseInt(rowId);
              const day = colKey;
@@ -83,8 +100,8 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: { readOnly?: bo
         return items;
     };
 
-    const checkConflicts = (item: any) => {
-        const conflicts = [];
+    const checkConflicts = (item: ScheduleItem): string[] => {
+        const conflicts: string[] = [];
         const others = schedule.filter(s => s.id !== item.id && s.day === item.day && s.period === item.period && s.shift === item.shift);
         
         const teacherBusy = others.find(s => s.teacherId === item.teacherId);
@@ -124,20 +141,24 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: { readOnly?: bo
         return warnings;
     };
 
-    const updateValidation = (item: any) => {
+    const updateValidation = (item: Partial<ScheduleItem>) => {
+        if (!item.classId || !item.subjectId || !item.roomId) {
+            setValidationWarnings([]);
+            return;
+        }
         const warns = validateRoom(item.classId, item.subjectId, item.roomId);
         setValidationWarnings(warns);
     }
 
-    const handleEditItem = (item: any) => { 
+    const handleEditItem = (item: ScheduleItem) => { 
         if(readOnly) return; 
         setTempItem(item); 
         updateValidation(item);
         setIsEditorOpen(true); 
     };
-    const handleAddItem = (rowId: string, period: any, day: any = selectedDay) => {
+    const handleAddItem = (rowId: string, period: number, day: DayOfWeek = selectedDay) => {
         if(readOnly) return;
-        const base = { period, day, shift: selectedShift, id: Math.random().toString(36).substr(2, 9) } as any;
+        const base: Partial<ScheduleItem> = { period, day, shift: selectedShift, id: Math.random().toString(36).substr(2, 9) };
         if (viewMode === 'class') base.classId = rowId;
         if (viewMode === 'teacher') base.teacherId = rowId;
         if (viewMode === 'subject') base.subjectId = rowId;
@@ -164,34 +185,35 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: { readOnly?: bo
         setIsEditorOpen(false);
     };
 
-    const handleContextMenu = (e: any, item: any, cellInfo: any) => {
+    const handleContextMenu = (e: React.MouseEvent, item: ScheduleItem | null, cellInfo: CellInfo | null) => {
         if(readOnly) return;
         e.preventDefault();
         e.stopPropagation(); 
         setContextMenu({ visible: true, x: e.clientX, y: e.clientY, item, cell: cellInfo });
     };
 
-    const handleDragStart = (e: any, item: any) => {
+    const handleDragStart = (e: React.DragEvent, item: ScheduleItem) => {
         if(readOnly) return;
         setDraggedItem(item);
         e.dataTransfer.effectAllowed = "move";
-        const el = e.target;
+        const el = e.currentTarget as HTMLElement;
         setTimeout(() => el.classList.add('dragging'), 0);
     };
 
-    const handleDragEnd = (e: any) => {
-        e.target.classList.remove('dragging');
+    const handleDragEnd = (e: React.DragEvent) => {
+        const el = e.currentTarget as HTMLElement;
+        el.classList.remove('dragging');
         setDraggedItem(null);
         setDragOverCell(null);
     };
 
-    const handleDragOver = (e: any, cellInfo: any) => {
+    const handleDragOver = (e: React.DragEvent, cellInfo: CellInfo) => {
         e.preventDefault();
         if(readOnly) return;
         setDragOverCell(`${cellInfo.rowId}-${cellInfo.colKey}`); 
     };
 
-    const handleDrop = async (e: any, cellInfo: any) => {
+    const handleDrop = async (e: React.DragEvent, cellInfo: CellInfo) => {
         e.preventDefault();
         if (!draggedItem || readOnly) return;
 
@@ -264,7 +286,7 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: { readOnly?: bo
         return getRows(); 
     }, [isWeeklyPrint, selectedShift, getRows]);
 
-    const getPrintItems = (rowId: string, colKey: any) => {
+    const getPrintItems = (rowId: string, colKey: string | number): ScheduleItem[] => {
         if (isWeeklyPrint) {
             const period = parseInt(rowId);
             const day = colKey;
@@ -303,12 +325,12 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: { readOnly?: bo
         setIsMassOperationsModalOpen(false); 
     };
 
-    const renderScheduleItemsContent = (items: any[], colKey: any, rowId: string) => {
+    const renderScheduleItemsContent = (items: ScheduleItem[], colKey: string | number, rowId: string) => {
         if (readOnly && items.length === 0) return null; 
 
         return (
             <div className="h-full flex flex-col gap-1">
-                {items.map((item: any) => {
+                {items.map((item) => {
                     const subj = subjects.find(s => s.id === item.subjectId);
                     const teacher = teachers.find(t => t.id === item.teacherId);
                     const cls = classes.find(c => c.id === item.classId);
@@ -496,21 +518,22 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: { readOnly?: bo
                                 {rows.length > 0 ? rows.map(row => (
                                     <tr key={row.id}>
                                         <td className="p-4 border-r border-slate-100 dark:border-slate-600 font-black text-lg text-slate-700 dark:text-slate-200 sticky left-0 bg-white dark:bg-dark-800 z-10 text-left">{row.name}</td>
-                                        {cols.map(colKey => {
-                                            const items = getScheduleItems(row.id, colKey);
-                                            const cellId = `${row.id}-${colKey}`;
-                                            return (
-                                                <td 
-                                                    key={colKey} 
-                                                    className={`p-2 border-r border-slate-50 dark:border-slate-700 h-28 align-top transition-colors ${dragOverCell === cellId ? 'drag-over' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}
-                                                    onContextMenu={!readOnly ? (e) => handleContextMenu(e, null, { rowId: row.id, colKey }) : undefined}
-                                                    onDragOver={!readOnly ? (e) => handleDragOver(e, { rowId: row.id, colKey }) : undefined}
-                                                    onDrop={!readOnly ? (e) => handleDrop(e, { rowId: row.id, colKey }) : undefined}
-                                                >
-                                                    {renderScheduleItemsContent(items, colKey, row.id)}
-                                                </td>
-                                            );
-                                        })}
+                        {cols.map(colKey => {
+                            const items = getScheduleItems(row.id, colKey);
+                            const cellId = `${row.id}-${colKey}`;
+                            const cellInfo: CellInfo = { rowId: row.id, colKey };
+                            return (
+                                <td 
+                                    key={colKey} 
+                                    className={`p-2 border-r border-slate-50 dark:border-slate-700 h-28 align-top transition-colors ${dragOverCell === cellId ? 'drag-over' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}
+                                    onContextMenu={!readOnly ? (e) => handleContextMenu(e, null, cellInfo) : undefined}
+                                    onDragOver={!readOnly ? (e) => handleDragOver(e, cellInfo) : undefined}
+                                    onDrop={!readOnly ? (e) => handleDrop(e, cellInfo) : undefined}
+                                >
+                                    {renderScheduleItemsContent(items, colKey, row.id)}
+                                </td>
+                            );
+                        })}
                                     </tr>
                                 )) : <tr><td colSpan={8} className="p-8 text-center text-slate-400 dark:text-slate-500">Нет данных для отображения</td></tr>}
                             </tbody>
@@ -530,7 +553,7 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: { readOnly?: bo
 
                     {validationWarnings.length > 0 && (
                         <div className="bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 p-3 rounded-lg text-sm border border-orange-100 dark:border-orange-900">
-                            {validationWarnings.map((w, i) => <div key={i} className="flex items-center gap-2"><Icon name="AlertTriangle" size={14}/>{w}</div>)}
+                            {validationWarnings.map((w) => <div key={w} className="flex items-center gap-2"><Icon name="AlertTriangle" size={14}/>{w}</div>)}
                         </div>
                     )}
                     
@@ -538,8 +561,8 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: { readOnly?: bo
                         <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">КЛАСС</label>
                         <SearchableSelect 
                             options={classes.filter(c => c.shift === selectedShift).map(c => ({ value: c.id, label: c.name }))} 
-                            value={tempItem.classId} 
-                            onChange={(val: any) => { setTempItem({...tempItem, classId: val}); updateValidation({...tempItem, classId: val}); }} 
+                            value={tempItem.classId || null} 
+                            onChange={(val) => { setTempItem({...tempItem, classId: val as string}); updateValidation({...tempItem, classId: val as string}); }} 
                             placeholder="Выберите класс" 
                         />
                     </div>
@@ -548,8 +571,8 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: { readOnly?: bo
                         <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">ПРЕДМЕТ</label>
                         <SearchableSelect 
                             options={subjects.map(s => ({ value: s.id, label: s.name }))} 
-                            value={tempItem.subjectId} 
-                            onChange={(val: any) => { setTempItem({...tempItem, subjectId: val}); updateValidation({...tempItem, subjectId: val}); }} 
+                            value={tempItem.subjectId || null} 
+                            onChange={(val) => { setTempItem({...tempItem, subjectId: val as string}); updateValidation({...tempItem, subjectId: val as string}); }} 
                             placeholder="Выберите предмет" 
                         />
                     </div>
@@ -558,8 +581,8 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: { readOnly?: bo
                         <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">УЧИТЕЛЬ</label>
                         <SearchableSelect 
                             options={[{ value: 'recommend', label: 'Рекомендуемые', options: recommendedTeachers.map(t => ({ value: t.id, label: t.name })) }, { value: 'others', label: 'Остальные', options: otherTeachers.map(t => ({ value: t.id, label: t.name })) }]} 
-                            value={tempItem.teacherId} 
-                            onChange={(val: any) => setTempItem({...tempItem, teacherId: val})} 
+                            value={tempItem.teacherId || null} 
+                            onChange={(val) => setTempItem({...tempItem, teacherId: val as string})} 
                             placeholder="Выберите учителя" 
                             groupBy 
                         />
