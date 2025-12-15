@@ -512,42 +512,47 @@ export const ExportPage = () => {
         });
     };
 
-    const handleDownloadPng = async () => {
+    const handleDownloadPngShift1 = async () => {
         setIsGenerating(true);
         try {
-            const downloads = [];
-            // Process first shift
-            if (printRef1.current) {
-                const canvas1 = await html2canvas(printRef1.current, { scale: 2, backgroundColor: '#ffffff', logging: false });
-                downloads.push({
-                    href: canvas1.toDataURL('image/png'),
-                    download: `Замены_${exportDate}_1смена.png`
-                });
-            }
-            // Process second shift
-            if (printRef2.current) {
-                const canvas2 = await html2canvas(printRef2.current, { scale: 2, backgroundColor: '#ffffff', logging: false });
-                downloads.push({
-                    href: canvas2.toDataURL('image/png'),
-                    download: `Замены_${exportDate}_2смена.png`
-                });
+            if (!printRef1.current) {
+                alert('Нет замен для 1-й смены.');
+                return;
             }
 
-            if (downloads.length === 0) {
-                alert('Нет замен для скачивания.');
-            } else {
-                downloads.forEach(({ href, download }) => {
-                    const link = document.createElement('a');
-                    link.href = href;
-                    link.download = download;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                });
-            }
+            const canvas1 = await html2canvas(printRef1.current, { scale: 2, backgroundColor: '#ffffff', logging: false });
+            const link = document.createElement('a');
+            link.href = canvas1.toDataURL('image/png');
+            link.download = `Замены_${exportDate}_1смена.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         } catch (e) {
             console.error(e);
-            alert("Ошибка при создании изображений");
+            alert("Ошибка при создании изображения");
+        } finally {
+            setIsGenerating(false);
+        }
+    };
+
+    const handleDownloadPngShift2 = async () => {
+        setIsGenerating(true);
+        try {
+            if (!printRef2.current) {
+                alert('Нет замен для 2-й смены.');
+                return;
+            }
+
+            const canvas2 = await html2canvas(printRef2.current, { scale: 2, backgroundColor: '#ffffff', logging: false });
+            const link = document.createElement('a');
+            link.href = canvas2.toDataURL('image/png');
+            link.download = `Замены_${exportDate}_2смена.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } catch (e) {
+            console.error(e);
+            alert("Ошибка при создании изображения");
         } finally {
             setIsGenerating(false);
         }
@@ -758,8 +763,19 @@ export const ExportPage = () => {
                     </div>
                     <div className="flex gap-4 items-center">
                         <input type="date" value={exportDate} onChange={e => setExportDate(e.target.value)} className="border border-slate-200 dark:border-slate-600 p-2 rounded-lg font-bold outline-none focus:border-indigo-500 bg-transparent dark:text-white"/>
-                        <button onClick={handleDownloadPng} disabled={isGenerating} className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition shadow-lg shadow-indigo-200 dark:shadow-none flex items-center gap-2 disabled:opacity-50">
-                            {isGenerating ? <><Icon name="Loader" size={20} className="animate-spin"/> Создание...</> : <><Icon name="Download" size={20}/> Скачать PNG</>}
+                        <button
+                            onClick={handleDownloadPngShift1}
+                            disabled={isGenerating || !subsForShift1}
+                            className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition shadow-lg shadow-indigo-200 dark:shadow-none flex items-center gap-2 disabled:opacity-50"
+                        >
+                            {isGenerating ? <><Icon name="Loader" size={20} className="animate-spin"/> Создание...</> : <><Icon name="Download" size={20}/> 1-я смена</>}
+                        </button>
+                        <button
+                            onClick={handleDownloadPngShift2}
+                            disabled={isGenerating || !subsForShift2}
+                            className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition shadow-lg shadow-indigo-200 dark:shadow-none flex items-center gap-2 disabled:opacity-50"
+                        >
+                            {isGenerating ? <><Icon name="Loader" size={20} className="animate-spin"/> Создание...</> : <><Icon name="Download" size={20}/> 2-я смена</>}
                         </button>
                     </div>
                 </div>

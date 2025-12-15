@@ -10,8 +10,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
       manifest: {
-        name: 'Gymnasium Manager - Управление расписанием',
-        short_name: 'Gym Manager',
+        name: 'Гимназия Pro22 - Управление расписанием',
+        short_name: 'Гимназия Pro22',
         description: 'Система управления расписанием, заменами и справочниками для школы',
         theme_color: '#4f46e5',
         background_color: '#ffffff',

@@ -112,3 +112,10 @@ npm run preview
 - [Lighthouse](https://developers.google.com/web/tools/lighthouse) - аудит PWA
 - [Workbox](https://developers.google.com/web/tools/workbox) - документация по кешированию
 
+
+
+
+
+
+
+

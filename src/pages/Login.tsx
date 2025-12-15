@@ -85,7 +85,7 @@ export const LoginPage = () => {
                     <div className="inline-flex p-4 bg-indigo-100 dark:bg-indigo-900/30 rounded-2xl text-indigo-600 dark:text-indigo-400 mb-4">
                         <Icon name="GraduationCap" size={48} />
                     </div>
-                    <h1 className="text-2xl font-black text-slate-800 dark:text-white">Gymnasium Manager</h1>
+                    <h1 className="text-2xl font-black text-slate-800 dark:text-white">Гимназия Pro22</h1>
                     <p className="text-slate-500 dark:text-slate-400">Выберите режим входа</p>
                 </div>
 
