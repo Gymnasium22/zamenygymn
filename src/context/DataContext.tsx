@@ -74,7 +74,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                 
                 // Нормализация данных
                 if (!fixedData.teachers) fixedData.teachers = [];
-                fixedData.teachers = fixedData.teachers.map(t => ({ shifts: [Shift.First, Shift.Second], telegramChatId: '', ...t }));
+                // Fix: apply defaults safely to avoid overwriting or TS warnings
+                fixedData.teachers = fixedData.teachers.map(t => ({ 
+                    telegramChatId: '', 
+                    ...t,
+                    shifts: t.shifts || [Shift.First, Shift.Second]
+                }));
 
                 if (!fixedData.schedule) fixedData.schedule = [];
                 if (!fixedData.schedule2ndHalf) fixedData.schedule2ndHalf = []; 

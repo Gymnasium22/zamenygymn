@@ -1,3 +1,4 @@
+
 import { useState, useMemo, useEffect } from 'react';
 import { useStaticData, useScheduleData } from '../context/DataContext'; 
 import { Icon } from '../components/Icons';
@@ -91,7 +92,7 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
                 if (!s.roomId) return false;
                 const room = rooms.find(r => r.id === s.roomId);
                 const roomName = room ? room.name : s.roomId;
-                return roomName!.toLowerCase().includes(filterRoom.toLowerCase());
+                return (roomName || '').toLowerCase().includes(filterRoom.toLowerCase());
             });
         }
         if (filterDirection) items = items.filter(s => s.direction?.toLowerCase().includes(filterDirection.toLowerCase()));
@@ -122,7 +123,7 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
     };
 
     const validateRoom = (classId: string, subjectId: string, roomId: string) => {
-        const warnings = [];
+        const warnings: string[] = [];
         const cls = classes.find(c => c.id === classId);
         const subj = subjects.find(s => s.id === subjectId);
         const room = rooms.find(r => r.id === roomId);
@@ -242,13 +243,15 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
             { label: 'Удалить', icon: 'Trash2', color: 'text-red-600', onClick: () => handleDeleteItem(contextMenu.item!.id) }
         );
     } else if (contextMenu.cell) {
+        // Capture cell in a const to guarantee strict null check safety within closures
+        const cell = contextMenu.cell;
         if (clipboard) {
             contextActions.push({ label: 'Вставить', icon: 'Clipboard', onClick: async () => {
-                 const newItem = { ...clipboard, id: Math.random().toString(36).substr(2, 9), day: selectedDay, shift: selectedShift, period: contextMenu.cell!.colKey } as ScheduleItem; 
-                 if(viewMode === 'week') { newItem.day = contextMenu.cell!.colKey as string; newItem.period = parseInt(contextMenu.cell!.rowId); }
-                 if(viewMode === 'class') newItem.classId = contextMenu.cell!.rowId;
-                 else if (viewMode === 'teacher') newItem.teacherId = contextMenu.cell!.rowId;
-                 else if (viewMode === 'subject') newItem.subjectId = contextMenu.cell!.rowId;
+                 const newItem = { ...clipboard, id: Math.random().toString(36).substr(2, 9), day: selectedDay, shift: selectedShift, period: cell.colKey } as ScheduleItem; 
+                 if(viewMode === 'week') { newItem.day = cell.colKey as string; newItem.period = parseInt(cell.rowId); }
+                 if(viewMode === 'class') newItem.classId = cell.rowId;
+                 else if (viewMode === 'teacher') newItem.teacherId = cell.rowId;
+                 else if (viewMode === 'subject') newItem.subjectId = cell.rowId;
                  
                  let newSchedule = [...schedule, newItem];
                  await saveCurrentSchedule(newSchedule);
@@ -259,9 +262,9 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
             label: 'Добавить урок', 
             icon: 'Plus', 
             onClick: () => handleAddItem(
-                contextMenu.cell!.rowId, 
-                typeof contextMenu.cell!.colKey === 'number' ? contextMenu.cell!.colKey : parseInt(contextMenu.cell!.rowId), 
-                viewMode === 'week' ? contextMenu.cell!.colKey as DayOfWeek : selectedDay
+                cell.rowId || '', 
+                typeof cell.colKey === 'number' ? cell.colKey : parseInt(cell.rowId || '0'), 
+                viewMode === 'week' ? cell.colKey as DayOfWeek : selectedDay
             ) 
         });
     }
@@ -550,6 +553,7 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
             </div>
 
             <Modal isOpen={isEditorOpen} onClose={() => setIsEditorOpen(false)} title={tempItem.id ? 'Редактирование урока' : 'Добавить урок'}>
+                {/* ... (Modal content unchanged) ... */}
                 <div className="space-y-4">
                     {/* Top Info Bar */}
                     <div className="bg-slate-50 dark:bg-slate-700/50 p-3 rounded-xl flex items-center gap-4 text-sm font-bold text-slate-600 dark:text-slate-300">
@@ -615,6 +619,7 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
                 </div>
             </Modal>
             
+            {/* ... (Mass Ops Modal and Print Overlay unchanged) ... */}
             <Modal isOpen={isMassOperationsModalOpen} onClose={() => setIsMassOperationsModalOpen(false)} title="Массовые операции с расписанием">
                 <div className="space-y-6">
                     <p className="text-sm text-slate-500 dark:text-slate-400">

@@ -480,7 +480,7 @@ export const SubstitutionsPage = () => {
                             if (rt?.telegramChatId) teacherChatIdsToNotify.add(rt.telegramChatId);
                         });
 
-                        const newRoomName = firstSub.replacementRoomId ? (rooms.find(r => r.id === firstSub.replacementRoomId)?.name || firstSub.replacementRoomId) : '—';
+                        const newRoomName = firstSub?.replacementRoomId ? (rooms.find(r => r.id === firstSub.replacementRoomId)?.name || firstSub.replacementRoomId) : '—';
                         
                         fullMessage += `${l.period} урок (${cls?.name} ${subj?.name}): *${replacementNames}* (Объединение${swappedClass ? ` с ${swappedClass.name}` : ''}). Кабинет: ${newRoomName}\n`;
                     } else {
@@ -885,7 +885,8 @@ export const SubstitutionsPage = () => {
                         const roomName = room ? room.name : l.roomId;
                         
                         const newRoomId = firstSub?.replacementRoomId;
-                        const newRoomName = newRoomId ? (rooms.find(r => r.id === newRoomId)?.name || newRoomId) : null;
+                        // FIX: Use undefined instead of null to match type signature
+                        const newRoomName = newRoomId ? (rooms.find(r => r.id === newRoomId)?.name || newRoomId) : undefined;
                         
                         // Check if content was swapped
                         const swappedClass = firstSub?.replacementClassId ? classes.find(c => c.id === firstSub.replacementClassId) : null;
@@ -900,7 +901,7 @@ export const SubstitutionsPage = () => {
                             const isRoomChangeOnly = firstSub?.replacementTeacherId === firstSub?.originalTeacherId && newRoomId && !swappedClass;
                             
                             // IMPORTANT FIX: Swap logic only applies if it is NOT a merger
-                            const isSwap = swappedClass && swappedSubj && !firstSub.isMerger;
+                            const isSwap = swappedClass && swappedSubj && !firstSub?.isMerger;
                             
                             // Multi-teacher display logic
                             const replacementNames = subs.map(s => teachers.find(t => t.id === s.replacementTeacherId)?.name).filter(Boolean).join(', ');
@@ -913,17 +914,17 @@ export const SubstitutionsPage = () => {
                                     <div className="font-bold text-emerald-900 dark:text-emerald-200 text-sm max-w-[200px] truncate" title={replacementNames}>
                                         {isRoomChangeOnly ? 'Учитель тот же' : isSwap ? `Урок ${swappedClass?.name}` : replacementNames}
                                     </div>
-                                    {firstSub.isMerger && (
+                                    {firstSub?.isMerger && (
                                         <div className="text-[10px] font-black text-purple-600 dark:text-purple-400 uppercase tracking-widest mt-0.5">
                                             ОБЪЕДИНЕНИЕ {swappedClass ? `(вместе с ${swappedClass.name})` : ''}
                                         </div>
                                     )}
-                                    {firstSub.lessonAbsenceReason && ( 
+                                    {firstSub?.lessonAbsenceReason && ( 
                                         <div className="text-[10px] text-red-500 dark:text-red-400 italic mt-0.5">Причина: {firstSub.lessonAbsenceReason}</div>
                                     )}
                                 </div>
                                 <div className="flex gap-1">
-                                    <button onClick={() => notifyTeacherFunction(rep || orig, l, cls, subj, newRoomName || roomName, selectedDate)} className="p-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600 shadow-sm transition-all" title="Отправить уведомление">
+                                    <button onClick={() => { if(rep || orig) notifyTeacherFunction(rep || orig!, l, cls, subj, newRoomName || roomName || undefined, selectedDate); }} className="p-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600 shadow-sm transition-all" title="Отправить уведомление">
                                         <Icon name="Send" size={18}/>
                                     </button>
                                     <button onClick={() => removeSubstitution(l.id)} className="p-2 rounded-lg bg-white dark:bg-slate-800 text-red-500 border border-red-100 dark:border-red-900/30 hover:bg-red-50 dark:hover:bg-red-900/20 shadow-sm transition-all" title="Отменить замену"><Icon name="UserX" size={18}/></button>
@@ -946,7 +947,7 @@ export const SubstitutionsPage = () => {
                                         {firstSub?.lessonAbsenceReason && ( // Always show lesson-specific reason
                                             <span className="text-xs bg-red-50 dark:bg-red-900/20 px-1.5 py-0.5 rounded border border-red-100 dark:border-red-900 text-red-500 dark:text-red-400 font-medium">({firstSub.lessonAbsenceReason})</span>
                                         )}
-                                        {swappedClass && swappedSubj && !firstSub.isMerger && (
+                                        {swappedClass && swappedSubj && !firstSub?.isMerger && (
                                             <span className="text-xs bg-purple-50 dark:bg-purple-900/20 px-1.5 py-0.5 rounded border border-purple-100 dark:border-purple-900 text-purple-600 dark:text-purple-400 font-bold">
                                                 Меняется на: {swappedClass.name}
                                             </span>
@@ -960,7 +961,7 @@ export const SubstitutionsPage = () => {
                 </div>
             </div>
             
-            {/* SUBSTITUTION MODAL */}
+            {/* ... rest of the component ... */}
             <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Выбор замены">
                 {modalContext && (
                     <div className="bg-slate-50 dark:bg-slate-700/50 p-3 rounded-xl mb-4 text-sm border border-slate-100 dark:border-slate-600">
@@ -982,7 +983,7 @@ export const SubstitutionsPage = () => {
                     </select>
                 </div>
 
-                {/* NEW: Lesson-specific absence reason */}
+                {/* ... rest of modal content ... */}
                 {modalContext && !modalContext.isTeacherAbsent && (
                     <div className="mb-6">
                         <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Причина отсутствия на уроке (Опционально)</label>
@@ -1008,7 +1009,6 @@ export const SubstitutionsPage = () => {
                 </div>
                 
                 <div className="mb-4">
-                    {/* Expandable Merge Option */}
                     <button 
                         onClick={() => setShowMergeOptions(!showMergeOptions)} 
                         className="w-full p-3 mb-2 rounded-xl bg-amber-50 text-amber-700 font-bold text-sm hover:bg-amber-100 transition border border-amber-200 flex items-center justify-center gap-2"
@@ -1141,8 +1141,8 @@ export const SubstitutionsPage = () => {
                 </div>
             </Modal>
 
-            {/* MANUAL SEARCH MODAL */}
             <Modal isOpen={manualSearchModalOpen} onClose={() => setManualSearchModalOpen(false)} title="Ручной поиск урока">
+                {/* ... (Manual Search Modal content unchanged) ... */}
                 <div className="mb-4">
                     <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">Введите имя учителя или название класса, чтобы найти урок и поставить замену (кабинета или учителя).</p>
                     <div className="relative">

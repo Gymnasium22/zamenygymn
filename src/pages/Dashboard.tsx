@@ -144,7 +144,8 @@ export const DashboardPage = () => {
 
         // Process partial absentees
         partialAbsenceMap.forEach((data, teacherId) => {
-            const lessons = data.lessons.sort((a: { period: number; reason?: string }, b: { period: number; reason?: string }) => a.period - b.period);
+            // FIX: Explicitly type 'lessons' here to avoid implicit 'any' error
+            const lessons: { period: number; reason?: string }[] = data.lessons.sort((a: { period: number; reason?: string }, b: { period: number; reason?: string }) => a.period - b.period);
             const periods = lessons.map((l) => l.period).join(', ');
             
             // Determine reason text. 
