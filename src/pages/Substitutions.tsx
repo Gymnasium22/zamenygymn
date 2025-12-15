@@ -33,6 +33,7 @@ export const SubstitutionsPage = () => {
     // State to track refusals in the current modal session
     const [refusedTeacherIds, setRefusedTeacherIds] = useState<string[]>([]);
     const [showSwapOptions, setShowSwapOptions] = useState(false);
+    const [showMergeOptions, setShowMergeOptions] = useState(false);
     // State for swap configuration
     const [swapKeepRooms, setSwapKeepRooms] = useState(false);
 
@@ -51,6 +52,7 @@ export const SubstitutionsPage = () => {
             setLessonAbsenceReason(''); 
             setRefusedTeacherIds([]);
             setShowSwapOptions(false);
+            setShowMergeOptions(false);
             setSwapKeepRooms(false);
             setIsModalOpen(true);
             window.history.replaceState({}, document.title);
@@ -67,6 +69,7 @@ export const SubstitutionsPage = () => {
                 setRefusedTeacherIds([]);
             }
             setShowSwapOptions(false);
+            setShowMergeOptions(false);
             setSwapKeepRooms(false);
         }
     }, [isModalOpen, currentSubParams, substitutions, selectedDate]);
@@ -158,9 +161,11 @@ export const SubstitutionsPage = () => {
             return;
         }
         
-        const existingSubIndex = newSubs.findIndex(s => s.scheduleItemId === currentSubParams.scheduleItemId && s.date === selectedDate);
+        // Remove ANY existing substitutions for this lesson on this date (to handle re-assignment or clearing splits)
+        const filteredSubs = newSubs.filter(s => !(s.scheduleItemId === currentSubParams.scheduleItemId && s.date === selectedDate));
+        
         const subData = { 
-            id: existingSubIndex >= 0 ? newSubs[existingSubIndex].id : Math.random().toString(36).substr(2, 9), 
+            id: Math.random().toString(36).substr(2, 9), 
             date: selectedDate, 
             scheduleItemId: currentSubParams.scheduleItemId, 
             originalTeacherId: item.teacherId, 
@@ -173,9 +178,9 @@ export const SubstitutionsPage = () => {
             refusals: refusedTeacherIds // Save the list of refusals
         }; 
         
-        if (existingSubIndex >= 0) newSubs[existingSubIndex] = subData; else newSubs.push(subData); 
+        filteredSubs.push(subData);
         
-        await saveScheduleData({ substitutions: newSubs }); 
+        await saveScheduleData({ substitutions: filteredSubs }); 
         
         setIsModalOpen(false); 
         setCandidateSearch('');
@@ -184,6 +189,53 @@ export const SubstitutionsPage = () => {
         setRefusedTeacherIds([]);
         setCurrentSubParams(null);
     }, [currentSubParams, selectedDate, selectedRoomId, activeSchedule, substitutions, teachers, lessonAbsenceReason, refusedTeacherIds, saveScheduleData]);
+
+    const handleBatchClassMerge = useCallback(async (targetClassId: string) => {
+        if (!currentSubParams || !selectedDayOfWeek) return;
+
+        // 1. Находим все уроки целевого класса (7А) в это время
+        const targetLessons = activeSchedule.filter(s => 
+            s.classId === targetClassId &&
+            s.day === selectedDayOfWeek &&
+            s.period === currentSubParams.period &&
+            s.shift === currentSubParams.shift
+        );
+
+        if (targetLessons.length === 0) {
+            alert("Уроки для объединения не найдены.");
+            return;
+        }
+
+        // 2. Удаляем старые замены для текущего урока (чтобы перезаписать)
+        const newSubs = substitutions.filter(s => !(s.scheduleItemId === currentSubParams.scheduleItemId && s.date === selectedDate));
+
+        // 3. Создаем замену для КАЖДОГО учителя целевого класса
+        targetLessons.forEach(lesson => {
+            const subData = {
+                id: Math.random().toString(36).substr(2, 9),
+                date: selectedDate,
+                scheduleItemId: currentSubParams.scheduleItemId, // ID урока 7Б (Химия)
+                originalTeacherId: currentSubParams.teacherId, // Петрова
+                replacementTeacherId: lesson.teacherId, // Учитель 7А (Подгруппа 1, потом 2)
+                replacementClassId: lesson.classId, // 7А
+                replacementSubjectId: lesson.subjectId, // Английский
+                isMerger: true,
+                replacementRoomId: lesson.roomId, // Идут в кабинет 7А
+                lessonAbsenceReason: lessonAbsenceReason || undefined
+            };
+            newSubs.push(subData);
+        });
+
+        await saveScheduleData({ substitutions: newSubs });
+        
+        setIsModalOpen(false);
+        setCandidateSearch('');
+        setSelectedRoomId('');
+        setLessonAbsenceReason('');
+        setCurrentSubParams(null);
+        setShowMergeOptions(false);
+
+    }, [currentSubParams, selectedDate, selectedDayOfWeek, activeSchedule, substitutions, lessonAbsenceReason, saveScheduleData]);
 
     const swapLessons = useCallback(async (targetLessonId: string) => {
         if (!currentSubParams) return;
@@ -201,15 +253,6 @@ export const SubstitutionsPage = () => {
         const newSubs = [...substitutions];
 
         // Logic for room assignment:
-        // By default (swapKeepRooms = false), lessons trade places. 
-        //   - Source Lesson (teaching Target Subject) goes to Target Room.
-        //   - Target Lesson (teaching Source Subject) goes to Source Room.
-        // If swapKeepRooms = true, teachers stay in their own rooms.
-        //   - Source Lesson (teaching Target Subject) stays in Source Room.
-        //   - Target Lesson (teaching Source Subject) stays in Target Room.
-        // Manual override: selectedRoomId overrides Source Lesson's room.
-
-        // Calculate specific room ID for source substitution
         let effectiveRoomForSource: string | undefined;
         if (selectedRoomId) {
             effectiveRoomForSource = selectedRoomId;
@@ -217,10 +260,7 @@ export const SubstitutionsPage = () => {
             effectiveRoomForSource = swapKeepRooms ? sourceLesson.roomId : targetLesson.roomId;
         }
 
-        // Calculate specific room ID for target substitution
-        // If keeping rooms, Target stays in Target Room. If swapping (default), Target takes Source Room.
         const effectiveRoomForTarget = swapKeepRooms ? targetLesson.roomId : sourceLesson.roomId;
-
 
         // 1. Create Sub for Source Lesson
         const sourceSubIndex = newSubs.findIndex(s => s.scheduleItemId === sourceLesson.id && s.date === selectedDate);
@@ -261,10 +301,6 @@ export const SubstitutionsPage = () => {
     }, [currentSubParams, activeSchedule, substitutions, selectedDate, saveScheduleData, selectedRoomId, swapKeepRooms]);
     
     const removeSubstitution = useCallback(async (id: string) => { 
-        // If it was a swap, we technically should check if the "other half" exists, 
-        // but user might want to cancel just one side or both. 
-        // For simplicity, we just delete the selected one. The other one will remain as a "substitution" 
-        // (Teacher X teaches Class Y at Period Z) which is still valid state.
         const newSubs = substitutions.filter(s => !(s.scheduleItemId === id && s.date === selectedDate)); 
         await saveScheduleData({ substitutions: newSubs }); 
     }, [substitutions, selectedDate, saveScheduleData]);
@@ -278,54 +314,81 @@ export const SubstitutionsPage = () => {
             const lessons = affectedLessons.filter(l => l.shift === shiftEnum);
             
             const lessonsWithSubs = lessons.filter(l => {
-                const sub = substitutions.find(s => s.scheduleItemId === l.id && s.date === selectedDate);
-                return sub && sub.replacementTeacherId !== 'conducted';
+                const subs = substitutions.filter(s => s.scheduleItemId === l.id && s.date === selectedDate);
+                return subs.length > 0 && subs.some(s => s.replacementTeacherId !== 'conducted');
             });
 
             if (lessonsWithSubs.length > 0) {
                 text += `\n🔹 *${shiftName.toUpperCase()}*\n`;
                 lessonsWithSubs.forEach(l => {
-                    const sub = substitutions.find(s => s.scheduleItemId === l.id && s.date === selectedDate);
-                    const cls = classes.find(c => c.id === l.classId);
-                    const subj = subjects.find(s => s.id === l.subjectId);
-                    const rep = sub ? teachers.find(t => t.id === sub.replacementTeacherId) : null;
-                    const orig = teachers.find(t => t.id === l.teacherId);
-                    const origRoom = rooms.find(r => r.id === l.roomId)?.name || l.roomId || '?';
+                    const subs = substitutions.filter(s => s.scheduleItemId === l.id && s.date === selectedDate);
                     
-                    const dayAbsenceReason = orig?.absenceReasons?.[selectedDate];
-                    const lessonSpecificReason = sub?.lessonAbsenceReason;
-                    
-                    const effectiveDayAbsenceDisplay = (dayAbsenceReason === 'Без записи') ? dayAbsenceReason : null;
-                    const effectiveLessonSpecificDisplay = (lessonSpecificReason === 'Без записи') ? lessonSpecificReason : null;
+                    const isMerger = subs.some(s => s.isMerger);
 
-                    const effectiveReasonDisplay = effectiveLessonSpecificDisplay || effectiveDayAbsenceDisplay;
-
-                    const origName = orig?.name + (effectiveReasonDisplay ? ` (${effectiveReasonDisplay})` : '');
-                    
-                    const newRoom = sub?.replacementRoomId ? rooms.find(r => r.id === sub.replacementRoomId)?.name || sub.replacementRoomId : null;
-                    
-                    // Logic for swapped content
-                    const swappedClass = sub?.replacementClassId ? classes.find(c => c.id === sub.replacementClassId) : null;
-                    const swappedSubj = sub?.replacementSubjectId ? subjects.find(s => s.id === sub.replacementSubjectId) : null;
-
-                    if (sub) {
-                        if (sub.replacementTeacherId === 'cancelled') {
-                            text += `❗ ${cls?.name} (${l.period} ур): ${subj?.name} (${origName}) -> УРОК СНЯТ\n`;
-                        } else {
-                            if (sub.replacementTeacherId === sub.originalTeacherId && newRoom && !swappedClass) {
-                                text += `🚪 ${cls?.name} (${l.period} ур): ${subj?.name} (${orig?.name}) -> Кабинет ${origRoom} → ${newRoom}\n`;
-                            } else if (swappedClass && swappedSubj) {
-                                text += `🔄 ${cls?.name} (${l.period} ур): ${subj?.name} -> Урок ${swappedClass.name} ${swappedSubj.name} (Обмен уроками)${newRoom ? ` в каб. ${newRoom}` : ''}\n`;
-                            } else {
-                                let line = `✅ ${cls?.name} (${l.period} ур): ${subj?.name} -> ${rep?.name} ${sub.isMerger ? '(ОБЪЕДИНЕНИЕ) ' : ''}(вместо ${origName})`;
-                                if (newRoom) line += ` в каб. ${newRoom}`;
-                                text += line + '\n';
-                            }
+                    if (isMerger) {
+                        const cls = classes.find(c => c.id === l.classId);
+                        const subj = subjects.find(s => s.id === l.subjectId);
+                        const orig = teachers.find(t => t.id === l.teacherId);
+                        const origName = orig?.name || '?';
+                        
+                        const replacementNames = subs.map(s => teachers.find(t => t.id === s.replacementTeacherId)?.name).filter(Boolean).join(', ');
+                        const firstSub = subs[0];
+                        const swappedClass = firstSub?.replacementClassId ? classes.find(c => c.id === firstSub.replacementClassId) : null;
+                        
+                        let line = `✅ ${cls?.name} (${l.period} ур): ${subj?.name} -> ${replacementNames} (Объединение${swappedClass ? ` с ${swappedClass.name}` : ''}) (вместо ${origName})`;
+                        
+                        const newRoomId = firstSub?.replacementRoomId;
+                        if (newRoomId) {
+                             const newRoomName = rooms.find(r => r.id === newRoomId)?.name || newRoomId;
+                             line += ` в каб. ${newRoomName}`;
                         }
+                        text += line + '\n';
+                    } else {
+                        subs.forEach(sub => {
+                            if (sub.replacementTeacherId === 'conducted') return;
+
+                            const cls = classes.find(c => c.id === l.classId);
+                            const subj = subjects.find(s => s.id === l.subjectId);
+                            const rep = teachers.find(t => t.id === sub.replacementTeacherId);
+                            const orig = teachers.find(t => t.id === l.teacherId);
+                            const origRoom = rooms.find(r => r.id === l.roomId)?.name || l.roomId || '?';
+                            
+                            const dayAbsenceReason = orig?.absenceReasons?.[selectedDate];
+                            const lessonSpecificReason = sub?.lessonAbsenceReason;
+                            
+                            const effectiveDayAbsenceDisplay = (dayAbsenceReason === 'Без записи') ? dayAbsenceReason : null;
+                            const effectiveLessonSpecificDisplay = (lessonSpecificReason === 'Без записи') ? lessonSpecificReason : null;
+
+                            const effectiveReasonDisplay = effectiveLessonSpecificDisplay || effectiveDayAbsenceDisplay;
+
+                            const origName = orig?.name + (effectiveReasonDisplay ? ` (${effectiveReasonDisplay})` : '');
+                            
+                            const newRoom = sub?.replacementRoomId ? rooms.find(r => r.id === sub.replacementRoomId)?.name || sub.replacementRoomId : null;
+                            
+                            const swappedClass = sub?.replacementClassId ? classes.find(c => c.id === sub.replacementClassId) : null;
+                            const swappedSubj = sub?.replacementSubjectId ? subjects.find(s => s.id === sub.replacementSubjectId) : null;
+                            
+                            const isSwap = swappedClass && swappedSubj && !sub.isMerger;
+
+                            if (sub.replacementTeacherId === 'cancelled') {
+                                text += `❗ ${cls?.name} (${l.period} ур): ${subj?.name} (${origName}) -> УРОК СНЯТ\n`;
+                            } else {
+                                if (sub.replacementTeacherId === sub.originalTeacherId && newRoom && !swappedClass) {
+                                    text += `🚪 ${cls?.name} (${l.period} ур): ${subj?.name} (${orig?.name}) -> Кабинет ${origRoom} → ${newRoom}\n`;
+                                } else if (isSwap) {
+                                    text += `🔄 ${cls?.name} (${l.period} ур): ${subj?.name} -> Урок ${swappedClass?.name} ${swappedSubj?.name} (Обмен уроками)${newRoom ? ` в каб. ${newRoom}` : ''}\n`;
+                                } else {
+                                    let line = `✅ ${cls?.name} (${l.period} ур): ${subj?.name} -> ${rep?.name} (вместо ${origName})`;
+                                    if (newRoom) line += ` в каб. ${newRoom}`;
+                                    text += line + '\n';
+                                }
+                            }
+                        });
                     }
                 });
+                text += '\n';
             }
-        };
+        }
 
         if(!hasAnyActiveSubs) {
             text += "\nЗамен нет.";
@@ -342,7 +405,6 @@ export const SubstitutionsPage = () => {
         let icalContent = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Gymnasium//Manager//RU\n";
         const subs = substitutions.filter(s => s.date === selectedDate);
         subs.forEach(sub => {
-            // Используем activeSchedule
             const item = activeSchedule.find(s => s.id === sub.scheduleItemId);
             if(!item) return;
             let repName = "Unknown";
@@ -389,61 +451,88 @@ export const SubstitutionsPage = () => {
         const shiftsToProcess = [Shift.First, Shift.Second];
         for (const shiftEnum of shiftsToProcess) {
             const lessonsInShift = affectedLessons.filter(l => l.shift === shiftEnum);
-            const activeSubstitutionsInShift = lessonsInShift.filter(l => 
+            
+            const activeLessonsInShift = lessonsInShift.filter(l => 
                 substitutions.some(s => s.scheduleItemId === l.id && s.date === selectedDate && s.replacementTeacherId !== 'conducted')
             );
 
-            if (activeSubstitutionsInShift.length > 0) {
+            if (activeLessonsInShift.length > 0) {
                 hasActiveSubs = true;
                 fullMessage += `🔹 *${shiftEnum.toUpperCase()}*\n`;
 
-                activeSubstitutionsInShift.forEach(l => {
-                    const sub = substitutions.find(s => s.scheduleItemId === l.id && s.date === selectedDate);
-                    if (!sub) return;
-
-                    const cls = classes.find(c => c.id === l.classId);
-                    const subj = subjects.find(s => s.id === l.subjectId);
-                    const originalTeacher = teachers.find(t => t.id === sub.originalTeacherId);
-                    const replacementTeacher = teachers.find(t => t.id === sub.replacementTeacherId);
-
-                    const dayAbsenceReason = originalTeacher?.absenceReasons?.[selectedDate];
-                    const lessonSpecificReason = sub.lessonAbsenceReason;
-
-                    const effectiveDayAbsenceDisplay = (dayAbsenceReason === 'Без записи') ? dayAbsenceReason : null;
-                    const effectiveLessonSpecificDisplay = (lessonSpecificReason === 'Без записи') ? lessonSpecificReason : null;
-                    const effectiveReasonDisplay = effectiveLessonSpecificDisplay || effectiveDayAbsenceDisplay;
-
-                    const origTeacherNameWithReason = originalTeacher?.name + (effectiveReasonDisplay ? ` (${effectiveReasonDisplay})` : '');
+                activeLessonsInShift.forEach(l => {
+                    const subs = substitutions.filter(s => s.scheduleItemId === l.id && s.date === selectedDate);
                     
-                    const oldRoomName = rooms.find(r => r.id === l.roomId)?.name || l.roomId || '—';
-                    const newRoomName = sub.replacementRoomId ? (rooms.find(r => r.id === sub.replacementRoomId)?.name || sub.replacementRoomId) : oldRoomName;
-                    
-                    // Logic for swapped content
-                    const swappedClass = sub.replacementClassId ? classes.find(c => c.id === sub.replacementClassId) : null;
-                    const swappedSubj = sub.replacementSubjectId ? subjects.find(s => s.id === sub.replacementSubjectId) : null;
+                    const isMerger = subs.some(s => s.isMerger);
 
-                    let lessonLine = `${l.period} урок (${cls?.name} ${subj?.name}${l.direction ? ` ${l.direction}` : ''}): `;
-                    
-                    if (sub.replacementTeacherId === 'cancelled') {
-                        lessonLine += `*УРОК СНЯТ* (вместо ${origTeacherNameWithReason})`;
-                    } else if (swappedClass && swappedSubj) {
-                        lessonLine += `🔄 Обмен уроками: ${swappedClass.name} ${swappedSubj.name} (вместо ${cls?.name} ${subj?.name})`;
-                        if (newRoomName !== oldRoomName) lessonLine += ` в каб. ${newRoomName}`;
-                    } else if (sub.replacementTeacherId === sub.originalTeacherId) { 
-                        lessonLine += `Учитель: ${origTeacherNameWithReason}. Смена кабинета: ${oldRoomName} → ${newRoomName}`;
-                    } else { 
-                        lessonLine += `*${replacementTeacher?.name}* ${sub.isMerger ? '(ОБЪЕДИНЕНИЕ) ' : ''}(вместо *${origTeacherNameWithReason}*)`;
-                        if (oldRoomName !== newRoomName) {
-                            lessonLine += `. Кабинет: ${oldRoomName} → ${newRoomName}`;
-                        } else if (newRoomName !== '—') {
-                            lessonLine += `. Кабинет: ${newRoomName}`;
-                        }
+                    if (isMerger) {
+                        const cls = classes.find(c => c.id === l.classId);
+                        const subj = subjects.find(s => s.id === l.subjectId);
+                        const originalTeacher = teachers.find(t => t.id === l.teacherId);
+                        
+                        const replacementNames = subs.map(s => teachers.find(t => t.id === s.replacementTeacherId)?.name).filter(Boolean).join(', ');
+                        const firstSub = subs[0];
+                        const swappedClass = firstSub?.replacementClassId ? classes.find(c => c.id === firstSub.replacementClassId) : null;
+                        
+                        if (originalTeacher?.telegramChatId) teacherChatIdsToNotify.add(originalTeacher.telegramChatId);
+                        subs.forEach(s => {
+                            const rt = teachers.find(t => t.id === s.replacementTeacherId);
+                            if (rt?.telegramChatId) teacherChatIdsToNotify.add(rt.telegramChatId);
+                        });
+
+                        const newRoomName = firstSub.replacementRoomId ? (rooms.find(r => r.id === firstSub.replacementRoomId)?.name || firstSub.replacementRoomId) : '—';
+                        
+                        fullMessage += `${l.period} урок (${cls?.name} ${subj?.name}): *${replacementNames}* (Объединение${swappedClass ? ` с ${swappedClass.name}` : ''}). Кабинет: ${newRoomName}\n`;
+                    } else {
+                        subs.forEach(sub => {
+                            if (!sub) return;
+
+                            const cls = classes.find(c => c.id === l.classId);
+                            const subj = subjects.find(s => s.id === l.subjectId);
+                            const originalTeacher = teachers.find(t => t.id === sub.originalTeacherId);
+                            const replacementTeacher = teachers.find(t => t.id === sub.replacementTeacherId);
+
+                            const dayAbsenceReason = originalTeacher?.absenceReasons?.[selectedDate];
+                            const lessonSpecificReason = sub.lessonAbsenceReason;
+
+                            const effectiveDayAbsenceDisplay = (dayAbsenceReason === 'Без записи') ? dayAbsenceReason : null;
+                            const effectiveLessonSpecificDisplay = (lessonSpecificReason === 'Без записи') ? lessonSpecificReason : null;
+                            const effectiveReasonDisplay = effectiveLessonSpecificDisplay || effectiveDayAbsenceDisplay;
+
+                            const origTeacherNameWithReason = originalTeacher?.name + (effectiveReasonDisplay ? ` (${effectiveReasonDisplay})` : '');
+                            
+                            const oldRoomName = rooms.find(r => r.id === l.roomId)?.name || l.roomId || '—';
+                            const newRoomName = sub.replacementRoomId ? (rooms.find(r => r.id === sub.replacementRoomId)?.name || sub.replacementRoomId) : oldRoomName;
+                            
+                            const swappedClass = sub.replacementClassId ? classes.find(c => c.id === sub.replacementClassId) : null;
+                            const swappedSubj = sub.replacementSubjectId ? subjects.find(s => s.id === sub.replacementSubjectId) : null;
+                            
+                            const isSwap = swappedClass && swappedSubj && !sub.isMerger;
+
+                            let lessonLine = `${l.period} урок (${cls?.name} ${subj?.name}${l.direction ? ` ${l.direction}` : ''}): `;
+                            
+                            if (sub.replacementTeacherId === 'cancelled') {
+                                lessonLine += `*УРОК СНЯТ* (вместо ${origTeacherNameWithReason})`;
+                            } else if (isSwap) {
+                                lessonLine += `🔄 Обмен уроками: ${swappedClass?.name} ${swappedSubj?.name} (вместо ${cls?.name} ${subj?.name})`;
+                                if (newRoomName !== oldRoomName) lessonLine += ` в каб. ${newRoomName}`;
+                            } else if (sub.replacementTeacherId === sub.originalTeacherId) { 
+                                lessonLine += `Учитель: ${origTeacherNameWithReason}. Смена кабинета: ${oldRoomName} → ${newRoomName}`;
+                            } else { 
+                                lessonLine += `*${replacementTeacher?.name}* (вместо *${origTeacherNameWithReason}*)`;
+                                if (oldRoomName !== newRoomName) {
+                                    lessonLine += `. Кабинет: ${oldRoomName} → ${newRoomName}`;
+                                } else if (newRoomName !== '—') {
+                                    lessonLine += `. Кабинет: ${newRoomName}`;
+                                }
+                            }
+
+                            fullMessage += `${lessonLine}\n`;
+
+                            if (originalTeacher?.telegramChatId) teacherChatIdsToNotify.add(originalTeacher.telegramChatId);
+                            if (replacementTeacher?.telegramChatId) teacherChatIdsToNotify.add(replacementTeacher.telegramChatId);
+                        });
                     }
-
-                    fullMessage += `${lessonLine}\n`;
-
-                    if (originalTeacher?.telegramChatId) teacherChatIdsToNotify.add(originalTeacher.telegramChatId);
-                    if (replacementTeacher?.telegramChatId) teacherChatIdsToNotify.add(replacementTeacher.telegramChatId);
                 });
                 fullMessage += '\n';
             }
@@ -503,14 +592,44 @@ export const SubstitutionsPage = () => {
         }
     }, [selectedDate, affectedLessons, substitutions, classes, subjects, teachers, rooms, absentTeachers, settings?.telegramToken]);
     
-    // activeSubstitutionsForSlot теперь использует activeSchedule
+    const notifyTeacherFunction = useCallback(async (replacementTeacher: Teacher, lessonInfo: ScheduleItem, classInfo: ClassEntity | undefined, subjectInfo: Subject | undefined, roomInfo: Room | string | undefined, dateStr: string) => {
+        const dateObj = new Date(dateStr);
+        const formattedDate = dateObj.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+        const shiftText = lessonInfo.shift === Shift.First ? '1 смена' : '2 смена';
+        const message = `🔔 *Уведомление о замене*\n${replacementTeacher.name}\n\n📅 Дата: ${formattedDate}\n🕒 Смена: ${shiftText}\n🏫 Класс: ${classInfo?.name}\n1️⃣ Урок: ${lessonInfo.period}\n📚 Предмет: ${subjectInfo?.name}\n🚪 Кабинет: ${roomInfo || 'по расписанию'}`;
+        
+        if (settings?.telegramToken && replacementTeacher.telegramChatId) {
+            try {
+                const response = await fetch(`https://api.telegram.org/bot${settings.telegramToken}/sendMessage`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ chat_id: replacementTeacher.telegramChatId, text: message, parse_mode: 'Markdown' })
+                });
+                const resData = await response.json();
+                if (resData.ok) {
+                    alert(`Сообщение отправлено в Telegram для ${replacementTeacher.name}!`);
+                } else {
+                    if (resData.description.includes("chat not found")) {
+                        alert(`Ошибка Telegram: Чат не найден.\n\nПопросите учителя ${replacementTeacher.name} найти вашего бота и нажать кнопку "Запустить" (/start).`);
+                    } else {
+                        alert(`Ошибка Telegram: ${resData.description}`);
+                    }
+                }
+            } catch (error) {
+                alert('Ошибка отправки в Telegram (сеть/токен).');
+                console.error(error);
+            }
+        } else {
+            if (navigator.share) { navigator.share({ title: 'Замена', text: message }).catch(() => {}); } else { navigator.clipboard.writeText(message); alert(`Сообщение скопировано! (Telegram не настроен или нет Chat ID)`); }
+        }
+    }, [settings?.telegramToken]);
+
     const activeSubstitutionsForSlot = useMemo(() => {
         if (!currentSubParams) return new Set<string>();
         
         return new Set(substitutions
             .filter(s => s.date === selectedDate && s.replacementTeacherId !== 'conducted' && s.replacementTeacherId !== 'cancelled')
             .map(s => {
-                // Ищем оригинальный урок в activeSchedule
                 const item = activeSchedule.find(i => i.id === s.scheduleItemId);
                 if (item && item.period === currentSubParams.period && item.shift === currentSubParams.shift) {
                     return s.replacementTeacherId;
@@ -528,7 +647,6 @@ export const SubstitutionsPage = () => {
             .filter(t => t.name.toLowerCase().includes(candidateSearch.toLowerCase()))
             .map(t => { 
             const isAbsent = t.unavailableDates.includes(selectedDate); 
-            // Используем activeSchedule для проверки занятости
             const isBusyRegular = activeSchedule.some(s => s.teacherId === t.id && s.day === selectedDayOfWeek && s.period === currentSubParams.period && s.shift === currentSubParams.shift); 
             const isBusySub = activeSubstitutionsForSlot.has(t.id);
             const isBusy = isBusyRegular || isBusySub;
@@ -543,6 +661,36 @@ export const SubstitutionsPage = () => {
         }).sort((a, b) => b.score - a.score); 
     }, [teachers, currentSubParams, selectedDate, candidateSearch, selectedDayOfWeek, activeSchedule, substitutions, activeSubstitutionsForSlot]);
     
+    const mergeCandidates = useMemo(() => {
+        if (!currentSubParams || !selectedDayOfWeek) return [];
+        
+        const possibleLessons = activeSchedule.filter(s => 
+            s.day === selectedDayOfWeek && 
+            s.period === currentSubParams.period && 
+            s.shift === currentSubParams.shift &&
+            s.classId !== currentSubParams.classId
+        );
+
+        const classMap = new Map<string, { classEntity: ClassEntity, teachers: string[], subjects: string[] }>();
+
+        possibleLessons.forEach(l => {
+            const cls = classes.find(c => c.id === l.classId);
+            const tch = teachers.find(t => t.id === l.teacherId);
+            const subj = subjects.find(s => s.id === l.subjectId);
+            
+            if (cls && tch) {
+                if (!classMap.has(cls.id)) {
+                    classMap.set(cls.id, { classEntity: cls, teachers: [], subjects: [] });
+                }
+                const entry = classMap.get(cls.id)!;
+                if (!entry.teachers.includes(tch.name)) entry.teachers.push(tch.name);
+                if (subj && !entry.subjects.includes(subj.name)) entry.subjects.push(subj.name);
+            }
+        });
+
+        return Array.from(classMap.values());
+    }, [activeSchedule, currentSubParams, selectedDayOfWeek, classes, teachers, subjects]);
+
     const modalContext = useMemo(() => {
         if(!currentSubParams) return null;
         const s = activeSchedule.find(i => i.id === currentSubParams.scheduleItemId);
@@ -608,38 +756,6 @@ export const SubstitutionsPage = () => {
 
         return results.sort((a, b) => a.period - b.period);
     }, [manualLessonSearch, selectedDayOfWeek, teachers, classes, activeSchedule, subjects]);
-
-    const notifyTeacherFunction = useCallback(async (replacementTeacher: Teacher, lessonInfo: ScheduleItem, classInfo: ClassEntity | undefined, subjectInfo: Subject | undefined, roomInfo: Room | string | undefined, dateStr: string) => {
-        const dateObj = new Date(dateStr);
-        const formattedDate = dateObj.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
-        const shiftText = lessonInfo.shift === Shift.First ? '1 смена' : '2 смена';
-        const message = `🔔 *Уведомление о замене*\n${replacementTeacher.name}\n\n📅 Дата: ${formattedDate}\n🕒 Смена: ${shiftText}\n🏫 Класс: ${classInfo?.name}\n1️⃣ Урок: ${lessonInfo.period}\n📚 Предмет: ${subjectInfo?.name}\n🚪 Кабинет: ${roomInfo || 'по расписанию'}`;
-        
-        if (settings?.telegramToken && replacementTeacher.telegramChatId) {
-            try {
-                const response = await fetch(`https://api.telegram.org/bot${settings.telegramToken}/sendMessage`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ chat_id: replacementTeacher.telegramChatId, text: message, parse_mode: 'Markdown' })
-                });
-                const resData = await response.json();
-                if (resData.ok) {
-                    alert(`Сообщение отправлено в Telegram для ${replacementTeacher.name}!`);
-                } else {
-                    if (resData.description.includes("chat not found")) {
-                        alert(`Ошибка Telegram: Чат не найден.\n\nПопросите учителя ${replacementTeacher.name} найти вашего бота и нажать кнопку "Запустить" (/start).`);
-                    } else {
-                        alert(`Ошибка Telegram: ${resData.description}`);
-                    }
-                }
-            } catch (error) {
-                alert('Ошибка отправки в Telegram (сеть/токен).');
-                console.error(error);
-            }
-        } else {
-            if (navigator.share) { navigator.share({ title: 'Замена', text: message }).catch(() => {}); } else { navigator.clipboard.writeText(message); alert(`Сообщение скопировано! (Telegram не настроен или нет Chat ID)`); }
-        }
-    }, [settings?.telegramToken]);
 
     const handleCandidateClick = (teacherId: string, isBusy: boolean) => {
         let isMerger = false;
@@ -757,42 +873,53 @@ export const SubstitutionsPage = () => {
                 </div>
                 <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-4">
                     {affectedLessons.length === 0 ? <div className="h-full flex flex-col items-center justify-center text-slate-400"><Icon name="CheckCircle" size={48} className="mb-4 text-slate-200 dark:text-slate-700"/><p>Нет уроков, требующих замены на эту дату</p></div> : affectedLessons.map(l => {
-                        const sub = substitutions.find(s => s.scheduleItemId === l.id && s.date === selectedDate);
-                        const rep = sub && sub.replacementTeacherId !== 'cancelled' && sub.replacementTeacherId !== 'conducted' ? teachers.find(t => t.id === sub.replacementTeacherId) : null; 
+                        // FIX: Get ALL substitutions for this lesson (since merge can create multiple)
+                        const subs = substitutions.filter(s => s.scheduleItemId === l.id && s.date === selectedDate);
+                        const hasSubs = subs.length > 0;
+                        const firstSub = hasSubs ? subs[0] : null;
+
+                        const rep = firstSub && firstSub.replacementTeacherId !== 'cancelled' && firstSub.replacementTeacherId !== 'conducted' ? teachers.find(t => t.id === firstSub.replacementTeacherId) : null; 
                         const orig = teachers.find(t => t.id === l.teacherId);
                         const subj = subjects.find(s => s.id === l.subjectId); const cls = classes.find(c => c.id === l.classId);
                         const room = rooms.find(r => r.id === l.roomId);
                         const roomName = room ? room.name : l.roomId;
                         
-                        const newRoomId = sub?.replacementRoomId;
+                        const newRoomId = firstSub?.replacementRoomId;
                         const newRoomName = newRoomId ? (rooms.find(r => r.id === newRoomId)?.name || newRoomId) : null;
                         
                         // Check if content was swapped
-                        const swappedClass = sub?.replacementClassId ? classes.find(c => c.id === sub.replacementClassId) : null;
-                        const swappedSubj = sub?.replacementSubjectId ? subjects.find(s => s.id === sub.replacementSubjectId) : null;
+                        const swappedClass = firstSub?.replacementClassId ? classes.find(c => c.id === firstSub.replacementClassId) : null;
+                        const swappedSubj = firstSub?.replacementSubjectId ? subjects.find(s => s.id === firstSub.replacementSubjectId) : null;
 
                         let statusEl = null;
-                        if (sub?.replacementTeacherId === 'conducted') {
+                        if (firstSub?.replacementTeacherId === 'conducted') {
                             statusEl = <div className="flex items-center gap-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900 pl-4 pr-2 py-2 rounded-xl"><div className="text-blue-700 dark:text-blue-400 font-bold text-sm">Урок проведен</div><button onClick={() => removeSubstitution(l.id)} className="p-2 bg-white dark:bg-dark-800 rounded-lg text-blue-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors shadow-sm"><Icon name="X" size={16}/></button></div>;
-                        } else if (sub?.replacementTeacherId === 'cancelled') {
+                        } else if (firstSub?.replacementTeacherId === 'cancelled') {
                             statusEl = <div className="flex items-center gap-3 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900 pl-4 pr-2 py-2 rounded-xl"><div className="text-red-700 dark:text-red-400 font-bold text-sm">УРОК СНЯТ</div><button onClick={() => removeSubstitution(l.id)} className="p-2 bg-white dark:bg-dark-800 rounded-lg text-red-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors shadow-sm"><Icon name="X" size={16}/></button></div>;
-                        } else if (rep || newRoomId) {
-                            const isRoomChangeOnly = sub?.replacementTeacherId === sub?.originalTeacherId && newRoomId && !swappedClass;
-                            const isSwap = swappedClass && swappedSubj;
+                        } else if (hasSubs) {
+                            const isRoomChangeOnly = firstSub?.replacementTeacherId === firstSub?.originalTeacherId && newRoomId && !swappedClass;
                             
+                            // IMPORTANT FIX: Swap logic only applies if it is NOT a merger
+                            const isSwap = swappedClass && swappedSubj && !firstSub.isMerger;
+                            
+                            // Multi-teacher display logic
+                            const replacementNames = subs.map(s => teachers.find(t => t.id === s.replacementTeacherId)?.name).filter(Boolean).join(', ');
+
                             statusEl = <div className="flex items-center gap-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-900 pl-4 pr-2 py-2 rounded-xl">
                                 <div>
                                     <div className="text-[10px] uppercase font-bold text-emerald-600 dark:text-emerald-400 tracking-wider">
                                         {isRoomChangeOnly ? 'Замена кабинета' : isSwap ? 'Обмен уроками' : 'Замена назначена'}
                                     </div>
-                                    <div className="font-bold text-emerald-900 dark:text-emerald-200 text-sm">
-                                        {isRoomChangeOnly ? 'Учитель тот же' : isSwap ? `Урок ${swappedClass?.name}` : rep?.name}
+                                    <div className="font-bold text-emerald-900 dark:text-emerald-200 text-sm max-w-[200px] truncate" title={replacementNames}>
+                                        {isRoomChangeOnly ? 'Учитель тот же' : isSwap ? `Урок ${swappedClass?.name}` : replacementNames}
                                     </div>
-                                    {sub.isMerger && (
-                                        <div className="text-[10px] font-black text-purple-600 dark:text-purple-400 uppercase tracking-widest mt-0.5">ОБЪЕДИНЕНИЕ</div>
+                                    {firstSub.isMerger && (
+                                        <div className="text-[10px] font-black text-purple-600 dark:text-purple-400 uppercase tracking-widest mt-0.5">
+                                            ОБЪЕДИНЕНИЕ {swappedClass ? `(вместе с ${swappedClass.name})` : ''}
+                                        </div>
                                     )}
-                                    {sub.lessonAbsenceReason && ( 
-                                        <div className="text-[10px] text-red-500 dark:text-red-400 italic mt-0.5">Причина: {sub.lessonAbsenceReason}</div>
+                                    {firstSub.lessonAbsenceReason && ( 
+                                        <div className="text-[10px] text-red-500 dark:text-red-400 italic mt-0.5">Причина: {firstSub.lessonAbsenceReason}</div>
                                     )}
                                 </div>
                                 <div className="flex gap-1">
@@ -816,10 +943,10 @@ export const SubstitutionsPage = () => {
                                     <div className="text-sm text-slate-600 dark:text-slate-300 flex items-center gap-2">
                                         <span className={isTeacherPresent ? 'font-semibold' : 'line-through decoration-red-400 decoration-2'}>{orig?.name}</span>
                                         {roomName && <span className="text-xs bg-white dark:bg-slate-700 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-600 flex items-center gap-1">{roomName} {newRoomName && <span className="text-indigo-600 font-bold">→ {newRoomName}</span>}</span>}
-                                        {sub?.lessonAbsenceReason && ( // Always show lesson-specific reason
-                                            <span className="text-xs bg-red-50 dark:bg-red-900/20 px-1.5 py-0.5 rounded border border-red-100 dark:border-red-900 text-red-500 dark:text-red-400 font-medium">({sub.lessonAbsenceReason})</span>
+                                        {firstSub?.lessonAbsenceReason && ( // Always show lesson-specific reason
+                                            <span className="text-xs bg-red-50 dark:bg-red-900/20 px-1.5 py-0.5 rounded border border-red-100 dark:border-red-900 text-red-500 dark:text-red-400 font-medium">({firstSub.lessonAbsenceReason})</span>
                                         )}
-                                        {swappedClass && swappedSubj && (
+                                        {swappedClass && swappedSubj && !firstSub.isMerger && (
                                             <span className="text-xs bg-purple-50 dark:bg-purple-900/20 px-1.5 py-0.5 rounded border border-purple-100 dark:border-purple-900 text-purple-600 dark:text-purple-400 font-bold">
                                                 Меняется на: {swappedClass.name}
                                             </span>
@@ -880,6 +1007,38 @@ export const SubstitutionsPage = () => {
                     <button onClick={() => assignSubstitution('cancelled')} className="p-3 rounded-xl bg-red-50 text-red-700 font-bold text-sm hover:bg-red-100 transition">Снять урок</button>
                 </div>
                 
+                <div className="mb-4">
+                    {/* Expandable Merge Option */}
+                    <button 
+                        onClick={() => setShowMergeOptions(!showMergeOptions)} 
+                        className="w-full p-3 mb-2 rounded-xl bg-amber-50 text-amber-700 font-bold text-sm hover:bg-amber-100 transition border border-amber-200 flex items-center justify-center gap-2"
+                    >
+                        <Icon name="Users" size={16}/> Замена: Объединить с классом (разбить на подгруппы)
+                    </button>
+
+                    {showMergeOptions && (
+                        <div className="mt-2 space-y-2 bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-slate-100 dark:border-slate-700">
+                            <p className="text-xs text-slate-500 dark:text-slate-400 text-center mb-1 font-bold">Выберите класс, у которого сейчас урок:</p>
+                            {mergeCandidates.length === 0 ? (
+                                <p className="text-xs text-slate-400 text-center italic">Нет подходящих классов в это время</p>
+                            ) : (
+                                mergeCandidates.map(cand => (
+                                    <button 
+                                        key={cand.classEntity.id}
+                                        onClick={() => handleBatchClassMerge(cand.classEntity.id)}
+                                        className="w-full p-2 text-left bg-white dark:bg-slate-700 rounded-lg border border-slate-200 dark:border-slate-600 hover:border-amber-500 transition-colors text-sm"
+                                    >
+                                        <div className="font-bold text-slate-800 dark:text-slate-200">{cand.classEntity.name}</div>
+                                        <div className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                            {cand.subjects.join(', ')} <span className="text-slate-400">|</span> {cand.teachers.join(', ')}
+                                        </div>
+                                    </button>
+                                ))
+                            )}
+                        </div>
+                    )}
+                </div>
+
                 {modalContext?.teacherId && !modalContext.isTeacherAbsent && (
                     <>
                         <button onClick={() => assignSubstitution(modalContext.teacherId)} className="w-full p-3 mb-2 rounded-xl bg-emerald-50 text-emerald-700 font-bold text-sm hover:bg-emerald-100 transition border border-emerald-200">
@@ -887,7 +1046,7 @@ export const SubstitutionsPage = () => {
                         </button>
                         
                         {otherLessonsForTeacher.length > 0 && (
-                            <div className="mb-4">
+                            <>
                                 <button 
                                     onClick={() => setShowSwapOptions(!showSwapOptions)} 
                                     className="w-full p-3 rounded-xl bg-purple-50 text-purple-700 font-bold text-sm hover:bg-purple-100 transition border border-purple-200 flex items-center justify-center gap-2"
@@ -915,21 +1074,21 @@ export const SubstitutionsPage = () => {
 
                                         <p className="text-xs text-slate-500 dark:text-slate-400 text-center mb-1 font-bold">Выберите урок для обмена:</p>
                                         {otherLessonsForTeacher.map(lesson => {
-                                             const c = classes.find(cl => cl.id === lesson.classId);
-                                             const s = subjects.find(sub => sub.id === lesson.subjectId);
-                                             return (
-                                                 <button 
+                                            const c = classes.find(cl => cl.id === lesson.classId);
+                                            const s = subjects.find(sub => sub.id === lesson.subjectId);
+                                            return (
+                                                <button 
                                                     key={lesson.id} 
                                                     onClick={() => swapLessons(lesson.id)}
                                                     className="w-full p-2 text-left bg-white dark:bg-slate-700 rounded-lg border border-slate-200 dark:border-slate-600 hover:border-purple-500 transition-colors text-sm"
-                                                 >
+                                                >
                                                     <span className="font-bold">{lesson.period} урок</span>: {c?.name} - {s?.name}
-                                                 </button>
-                                             )
+                                                </button>
+                                            )
                                         })}
                                     </div>
                                 )}
-                            </div>
+                            </>
                         )}
                     </>
                 )}

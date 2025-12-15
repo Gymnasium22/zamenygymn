@@ -252,7 +252,7 @@ export const ExportPage = () => {
         }
 
         interface SubstitutionDetail {
-            sub: Substitution;
+            subs: Substitution[]; // Array of subs for grouped display
             scheduleItem: ScheduleItem;
             cls: ClassEntity | undefined;
             subj: Subject | undefined;
@@ -260,38 +260,41 @@ export const ExportPage = () => {
             reason: string;
         }
 
+        // Group by scheduleItemId to handle merges
+        const groupedSubs = new Map<string, Substitution[]>();
+        monthlySubs.forEach(sub => {
+            // Group by item AND date to separate same lesson on different days
+            const key = `${sub.scheduleItemId}_${sub.date}`;
+            const existing = groupedSubs.get(key) || [];
+            existing.push(sub);
+            groupedSubs.set(key, existing);
+        });
+
         const mainSubs: SubstitutionDetail[] = [];
         const noRecordSubs: SubstitutionDetail[] = [];
 
-        // Helper to determine reason
-        const getSubstitutionDetails = (sub: Substitution): SubstitutionDetail | null => {
+        groupedSubs.forEach(subsGroup => {
+            const firstSub = subsGroup[0];
             // Ищем урок в обоих расписаниях
-            const scheduleItem = schedule1.find(s => s.id === sub.scheduleItemId) || schedule2.find(s => s.id === sub.scheduleItemId);
-            if (!scheduleItem) return null;
+            const scheduleItem = schedule1.find(s => s.id === firstSub.scheduleItemId) || schedule2.find(s => s.id === firstSub.scheduleItemId);
+            if (!scheduleItem) return;
 
             const cls = classes.find(c => c.id === scheduleItem.classId);
             const subj = subjects.find(s => s.id === scheduleItem.subjectId);
-            const origTeacher = teachers.find(t => t.id === sub.originalTeacherId);
+            const origTeacher = teachers.find(t => t.id === firstSub.originalTeacherId);
 
-            let reason = sub.lessonAbsenceReason || origTeacher?.absenceReasons?.[sub.date] || '';
+            let reason = firstSub.lessonAbsenceReason || origTeacher?.absenceReasons?.[firstSub.date] || '';
             
-            // Logic overrides for display (same as in UI/Copy)
-            if (sub.replacementTeacherId === sub.originalTeacherId && sub.replacementRoomId && !sub.replacementClassId) reason = 'Смена кабинета';
-            if (sub.replacementClassId && sub.replacementSubjectId) reason = 'Обмен уроками';
+            // Logic overrides for display
+            if (firstSub.replacementTeacherId === firstSub.originalTeacherId && firstSub.replacementRoomId && !firstSub.replacementClassId) reason = 'Смена кабинета';
+            if (firstSub.replacementClassId && firstSub.replacementSubjectId && !firstSub.isMerger) reason = 'Обмен уроками';
 
-            return { sub, scheduleItem, cls, subj, origTeacher, reason };
-        };
+            const detail: SubstitutionDetail = { subs: subsGroup, scheduleItem, cls, subj, origTeacher, reason };
 
-        // Split into lists
-        monthlySubs.forEach(sub => {
-            const details = getSubstitutionDetails(sub);
-            if (!details) return;
-
-            // Если причина "Без записи", то в отдельный список
-            if (details.reason === 'Без записи') {
-                noRecordSubs.push(details);
+            if (reason === 'Без записи') {
+                noRecordSubs.push(detail);
             } else {
-                mainSubs.push(details);
+                mainSubs.push(detail);
             }
         });
 
@@ -311,26 +314,39 @@ export const ExportPage = () => {
 
         const renderRows = (items: SubstitutionDetail[]) => {
             return items.map(item => {
-                const { sub, scheduleItem, cls, subj, origTeacher, reason } = item;
-                const dateStr = new Date(sub.date).toLocaleDateString('ru-RU');
+                const { subs, scheduleItem, cls, subj, origTeacher, reason } = item;
+                const firstSub = subs[0];
+                const dateStr = new Date(firstSub.date).toLocaleDateString('ru-RU');
                 
                 let repTeacherName = '';
-                if (sub.replacementTeacherId === 'conducted') repTeacherName = 'Урок проведен';
-                else if (sub.replacementTeacherId === 'cancelled') repTeacherName = 'Урок снят';
+                
+                if (firstSub.replacementTeacherId === 'conducted') repTeacherName = 'Урок проведен';
+                else if (firstSub.replacementTeacherId === 'cancelled') repTeacherName = 'Урок снят';
                 else {
-                    const t = teachers.find(x => x.id === sub.replacementTeacherId);
-                    repTeacherName = t ? t.name : 'Неизвестно';
-                    if (sub.isMerger) repTeacherName += ' (Объединение)';
+                    // Combine names for merged/split subs
+                    const names = subs.map(s => {
+                        const t = teachers.find(x => x.id === s.replacementTeacherId);
+                        return t ? t.name : 'Неизвестно';
+                    }).join(', ');
                     
-                    if (sub.replacementClassId && sub.replacementSubjectId) {
-                        const swappedClass = classes.find(c => c.id === sub.replacementClassId);
-                        const swappedSubj = subjects.find(s => s.id === sub.replacementSubjectId);
+                    repTeacherName = names;
+                    
+                    if (firstSub.isMerger) {
+                        let suffix = ' (Объединение)';
+                        if (firstSub.replacementClassId) {
+                             const swappedClass = classes.find(c => c.id === firstSub.replacementClassId);
+                             if (swappedClass) suffix = ` (Объединение с ${swappedClass.name})`;
+                        }
+                        repTeacherName += suffix;
+                    } else if (firstSub.replacementClassId && firstSub.replacementSubjectId) {
+                        const swappedClass = classes.find(c => c.id === firstSub.replacementClassId);
+                        const swappedSubj = subjects.find(s => s.id === firstSub.replacementSubjectId);
                         repTeacherName += ` (Урок ${swappedClass?.name || '?'} ${swappedSubj?.name || '?'})`;
                     }
                 }
 
                 const originalRoomId = scheduleItem.roomId;
-                const replacementRoomId = sub.replacementRoomId;
+                const replacementRoomId = firstSub.replacementRoomId;
                 const actualRoomId = replacementRoomId || originalRoomId;
                 const roomObj = rooms.find(r => r.id === actualRoomId);
                 const roomName = roomObj ? roomObj.name : (actualRoomId || '-');
@@ -403,7 +419,6 @@ export const ExportPage = () => {
         const targetMonth = targetDate.getMonth();
         const targetYear = targetDate.getFullYear();
 
-        // Фильтруем замены за выбранный месяц, у которых есть отказы
         const refusalsData = substitutions.filter(s => {
             const sDate = new Date(s.date);
             const inMonth = sDate.getMonth() === targetMonth && sDate.getFullYear() === targetYear;
@@ -580,12 +595,15 @@ export const ExportPage = () => {
     const renderTableForShift = (shift: string) => {
         const currentSchedule = getScheduleForDate(exportDate);
 
+        // Group subs by scheduleItemId to handle merges
         const shiftSubs = subsForDate.filter(sub => {
             const s = currentSchedule.find(x => x.id === sub.scheduleItemId);
             return s && s.shift === shift;
         }).filter(sub => sub.replacementTeacherId !== 'conducted');
         
         if (shiftSubs.length === 0) return null;
+
+        const uniqueLessonIds = Array.from(new Set(shiftSubs.map(s => s.scheduleItemId)));
 
         return (
             <div>
@@ -602,8 +620,10 @@ export const ExportPage = () => {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                        {shiftSubs.map(sub => { 
-                            const s = currentSchedule.find(x => x.id === sub.scheduleItemId); 
+                        {uniqueLessonIds.map(lessonId => { 
+                            const lessonSubs = shiftSubs.filter(s => s.scheduleItemId === lessonId);
+                            const sub = lessonSubs[0];
+                            const s = currentSchedule.find(x => x.id === lessonId); 
                             if (!s) return null;
                             const cls = classes.find(c => c.id === s.classId); 
                             const subj = subjects.find(x => x.id === s.subjectId); 
@@ -616,34 +636,28 @@ export const ExportPage = () => {
                             const newRoomName = newRoomObj ? newRoomObj.name : (newRoomId || '—');
                             
                             const isCancelled = sub.replacementTeacherId === 'cancelled';
-                            const t2 = isCancelled ? { name: 'УРОК СНЯТ' } : teachers.find(t => t.id === sub.replacementTeacherId); 
                             
                             const dayReason = t1?.absenceReasons?.[exportDate];
                             const lessonReason = sub.lessonAbsenceReason;
-                            // Only display if the reason is explicitly 'Без записи'. 
-                            // Prioritize lesson reason if it exists and is 'Без записи', otherwise fall back to day reason if 'Без записи'.
                             const displayReason = (lessonReason === 'Без записи') ? lessonReason : ((dayReason === 'Без записи') ? dayReason : '');
                             
-                            // Check if content was swapped
                             const swappedClass = sub.replacementClassId ? classes.find(c => c.id === sub.replacementClassId) : null;
                             const swappedSubj = sub.replacementSubjectId ? subjects.find(s => s.id === sub.replacementSubjectId) : null;
 
                             const isRoomChangeOnly = sub.replacementTeacherId === sub.originalTeacherId && newRoomId && !swappedClass;
-                            const isSwap = swappedClass && swappedSubj;
+                            const isSwap = swappedClass && swappedSubj && !sub.isMerger;
                             const isTeacherPresent = sub.replacementTeacherId === sub.originalTeacherId;
 
                             return (
-                                <tr key={sub.id}>
+                                <tr key={lessonId}>
                                     <td className="py-3 px-2 text-center font-bold text-slate-800 text-lg">{s.period}</td>
                                     <td className="py-3 px-2 font-bold text-slate-700">{cls?.name}</td>
                                     <td className="py-3 px-2"><div className="font-semibold text-slate-800">{subj?.name}</div>{s.direction && <div className="text-[10px] text-slate-500 bg-slate-100 inline-block px-1 rounded mt-0.5">{s.direction}</div>}</td>
                                     <td className="py-3 px-2">
                                         {!isTeacherPresent && !isRoomChangeOnly && !isSwap && (
                                             <>
-                                                {/* FIX: Use relative div with absolute line for reliable strikethrough in html2canvas */}
                                                 <div className="relative inline-block text-red-400 text-sm font-medium">
                                                     {t1?.name}
-                                                    {/* Adjusted top position to fix html2canvas rendering issue where line appears too high. top-[60%] pushes it down. */}
                                                     <div className="absolute left-0 top-[85%] w-full h-px bg-red-300"></div>
                                                 </div>
                                                 {displayReason && <span className="text-[10px] text-slate-500 block font-bold uppercase mt-0.5">{displayReason}</span>}
@@ -661,10 +675,27 @@ export const ExportPage = () => {
                                                 <span className="text-slate-800">{t1?.name}</span>
                                                 <span className="text-[10px] text-purple-600 font-bold uppercase tracking-wide mt-0.5">Обмен уроками: {swappedClass?.name}</span>
                                             </div>
+                                        ) : isCancelled ? (
+                                            <div className="flex flex-col">
+                                                <span>УРОК СНЯТ</span>
+                                            </div>
                                         ) : (
                                             <div className="flex flex-col">
-                                                <span>{t2?.name}</span>
-                                                {sub.isMerger && <span className="text-[9px] font-black text-purple-600 uppercase tracking-widest mt-0.5">ОБЪЕДИНЕНИЕ</span>}
+                                                {lessonSubs.length > 1 || sub.isMerger ? (
+                                                    <>
+                                                        <span className="text-slate-800 text-xs">
+                                                            {lessonSubs.map(ls => {
+                                                                const tr = teachers.find(x => x.id === ls.replacementTeacherId);
+                                                                return tr ? tr.name : 'Неизвестно';
+                                                            }).join(', ')}
+                                                        </span>
+                                                        <span className="text-[9px] font-black text-purple-600 uppercase tracking-widest mt-0.5">
+                                                            ОБЪЕДИНЕНИЕ {sub.replacementClassId ? `(${classes.find(c => c.id === sub.replacementClassId)?.name})` : ''}
+                                                        </span>
+                                                    </>
+                                                ) : (
+                                                    <span>{teachers.find(t => t.id === sub.replacementTeacherId)?.name}</span>
+                                                )}
                                             </div>
                                         )}
                                     </td>

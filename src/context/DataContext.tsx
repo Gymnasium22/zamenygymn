@@ -18,6 +18,8 @@ interface FullDataContextType {
 
 const FullDataContext = createContext<FullDataContextType | undefined>(undefined);
 
+const LOCAL_STORAGE_KEY = 'gym_data_local_backup_v2';
+
 export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: AppData }> = ({ children, initialData }) => {
     const [data, setInternalData] = useState<AppData>(INITIAL_DATA);
     const [isLoading, setIsLoading] = useState(true);
@@ -27,8 +29,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
     // Получаем user и role для проверки прав
     const { user, role, loading: authLoading } = useAuth();
 
+    // Загрузка данных
     useEffect(() => {
-        // Если переданы начальные данные (например, для публичного просмотра), используем их
+        // 1. Если переданы начальные данные (публичный вид)
         if (initialData) {
             setInternalData(initialData);
             setHistory([initialData]);
@@ -40,30 +43,41 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
         // Ждем инициализации аутентификации
         if (authLoading) return;
 
-        // Разрешаем загрузку, если есть пользователь ИЛИ если это гость (родитель)
-        // ВАЖНО: Правила Firestore должны разрешать чтение (allow read: if true) для работы гостей
-        const canLoadData = user || role === 'guest';
+        // 2. Пытаемся загрузить локальную копию сразу, чтобы пользователь что-то видел
+        const localBackup = localStorage.getItem(LOCAL_STORAGE_KEY);
+        if (localBackup) {
+            try {
+                const parsed = JSON.parse(localBackup);
+                // Простая валидация
+                if (parsed && parsed.teachers) {
+                    setInternalData(prev => ({ ...prev, ...parsed }));
+                    console.log('Loaded from local storage backup');
+                }
+            } catch (e) {
+                console.error('Error parsing local backup', e);
+            }
+        }
 
+        const canLoadData = user || role === 'guest';
         if (!canLoadData) {
-            // Если не авторизован и не гость - используем локальные дефолтные данные
-            setInternalData(INITIAL_DATA);
+            if (!localBackup) setInternalData(INITIAL_DATA);
             setIsLoading(false);
             return;
         }
 
         setIsLoading(true);
 
-        // Используем подписку вместо одноразовой загрузки (load)
+        // 3. Подписываемся на Firebase
         const unsubscribe = dbService.subscribe(
             (loaded) => {
                 const fixedData = { ...INITIAL_DATA, ...loaded };
                 
-                // Нормализация данных для предотвращения ошибок undefined
+                // Нормализация данных
                 if (!fixedData.teachers) fixedData.teachers = [];
                 fixedData.teachers = fixedData.teachers.map(t => ({ shifts: [Shift.First, Shift.Second], telegramChatId: '', ...t }));
 
                 if (!fixedData.schedule) fixedData.schedule = [];
-                if (!fixedData.schedule2ndHalf) fixedData.schedule2ndHalf = []; // Инициализация 2 полугодия
+                if (!fixedData.schedule2ndHalf) fixedData.schedule2ndHalf = []; 
                 if (!fixedData.substitutions) fixedData.substitutions = [];
                 if (!fixedData.bellSchedule) fixedData.bellSchedule = DEFAULT_BELLS;
                 
@@ -72,8 +86,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                 
                 setInternalData(fixedData);
                 
-                // Инициализируем историю только при первой загрузке, чтобы не сбивать undo/redo при внешних обновлениях
-                // (хотя в реальном времени undo/redo сложнее, здесь простая реализация)
+                // Обновляем локальный бэкап актуальными данными из облака
+                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(fixedData));
+                
                 setHistory(prev => {
                     if (prev.length === 0) return [fixedData];
                     return prev; 
@@ -86,14 +101,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                 setIsLoading(false);
             },
             (error) => {
-                console.error("Failed to subscribe to data:", error); 
-                // В случае ошибки (например, нет прав) загружаем дефолтные, чтобы приложение работало
-                setInternalData(INITIAL_DATA);
+                console.error("Failed to subscribe to data:", error);
+                // Если ошибка квоты или сети - мы уже загрузили localBackup выше, так что данные не пропадут
                 setIsLoading(false); 
             }
         );
 
-        // Очистка подписки при размонтировании или смене пользователя
         return () => {
             if (unsubscribe) unsubscribe();
         };
@@ -101,18 +114,37 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
     }, [initialData, user, role, authLoading]); 
 
     const saveData = useCallback(async (newData: Partial<AppData>, addToHistory = true) => {
-        // Запрещаем сохранение, если пользователь не авторизован (гости не могут сохранять)
         const isGuest = !user && role === 'guest';
         
+        // 1. Оптимистичное обновление интерфейса (сразу меняем стейт)
         const mergedData = { ...data, ...newData };
         setInternalData(mergedData);
         
-        // Сохраняем в облако только если это не публичный просмотр и пользователь авторизован
+        // 2. Всегда сохраняем в LocalStorage как резерв
+        try {
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(mergedData));
+        } catch (e) {
+            console.error("Local storage quota exceeded", e);
+        }
+
+        // 3. Пробуем отправить в облако
         if (!initialData && user && !isGuest) {
             try {
-                await dbService.save(mergedData);
-            } catch (e) {
-                console.error("Save failed silently in background", e);
+                await dbService.save(newData); 
+            } catch (e: any) {
+                console.error("Save failed:", e);
+                // Специальная обработка для исчерпания квоты
+                if (e?.code === 'resource-exhausted') {
+                    // Мы не показываем alert на каждое действие, чтобы не блокировать работу.
+                    // Данные сохранены в LocalStorage (шаг 2), поэтому пользователь может продолжать работать.
+                    console.warn("Quota exceeded. Saved locally only.");
+                    
+                    // Можно показать ненавязчивое уведомление (toast), если бы был компонент
+                } else if (e?.code === 'permission-denied') {
+                    alert("⚠️ Ошибка доступа. Изменения сохранены только локально.");
+                } else {
+                    console.warn("Cloud save error. Saved locally.", e.message);
+                }
             }
         } else if (isGuest) {
             console.warn("Гости не могут сохранять изменения в базу данных.");
@@ -132,7 +164,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
             const prevData = history[historyPointer - 1];
             setHistoryPointer(historyPointer - 1);
             setInternalData(prevData);
-            if (!initialData && user) await dbService.save(prevData);
+            // Сохраняем локально
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(prevData));
+            
+            if (!initialData && user) {
+                try {
+                    await dbService.save(prevData);
+                } catch(e) { console.error(e); }
+            }
         }
     }, [history, historyPointer, user, initialData]);
 
@@ -141,7 +180,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
             const nextData = history[historyPointer + 1];
             setHistoryPointer(historyPointer + 1);
             setInternalData(nextData);
-            if (!initialData && user) await dbService.save(nextData);
+            // Сохраняем локально
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(nextData));
+
+            if (!initialData && user) {
+                 try {
+                    await dbService.save(nextData);
+                } catch(e) { console.error(e); }
+            }
         }
     }, [history, historyPointer, user, initialData]);
 
@@ -207,14 +253,8 @@ export const StaticDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 export const ScheduleDataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { data, saveData } = useFullData();
 
-    // Логика определения текущего семестра
-    // 1 полугодие: Сентябрь (8) - Декабрь (11)
-    // 2 полугодие: Январь (0) - Май (4)
-    // Лето (5,6,7): Можно настроить по умолчанию на 1 или 2. Пусть будет 1.
     const currentMonth = new Date().getMonth();
     const isSecondSemester = currentMonth >= 0 && currentMonth <= 4;
-
-    // Выбираем активное расписание для отображения в "Рабочем столе", "Заменах" и т.д.
     const activeSchedule = isSecondSemester ? (data.schedule2ndHalf || []) : data.schedule;
 
     const saveSemesterSchedule = useCallback(async (semester: 1 | 2, newData: ScheduleItem[]) => {
@@ -226,14 +266,11 @@ export const ScheduleDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }, [saveData]);
 
     const saveScheduleData = useCallback(async (newData: Partial<ScheduleAndSubstitutionData>, addToHistory?: boolean) => {
-        // Этот метод используется для обратной совместимости, если кто-то вызывает saveScheduleData({schedule: ...})
-        // Он сохранит в "текущий" (1 полугодие в структуре данных, так как 'schedule' мапится туда)
-        // Но лучше использовать saveSemesterSchedule
         await saveData(newData as any, addToHistory);
     }, [saveData]);
 
     const scheduleData: ScheduleAndSubstitutionData = useMemo(() => ({
-        schedule: activeSchedule, // Автоматическое "активное" расписание
+        schedule: activeSchedule,
         schedule1: data.schedule,
         schedule2: data.schedule2ndHalf || [],
         substitutions: data.substitutions,

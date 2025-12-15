@@ -22,11 +22,10 @@ const COLLECTIONS = {
     SCHEDULE_1: 'schedule_sem1',
     SCHEDULE_2: 'schedule_sem2',
     SUBSTITUTIONS: 'substitutions',
-    CONFIG: 'config', // Тут храним settings и bells
+    CONFIG: 'config', 
     PUBLIC: 'publicSchedules'
 };
 
-// Хелпер для разбивки массива на чанки (лимит Firestore batch = 500 операций)
 const chunkArray = <T>(array: T[], size: number): T[][] => {
     const chunked = [];
     for (let i = 0; i < array.length; i += size) {
@@ -36,29 +35,48 @@ const chunkArray = <T>(array: T[], size: number): T[][] => {
 };
 
 export const dbService = {
-    // Синхронизация массива данных с коллекцией (Create, Update, Delete)
-    // Это ключевая функция, позволяющая оставить логику приложения на массивах,
-    // но хранить данные в масштабируемых коллекциях.
+    // Оптимизированная синхронизация: сравнивает данные перед записью
     syncCollection: async (collectionName: string, items: any[]) => {
         if (!firestoreDB) return;
 
-        // 1. Получаем текущие ID в базе, чтобы понять, что нужно удалить
+        // 1. Получаем текущие данные из базы
         const q = query(collection(firestoreDB, collectionName));
-        const querySnapshot = await getDocs(q);
-        const existingIds = new Set(querySnapshot.docs.map(d => d.id));
-        const newIds = new Set(items.map(i => i.id));
+        const querySnapshot = await awaitHZ(async() => await getDocs(q));
+        
+        const existingDocsMap = new Map();
+        querySnapshot.docs.forEach((doc: any) => {
+            existingDocsMap.set(doc.id, doc.data());
+        });
 
-        // 2. Определяем операции
-        const toDelete = [...existingIds].filter(id => !newIds.has(id));
-        const toUpsert = items; // Все элементы обновляем/создаем (проще, чем сравнивать поля)
+        const newItemsMap = new Map();
+        items.forEach(item => newItemsMap.set(item.id, item));
 
-        // 3. Выполняем операции пачками (batches)
-        const operations = [
-            ...toDelete.map(id => ({ type: 'delete', id })),
-            ...toUpsert.map(item => ({ type: 'set', item }))
-        ];
+        // 2. Вычисляем разницу
+        const operations: any[] = [];
 
-        const chunks = chunkArray(operations, 450); // Берем с запасом меньше 500
+        // Удаление
+        existingDocsMap.forEach((_, id) => {
+            if (!newItemsMap.has(id)) {
+                operations.push({ type: 'delete', id });
+            }
+        });
+
+        // Создание / Обновление
+        items.forEach(item => {
+            const existingData = existingDocsMap.get(item.id);
+            if (!existingData || JSON.stringify(existingData) !== JSON.stringify(item)) {
+                operations.push({ type: 'set', item });
+            }
+        });
+
+        if (operations.length === 0) {
+            return; 
+        }
+
+        console.log(`Syncing ${collectionName}: ${operations.length} changes.`);
+
+        // 3. Запись пачками (Batch write)
+        const chunks = chunkArray(operations, 450); 
 
         for (const chunk of chunks) {
             const batch = writeBatch(firestoreDB);
@@ -86,43 +104,29 @@ export const dbService = {
             return;
         }
 
-        try {
-            const promises = [];
+        const promises = [];
 
-            // Синхронизируем только те коллекции, которые были изменены
-            if (data.teachers) promises.push(dbService.syncCollection(COLLECTIONS.TEACHERS, data.teachers));
-            if (data.subjects) promises.push(dbService.syncCollection(COLLECTIONS.SUBJECTS, data.subjects));
-            if (data.classes) promises.push(dbService.syncCollection(COLLECTIONS.CLASSES, data.classes));
-            if (data.rooms) promises.push(dbService.syncCollection(COLLECTIONS.ROOMS, data.rooms));
-            
-            // Расписание 1
-            if (data.schedule) promises.push(dbService.syncCollection(COLLECTIONS.SCHEDULE_1, data.schedule));
-            // Расписание 2
-            if (data.schedule2ndHalf) promises.push(dbService.syncCollection(COLLECTIONS.SCHEDULE_2, data.schedule2ndHalf));
-            
-            if (data.substitutions) promises.push(dbService.syncCollection(COLLECTIONS.SUBSTITUTIONS, data.substitutions));
+        if (data.teachers) promises.push(dbService.syncCollection(COLLECTIONS.TEACHERS, data.teachers));
+        if (data.subjects) promises.push(dbService.syncCollection(COLLECTIONS.SUBJECTS, data.subjects));
+        if (data.classes) promises.push(dbService.syncCollection(COLLECTIONS.CLASSES, data.classes));
+        if (data.rooms) promises.push(dbService.syncCollection(COLLECTIONS.ROOMS, data.rooms));
+        
+        if (data.schedule) promises.push(dbService.syncCollection(COLLECTIONS.SCHEDULE_1, data.schedule));
+        if (data.schedule2ndHalf) promises.push(dbService.syncCollection(COLLECTIONS.SCHEDULE_2, data.schedule2ndHalf));
+        
+        if (data.substitutions) promises.push(dbService.syncCollection(COLLECTIONS.SUBSTITUTIONS, data.substitutions));
 
-            // Настройки и звонки храним как отдельные документы в коллекции config
-            if (data.settings) {
-                promises.push(setDoc(doc(firestoreDB, COLLECTIONS.CONFIG, 'settings'), data.settings));
-            }
-            if (data.bellSchedule) {
-                promises.push(setDoc(doc(firestoreDB, COLLECTIONS.CONFIG, 'bells'), { items: data.bellSchedule }));
-            }
-
-            await Promise.all(promises);
-            console.log("Data saved successfully to collections");
-
-        } catch (error) {
-            console.error("Ошибка сохранения в Firebase:", error);
-            if ((error as any)?.code === 'permission-denied') {
-                alert("Ошибка доступа: Недостаточно прав для сохранения данных.");
-            }
-            throw error;
+        if (data.settings) {
+            promises.push(setDoc(doc(firestoreDB, COLLECTIONS.CONFIG, 'settings'), data.settings));
         }
+        if (data.bellSchedule) {
+            promises.push(setDoc(doc(firestoreDB, COLLECTIONS.CONFIG, 'bells'), { items: data.bellSchedule }));
+        }
+
+        await Promise.all(promises);
+        console.log("Data saved successfully to collections");
     },
 
-    // Функция подписки на изменения
     subscribe: (
         onNext: (data: AppData) => void,
         onError: (error: Error) => void
@@ -131,23 +135,18 @@ export const dbService = {
             return () => {};
         }
 
-        // Локальный кэш данных для сборки полного объекта
         let localData: AppData = { ...INITIAL_DATA };
-        let hasInitialLoad = false;
-
-        // Дебаунс, чтобы не дергать обновление стейта React на каждое изменение в каждой коллекции
+        
         let updateTimeout: any;
         const triggerUpdate = () => {
             clearTimeout(updateTimeout);
             updateTimeout = setTimeout(() => {
                 onNext({ ...localData });
-                hasInitialLoad = true;
-            }, 50); // 50мс задержка для группировки обновлений
+            }, 50); 
         };
 
         const unsubs: any[] = [];
 
-        // Хелпер для подписки на коллекцию
         const subColl = (colName: string, key: keyof AppData) => {
             const q = query(collection(firestoreDB, colName));
             return onSnapshot(q, (snapshot) => {
@@ -155,13 +154,10 @@ export const dbService = {
                 (localData as any)[key] = items;
                 triggerUpdate();
             }, (err) => {
-                // Игнорируем ошибку permission-denied при первой загрузке, если пользователь гость
-                // (хотя правила должны разрешать чтение)
                 console.warn(`Error reading ${colName}:`, err);
             });
         };
 
-        // Подписки на основные коллекции
         unsubs.push(subColl(COLLECTIONS.TEACHERS, 'teachers'));
         unsubs.push(subColl(COLLECTIONS.SUBJECTS, 'subjects'));
         unsubs.push(subColl(COLLECTIONS.CLASSES, 'classes'));
@@ -170,7 +166,6 @@ export const dbService = {
         unsubs.push(subColl(COLLECTIONS.SCHEDULE_2, 'schedule2ndHalf'));
         unsubs.push(subColl(COLLECTIONS.SUBSTITUTIONS, 'substitutions'));
 
-        // Подписка на конфиги (settings)
         unsubs.push(onSnapshot(doc(firestoreDB, COLLECTIONS.CONFIG, 'settings'), (doc) => {
             if (doc.exists()) {
                 localData.settings = { ...INITIAL_DATA.settings, ...doc.data() };
@@ -178,7 +173,6 @@ export const dbService = {
             }
         }));
 
-        // Подписка на конфиги (bells)
         unsubs.push(onSnapshot(doc(firestoreDB, COLLECTIONS.CONFIG, 'bells'), (doc) => {
             if (doc.exists()) {
                 const data = doc.data();
@@ -204,14 +198,12 @@ export const dbService = {
         document.body.removeChild(link);
     },
 
-    // Публичные расписания (пока оставим как один документ, так как они обычно read-only и создаются разово)
     setPublicData: async (id: string, data: AppData) => {
         if (!firestoreDB) throw new Error("Database not initialized");
         const user = auth?.currentUser;
         if (!user || user.email !== "admin@gymnasium22.com") throw new Error("Нет прав.");
 
         const publicDataSubset = {
-            // ... (оставляем логику фильтрации, она хорошая)
             subjects: data.subjects,
             teachers: data.teachers.map(t => ({ 
                 id: t.id,
@@ -232,7 +224,6 @@ export const dbService = {
                 publicScheduleId: data.settings.publicScheduleId
             }
         };
-        // Для публичного расписания можно оставить один документ, так как он создается редко и не меняется часто
         const cleanData = JSON.parse(JSON.stringify(publicDataSubset));
         await setDoc(doc(firestoreDB, COLLECTIONS.PUBLIC, id), cleanData);
     },
@@ -254,3 +245,14 @@ export const dbService = {
         await deleteDoc(doc(firestoreDB, COLLECTIONS.PUBLIC, id));
     }
 };
+
+// Wrapper to safely execute getDocs even if it fails (simplistic retry logic could go here)
+async function awaitHZ(fn: Function) {
+    try {
+        return await fn();
+    } catch(e) {
+        // If query fails (quota), return empty snapshot structure to prevent crash in loop
+        console.error("Firestore read error (likely quota):", e);
+        return { docs: [] };
+    }
+}
