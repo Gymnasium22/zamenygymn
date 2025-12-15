@@ -141,12 +141,12 @@ export const ExportPage = () => {
         let html = `
             <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
             <head><meta charset="UTF-8"><style>
-                table { border-collapse: collapse; font-family: Arial, sans-serif; font-size: 12px; margin-bottom: 20px; }
+                table { border-collapse: collapse; font-family: Arial, sans-serif; font-size: 12pt; margin-bottom: 20px; }
                 td, th { border: 1px solid #000; padding: 2px; vertical-align: middle; text-align: center; }
                 .header { font-weight: bold; background-color: #f3f4f6; }
                 .subject-cell { font-weight: bold; vertical-align: middle; background-color: #fff; }
                 .teacher-cell { text-align: left; padding-left: 5px; }
-                sub { font-size: 9px; vertical-align: sub; }
+                sub { font-size: 10px; vertical-align: sub; }
             </style></head><body>
         `;
 
@@ -209,7 +209,7 @@ export const ExportPage = () => {
                                 const r = rooms.find(rm => rm.id === item.roomId);
                                 const roomName = r ? r.name : item.roomId;
                                 const room = roomName ? `<sub>${roomName}</sub>` : '';
-                                const dir = item.direction ? ` <span style="font-size:9px">(${item.direction})</span>` : '';
+                                const dir = item.direction ? ` <span style="font-size:10px">(${item.direction})</span>` : '';
                                 const bgColor = subject.color || '#ffffff';
                                 html += `<td style="border: 1px solid #000; font-weight: bold; background-color: ${bgColor};">${cls ? cls.name : ''}${dir}${room}</td>`;
                             } else {
