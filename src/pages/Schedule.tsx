@@ -1,4 +1,3 @@
-
 import { useState, useMemo, useEffect } from 'react';
 import { useStaticData, useScheduleData } from '../context/DataContext'; 
 import { Icon } from '../components/Icons';
@@ -77,11 +76,11 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
         let items: ScheduleItem[] = [];
         if (viewMode === 'week') {
              const period = parseInt(rowId);
-             const day = colKey;
+             const day = colKey as string;
              items = schedule.filter(s => s.shift === selectedShift && s.period === period && s.day === day);
              if (filterId) items = items.filter(s => s.classId === filterId);
         } else {
-            const period = colKey;
+            const period = colKey as number;
             if (viewMode === 'class') items = schedule.filter(s => s.classId === rowId && s.period === period && s.day === selectedDay && s.shift === selectedShift);
             if (viewMode === 'teacher') items = schedule.filter(s => s.teacherId === rowId && s.period === period && s.day === selectedDay && s.shift === selectedShift);
             if (viewMode === 'subject') items = schedule.filter(s => s.subjectId === rowId && s.period === period && s.day === selectedDay && s.shift === selectedShift);
@@ -175,7 +174,7 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
         if (!tempItem.subjectId || !tempItem.teacherId || !tempItem.classId) return;
         let newSchedule = [...schedule];
         const idx = newSchedule.findIndex(s => s.id === tempItem.id);
-        if (idx >= 0) newSchedule[idx] = tempItem; else newSchedule.push(tempItem);
+        if (idx >= 0) newSchedule[idx] = tempItem as ScheduleItem; else newSchedule.push(tempItem as ScheduleItem);
         await saveCurrentSchedule(newSchedule);
         setIsEditorOpen(false);
     };
@@ -221,9 +220,9 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
         
         if (viewMode === 'week') {
             newItem.period = parseInt(cellInfo.rowId);
-            newItem.day = cellInfo.colKey;
+            newItem.day = cellInfo.colKey as string;
         } else {
-            newItem.period = cellInfo.colKey;
+            newItem.period = cellInfo.colKey as number;
             newItem.day = selectedDay;
             if (viewMode === 'class') newItem.classId = cellInfo.rowId;
             if (viewMode === 'teacher') newItem.teacherId = cellInfo.rowId; 
@@ -240,23 +239,31 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
     if (contextMenu.item) {
         contextActions.push(
             { label: 'Копировать', icon: 'Copy', onClick: () => setClipboard(contextMenu.item) },
-            { label: 'Удалить', icon: 'Trash2', color: 'text-red-600', onClick: () => handleDeleteItem(contextMenu.item.id) }
+            { label: 'Удалить', icon: 'Trash2', color: 'text-red-600', onClick: () => handleDeleteItem(contextMenu.item!.id) }
         );
     } else if (contextMenu.cell) {
         if (clipboard) {
             contextActions.push({ label: 'Вставить', icon: 'Clipboard', onClick: async () => {
-                 const newItem = { ...clipboard, id: Math.random().toString(36).substr(2, 9), day: selectedDay, shift: selectedShift, period: contextMenu.cell.colKey }; 
-                 if(viewMode === 'week') { newItem.day = contextMenu.cell.colKey; newItem.period = parseInt(contextMenu.cell.rowId); }
-                 if(viewMode === 'class') newItem.classId = contextMenu.cell.rowId;
-                 else if (viewMode === 'teacher') newItem.teacherId = contextMenu.cell.rowId;
-                 else if (viewMode === 'subject') newItem.subjectId = contextMenu.cell.rowId;
+                 const newItem = { ...clipboard, id: Math.random().toString(36).substr(2, 9), day: selectedDay, shift: selectedShift, period: contextMenu.cell!.colKey } as ScheduleItem; 
+                 if(viewMode === 'week') { newItem.day = contextMenu.cell!.colKey as string; newItem.period = parseInt(contextMenu.cell!.rowId); }
+                 if(viewMode === 'class') newItem.classId = contextMenu.cell!.rowId;
+                 else if (viewMode === 'teacher') newItem.teacherId = contextMenu.cell!.rowId;
+                 else if (viewMode === 'subject') newItem.subjectId = contextMenu.cell!.rowId;
                  
                  let newSchedule = [...schedule, newItem];
                  await saveCurrentSchedule(newSchedule);
                  setClipboard(null);
             }});
         }
-        contextActions.push({ label: 'Добавить урок', icon: 'Plus', onClick: () => handleAddItem(contextMenu.cell.rowId, contextMenu.cell.colKey, viewMode === 'week' ? contextMenu.cell.colKey : selectedDay) });
+        contextActions.push({ 
+            label: 'Добавить урок', 
+            icon: 'Plus', 
+            onClick: () => handleAddItem(
+                contextMenu.cell!.rowId, 
+                typeof contextMenu.cell!.colKey === 'number' ? contextMenu.cell!.colKey : parseInt(contextMenu.cell!.rowId), 
+                viewMode === 'week' ? contextMenu.cell!.colKey as DayOfWeek : selectedDay
+            ) 
+        });
     }
 
     const recommendedTeachers = tempItem.subjectId ? teachers.filter(t => t.subjectIds.includes(tempItem.subjectId)) : [];
@@ -289,7 +296,7 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
     const getPrintItems = (rowId: string, colKey: string | number): ScheduleItem[] => {
         if (isWeeklyPrint) {
             const period = parseInt(rowId);
-            const day = colKey;
+            const day = colKey as string;
             let items = schedule.filter(s => s.shift === selectedShift && s.period === period && s.day === day);
             
             if (viewMode === 'class' || viewMode === 'week') items = items.filter(s => s.classId === filterId);
@@ -367,7 +374,7 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
                         </div>
                     )
                 })}
-                {!readOnly && items.length < 3 && <button onClick={() => handleAddItem(rowId, colKey, viewMode === 'week' ? colKey : selectedDay)} className="w-full rounded-lg border-2 border-dashed border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-300 dark:text-slate-600 hover:border-indigo-300 hover:text-indigo-400 transition-colors mt-auto h-6"><Icon name="Plus" size={16} /></button>}
+                {!readOnly && items.length < 3 && <button onClick={() => handleAddItem(rowId, typeof colKey === 'number' ? colKey : parseInt(rowId), viewMode === 'week' ? colKey as DayOfWeek : selectedDay)} className="w-full rounded-lg border-2 border-dashed border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-300 dark:text-slate-600 hover:border-indigo-300 hover:text-indigo-400 transition-colors mt-auto h-6"><Icon name="Plus" size={16} /></button>}
             </div>
         );
     };
@@ -580,7 +587,7 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
                     <div>
                         <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">УЧИТЕЛЬ</label>
                         <SearchableSelect 
-                            options={[{ value: 'recommend', label: 'Рекомендуемые', options: recommendedTeachers.map(t => ({ value: t.id, label: t.name })) }, { value: 'others', label: 'Остальные', options: otherTeachers.map(t => ({ value: t.id, label: t.name })) }]} 
+                            options={[{ label: 'Рекомендуемые', options: recommendedTeachers.map(t => ({ value: t.id, label: t.name })) }, { label: 'Остальные', options: otherTeachers.map(t => ({ value: t.id, label: t.name })) }]} 
                             value={tempItem.teacherId || null} 
                             onChange={(val) => setTempItem({...tempItem, teacherId: val as string})} 
                             placeholder="Выберите учителя" 

@@ -13,3 +13,20 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+declare module 'firebase/app' {
+  export function initializeApp(config: any): any;
+  export function getApps(): any[];
+  export function getApp(name?: string): any;
+}
+
+declare module 'firebase/auth' {
+  export function getAuth(app?: any): any;
+  export function onAuthStateChanged(auth: any, observer: (user: User | null) => void): any;
+  export function signOut(auth: any): Promise<void>;
+  export function signInWithEmailAndPassword(auth: any, email: string, password: string): Promise<any>;
+  export interface User {
+      email: string | null;
+      uid: string;
+  }
+}

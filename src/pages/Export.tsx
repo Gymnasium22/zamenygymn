@@ -279,7 +279,7 @@ export const ExportPage = () => {
             if (sub.replacementTeacherId === sub.originalTeacherId && sub.replacementRoomId && !sub.replacementClassId) reason = 'Смена кабинета';
             if (sub.replacementClassId && sub.replacementSubjectId) reason = 'Обмен уроками';
 
-            return { scheduleItem, cls, subj, origTeacher, reason };
+            return { sub, scheduleItem, cls, subj, origTeacher, reason };
         };
 
         // Split into lists
@@ -289,9 +289,9 @@ export const ExportPage = () => {
 
             // Если причина "Без записи", то в отдельный список
             if (details.reason === 'Без записи') {
-                noRecordSubs.push({ sub, ...details });
+                noRecordSubs.push(details);
             } else {
-                mainSubs.push({ sub, ...details });
+                mainSubs.push(details);
             }
         });
 

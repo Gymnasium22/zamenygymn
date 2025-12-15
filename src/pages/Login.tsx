@@ -1,10 +1,10 @@
+
 import { useState, useEffect } from 'react';
 import { auth } from '../services/firebase';
 import { useAuth } from '../context/AuthContext';
 import { Icon } from '../components/Icons';
 import { useNavigate } from 'react-router-dom';
-// FIX: Removed Firebase v9 modular import, switched to compat/v8 syntax.
-// import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 
 export const LoginPage = () => {
     const { setGuestRole, role, loading: authLoading } = useAuth();
@@ -16,13 +16,10 @@ export const LoginPage = () => {
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        // Если аутентификация не в процессе загрузки и роль установлена (т.е. вход успешен),
-        // перенаправляем пользователя.
         if (!authLoading && role) {
             if (role === 'admin' || role === 'teacher') {
                 navigate('/dashboard');
             }
-            // Для 'guest' навигация происходит в handleParentLogin
         }
     }, [role, authLoading, navigate]);
 
@@ -44,8 +41,7 @@ export const LoginPage = () => {
                 loginEmail = 'teacher@gymnasium22.com';
             }
 
-            await auth.signInWithEmailAndPassword(loginEmail, password);
-            // Навигация произойдет автоматически через useEffect после смены 'role'
+            await signInWithEmailAndPassword(auth, loginEmail, password);
             
         } catch (err) {
             console.error("Firebase Auth Error:", err);
@@ -56,16 +52,16 @@ export const LoginPage = () => {
                 case 'auth/invalid-credential':
                 case 'auth/wrong-password':
                 case 'auth/user-not-found':
-                    friendlyMessage = 'Неверный логин или пароль. Проверьте данные и попробуйте снова.';
+                    friendlyMessage = 'Неверный логин или пароль.';
                     break;
                 case 'auth/invalid-email':
-                    friendlyMessage = 'Некорректный формат email адреса.';
+                    friendlyMessage = 'Некорректный формат email.';
                     break;
                 case 'auth/too-many-requests':
-                    friendlyMessage = 'Слишком много попыток входа. Попробуйте позже.';
+                    friendlyMessage = 'Слишком много попыток. Подождите.';
                     break;
                 default:
-                    friendlyMessage = 'Ошибка входа. Проверьте подключение к интернету или настройки Firebase.';
+                    friendlyMessage = 'Ошибка входа. Проверьте сеть.';
             }
             setError(friendlyMessage);
         } finally {
@@ -111,7 +107,7 @@ export const LoginPage = () => {
                             <div className="bg-purple-100 dark:bg-purple-900/50 p-3 rounded-lg text-purple-600 dark:text-purple-400 group-hover:scale-110 transition-transform"><Icon name="Settings" size={24}/></div>
                             <div>
                                 <div className="font-bold text-slate-800 dark:text-white group-hover:text-purple-700 dark:group-hover:text-purple-400">Администратор</div>
-                                <div className="text-xs text-slate-500 dark:text-slate-400">Полный доступ (логин/пароль)</div>
+                                <div className="text-xs text-slate-500 dark:text-slate-400">Полный доступ</div>
                             </div>
                         </button>
                     </div>

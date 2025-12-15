@@ -1,12 +1,12 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import firebase from 'firebase/compat/app';
-import 'firebase/compat/auth';
+import { User, onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from '../services/firebase';
 
 export type UserRole = 'admin' | 'teacher' | 'guest' | null;
 
 interface AuthContextType {
-    user: firebase.User | null;
+    user: User | null;
     role: UserRole;
     loading: boolean;
     logout: () => Promise<void>;
@@ -15,35 +15,31 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// ВАЖНО: Эти email должны совпадать с теми, которые вы создали в Firebase Console
 const ADMIN_EMAIL = 'admin@gymnasium22.com';
 const TEACHER_EMAIL = 'teacher@gymnasium22.com';
 
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [user, setUser] = useState<firebase.User | null>(null);
+    const [user, setUser] = useState<User | null>(null);
     const [role, setRole] = useState<UserRole>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         if (!auth) {
-            console.warn("Firebase Auth is not initialized. Authentication is disabled.");
+            console.warn("Firebase Auth is not initialized.");
             setLoading(false);
             return;
         }
 
-        const unsubscribe = auth.onAuthStateChanged((currentUser) => {
+        const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
             setUser(currentUser);
             if (currentUser) {
-                // Улучшенная логика ролей
                 if (currentUser.email === ADMIN_EMAIL) {
                     setRole('admin');
                 } else if (currentUser.email === TEACHER_EMAIL) {
                     setRole('teacher');
                 } else {
-                    // Если залогинился неизвестный пользователь, не даем ему роль и выкидываем
                     setRole(null);
-                    auth?.signOut();
+                    signOut(auth);
                 }
             } else {
                 setRole(null);
@@ -55,7 +51,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const logout = async () => {
         if (auth) {
-            await auth.signOut();
+            await signOut(auth);
         }
         setRole(null);
     };

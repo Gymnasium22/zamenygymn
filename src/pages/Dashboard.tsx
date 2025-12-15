@@ -1,3 +1,4 @@
+
 import { useMemo, useState, useEffect } from 'react';
 import { useStaticData, useScheduleData } from '../context/DataContext'; 
 import { Icon } from '../components/Icons';
@@ -6,12 +7,13 @@ import { useNavigate } from 'react-router-dom';
 import { Modal } from '../components/UI';
 
 interface SearchItem {
-    room: string;
-    subject: string;
-    entityName: string;
+    room?: string;
+    subject?: string;
+    entityName?: string;
     direction?: string;
-    isSubstitution: boolean;
-    originalTeacherName: string | null;
+    isSubstitution?: boolean;
+    originalTeacherName?: string | null;
+    cancelled?: boolean;
 }
 
 interface SearchResult {
@@ -329,7 +331,7 @@ export const DashboardPage = () => {
                     return { room, subject, entityName: teacherName, direction: lesson.direction, isSubstitution: isSubbed, originalTeacherName };
                 });
 
-                const activeItems = items.filter(item => !item.cancelled);
+                const activeItems = items.filter(item => !item.cancelled) as SearchItem[];
                 const cancelledItems = items.filter(item => !!item.cancelled);
                 
                 if (activeItems.length > 0) {
