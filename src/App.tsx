@@ -17,7 +17,7 @@ import { dbService } from './services/db';
 import { AppData } from './types'; 
 import { INITIAL_DATA } from './constants'; 
 
-const ProtectedRoute = ({ children, allowedRoles }: { children: React.ReactNode, allowedRoles?: string[] }) => {
+const ProtectedRoute = ({ children, allowedRoles }: React.PropsWithChildren<{ allowedRoles?: string[] }>) => {
     const { user, role, loading } = useAuth();
 
     if (loading) return <div className="h-screen flex items-center justify-center"><Icon name="Loader" className="animate-spin text-indigo-600" size={48} /></div>;

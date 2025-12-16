@@ -1,5 +1,5 @@
 
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useStaticData, useScheduleData } from '../context/DataContext'; 
 import { Icon } from '../components/Icons';
@@ -161,7 +161,7 @@ export const SubstitutionsPage = () => {
             return;
         }
         
-        // Remove ANY existing substitutions for this lesson on this date (to handle re-assignment or clearing splits)
+        // Remove ANY existing substitutions for this lesson on this date
         const filteredSubs = newSubs.filter(s => !(s.scheduleItemId === currentSubParams.scheduleItemId && s.date === selectedDate));
         
         const subData = { 
@@ -206,7 +206,7 @@ export const SubstitutionsPage = () => {
             return;
         }
 
-        // 2. Удаляем старые замены для текущего урока (чтобы перезаписать)
+        // 2. Удаляем старые замены для текущего урока
         const newSubs = substitutions.filter(s => !(s.scheduleItemId === currentSubParams.scheduleItemId && s.date === selectedDate));
 
         // 3. Создаем замену для КАЖДОГО учителя целевого класса
@@ -214,13 +214,13 @@ export const SubstitutionsPage = () => {
             const subData = {
                 id: Math.random().toString(36).substr(2, 9),
                 date: selectedDate,
-                scheduleItemId: currentSubParams.scheduleItemId, // ID урока 7Б (Химия)
-                originalTeacherId: currentSubParams.teacherId, // Петрова
-                replacementTeacherId: lesson.teacherId, // Учитель 7А (Подгруппа 1, потом 2)
-                replacementClassId: lesson.classId, // 7А
-                replacementSubjectId: lesson.subjectId, // Английский
+                scheduleItemId: currentSubParams.scheduleItemId, 
+                originalTeacherId: currentSubParams.teacherId, 
+                replacementTeacherId: lesson.teacherId, 
+                replacementClassId: lesson.classId, 
+                replacementSubjectId: lesson.subjectId, 
                 isMerger: true,
-                replacementRoomId: lesson.roomId, // Идут в кабинет 7А
+                replacementRoomId: lesson.roomId, 
                 lessonAbsenceReason: lessonAbsenceReason || undefined
             };
             newSubs.push(subData);
@@ -961,7 +961,7 @@ export const SubstitutionsPage = () => {
                 </div>
             </div>
             
-            {/* ... rest of the component ... */}
+            {/* SUBSTITUTION MODAL */}
             <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Выбор замены">
                 {modalContext && (
                     <div className="bg-slate-50 dark:bg-slate-700/50 p-3 rounded-xl mb-4 text-sm border border-slate-100 dark:border-slate-600">
@@ -983,7 +983,7 @@ export const SubstitutionsPage = () => {
                     </select>
                 </div>
 
-                {/* ... rest of modal content ... */}
+                {/* NEW: Lesson-specific absence reason */}
                 {modalContext && !modalContext.isTeacherAbsent && (
                     <div className="mb-6">
                         <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Причина отсутствия на уроке (Опционально)</label>
@@ -1009,6 +1009,7 @@ export const SubstitutionsPage = () => {
                 </div>
                 
                 <div className="mb-4">
+                    {/* Expandable Merge Option */}
                     <button 
                         onClick={() => setShowMergeOptions(!showMergeOptions)} 
                         className="w-full p-3 mb-2 rounded-xl bg-amber-50 text-amber-700 font-bold text-sm hover:bg-amber-100 transition border border-amber-200 flex items-center justify-center gap-2"
@@ -1141,8 +1142,8 @@ export const SubstitutionsPage = () => {
                 </div>
             </Modal>
 
+            {/* MANUAL SEARCH MODAL */}
             <Modal isOpen={manualSearchModalOpen} onClose={() => setManualSearchModalOpen(false)} title="Ручной поиск урока">
-                {/* ... (Manual Search Modal content unchanged) ... */}
                 <div className="mb-4">
                     <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">Введите имя учителя или название класса, чтобы найти урок и поставить замену (кабинета или учителя).</p>
                     <div className="relative">

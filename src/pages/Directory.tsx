@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useStaticData } from '../context/DataContext'; 
 import { Icon } from '../components/Icons';
 import { Modal, StaggerContainer } from '../components/UI';

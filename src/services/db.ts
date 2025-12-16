@@ -34,6 +34,11 @@ const chunkArray = <T>(array: T[], size: number): T[][] => {
     return chunked;
 };
 
+// Helper to remove undefined values which Firebase doesn't support
+const sanitizeForFirestore = (data: any) => {
+    return JSON.parse(JSON.stringify(data));
+};
+
 export const dbService = {
     // Оптимизированная синхронизация: сравнивает данные перед записью
     syncCollection: async (collectionName: string, items: any[]) => {
@@ -64,8 +69,13 @@ export const dbService = {
         // Создание / Обновление
         items.forEach(item => {
             const existingData = existingDocsMap.get(item.id);
-            if (!existingData || JSON.stringify(existingData) !== JSON.stringify(item)) {
-                operations.push({ type: 'set', item });
+            // Используем JSON.stringify для сравнения, это также игнорирует порядок ключей в простых объектах,
+            // но для надежности глубокого сравнения лучше использовать lodash.isEqual, 
+            // однако здесь мы полагаемся на то, что sanitize уберет undefined, который мог вызвать ложные срабатывания или ошибки.
+            const sanitizedItem = sanitizeForFirestore(item);
+            
+            if (!existingData || JSON.stringify(existingData) !== JSON.stringify(sanitizedItem)) {
+                operations.push({ type: 'set', item: sanitizedItem });
             }
         });
 
@@ -85,6 +95,7 @@ export const dbService = {
                 if (op.type === 'delete') {
                     batch.delete(docRef);
                 } else {
+                    // Гарантируем, что undefined поля удалены перед записью
                     batch.set(docRef, op.item);
                 }
             });
@@ -117,10 +128,10 @@ export const dbService = {
         if (data.substitutions) promises.push(dbService.syncCollection(COLLECTIONS.SUBSTITUTIONS, data.substitutions));
 
         if (data.settings) {
-            promises.push(setDoc(doc(firestoreDB, COLLECTIONS.CONFIG, 'settings'), data.settings));
+            promises.push(setDoc(doc(firestoreDB, COLLECTIONS.CONFIG, 'settings'), sanitizeForFirestore(data.settings)));
         }
         if (data.bellSchedule) {
-            promises.push(setDoc(doc(firestoreDB, COLLECTIONS.CONFIG, 'bells'), { items: data.bellSchedule }));
+            promises.push(setDoc(doc(firestoreDB, COLLECTIONS.CONFIG, 'bells'), sanitizeForFirestore({ items: data.bellSchedule })));
         }
 
         await Promise.all(promises);
@@ -224,7 +235,8 @@ export const dbService = {
                 publicScheduleId: data.settings.publicScheduleId
             }
         };
-        const cleanData = JSON.parse(JSON.stringify(publicDataSubset));
+        // sanitize here too just in case
+        const cleanData = sanitizeForFirestore(publicDataSubset);
         await setDoc(doc(firestoreDB, COLLECTIONS.PUBLIC, id), cleanData);
     },
 

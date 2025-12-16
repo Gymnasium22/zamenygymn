@@ -1,5 +1,5 @@
 
-import { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useStaticData, useScheduleData } from '../context/DataContext'; 
 import { Icon } from '../components/Icons';
 import { Modal, SearchableSelect, ContextMenu } from '../components/UI';

@@ -1,5 +1,5 @@
 
-import { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useStaticData, useScheduleData } from '../context/DataContext'; 
 import { Icon } from '../components/Icons';
 import { DayOfWeek, DAYS, ScheduleItem } from '../types'; 
