@@ -18,6 +18,7 @@ export interface Subject {
   color: string;
   difficulty: number;
   requiredRoomType: string;
+  order?: number;
 }
 
 export interface Teacher {
@@ -29,6 +30,7 @@ export interface Teacher {
   shifts: string[]; // Shift values
   birthDate?: string;
   telegramChatId?: string;
+  order?: number;
 }
 
 export interface ClassEntity {
@@ -36,6 +38,7 @@ export interface ClassEntity {
   name: string;
   shift: string; // Shift enum
   studentsCount: number;
+  order?: number;
 }
 
 export interface Room {
@@ -43,6 +46,7 @@ export interface Room {
   name: string;
   capacity: number;
   type: string;
+  order?: number;
 }
 
 export interface ScheduleItem {

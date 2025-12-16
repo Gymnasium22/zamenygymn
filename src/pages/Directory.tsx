@@ -59,7 +59,8 @@ export const DirectoryPage = () => {
         if (editingId) {
             newList = newList.map(item => (item.id === editingId ? { ...item, ...form } : item));
         } else {
-            newList.push({ ...form, id: genId() } as any);
+            const maxOrder = list.reduce((max, item) => Math.max(max, (item as any).order || 0), 0);
+            newList.push({ ...form, id: genId(), order: maxOrder + 1 } as any);
         }
         
         await saveStaticData({ [key]: newList });
@@ -82,34 +83,29 @@ export const DirectoryPage = () => {
     const onDragOver = (e: React.DragEvent) => { e.preventDefault(); };
     const onDrop = async (e: React.DragEvent, index: number) => { 
         if (draggedIdx === null || draggedIdx === index) return; 
+
+        const reorderWithUpdate = (items: any[]) => {
+            const newList = [...items];
+            const [movedItem] = newList.splice(draggedIdx, 1);
+            newList.splice(index, 0, movedItem);
+            return newList.map((item, idx) => ({ ...item, order: idx }));
+        };
         
         switch (activeTab) {
             case 'teachers': {
-                const newList = [...teachers];
-                const [movedItem] = newList.splice(draggedIdx, 1);
-                newList.splice(index, 0, movedItem);
-                await saveStaticData({ teachers: newList });
+                await saveStaticData({ teachers: reorderWithUpdate(teachers) });
                 break;
             }
             case 'subjects': {
-                const newList = [...subjects];
-                const [movedItem] = newList.splice(draggedIdx, 1);
-                newList.splice(index, 0, movedItem);
-                await saveStaticData({ subjects: newList });
+                await saveStaticData({ subjects: reorderWithUpdate(subjects) });
                 break;
             }
             case 'classes': {
-                const newList = [...classes];
-                const [movedItem] = newList.splice(draggedIdx, 1);
-                newList.splice(index, 0, movedItem);
-                await saveStaticData({ classes: newList });
+                await saveStaticData({ classes: reorderWithUpdate(classes) });
                 break;
             }
             case 'rooms': {
-                const newList = [...rooms];
-                const [movedItem] = newList.splice(draggedIdx, 1);
-                newList.splice(index, 0, movedItem);
-                await saveStaticData({ rooms: newList });
+                await saveStaticData({ rooms: reorderWithUpdate(rooms) });
                 break;
             }
         }

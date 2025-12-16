@@ -162,6 +162,12 @@ export const dbService = {
             const q = query(collection(firestoreDB, colName));
             return onSnapshot(q, (snapshot) => {
                 const items = snapshot.docs.map(d => d.data());
+                // Sort items based on 'order' property client-side
+                items.sort((a: any, b: any) => {
+                    const orderA = typeof a.order === 'number' ? a.order : 999999;
+                    const orderB = typeof b.order === 'number' ? b.order : 999999;
+                    return orderA - orderB;
+                });
                 (localData as any)[key] = items;
                 triggerUpdate();
             }, (err) => {
