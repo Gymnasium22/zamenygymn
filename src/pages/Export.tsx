@@ -603,7 +603,12 @@ export const ExportPage = () => {
         
         if (shiftSubs.length === 0) return null;
 
-        const uniqueLessonIds = Array.from(new Set(shiftSubs.map(s => s.scheduleItemId)));
+        const uniqueLessonIds = Array.from(new Set(shiftSubs.map(s => s.scheduleItemId)))
+            .sort((idA, idB) => {
+                const itemA = currentSchedule.find(x => x.id === idA);
+                const itemB = currentSchedule.find(x => x.id === idB);
+                return (itemA?.period ?? 0) - (itemB?.period ?? 0);
+            });
 
         return (
             <div>

@@ -6,3 +6,123 @@
 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
 .dark .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; }
+
+/* --- NEW YEAR MODE ENHANCEMENTS --- */
+
+@keyframes snow-fall {
+  0% { background-position: 0 0, 0 0, 0 0; }
+  100% { background-position: 500px 1000px, 400px 400px, 300px 300px; }
+}
+
+@keyframes garland-blink {
+  0%, 100% { opacity: 1; filter: brightness(1.2) drop-shadow(0 0 5px currentColor); }
+  50% { opacity: 0.6; filter: brightness(0.8); }
+}
+
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 10s linear infinite;
+}
+
+.new-year-mode {
+  --tw-ring-color: #ef4444;
+  --festive-red: #dc2626;
+  --festive-green: #059669;
+}
+
+.new-year-mode .bg-indigo-600 {
+  background-color: var(--festive-red) !important;
+}
+
+.new-year-mode .text-indigo-600,
+.new-year-mode .text-indigo-700 {
+  color: var(--festive-red) !important;
+}
+
+.new-year-mode .bg-indigo-50 {
+  background-color: #fef2f2 !important;
+}
+
+.dark.new-year-mode .bg-indigo-900\/30 {
+  background-color: rgba(153, 27, 27, 0.3) !important;
+}
+
+/* Realistic Multi-layered Snowfall */
+.new-year-mode .snow-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9999;
+  background-image: 
+    /* Layer 1 - Small flakes */
+    radial-gradient(3px 3px at 50px 50px, #fff, transparent),
+    radial-gradient(4px 4px at 150px 150px, #fff, transparent),
+    radial-gradient(3px 3px at 250px 100px, #fff, transparent),
+    /* Layer 2 - Medium flakes */
+    radial-gradient(6px 6px at 100px 200px, rgba(255,255,255,0.8), transparent),
+    radial-gradient(5px 5px at 300px 350px, rgba(255,255,255,0.8), transparent),
+    /* Layer 3 - Large blurry flakes */
+    radial-gradient(8px 8px at 200px 50px, rgba(255,255,255,0.5), transparent);
+  background-size: 400px 400px, 350px 350px, 500px 500px, 600px 600px, 450px 450px, 700px 700px;
+  animation: snow-fall 15s linear infinite;
+  filter: drop-shadow(0 0 2px rgba(0,0,0,0.1));
+}
+
+/* Animated Garland */
+.new-year-mode .bg-garland {
+  background-image: 
+    radial-gradient(circle at 10px 10px, #ff0000 4px, transparent 5px),
+    radial-gradient(circle at 30px 10px, #00ff00 4px, transparent 5px),
+    radial-gradient(circle at 50px 10px, #ffff00 4px, transparent 5px),
+    radial-gradient(circle at 70px 10px, #0000ff 4px, transparent 5px);
+  background-size: 80px 20px;
+  background-repeat: repeat-x;
+  height: 15px;
+  width: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 20;
+  animation: garland-blink 1.5s ease-in-out infinite;
+}
+
+.new-year-mode aside nav a.active {
+  background-color: #fef2f2 !important;
+  color: var(--festive-red) !important;
+  border-left: 4px solid var(--festive-red);
+}
+
+.dark.new-year-mode aside nav a.active {
+  background-color: rgba(153, 27, 27, 0.2) !important;
+  color: #f87171 !important;
+}
+
+/* Frosty effect on cards */
+.new-year-mode .bg-white.dark\:bg-dark-800 {
+  position: relative;
+  overflow: hidden;
+}
+
+.new-year-mode .bg-white.dark\:bg-dark-800::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.8), transparent);
+  z-index: 10;
+}
+
+.new-year-mode .festive-bg {
+  background-image: 
+    radial-gradient(circle at 10% 20%, rgba(5, 150, 105, 0.05) 0%, transparent 30%),
+    radial-gradient(circle at 90% 80%, rgba(220, 38, 38, 0.05) 0%, transparent 30%);
+}
