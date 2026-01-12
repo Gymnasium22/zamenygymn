@@ -1,9 +1,9 @@
 
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { useStaticData, useScheduleData } from '../context/DataContext';
 import { Icon } from '../components/Icons';
 import { dbService } from '../services/db'; 
-import { DAYS, Shift, SHIFT_PERIODS, AppData, Substitution, ScheduleItem, ClassEntity, Subject, Teacher } from '../types';
+import { DAYS, Shift, SHIFT_PERIODS, AppData, Substitution, ScheduleItem, ClassEntity, Subject, Teacher, DayOfWeek } from '../types';
 import { INITIAL_DATA } from '../constants';
 import html2canvas from 'html2canvas';
 
@@ -30,6 +30,10 @@ export const ExportPage = () => {
     const [publicScheduleUrl, setPublicScheduleUrl] = useState('');
     const [publicScheduleId, setPublicScheduleId] = useState('');
 
+    // Matrix Print State
+    const [isMatrixPrintOpen, setIsMatrixPrintOpen] = useState(false);
+    const [matrixGrade, setMatrixGrade] = useState<string>("");
+
     const fullAppData: AppData = useMemo(() => ({
         subjects, teachers, classes, rooms, settings, bellSchedule,
         schedule: schedule1,
@@ -45,6 +49,22 @@ export const ExportPage = () => {
         const month = new Date(date).getMonth();
         return (month >= 0 && month <= 4) ? schedule2 : schedule1;
     };
+
+    // Extract available grades (parallels)
+    const availableGrades = useMemo<string[]>(() => {
+        const grades = new Set<string>();
+        classes.forEach(c => {
+            const match = c.name.match(/^(\d+)/);
+            if (match) grades.add(match[1]);
+        });
+        return Array.from(grades).sort((a,b) => parseInt(a)-parseInt(b));
+    }, [classes]);
+
+    useEffect(() => {
+        if (availableGrades.length > 0 && !matrixGrade) {
+            setMatrixGrade(availableGrades[0]);
+        }
+    }, [availableGrades]);
 
     const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => { 
         const file = e.target.files?.[0]; 
@@ -770,6 +790,127 @@ export const ExportPage = () => {
         </div>
     );
     
+    // --- Matrix Print Content Component ---
+    const MatrixPrintContent = () => {
+        const currentSchedule = getScheduleForExport();
+        // Shift 1 by default for this view as per request image, but logic can handle both if user selects
+        // The user selects the shift in the UI before opening modal, but let's assume we iterate all shifts if needed or just one.
+        // The image shows just "1 СМЕНА". So we iterate shifts present in filtered classes or just use Shift.First / Shift.Second.
+        // Actually, classes might be mixed in a grade level (rare but possible). 
+        // We will group by shift.
+        
+        const targetClasses = classes.filter(c => c.name.startsWith(matrixGrade)).sort((a,b) => a.name.localeCompare(b.name));
+        const shifts = Array.from(new Set(targetClasses.map(c => c.shift))).sort();
+
+        // New distinct colors for each day rows
+        const dayStyles: Record<string, { label: string, cell: string }> = {
+            [DayOfWeek.Monday]:    { label: 'bg-red-200',    cell: 'bg-red-100' },
+            [DayOfWeek.Tuesday]:   { label: 'bg-orange-200', cell: 'bg-orange-100' },
+            [DayOfWeek.Wednesday]: { label: 'bg-yellow-200', cell: 'bg-yellow-100' },
+            [DayOfWeek.Thursday]:  { label: 'bg-green-200',  cell: 'bg-green-100' },
+            [DayOfWeek.Friday]:    { label: 'bg-blue-200',   cell: 'bg-blue-100' },
+        };
+
+        if (targetClasses.length === 0) return <div className="text-center p-10">Нет классов для выбранной параллели</div>;
+
+        return (
+            <div className="font-sans text-black">
+                {shifts.map((shift: string) => {
+                    const shiftClasses = targetClasses.filter(c => c.shift === shift);
+                    const periods = SHIFT_PERIODS[shift as Shift];
+                    if (shiftClasses.length === 0) return null;
+
+                    return (
+                        <div key={shift} className="mb-10 page-break-inside-avoid">
+                            <table className="w-full border-collapse border-2 border-black text-center text-sm">
+                                <thead>
+                                    <tr>
+                                        <th className="border-2 border-black w-8"></th>
+                                        <th className="border-2 border-black w-8"></th>
+                                        <th colSpan={shiftClasses.length} className="border-2 border-black py-2 text-xl uppercase font-black tracking-widest bg-white">
+                                            {shift}
+                                        </th>
+                                    </tr>
+                                    <tr>
+                                        <th className="border-2 border-black w-8"></th>
+                                        <th className="border-2 border-black w-8"></th>
+                                        {shiftClasses.map(c => (
+                                            <th key={c.id} className="border-2 border-black py-2 font-bold text-lg bg-white w-32">
+                                                {c.name}
+                                            </th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {DAYS.map((day) => {
+                                        const styles = dayStyles[day as string] || { label: 'bg-gray-200', cell: 'bg-gray-100' };
+                                        return (
+                                            <React.Fragment key={day as string}>
+                                                {periods.map((period, pIndex) => (
+                                                    <tr key={`${day}-${period}`}>
+                                                        {/* Day Name Merged Cell */}
+                                                        {pIndex === 0 && (
+                                                            <td 
+                                                                rowSpan={periods.length} 
+                                                                className={`border-2 border-black font-bold uppercase text-xs writing-vertical-lr rotate-180 p-1 ${styles.label}`}
+                                                                style={{ writingMode: 'vertical-lr', transform: 'rotate(180deg)' }}
+                                                            >
+                                                                {day === DayOfWeek.Monday ? 'ПОНЕДЕЛЬНИК' :
+                                                                 day === DayOfWeek.Tuesday ? 'ВТОРНИК' :
+                                                                 day === DayOfWeek.Wednesday ? 'СРЕДА' :
+                                                                 day === DayOfWeek.Thursday ? 'ЧЕТВЕРГ' :
+                                                                 day === DayOfWeek.Friday ? 'ПЯТНИЦА' : day}
+                                                            </td>
+                                                        )}
+                                                        
+                                                        {/* Period Number */}
+                                                        <td className={`border-2 border-black font-bold text-base ${styles.label}`}>
+                                                            {period}
+                                                        </td>
+
+                                                        {/* Classes Cells */}
+                                                        {shiftClasses.map(cls => {
+                                                            // Find lessons. Could be multiple (groups)
+                                                            const lessons = currentSchedule.filter(s => 
+                                                                s.classId === cls.id && 
+                                                                s.day === day && 
+                                                                s.shift === shift && 
+                                                                s.period === period
+                                                            );
+                                                            
+                                                            return (
+                                                                <td key={cls.id} className={`border-2 border-black p-1 h-12 ${styles.cell}`}>
+                                                                    {lessons.map(lesson => {
+                                                                        const subj = subjects.find(s => s.id === lesson.subjectId);
+                                                                        const room = rooms.find(r => r.id === lesson.roomId);
+                                                                        const roomName = room ? room.name : lesson.roomId;
+                                                                        
+                                                                        return (
+                                                                            <div key={lesson.id} className="flex justify-center items-center gap-1 leading-tight text-sm font-bold">
+                                                                                <span>{subj?.name}</span>
+                                                                                {roomName && <span className="font-black">{roomName}</span>}
+                                                                            </div>
+                                                                        );
+                                                                    })}
+                                                                </td>
+                                                            );
+                                                        })}
+                                                    </tr>
+                                                ))}
+                                                {/* Separator row (thick border handled by CSS usually, but explicit works too) */}
+                                                <tr className="h-2 bg-black border-2 border-black"><td colSpan={2 + shiftClasses.length}></td></tr>
+                                            </React.Fragment>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    );
+                })}
+            </div>
+        );
+    };
+
     return (
         <div className="max-w-5xl mx-auto space-y-8 pb-20">
             <section className="bg-white dark:bg-dark-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
@@ -842,6 +983,27 @@ export const ExportPage = () => {
                             )}
                         </div>
                     )}
+                </div>
+            </section>
+
+            <section className="bg-white dark:bg-dark-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
+                <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                    <Icon name="Printer" className="text-blue-600 dark:text-blue-400"/> Печать сетки (как на фото)
+                </h2>
+                <div className="flex flex-wrap gap-4 items-center">
+                    <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl p-1.5 pl-3">
+                        <span className="text-xs font-bold text-slate-500 dark:text-slate-400">Параллель:</span>
+                        <select
+                            value={matrixGrade}
+                            onChange={(e) => setMatrixGrade(e.target.value)}
+                            className="bg-transparent text-sm font-bold text-slate-700 dark:text-slate-200 outline-none cursor-pointer"
+                        >
+                            {availableGrades.map((g: string) => <option key={g} value={g}>{g}-е классы</option>)}
+                        </select>
+                    </div>
+                    <button onClick={() => setIsMatrixPrintOpen(true)} className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200 dark:shadow-none flex items-center gap-2">
+                        <Icon name="Printer" size={20}/> Открыть версию для печати
+                    </button>
                 </div>
             </section>
 
@@ -925,6 +1087,23 @@ export const ExportPage = () => {
                     )}
                 </div>
             </Modal>
+
+            {isMatrixPrintOpen && (
+                <div className="fixed inset-0 z-[100] bg-white flex flex-col">
+                    {/* Toolbar */}
+                    <div className="p-4 border-b flex justify-between items-center bg-slate-50 no-print">
+                         <h2 className="font-bold text-lg text-slate-800">Печать сетки ({matrixGrade}-е классы)</h2>
+                         <div className="flex gap-2">
+                             <button onClick={() => window.print()} className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold flex items-center gap-2 hover:bg-indigo-700"><Icon name="Printer" size={16}/> Печать</button>
+                             <button onClick={() => setIsMatrixPrintOpen(false)} className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg font-bold hover:bg-slate-300">Закрыть</button>
+                         </div>
+                    </div>
+                    {/* Printable Area */}
+                    <div className="flex-1 overflow-auto p-8 custom-scrollbar bg-white">
+                         <MatrixPrintContent />
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
