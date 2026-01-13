@@ -821,7 +821,7 @@ export const ExportPage = () => {
                     if (shiftClasses.length === 0) return null;
 
                     return (
-                        <div key={shift} className="mb-10 page-break-inside-avoid">
+                        <div key={String(shift)} className="mb-10 page-break-inside-avoid">
                             <table className="w-full border-collapse border-2 border-black text-center text-sm">
                                 <thead>
                                     <tr>
@@ -835,19 +835,19 @@ export const ExportPage = () => {
                                         <th className="border-2 border-black w-8"></th>
                                         <th className="border-2 border-black w-8"></th>
                                         {shiftClasses.map(c => (
-                                            <th key={c.id} className="border-2 border-black py-2 font-bold text-lg bg-white w-32">
+                                            <th key={String(c.id)} className="border-2 border-black py-2 font-bold text-lg bg-white w-32">
                                                 {c.name}
                                             </th>
                                         ))}
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {DAYS.map((day) => {
-                                        const styles = dayStyles[day as string] || { label: 'bg-gray-200', cell: 'bg-gray-100' };
+                                    {DAYS.map((day: string) => {
+                                        const styles = dayStyles[day] || { label: 'bg-gray-200', cell: 'bg-gray-100' };
                                         return (
-                                            <React.Fragment key={day as string}>
+                                            <React.Fragment key={day}>
                                                 {periods.map((period, pIndex) => (
-                                                    <tr key={`${day}-${period}`}>
+                                                    <tr key={`${String(day)}-${period}`}>
                                                         {/* Day Name Merged Cell */}
                                                         {pIndex === 0 && (
                                                             <td 
@@ -879,7 +879,7 @@ export const ExportPage = () => {
                                                             );
                                                             
                                                             return (
-                                                                <td key={cls.id} className={`border-2 border-black p-1 h-12 ${styles.cell}`}>
+                                                                <td key={String(cls.id)} className={`border-2 border-black p-1 h-12 ${styles.cell}`}>
                                                                     {lessons.map(lesson => {
                                                                         const subj = subjects.find(s => s.id === lesson.subjectId);
                                                                         const room = rooms.find(r => r.id === lesson.roomId);
@@ -909,6 +909,111 @@ export const ExportPage = () => {
                 })}
             </div>
         );
+    };
+
+    const downloadGradeMatrixExcel = () => {
+        const currentSchedule = getScheduleForExport();
+        const targetClasses = classes.filter(c => c.name.startsWith(matrixGrade)).sort((a,b) => a.name.localeCompare(b.name));
+        const shifts = Array.from(new Set(targetClasses.map(c => c.shift))).sort();
+
+        // Colors for Excel to match UI
+        const dayColors: Record<string, { header: string, cell: string }> = {
+            [DayOfWeek.Monday]:    { header: '#fecaca', cell: '#fee2e2' }, // Red 200/100
+            [DayOfWeek.Tuesday]:   { header: '#fed7aa', cell: '#ffedd5' }, // Orange
+            [DayOfWeek.Wednesday]: { header: '#fef08a', cell: '#fef9c3' }, // Yellow
+            [DayOfWeek.Thursday]:  { header: '#bbf7d0', cell: '#dcfce7' }, // Green
+            [DayOfWeek.Friday]:    { header: '#bfdbfe', cell: '#dbeafe' }, // Blue
+        };
+
+        let html = `
+            <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+            <head><meta charset="UTF-8"><style>
+                table { border-collapse: collapse; font-family: Arial, sans-serif; font-size: 10pt; width: 100%; }
+                td, th { border: 1px solid #000; padding: 4px; text-align: center; vertical-align: middle; }
+                .header { font-weight: bold; background-color: #f3f4f6; }
+                .class-header { font-weight: bold; font-size: 12pt; background-color: #ffffff; }
+                .subject { font-weight: bold; }
+                .room { font-size: 8pt; color: #555; }
+            </style></head><body>
+        `;
+
+        shifts.forEach((shift) => {
+            const shiftClasses = targetClasses.filter(c => c.shift === shift);
+            const periods = SHIFT_PERIODS[shift as Shift];
+            if (shiftClasses.length === 0) return;
+
+            html += `<h3 style="font-family: Arial; font-size: 14pt;">${shift}</h3><table>`;
+            
+            // Header Row 1: Shift Title
+            html += `<tr><th class="header" style="width:30px"></th><th class="header" style="width:30px"></th>`;
+            html += `<th colspan="${shiftClasses.length}" class="header" style="font-size:14pt; background-color: #ffffff;">${shift}</th></tr>`;
+
+            // Header Row 2: Class Names
+            html += `<tr><th class="header"></th><th class="header"></th>`;
+            shiftClasses.forEach(c => {
+                html += `<th class="class-header" style="width:150px;">${c.name}</th>`;
+            });
+            html += `</tr>`;
+
+            DAYS.forEach((day) => {
+                const styles = dayColors[day as string] || { header: '#e5e7eb', cell: '#f3f4f6' };
+                
+                periods.forEach((period, pIndex) => {
+                    html += `<tr>`;
+                    
+                    // Day Name Merged Cell
+                    if (pIndex === 0) {
+                        html += `<td rowspan="${periods.length}" class="header" style="background-color: ${styles.header}; font-weight:bold;">${day}</td>`;
+                    }
+
+                    // Period Number
+                    html += `<td class="header" style="background-color: ${styles.header};">${period}</td>`;
+
+                    // Class Cells
+                    shiftClasses.forEach(cls => {
+                        const lessons = currentSchedule.filter(s => 
+                            s.classId === cls.id && 
+                            s.day === day && 
+                            s.shift === shift && 
+                            s.period === period
+                        );
+                        
+                        html += `<td style="background-color: ${styles.cell}; vertical-align: top; height: 40px;">`;
+                        
+                        lessons.forEach((lesson, idx) => {
+                            const subj = subjects.find(s => s.id === lesson.subjectId);
+                            const room = rooms.find(r => r.id === lesson.roomId);
+                            const roomName = room ? room.name : lesson.roomId;
+                            
+                            if(idx > 0) html += `<br style="mso-data-placement:same-cell;" />`; // Excel line break
+                            
+                            html += `<div style="font-weight:bold;">${subj?.name || ''}</div>`;
+                            if (roomName) html += `<div style="font-size:8pt; font-weight:bold;">${roomName}</div>`;
+                        });
+                        
+                        html += `</td>`;
+                    });
+
+                    html += `</tr>`;
+                });
+                
+                // Thick separator row
+                html += `<tr><td colspan="${2 + shiftClasses.length}" style="height:3px; background-color:#000; border:none;"></td></tr>`;
+            });
+
+            html += `</table><br/><br/>`;
+        });
+
+        html += `</body></html>`;
+        
+        const blob = new Blob([html], { type: "application/vnd.ms-excel" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `Сетка_Расписания_${matrixGrade}_параллель.xls`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     };
 
     return (
@@ -1003,6 +1108,9 @@ export const ExportPage = () => {
                     </div>
                     <button onClick={() => setIsMatrixPrintOpen(true)} className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200 dark:shadow-none flex items-center gap-2">
                         <Icon name="Printer" size={20}/> Открыть версию для печати
+                    </button>
+                    <button onClick={downloadGradeMatrixExcel} className="px-6 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition shadow-lg shadow-emerald-200 dark:shadow-none flex items-center gap-2">
+                        <Icon name="FileSpreadsheet" size={20}/> Скачать Excel
                     </button>
                 </div>
             </section>
