@@ -255,6 +255,132 @@ export const ExportPage = () => {
         document.body.removeChild(link);
     };
 
+    const downloadGradeMatrixExcel = () => {
+        const currentSchedule = getScheduleForExport();
+        const targetClasses = classes.filter(c => c.name.startsWith(matrixGrade)).sort((a,b) => a.name.localeCompare(b.name));
+        const shifts = Array.from(new Set(targetClasses.map(c => c.shift))).sort();
+
+        // Colors matching the visual style in MatrixPrintContent
+        const dayStyles: Record<string, { label: string, cell: string }> = {
+            [DayOfWeek.Monday]:    { label: '#fecaca', cell: '#fee2e2' }, // Red 200/100
+            [DayOfWeek.Tuesday]:   { label: '#fed7aa', cell: '#ffedd5' }, // Orange 200/100
+            [DayOfWeek.Wednesday]: { label: '#fef08a', cell: '#fef9c3' }, // Yellow 200/100
+            [DayOfWeek.Thursday]:  { label: '#bbf7d0', cell: '#dcfce7' }, // Green 200/100
+            [DayOfWeek.Friday]:    { label: '#bfdbfe', cell: '#dbeafe' }, // Blue 200/100
+        };
+
+        let html = `
+            <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+            <head>
+                <meta charset="UTF-8">
+                <style>
+                    table { border-collapse: collapse; font-family: Arial, sans-serif; width: 100%; }
+                    td, th { border: 1px solid #000000; text-align: center; vertical-align: middle; padding: 4px; }
+                    .shift-header { font-size: 16pt; font-weight: bold; background-color: #ffffff; text-align: center; border: 2px solid #000; }
+                    .class-header { font-size: 12pt; font-weight: bold; background-color: #ffffff; text-align: center; border: 2px solid #000; }
+                    .day-cell { 
+                        font-weight: bold; 
+                        text-transform: uppercase; 
+                        writing-mode: vertical-lr; 
+                        transform: rotate(180deg);
+                        text-align: center;
+                        vertical-align: middle;
+                        border: 2px solid #000;
+                        mso-rotate: 90; 
+                    }
+                    .period-cell { font-weight: bold; border: 2px solid #000; }
+                    .content-cell { font-weight: bold; border: 1px solid #000; height: 50px; }
+                    .subject { font-weight: bold; }
+                    .room { font-size: 8pt; font-weight: bold; }
+                </style>
+            </head>
+            <body>
+        `;
+
+        shifts.forEach((shift) => {
+            const shiftClasses = targetClasses.filter(c => c.shift === shift);
+            const periods = SHIFT_PERIODS[shift as Shift];
+            if (shiftClasses.length === 0) return;
+
+            html += `<table>`;
+            
+            // Row 1: "1 СМЕНА" merged
+            html += `<tr>`;
+            html += `<td style="border:none"></td>`;
+            html += `<td style="border:none"></td>`;
+            html += `<td colspan="${shiftClasses.length}" class="shift-header">${shift}</td>`;
+            html += `</tr>`;
+
+            // Row 2: Classes
+            html += `<tr>`;
+            html += `<td style="border:none"></td>`;
+            html += `<td style="border:none"></td>`;
+            shiftClasses.forEach(c => {
+                html += `<td class="class-header">${c.name}</td>`;
+            });
+            html += `</tr>`;
+
+            // Data Rows
+            DAYS.forEach((day) => {
+                const colors = dayStyles[day as string] || { label: '#e5e7eb', cell: '#f3f4f6' };
+                
+                periods.forEach((period, pIndex) => {
+                    html += `<tr>`;
+
+                    // Day Column (Merged)
+                    if (pIndex === 0) {
+                        html += `<td rowspan="${periods.length}" class="day-cell" style="background-color: ${colors.label};">${day.toUpperCase()}</td>`;
+                    }
+
+                    // Period Column
+                    html += `<td class="period-cell" style="background-color: ${colors.label};">${period}</td>`;
+
+                    // Class Columns
+                    shiftClasses.forEach(cls => {
+                        const lessons = currentSchedule.filter(s => 
+                            s.classId === cls.id && 
+                            s.day === day && 
+                            s.shift === shift && 
+                            s.period === period
+                        );
+                        
+                        html += `<td class="content-cell" style="background-color: ${colors.cell};">`;
+                        
+                        lessons.forEach((lesson, i) => {
+                            if (i > 0) html += `<br style="mso-data-placement:same-cell;">`;
+                            const sub = subjects.find(s => s.id === lesson.subjectId);
+                            const room = rooms.find(r => r.id === lesson.roomId);
+                            const roomName = room ? room.name : (lesson.roomId || '');
+                            
+                            html += `<span class="subject">${sub?.name || ''}</span>`;
+                            if (roomName) html += ` <span class="room">${roomName}</span>`;
+                        });
+                        
+                        html += `</td>`;
+                    });
+
+                    html += `</tr>`;
+                });
+                
+                // Add a black separator row to mimic the thick border in the image
+                html += `<tr><td colspan="${2 + shiftClasses.length}" style="height: 3px; background-color: #000000; border: none;"></td></tr>`;
+            });
+
+            html += `</table><br><br>`;
+        });
+
+        html += `</body></html>`;
+        
+        const blob = new Blob([html], { type: "application/vnd.ms-excel" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `Сетка_Расписания_${matrixGrade}_параллель.xls`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     const exportMonthlySubstitutionsExcel = () => {
         const targetDate = new Date(exportDate);
         const targetMonth = targetDate.getMonth();
@@ -793,16 +919,10 @@ export const ExportPage = () => {
     // --- Matrix Print Content Component ---
     const MatrixPrintContent = () => {
         const currentSchedule = getScheduleForExport();
-        // Shift 1 by default for this view as per request image, but logic can handle both if user selects
-        // The user selects the shift in the UI before opening modal, but let's assume we iterate all shifts if needed or just one.
-        // The image shows just "1 СМЕНА". So we iterate shifts present in filtered classes or just use Shift.First / Shift.Second.
-        // Actually, classes might be mixed in a grade level (rare but possible). 
-        // We will group by shift.
-        
         const targetClasses = classes.filter(c => c.name.startsWith(matrixGrade)).sort((a,b) => a.name.localeCompare(b.name));
         const shifts = Array.from(new Set(targetClasses.map(c => c.shift))).sort();
 
-        // New distinct colors for each day rows
+        // New distinct colors for each day rows matching the Excel export colors
         const dayStyles: Record<string, { label: string, cell: string }> = {
             [DayOfWeek.Monday]:    { label: 'bg-red-200',    cell: 'bg-red-100' },
             [DayOfWeek.Tuesday]:   { label: 'bg-orange-200', cell: 'bg-orange-100' },
@@ -842,10 +962,10 @@ export const ExportPage = () => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {DAYS.map((day: string) => {
-                                        const styles = dayStyles[day] || { label: 'bg-gray-200', cell: 'bg-gray-100' };
+                                    {DAYS.map((day) => {
+                                        const styles = dayStyles[day as string] || { label: 'bg-gray-200', cell: 'bg-gray-100' };
                                         return (
-                                            <React.Fragment key={day}>
+                                            <React.Fragment key={String(day)}>
                                                 {periods.map((period, pIndex) => (
                                                     <tr key={`${String(day)}-${period}`}>
                                                         {/* Day Name Merged Cell */}
@@ -870,7 +990,6 @@ export const ExportPage = () => {
 
                                                         {/* Classes Cells */}
                                                         {shiftClasses.map(cls => {
-                                                            // Find lessons. Could be multiple (groups)
                                                             const lessons = currentSchedule.filter(s => 
                                                                 s.classId === cls.id && 
                                                                 s.day === day && 
@@ -897,8 +1016,8 @@ export const ExportPage = () => {
                                                         })}
                                                     </tr>
                                                 ))}
-                                                {/* Separator row (thick border handled by CSS usually, but explicit works too) */}
-                                                <tr className="h-2 bg-black border-2 border-black"><td colSpan={2 + shiftClasses.length}></td></tr>
+                                                {/* Thick separator row between days */}
+                                                <tr className="h-1 bg-black border-2 border-black"><td colSpan={2 + shiftClasses.length}></td></tr>
                                             </React.Fragment>
                                         );
                                     })}
@@ -909,111 +1028,6 @@ export const ExportPage = () => {
                 })}
             </div>
         );
-    };
-
-    const downloadGradeMatrixExcel = () => {
-        const currentSchedule = getScheduleForExport();
-        const targetClasses = classes.filter(c => c.name.startsWith(matrixGrade)).sort((a,b) => a.name.localeCompare(b.name));
-        const shifts = Array.from(new Set(targetClasses.map(c => c.shift))).sort();
-
-        // Colors for Excel to match UI
-        const dayColors: Record<string, { header: string, cell: string }> = {
-            [DayOfWeek.Monday]:    { header: '#fecaca', cell: '#fee2e2' }, // Red 200/100
-            [DayOfWeek.Tuesday]:   { header: '#fed7aa', cell: '#ffedd5' }, // Orange
-            [DayOfWeek.Wednesday]: { header: '#fef08a', cell: '#fef9c3' }, // Yellow
-            [DayOfWeek.Thursday]:  { header: '#bbf7d0', cell: '#dcfce7' }, // Green
-            [DayOfWeek.Friday]:    { header: '#bfdbfe', cell: '#dbeafe' }, // Blue
-        };
-
-        let html = `
-            <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-            <head><meta charset="UTF-8"><style>
-                table { border-collapse: collapse; font-family: Arial, sans-serif; font-size: 10pt; width: 100%; }
-                td, th { border: 1px solid #000; padding: 4px; text-align: center; vertical-align: middle; }
-                .header { font-weight: bold; background-color: #f3f4f6; }
-                .class-header { font-weight: bold; font-size: 12pt; background-color: #ffffff; }
-                .subject { font-weight: bold; }
-                .room { font-size: 8pt; color: #555; }
-            </style></head><body>
-        `;
-
-        shifts.forEach((shift) => {
-            const shiftClasses = targetClasses.filter(c => c.shift === shift);
-            const periods = SHIFT_PERIODS[shift as Shift];
-            if (shiftClasses.length === 0) return;
-
-            html += `<h3 style="font-family: Arial; font-size: 14pt;">${shift}</h3><table>`;
-            
-            // Header Row 1: Shift Title
-            html += `<tr><th class="header" style="width:30px"></th><th class="header" style="width:30px"></th>`;
-            html += `<th colspan="${shiftClasses.length}" class="header" style="font-size:14pt; background-color: #ffffff;">${shift}</th></tr>`;
-
-            // Header Row 2: Class Names
-            html += `<tr><th class="header"></th><th class="header"></th>`;
-            shiftClasses.forEach(c => {
-                html += `<th class="class-header" style="width:150px;">${c.name}</th>`;
-            });
-            html += `</tr>`;
-
-            DAYS.forEach((day) => {
-                const styles = dayColors[day as string] || { header: '#e5e7eb', cell: '#f3f4f6' };
-                
-                periods.forEach((period, pIndex) => {
-                    html += `<tr>`;
-                    
-                    // Day Name Merged Cell
-                    if (pIndex === 0) {
-                        html += `<td rowspan="${periods.length}" class="header" style="background-color: ${styles.header}; font-weight:bold;">${day}</td>`;
-                    }
-
-                    // Period Number
-                    html += `<td class="header" style="background-color: ${styles.header};">${period}</td>`;
-
-                    // Class Cells
-                    shiftClasses.forEach(cls => {
-                        const lessons = currentSchedule.filter(s => 
-                            s.classId === cls.id && 
-                            s.day === day && 
-                            s.shift === shift && 
-                            s.period === period
-                        );
-                        
-                        html += `<td style="background-color: ${styles.cell}; vertical-align: top; height: 40px;">`;
-                        
-                        lessons.forEach((lesson, idx) => {
-                            const subj = subjects.find(s => s.id === lesson.subjectId);
-                            const room = rooms.find(r => r.id === lesson.roomId);
-                            const roomName = room ? room.name : lesson.roomId;
-                            
-                            if(idx > 0) html += `<br style="mso-data-placement:same-cell;" />`; // Excel line break
-                            
-                            html += `<div style="font-weight:bold;">${subj?.name || ''}</div>`;
-                            if (roomName) html += `<div style="font-size:8pt; font-weight:bold;">${roomName}</div>`;
-                        });
-                        
-                        html += `</td>`;
-                    });
-
-                    html += `</tr>`;
-                });
-                
-                // Thick separator row
-                html += `<tr><td colspan="${2 + shiftClasses.length}" style="height:3px; background-color:#000; border:none;"></td></tr>`;
-            });
-
-            html += `</table><br/><br/>`;
-        });
-
-        html += `</body></html>`;
-        
-        const blob = new Blob([html], { type: "application/vnd.ms-excel" });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `Сетка_Расписания_${matrixGrade}_параллель.xls`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
     };
 
     return (
