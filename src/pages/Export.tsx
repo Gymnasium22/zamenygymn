@@ -3,7 +3,7 @@ import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { useStaticData, useScheduleData } from '../context/DataContext';
 import { Icon } from '../components/Icons';
 import { dbService } from '../services/db'; 
-import { DAYS, Shift, SHIFT_PERIODS, AppData, Substitution, ScheduleItem, ClassEntity, Subject, Teacher, DayOfWeek } from '../types';
+import { DAYS, DayOfWeek, Shift, SHIFT_PERIODS, AppData, Substitution, ScheduleItem, ClassEntity, Subject, Teacher } from '../types';
 import { INITIAL_DATA } from '../constants';
 import html2canvas from 'html2canvas';
 
@@ -158,12 +158,22 @@ export const ExportPage = () => {
 
     const exportMatrixExcel = () => {
         const currentSchedule = getScheduleForExport();
+
+        // Цвета для дней недели (Header - потемнее, Cell - посветлее)
+        const dayColors: Record<string, { header: string, cell: string }> = {
+            [DayOfWeek.Monday]:    { header: '#fecaca', cell: '#fee2e2' }, // Red
+            [DayOfWeek.Tuesday]:   { header: '#fed7aa', cell: '#ffedd5' }, // Orange
+            [DayOfWeek.Wednesday]: { header: '#fef08a', cell: '#fef9c3' }, // Yellow
+            [DayOfWeek.Thursday]:  { header: '#bbf7d0', cell: '#dcfce7' }, // Green
+            [DayOfWeek.Friday]:    { header: '#bfdbfe', cell: '#dbeafe' }, // Blue
+        };
+
         let html = `
             <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
             <head><meta charset="UTF-8"><style>
                 table { border-collapse: collapse; font-family: Arial, sans-serif; font-size: 12pt; margin-bottom: 20px; }
                 td, th { border: 1px solid #000; padding: 2px; vertical-align: middle; text-align: center; }
-                .header { font-weight: bold; background-color: #f3f4f6; }
+                .header { font-weight: bold; }
                 .subject-cell { font-weight: bold; vertical-align: middle; background-color: #fff; }
                 .teacher-cell { text-align: left; padding-left: 5px; }
                 sub { font-size: 10px; vertical-align: sub; }
@@ -175,29 +185,34 @@ export const ExportPage = () => {
             
             html += `<table>`;
             html += `<tr>
-                <th rowspan="3" class="header" style="border: 2px solid #000; width: 150px;">Учебный предмет</th>
-                <th rowspan="3" class="header" style="border: 2px solid #000; width: 200px;">ФИО</th>
-                <th colspan="${DAYS.length * periods.length}" class="header" style="border: 2px solid #000; font-size: 14px;">День недели</th>
+                <th rowspan="3" class="header" style="border: 2px solid #000; width: 150px; background-color: #e9d5ff;">Учебный предмет</th>
+                <th rowspan="3" class="header" style="border: 2px solid #000; width: 200px; background-color: #e9d5ff;">ФИО</th>
+                <th colspan="${DAYS.length * periods.length}" class="header" style="border: 2px solid #000; font-size: 14px; background-color: #e9d5ff;">День недели</th>
             </tr>`;
 
             html += `<tr>`;
             DAYS.forEach(day => {
-                html += `<th colspan="${periods.length}" class="header" style="border: 2px solid #000;">${day}</th>`;
+                const bg = dayColors[day]?.header || '#f3f4f6';
+                html += `<th colspan="${periods.length}" class="header" style="border: 2px solid #000; background-color: ${bg};">${day}</th>`;
             });
             html += `</tr>`;
 
             html += `<tr>`;
-            DAYS.forEach(() => {
-                periods.forEach(p => html += `<th class="header" style="border-bottom: 2px solid #000;">Урок</th>`);
+            DAYS.forEach((day) => {
+                const bg = dayColors[day]?.header || '#f3f4f6';
+                periods.forEach(p => html += `<th class="header" style="border-bottom: 2px solid #000; background-color: ${bg};">Урок</th>`);
             });
             html += `</tr>`;
             
+            const shiftGray = '#e5e7eb'; 
+
             html += `<tr>
-                <th class="header" style="border: 2px solid #000; background-color: #e0e7ff;">${shift}</th>
-                <th class="header" style="border: 2px solid #000;"></th>
+                <th class="header" style="border: 2px solid #000; background-color: ${shiftGray};">${shift}</th>
+                <th class="header" style="border: 2px solid #000; background-color: ${shiftGray};"></th>
             `;
-            DAYS.forEach(() => {
-                periods.forEach(p => html += `<th class="header" style="width: 40px;">${p}</th>`);
+            DAYS.forEach((day) => {
+                const bg = dayColors[day]?.header || '#f3f4f6';
+                periods.forEach(p => html += `<th class="header" style="width: 40px; background-color: ${bg};">${p}</th>`);
             });
             html += `</tr>`;
 
@@ -205,16 +220,15 @@ export const ExportPage = () => {
                 const filteredTeachers = teachers.filter(t => t.subjectIds.includes(subject.id));
                 if (filteredTeachers.length === 0) return;
 
-                const subjectColor = subject.color || '#ffffff';
-
                 filteredTeachers.forEach((teacher, tIndex) => {
                     html += `<tr>`;
                     if (tIndex === 0) {
-                        html += `<td rowspan="${filteredTeachers.length}" class="subject-cell" style="border: 2px solid #000; background-color: ${subjectColor};">${subject.name}</td>`;
+                        html += `<td rowspan="${filteredTeachers.length}" class="subject-cell" style="border: 2px solid #000; background-color: #e9d5ff;">${subject.name}</td>`;
                     }
-                    html += `<td class="teacher-cell" style="border-right: 2px solid #000;">${teacher.name}</td>`;
+                    html += `<td class="teacher-cell" style="border-right: 2px solid #000; background-color: #e9d5ff;">${teacher.name}</td>`;
 
                     DAYS.forEach(day => {
+                        const cellBg = dayColors[day]?.cell || '#fff';
                         periods.forEach(p => {
                             const item = currentSchedule.find(s => 
                                 s.teacherId === teacher.id && 
@@ -230,10 +244,12 @@ export const ExportPage = () => {
                                 const roomName = r ? r.name : item.roomId;
                                 const room = roomName ? `<sub>${roomName}</sub>` : '';
                                 const dir = item.direction ? ` <span style="font-size:10px">(${item.direction})</span>` : '';
-                                const bgColor = subject.color || '#ffffff';
+                                // Убрали индивидуальный цвет предмета, используем цвет дня
+                                const bgColor = cellBg;
                                 html += `<td style="border: 1px solid #000; font-weight: bold; background-color: ${bgColor};">${cls ? cls.name : ''}${dir}${room}</td>`;
                             } else {
-                                html += `<td style="border: 1px solid #000;"></td>`;
+                                // Пустые ячейки красим в цвет дня
+                                html += `<td style="border: 1px solid #000; background-color: ${cellBg};"></td>`;
                             }
                         });
                     });
@@ -258,7 +274,7 @@ export const ExportPage = () => {
     const downloadGradeMatrixExcel = () => {
         const currentSchedule = getScheduleForExport();
         const targetClasses = classes.filter(c => c.name.startsWith(matrixGrade)).sort((a,b) => a.name.localeCompare(b.name));
-        const shifts = Array.from(new Set(targetClasses.map(c => c.shift))).sort();
+        const shifts = (Array.from(new Set(targetClasses.map(c => c.shift))) as string[]).sort();
 
         // Colors matching the visual style in MatrixPrintContent
         const dayStyles: Record<string, { label: string, cell: string }> = {
@@ -800,7 +816,7 @@ export const ExportPage = () => {
                             const isTeacherPresent = sub.replacementTeacherId === sub.originalTeacherId;
 
                             return (
-                                <tr key={lessonId}>
+                                <tr key={String(lessonId)}>
                                     <td className="py-3 px-2 text-center font-bold text-slate-800 text-lg">{s.period}</td>
                                     <td className="py-3 px-2 font-bold text-slate-700">{cls?.name}</td>
                                     <td className="py-3 px-2"><div className="font-semibold text-slate-800">{subj?.name}</div>{s.direction && <div className="text-[10px] text-slate-500 bg-slate-100 inline-block px-1 rounded mt-0.5">{s.direction}</div>}</td>
@@ -920,7 +936,7 @@ export const ExportPage = () => {
     const MatrixPrintContent = () => {
         const currentSchedule = getScheduleForExport();
         const targetClasses = classes.filter(c => c.name.startsWith(matrixGrade)).sort((a,b) => a.name.localeCompare(b.name));
-        const shifts = Array.from(new Set(targetClasses.map(c => c.shift))).sort();
+        const shifts = (Array.from(new Set(targetClasses.map(c => c.shift))) as string[]).sort();
 
         // New distinct colors for each day rows matching the Excel export colors
         const dayStyles: Record<string, { label: string, cell: string }> = {
@@ -962,8 +978,8 @@ export const ExportPage = () => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {DAYS.map((day) => {
-                                        const styles = dayStyles[day as string] || { label: 'bg-gray-200', cell: 'bg-gray-100' };
+                                    {DAYS.map((day: string) => {
+                                        const styles = dayStyles[day] || { label: 'bg-gray-200', cell: 'bg-gray-100' };
                                         return (
                                             <React.Fragment key={String(day)}>
                                                 {periods.map((period, pIndex) => (
@@ -1002,10 +1018,10 @@ export const ExportPage = () => {
                                                                     {lessons.map(lesson => {
                                                                         const subj = subjects.find(s => s.id === lesson.subjectId);
                                                                         const room = rooms.find(r => r.id === lesson.roomId);
-                                                                        const roomName = room ? room.name : lesson.roomId;
+                                                                        const roomName = room ? room.name : (lesson.roomId || '');
                                                                         
                                                                         return (
-                                                                            <div key={lesson.id} className="flex justify-center items-center gap-1 leading-tight text-sm font-bold">
+                                                                            <div key={String(lesson.id)} className="flex justify-center items-center gap-1 leading-tight text-sm font-bold">
                                                                                 <span>{subj?.name}</span>
                                                                                 {roomName && <span className="font-black">{roomName}</span>}
                                                                             </div>
