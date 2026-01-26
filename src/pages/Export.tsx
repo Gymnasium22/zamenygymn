@@ -171,13 +171,45 @@ export const ExportPage = () => {
         let html = `
             <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
             <head><meta charset="UTF-8"><style>
-                table { border-collapse: collapse; font-family: Arial, sans-serif; font-size: 12pt; margin-bottom: 20px; }
+                table { border-collapse: collapse; font-family: Arial, sans-serif; font-size: 10pt; margin-bottom: 20px; width: 100%; }
                 td, th { border: 1px solid #000; padding: 2px; vertical-align: middle; text-align: center; }
                 .header { font-weight: bold; }
                 .subject-cell { font-weight: bold; vertical-align: middle; background-color: #fff; }
                 .teacher-cell { text-align: left; padding-left: 5px; }
                 sub { font-size: 10px; vertical-align: sub; }
+                
+                /* Doc Header/Footer Styles */
+                .doc-table td { border: none !important; padding: 5px; vertical-align: top; }
+                .doc-left { text-align: left; }
+                .doc-right { text-align: right; }
             </style></head><body>
+        `;
+
+        // HEADER
+        html += `
+            <table class="doc-table" style="width: 100%; border: none;">
+                <tr>
+                    <td colspan="10" class="doc-left">СОГЛАСОВАНО</td>
+                    <td colspan="17"></td>
+                    <td colspan="10" class="doc-right">УТВЕРЖДАЮ</td>
+                </tr>
+                <tr>
+                    <td colspan="10" class="doc-left">Председатель ПК ГУО "Гимназия №22 г.Минска"</td>
+                    <td colspan="17"></td>
+                    <td colspan="10" class="doc-right">Директор ГУО "Гимназия №22 г.Минска"</td>
+                </tr>
+                <tr>
+                    <td colspan="10" class="doc-left">____________________ Ю.Г.Михалова</td>
+                    <td colspan="17"></td>
+                    <td colspan="10" class="doc-right">____________________ Н.В.Кисель</td>
+                </tr>
+                <tr>
+                    <td colspan="10" class="doc-left">"__" __________ 2025г.</td>
+                    <td colspan="17"></td>
+                    <td colspan="10" class="doc-right">"__" __________ 2025г.</td>
+                </tr>
+            </table>
+            <br/>
         `;
 
         [Shift.First, Shift.Second].forEach(shift => {
@@ -187,7 +219,7 @@ export const ExportPage = () => {
             html += `<tr>
                 <th rowspan="3" class="header" style="border: 2px solid #000; width: 150px; background-color: #e9d5ff;">Учебный предмет</th>
                 <th rowspan="3" class="header" style="border: 2px solid #000; width: 200px; background-color: #e9d5ff;">ФИО</th>
-                <th colspan="${DAYS.length * periods.length}" class="header" style="border: 2px solid #000; font-size: 14px; background-color: #e9d5ff;">День недели</th>
+                <th colspan="${DAYS.length * periods.length}" class="header" style="border: 2px solid #000; font-size: 14px; background-color: #f3f4f6;">День недели</th>
             </tr>`;
 
             html += `<tr>`;
@@ -217,7 +249,7 @@ export const ExportPage = () => {
             html += `</tr>`;
 
             subjects.forEach(subject => {
-                const filteredTeachers = teachers.filter(t => t.subjectIds.includes(subject.id));
+                const filteredTeachers = teachers.filter(t => t.subjectIds.includes(subject.id) && t.shifts.includes(shift));
                 if (filteredTeachers.length === 0) return;
 
                 filteredTeachers.forEach((teacher, tIndex) => {
@@ -259,6 +291,18 @@ export const ExportPage = () => {
             });
             html += `</table><br/><br/>`;
         });
+
+        // FOOTER
+        html += `
+            <br/>
+            <table class="doc-table" style="width: 100%; border: none;">
+                <tr>
+                    <td colspan="10" class="doc-left">Секретарь учебной части</td>
+                    <td colspan="17"></td>
+                    <td colspan="10" class="doc-right">Е.К.Шунто</td>
+                </tr>
+            </table>
+        `;
 
         html += `</body></html>`;
         const blob = new Blob([html], { type: "application/vnd.ms-excel" });
