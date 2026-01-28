@@ -199,12 +199,12 @@ export const ExportPage = () => {
                     <td colspan="10" class="doc-right">Директор ГУО "Гимназия №22 г.Минска"</td>
                 </tr>
                 <tr>
-                    <td colspan="10" class="doc-left">____________________ Ю.Г.Михалова</td>
+                    <td colspan="10" class="doc-left">____________________ Ю.Г.Миханова</td>
                     <td colspan="17"></td>
                     <td colspan="10" class="doc-right">____________________ Н.В.Кисель</td>
                 </tr>
                 <tr>
-                    <td colspan="10" class="doc-left">"__" __________ 2025г.</td>
+                    <td colspan="10" class="doc-left">"__"_ __________ 2025г.</td>
                     <td colspan="17"></td>
                     <td colspan="10" class="doc-right">"__" __________ 2025г.</td>
                 </tr>
@@ -310,6 +310,183 @@ export const ExportPage = () => {
         const link = document.createElement("a");
         link.href = url;
         link.download = `Матрица_Расписания_${exportSemester}пол.xls`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    // --- UPDATED POSTER EXPORT FUNCTION ---
+    const exportPosterMatrixExcel = () => {
+        const currentSchedule = getScheduleForExport();
+
+        // Цвета для дней недели (как в обычной матрице)
+        const dayColors: Record<string, { header: string, cell: string }> = {
+            [DayOfWeek.Monday]:    { header: '#fecaca', cell: '#fee2e2' }, // Red
+            [DayOfWeek.Tuesday]:   { header: '#fed7aa', cell: '#ffedd5' }, // Orange
+            [DayOfWeek.Wednesday]: { header: '#fef08a', cell: '#fef9c3' }, // Yellow
+            [DayOfWeek.Thursday]:  { header: '#bbf7d0', cell: '#dcfce7' }, // Green
+            [DayOfWeek.Friday]:    { header: '#bfdbfe', cell: '#dbeafe' }, // Blue
+        };
+
+        const abbreviateRoom = (name: string) => {
+            if (!name) return '';
+            const lower = name.toLowerCase();
+            if (lower.includes('спортзал')) return 'С/З'; // Shortened
+            if (lower.includes('актовый')) return 'Акт';
+            if (lower.includes('библиотека')) return 'Биб';
+            return name;
+        };
+
+        // Увеличенные шрифты и размеры для плаката
+        let html = `
+            <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+            <head><meta charset="UTF-8"><style>
+                /* Poster scaling */
+                table { border-collapse: collapse; font-family: Arial, sans-serif; font-size: 16pt; margin-bottom: 40px; width: 100%; }
+                td, th { border: 2px solid #000; padding: 2px; vertical-align: middle; text-align: center; }
+                .header { font-weight: bold; }
+                .subject-cell { font-weight: bold; vertical-align: middle; background-color: #fff; font-size: 20pt; }
+                .teacher-cell { text-align: left; padding-left: 10px; font-size: 20pt; }
+                sub { font-size: 10pt; vertical-align: sub; display: block; line-height: 1; }
+                
+                /* Doc Header/Footer Styles - Scaled */
+                .doc-table td { border: none !important; padding: 10px; vertical-align: top; font-size: 16pt; }
+                .doc-left { text-align: left; }
+                .doc-right { text-align: right; }
+            </style></head><body>
+        `;
+
+        // HEADER
+        html += `
+            <table class="doc-table" style="width: 100%; border: none;">
+                <tr>
+                    <td colspan="10" class="doc-left">СОГЛАСОВАНО</td>
+                    <td colspan="17"></td>
+                    <td colspan="10" class="doc-right">УТВЕРЖДАЮ</td>
+                </tr>
+                <tr>
+                    <td colspan="10" class="doc-left">Председатель ПК ГУО "Гимназия №22 г.Минска"</td>
+                    <td colspan="17"></td>
+                    <td colspan="10" class="doc-right">Директор ГУО "Гимназия №22 г.Минска"</td>
+                </tr>
+                <tr>
+                    <td colspan="10" class="doc-left">____________________ Ю.Г.Миханова</td>
+                    <td colspan="17"></td>
+                    <td colspan="10" class="doc-right">____________________ Н.В.Кисель</td>
+                </tr>
+                <tr>
+                    <td colspan="10" class="doc-left">"__"_ __________ 2025г.</td>
+                    <td colspan="17"></td>
+                    <td colspan="10" class="doc-right">"__" __________ 2025г.</td>
+                </tr>
+            </table>
+            <br/>
+        `;
+
+        [Shift.First, Shift.Second].forEach(shift => {
+            const periods = SHIFT_PERIODS[shift];
+            
+            html += `<table>`;
+            
+            // --- ROW 1: Main Headers ---
+            html += `<tr>
+                <th rowspan="3" class="header" style="border: 3px solid #000; width: 350px; background-color: #e9d5ff; font-size: 24pt;">Учебный предмет</th>
+                <th rowspan="3" class="header" style="border: 3px solid #000; width: 450px; background-color: #e9d5ff; font-size: 24pt;">ФИО</th>
+                <th colspan="${DAYS.length * periods.length}" class="header" style="border: 3px solid #000; font-size: 24pt; background-color: #f3f4f6;">День недели</th>
+            </tr>`;
+
+            // --- ROW 2: Day Names ---
+            html += `<tr>`;
+            DAYS.forEach(day => {
+                const bg = dayColors[day]?.header || '#f3f4f6';
+                html += `<th colspan="${periods.length}" class="header" style="border: 3px solid #000; background-color: ${bg}; font-size: 20pt;">${day}</th>`;
+            });
+            html += `</tr>`;
+
+            // --- ROW 3: "Урок" label (Merged per day to save space/clean look for poster) ---
+            html += `<tr>`;
+            DAYS.forEach((day) => {
+                const bg = dayColors[day]?.header || '#f3f4f6';
+                // Одна ячейка "Урок" на весь день (как просили в одной из итераций)
+                // Если нужно как в обычной матрице - можно разбить на cells
+                html += `<th colspan="${periods.length}" class="header" style="border-bottom: 3px solid #000; background-color: ${bg}; font-size: 16pt;">Урок</th>`;
+            });
+            html += `</tr>`;
+            
+            // --- ROW 4: Shift Name + Period Numbers ---
+            const shiftGray = '#e5e7eb'; 
+            html += `<tr>
+                <th class="header" style="border: 3px solid #000; background-color: ${shiftGray}; font-size: 24pt;">${shift}</th>
+                <th class="header" style="border: 3px solid #000; background-color: ${shiftGray};"></th>
+            `;
+            DAYS.forEach((day) => {
+                const bg = dayColors[day]?.header || '#f3f4f6';
+                periods.forEach(p => html += `<th class="header" style="width: 25px; background-color: ${bg}; font-size: 16pt;">${p}</th>`);
+            });
+            html += `</tr>`;
+
+            // --- DATA ROWS ---
+            subjects.forEach(subject => {
+                const filteredTeachers = teachers.filter(t => t.subjectIds.includes(subject.id) && t.shifts.includes(shift));
+                if (filteredTeachers.length === 0) return;
+
+                filteredTeachers.forEach((teacher, tIndex) => {
+                    html += `<tr>`;
+                    if (tIndex === 0) {
+                        html += `<td rowspan="${filteredTeachers.length}" class="subject-cell" style="border: 3px solid #000; background-color: #e9d5ff;">${subject.name}</td>`;
+                    }
+                    html += `<td class="teacher-cell" style="border-right: 3px solid #000; background-color: #e9d5ff;">${teacher.name}</td>`;
+
+                    DAYS.forEach(day => {
+                        const cellBg = dayColors[day]?.cell || '#fff';
+                        periods.forEach(p => {
+                            const item = currentSchedule.find(s => 
+                                s.teacherId === teacher.id && 
+                                s.subjectId === subject.id && 
+                                s.day === day && 
+                                s.period === p &&
+                                s.shift === shift
+                            );
+
+                            if (item) {
+                                const cls = classes.find(c => c.id === item.classId);
+                                const r = rooms.find(rm => rm.id === item.roomId);
+                                const rawRoomName = r ? r.name : item.roomId;
+                                const roomName = abbreviateRoom(rawRoomName || '');
+                                const room = roomName ? `<sub>${roomName}</sub>` : '';
+                                const dir = item.direction ? ` <span style="font-size:10pt">(${item.direction})</span>` : '';
+                                
+                                html += `<td style="border: 1px solid #000; font-weight: bold; background-color: ${cellBg}; height: 60px; font-size: 18pt; line-height: 1.1;">${cls ? cls.name : ''}${dir}${room}</td>`;
+                            } else {
+                                html += `<td style="border: 1px solid #000; background-color: ${cellBg};"></td>`;
+                            }
+                        });
+                    });
+                    html += `</tr>`;
+                });
+                html += `<tr><td colspan="${2 + DAYS.length * periods.length}" style="height: 4px; background-color: #000;"></td></tr>`;
+            });
+            html += `</table><br/><br/>`;
+        });
+
+        // FOOTER
+        html += `
+            <br/>
+            <table class="doc-table" style="width: 100%; border: none;">
+                <tr>
+                    <td colspan="10" class="doc-left">Секретарь учебной части</td>
+                    <td colspan="17"></td>
+                    <td colspan="10" class="doc-right">Е.К.Шунто</td>
+                </tr>
+            </table>
+        `;
+
+        html += `</body></html>`;
+        const blob = new Blob([html], { type: "application/vnd.ms-excel" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `Плакат_Матрица_${exportSemester}пол.xls`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -608,6 +785,73 @@ export const ExportPage = () => {
             html += `<h3 style="color: #b91c1c;">Замены без записи (Не подтверждена причина)</h3>`;
             html += renderTable(noRecordSubs, true);
         }
+
+        // --- NEW SUMMARY TABLE ---
+        const teacherStats = new Map<string, { name: string, total: number, withoutRecord: number, merger: number, other: number }>();
+
+        monthlySubs.forEach(sub => {
+            if (sub.replacementTeacherId === 'conducted' || 
+                sub.replacementTeacherId === 'cancelled' || 
+                sub.replacementTeacherId === sub.originalTeacherId) {
+                return;
+            }
+
+            const teacher = teachers.find(t => t.id === sub.replacementTeacherId);
+            if (!teacher) return;
+
+            const stats = teacherStats.get(teacher.id) || { name: teacher.name, total: 0, withoutRecord: 0, merger: 0, other: 0 };
+            
+            const origTeacher = teachers.find(t => t.id === sub.originalTeacherId);
+            let reason = sub.lessonAbsenceReason || origTeacher?.absenceReasons?.[sub.date] || '';
+            
+            if (sub.replacementClassId && sub.replacementSubjectId && !sub.isMerger) reason = 'Обмен уроками';
+
+            stats.total++;
+            
+            // Priority: Merger > Without Record > Other
+            if (sub.isMerger) {
+                stats.merger++;
+            } else if (reason === 'Без записи') {
+                stats.withoutRecord++;
+            } else {
+                stats.other++;
+            }
+
+            teacherStats.set(teacher.id, stats);
+        });
+
+        const statsArray = Array.from(teacherStats.values()).sort((a, b) => a.name.localeCompare(b.name));
+
+        if (statsArray.length > 0) {
+             html += `<br/><br/>`;
+             html += `<h3>Сводная ведомость заменяющих учителей</h3>`;
+             html += `
+             <table style="border-collapse: collapse; width: 50%;">
+             <thead>
+                 <tr class="header">
+                     <th style="border: 1px solid #999; padding: 4px;">ФИО Учителя</th>
+                     <th style="text-align: center; border: 1px solid #999; padding: 4px;">Всего часов</th>
+                     <th style="text-align: center; border: 1px solid #999; padding: 4px;">Без записи</th>
+                     <th style="text-align: center; border: 1px solid #999; padding: 4px;">Объединение</th>
+                     <th style="text-align: center; border: 1px solid #999; padding: 4px;">Другие причины</th>
+                 </tr>
+             </thead>
+             <tbody>
+             `;
+             statsArray.forEach(stat => {
+                 html += `
+                     <tr>
+                         <td style="border: 1px solid #999; padding: 4px;">${stat.name}</td>
+                         <td style="text-align: center; border: 1px solid #999; padding: 4px;">${stat.total}</td>
+                         <td style="text-align: center; border: 1px solid #999; padding: 4px;">${stat.withoutRecord}</td>
+                         <td style="text-align: center; border: 1px solid #999; padding: 4px;">${stat.merger}</td>
+                         <td style="text-align: center; border: 1px solid #999; padding: 4px;">${stat.other}</td>
+                     </tr>
+                 `;
+             });
+             html += `</tbody></table>`;
+        }
+        // -------------------------
 
         html += `</body></html>`;
         const blob = new Blob([html], { type: "application/vnd.ms-excel" });
@@ -1167,7 +1411,7 @@ export const ExportPage = () => {
 
             <section className="bg-white dark:bg-dark-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
                 <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
-                    <Icon name="Printer" className="text-blue-600 dark:text-blue-400"/> Печать сетки (как на фото)
+                    <Icon name="Printer" className="text-blue-600 dark:text-blue-400"/> Печать сетки
                 </h2>
                 <div className="flex flex-wrap gap-4 items-center">
                     <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl p-1.5 pl-3">
@@ -1181,7 +1425,7 @@ export const ExportPage = () => {
                         </select>
                     </div>
                     <button onClick={() => setIsMatrixPrintOpen(true)} className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200 dark:shadow-none flex items-center gap-2">
-                        <Icon name="Printer" size={20}/> Открыть версию для печати
+                        <Icon name="Printer" size={20}/> Стандартная печать
                     </button>
                     <button onClick={downloadGradeMatrixExcel} className="px-6 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition shadow-lg shadow-emerald-200 dark:shadow-none flex items-center gap-2">
                         <Icon name="FileSpreadsheet" size={20}/> Скачать Excel
@@ -1210,6 +1454,9 @@ export const ExportPage = () => {
                     </button>
                     <button onClick={exportMatrixExcel} className="px-6 py-3 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border border-blue-100 dark:border-blue-900 rounded-xl font-bold hover:bg-blue-100 dark:hover:bg-blue-900/50 transition flex items-center gap-2">
                         <Icon name="Table" size={20}/> Скачать Матрицу (XLS)
+                    </button>
+                    <button onClick={exportPosterMatrixExcel} className="px-6 py-3 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 border border-purple-100 dark:border-purple-900 rounded-xl font-bold hover:bg-purple-100 dark:hover:bg-purple-900/50 transition flex items-center gap-2">
+                        <Icon name="Table" size={20}/> Скачать Плакат (XLS)
                     </button>
                     <button onClick={copyForGoogleSheets} className="px-6 py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition shadow-lg shadow-green-200 dark:shadow-none flex items-center gap-2">
                         <Icon name="Clipboard" size={20}/> Копировать для Google Sheets

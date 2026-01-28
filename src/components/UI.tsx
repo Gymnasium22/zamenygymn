@@ -8,7 +8,8 @@ interface ModalProps {
     isOpen: boolean;
     onClose: () => void;
     title: string;
-    children: React.ReactNode;
+    // Fix: Made children optional to prevent "Property 'children' is missing" TS error in JSX
+    children?: React.ReactNode;
     maxWidth?: string;
 }
 
@@ -327,7 +328,8 @@ export const SearchableSelect = ({ options, value, onChange, placeholder = "Вы
 };
 
 interface StaggerContainerProps {
-    children: React.ReactNode;
+    // Fix: Made children optional to prevent "Property 'children' is missing" TS error in JSX
+    children?: React.ReactNode;
     className?: string;
 }
 
