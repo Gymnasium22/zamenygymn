@@ -75,71 +75,92 @@ export const LoginPage = () => {
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center p-4">
-            <div className="bg-white dark:bg-slate-800 rounded-3xl shadow-xl max-w-md w-full p-8 transition-all">
+        <div className="min-h-screen mesh-gradient-bg flex items-center justify-center p-4 relative overflow-hidden">
+            {/* Background Decorations */}
+            <div className="absolute top-20 left-20 w-72 h-72 bg-purple-400 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>
+            <div className="absolute top-20 right-20 w-72 h-72 bg-indigo-400 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000"></div>
+            <div className="absolute -bottom-20 left-1/2 w-96 h-96 bg-pink-400 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-4000"></div>
+
+            <div className="glass-panel rounded-3xl shadow-2xl max-w-md w-full p-8 transition-all relative z-10">
                 <div className="text-center mb-8">
-                    <div className="inline-flex p-4 bg-indigo-100 dark:bg-indigo-900/30 rounded-2xl text-indigo-600 dark:text-indigo-400 mb-4">
+                    <div className="inline-flex p-4 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl text-white shadow-lg shadow-indigo-500/30 mb-4 transform hover:scale-105 transition-transform duration-300">
                         <Icon name="GraduationCap" size={48} />
                     </div>
-                    <h1 className="text-2xl font-black text-slate-800 dark:text-white">Гимназия Pro22</h1>
-                    <p className="text-slate-500 dark:text-slate-400">Выберите режим входа</p>
+                    <h1 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight mb-2">Гимназия Pro22</h1>
+                    <p className="text-slate-500 dark:text-slate-300 font-medium">Выберите режим входа</p>
                 </div>
 
                 {mode === 'select' && (
-                    <div className="space-y-3">
-                        <button onClick={handleParentLogin} className="w-full p-4 rounded-xl border-2 border-slate-100 dark:border-slate-700 hover:border-emerald-500 dark:hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 group transition-all text-left flex items-center gap-4">
-                            <div className="bg-emerald-100 dark:bg-emerald-900/50 p-3 rounded-lg text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform"><Icon name="Users" size={24}/></div>
-                            <div>
-                                <div className="font-bold text-slate-800 dark:text-white group-hover:text-emerald-700 dark:group-hover:text-emerald-400">Родитель / Ученик</div>
-                                <div className="text-xs text-slate-500 dark:text-slate-400">Только просмотр расписания</div>
+                    <div className="space-y-4 animate-fade-in">
+                        <button onClick={handleParentLogin} className="w-full p-4 rounded-2xl bg-white/60 dark:bg-slate-800/60 border border-white/50 dark:border-slate-700 shadow-sm hover:shadow-md hover:bg-white dark:hover:bg-slate-800 group transition-all text-left flex items-center gap-4 relative overflow-hidden">
+                            <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                            <div className="bg-emerald-100 dark:bg-emerald-900/50 p-3 rounded-xl text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform"><Icon name="Users" size={24}/></div>
+                            <div className="relative z-10">
+                                <div className="font-bold text-slate-800 dark:text-white text-lg">Родитель / Ученик</div>
+                                <div className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Только просмотр</div>
                             </div>
+                            <Icon name="ArrowRight" className="ml-auto text-slate-300 group-hover:text-emerald-500 transition-colors" size={20}/>
                         </button>
 
-                        <button onClick={() => setMode('teacher')} className="w-full p-4 rounded-xl border-2 border-slate-100 dark:border-slate-700 hover:border-indigo-500 dark:hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 group transition-all text-left flex items-center gap-4">
-                            <div className="bg-indigo-100 dark:bg-indigo-900/50 p-3 rounded-lg text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform"><Icon name="BookOpen" size={24}/></div>
-                            <div>
-                                <div className="font-bold text-slate-800 dark:text-white group-hover:text-indigo-700 dark:group-hover:text-indigo-400">Учитель</div>
-                                <div className="text-xs text-slate-500 dark:text-slate-400">Вход по общему паролю</div>
+                        <button onClick={() => setMode('teacher')} className="w-full p-4 rounded-2xl bg-white/60 dark:bg-slate-800/60 border border-white/50 dark:border-slate-700 shadow-sm hover:shadow-md hover:bg-white dark:hover:bg-slate-800 group transition-all text-left flex items-center gap-4 relative overflow-hidden">
+                            <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                            <div className="bg-indigo-100 dark:bg-indigo-900/50 p-3 rounded-xl text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform"><Icon name="BookOpen" size={24}/></div>
+                            <div className="relative z-10">
+                                <div className="font-bold text-slate-800 dark:text-white text-lg">Учитель</div>
+                                <div className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Вход по общему паролю</div>
                             </div>
+                            <Icon name="ArrowRight" className="ml-auto text-slate-300 group-hover:text-indigo-500 transition-colors" size={20}/>
                         </button>
 
-                        <button onClick={() => setMode('admin')} className="w-full p-4 rounded-xl border-2 border-slate-100 dark:border-slate-700 hover:border-purple-500 dark:hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/20 group transition-all text-left flex items-center gap-4">
-                            <div className="bg-purple-100 dark:bg-purple-900/50 p-3 rounded-lg text-purple-600 dark:text-purple-400 group-hover:scale-110 transition-transform"><Icon name="Settings" size={24}/></div>
-                            <div>
-                                <div className="font-bold text-slate-800 dark:text-white group-hover:text-purple-700 dark:group-hover:text-purple-400">Администратор</div>
-                                <div className="text-xs text-slate-500 dark:text-slate-400">Полный доступ</div>
+                        <button onClick={() => setMode('admin')} className="w-full p-4 rounded-2xl bg-white/60 dark:bg-slate-800/60 border border-white/50 dark:border-slate-700 shadow-sm hover:shadow-md hover:bg-white dark:hover:bg-slate-800 group transition-all text-left flex items-center gap-4 relative overflow-hidden">
+                            <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                            <div className="bg-purple-100 dark:bg-purple-900/50 p-3 rounded-xl text-purple-600 dark:text-purple-400 group-hover:scale-110 transition-transform"><Icon name="Settings" size={24}/></div>
+                            <div className="relative z-10">
+                                <div className="font-bold text-slate-800 dark:text-white text-lg">Администратор</div>
+                                <div className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Полный доступ</div>
                             </div>
+                            <Icon name="ArrowRight" className="ml-auto text-slate-300 group-hover:text-purple-500 transition-colors" size={20}/>
                         </button>
                     </div>
                 )}
 
                 {mode !== 'select' && (
-                    <form onSubmit={handleLogin} className="space-y-4 animate-fade-in">
-                        <div className="flex items-center gap-2 mb-4">
-                            <button type="button" onClick={() => { setMode('select'); setError(''); }} className="p-2 -ml-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><Icon name="ArrowRight" className="rotate-180" size={20}/></button>
-                            <h2 className="font-bold text-lg dark:text-white">{mode === 'teacher' ? 'Вход для учителей' : 'Вход для администратора'}</h2>
+                    <form onSubmit={handleLogin} className="space-y-5 animate-fade-in">
+                        <div className="flex items-center gap-2 mb-6">
+                            <button type="button" onClick={() => { setMode('select'); setError(''); }} className="p-2 -ml-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors rounded-full hover:bg-slate-100 dark:hover:bg-slate-700"><Icon name="ArrowRight" className="rotate-180" size={24}/></button>
+                            <h2 className="font-bold text-xl dark:text-white">{mode === 'teacher' ? 'Вход для учителей' : 'Вход для администратора'}</h2>
                         </div>
                         
                         {mode === 'admin' && (
                             <div>
-                                <label className="block text-xs font-bold uppercase text-slate-500 dark:text-slate-400 mb-1">Email</label>
-                                <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 ring-indigo-500" autoFocus required />
+                                <label className="block text-xs font-bold uppercase text-slate-500 dark:text-slate-400 mb-2 ml-1">Email</label>
+                                <div className="relative">
+                                    <Icon name="User" className="absolute left-4 top-3.5 text-slate-400" size={18}/>
+                                    <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50/50 dark:bg-slate-700/50 dark:text-white outline-none focus:ring-2 ring-indigo-500/50 transition-all font-medium" placeholder="admin@school.com" autoFocus required />
+                                </div>
                             </div>
                         )}
 
                         <div>
-                            <label className="block text-xs font-bold uppercase text-slate-500 dark:text-slate-400 mb-1">Пароль</label>
-                            <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 dark:text-white outline-none focus:ring-2 ring-indigo-500" required />
+                            <label className="block text-xs font-bold uppercase text-slate-500 dark:text-slate-400 mb-2 ml-1">Пароль</label>
+                            <div className="relative">
+                                <Icon name="Briefcase" className="absolute left-4 top-3.5 text-slate-400" size={18}/>
+                                <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50/50 dark:bg-slate-700/50 dark:text-white outline-none focus:ring-2 ring-indigo-500/50 transition-all font-medium" placeholder="••••••••" required />
+                            </div>
                         </div>
 
-                        {error && <div className="text-red-500 text-sm font-bold text-center bg-red-50 dark:bg-red-900/20 p-2 rounded-lg">{error}</div>}
+                        {error && <div className="text-red-500 text-sm font-bold text-center bg-red-50 dark:bg-red-900/20 p-3 rounded-xl border border-red-100 dark:border-red-900/50 animate-shake">{error}</div>}
 
-                        <button type="submit" disabled={loading || authLoading} className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition shadow-lg shadow-indigo-200 dark:shadow-none flex items-center justify-center gap-2 disabled:opacity-50">
-                            {(loading || authLoading) && <Icon name="Loader" className="animate-spin" size={20}/>}
-                            Войти
+                        <button type="submit" disabled={loading || authLoading} className="w-full py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-bold hover:shadow-lg hover:shadow-indigo-500/30 transition-all active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed">
+                            {(loading || authLoading) ? <Icon name="Loader" className="animate-spin" size={20}/> : <Icon name="LogOut" className="rotate-180" size={20}/>}
+                            {loading ? 'Вход...' : 'Войти в систему'}
                         </button>
                     </form>
                 )}
+            </div>
+            
+            <div className="absolute bottom-6 text-center w-full text-slate-400 dark:text-slate-500 text-xs font-medium">
+                &copy; {new Date().getFullYear()} Гимназия Pro22. Все права защищены.
             </div>
         </div>
     );

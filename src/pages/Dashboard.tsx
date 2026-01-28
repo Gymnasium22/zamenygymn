@@ -1,6 +1,7 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
 import { useStaticData, useScheduleData } from '../context/DataContext'; 
+import { useAuth } from '../context/AuthContext';
 import { Icon } from '../components/Icons';
 import { DayOfWeek, DAYS, ScheduleItem } from '../types'; 
 import { useNavigate } from 'react-router-dom'; 
@@ -38,6 +39,7 @@ interface ProblemZone {
 export const DashboardPage = () => {
     const { subjects, teachers, classes, rooms, bellSchedule, settings } = useStaticData();
     const { schedule, substitutions } = useScheduleData();
+    const { role } = useAuth();
     const navigate = useNavigate(); 
 
     const [notes, setNotes] = useState(localStorage.getItem('gym_notes') || '');
@@ -59,6 +61,15 @@ export const DashboardPage = () => {
             return () => clearTimeout(t);
         }
     }, [notes]);
+
+    // Greeting logic
+    const greeting = useMemo(() => {
+        const hour = currentDate.getHours();
+        if (hour < 5) return 'Доброй ночи';
+        if (hour < 12) return 'Доброе утро';
+        if (hour < 18) return 'Добрый день';
+        return 'Добрый вечер';
+    }, [currentDate]);
 
     const getLocalDateString = (date: Date) => {
         const d = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
@@ -106,8 +117,6 @@ export const DashboardPage = () => {
         });
 
         // 2. Teachers with SUBSTITUTIONS (Partial absence)
-        // Find substitutions for today
-        // FIX: Added condition `s.replacementTeacherId !== s.originalTeacherId` to ignore mere room changes where teacher is same
         const todaySubs = substitutions.filter(s => 
             s.date === todayStr && 
             s.replacementTeacherId !== 'conducted' && 
@@ -117,7 +126,6 @@ export const DashboardPage = () => {
         const partialAbsenceMap = new Map();
 
         todaySubs.forEach(sub => {
-            // If already marked as full day absent, skip
             if (fullDayAbsenteesMap.has(sub.originalTeacherId)) return;
 
             const originalTeacher = teachers.find(t => t.id === sub.originalTeacherId);
@@ -144,14 +152,9 @@ export const DashboardPage = () => {
 
         // Process partial absentees
         partialAbsenceMap.forEach((data, teacherId) => {
-            // FIX: Explicitly type 'lessons' here to avoid implicit 'any' error
             const lessons: { period: number; reason?: string }[] = data.lessons.sort((a: { period: number; reason?: string }, b: { period: number; reason?: string }) => a.period - b.period);
             const periods = lessons.map((l) => l.period).join(', ');
             
-            // Determine reason text. 
-            // If ANY of the substituted lessons has "Без записи", we show "Без записи"? 
-            // Or strictly "Отсутствует" unless specifically "Без записи".
-            // Let's check if there is at least one "Без записи".
             const hasBezZapisi = lessons.some((l) => l.reason === 'Без записи');
             const reasonText = hasBezZapisi ? 'Без записи' : 'Отсутствует';
 
@@ -162,7 +165,6 @@ export const DashboardPage = () => {
             });
         });
 
-        // Sort alphabetically
         combinedList.sort((a, b) => a.name.localeCompare(b.name));
 
         const absentCount = combinedList.length;
@@ -209,9 +211,6 @@ export const DashboardPage = () => {
                 const substitution = substitutions.find(sub => 
                     sub.scheduleItemId === lesson.id && sub.date === todayStr
                 );
-
-                // FIX: Если есть ЛЮБАЯ запись в заменах (отменен, проведен, заменен), то ситуация разрешена.
-                // Считаем только если записи вообще нет.
                 if (!substitution) {
                     count++;
                 }
@@ -254,13 +253,12 @@ export const DashboardPage = () => {
                 return;
             }
 
-            // Fix: Added check for s.shift === bell.shift to ensure we only show lessons for the CURRENT shift time
             const ownLessons = schedule.filter(s => s.teacherId === teacher.id && s.day === dayName && s.period === bell.period && s.shift === bell.shift);
             
             const substituteLessons = substitutions
                 .filter(sub => sub.date === todayStr && sub.replacementTeacherId === teacher.id)
                 .map(sub => schedule.find(s => s.id === sub.scheduleItemId))
-                .filter((lesson): lesson is ScheduleItem => !!lesson && lesson.day === dayName && lesson.period === bell.period && lesson.shift === bell.shift); // Fix: Added shift check
+                .filter((lesson): lesson is ScheduleItem => !!lesson && lesson.day === dayName && lesson.period === bell.period && lesson.shift === bell.shift); 
             
             let activeItems: SearchItem[] = [];
 
@@ -308,7 +306,6 @@ export const DashboardPage = () => {
         } else if (cls) {
             if (!bell) { setSearchResult({ status: 'Перемена', detail: 'Класс свободен', color: 'text-amber-500', icon: 'Clock', items: [] }); return; }
 
-            // Fix: Added check for s.shift === bell.shift
             const lessons = schedule.filter(s => s.classId === cls.id && s.day === dayName && s.period === bell.period && s.shift === bell.shift);
             
             if (lessons.length > 0) {
@@ -389,156 +386,237 @@ export const DashboardPage = () => {
     };
 
     return (
-        <div className="max-w-7xl mx-auto space-y-6 pb-20">
-            <header className="mb-6 flex justify-between items-start">
+        <div className="max-w-7xl mx-auto space-y-8 pb-20">
+            {/* Header Section with Greeting */}
+            <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 animate-fade-in">
                  <div>
-                    <h1 className="text-2xl font-black text-slate-800 dark:text-white">Рабочий стол администратора</h1>
-                    <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">{currentDate.toLocaleDateString('ru-RU', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                    <h1 className="text-4xl font-black text-slate-800 dark:text-white tracking-tight mb-1 bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400">
+                        {greeting}, {role === 'admin' ? 'Администратор' : 'Учитель'}!
+                    </h1>
+                    <p className="text-slate-500 dark:text-slate-400 text-lg font-medium">
+                        Сегодня {currentDate.toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' })}
+                    </p>
                  </div>
-                 <button onClick={() => setIsFeedbackModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition text-sm">
-                    <Icon name="Send" size={16} /> Обратная связь
-                </button>
+                 <div className="flex gap-3">
+                    <button onClick={() => setIsFeedbackModalOpen(true)} className="flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl font-bold hover:shadow-lg transition-all text-sm border border-slate-200 dark:border-slate-700">
+                        <Icon name="Send" size={18} /> Обратная связь
+                    </button>
+                 </div>
             </header>
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {/* Widget 1: Who Where */}
-                <div className="bg-white dark:bg-dark-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col h-full relative overflow-hidden">
-                    <div className="flex items-center gap-3 mb-4"><div className="bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 p-2 rounded-lg"><Icon name="Search" size={20}/></div><h3 className="font-bold text-lg dark:text-white">Кто где?</h3></div>
-                    <div className="flex gap-2 mb-4">
-                        <input placeholder="Учитель или класс..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSearch()} className="w-full bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl p-3 text-sm outline-none dark:text-white" />
-                        <button onClick={handleSearch} className="bg-indigo-600 hover:bg-indigo-700 text-white p-3 rounded-xl transition-colors"><Icon name="Search" size={20}/></button>
+                {/* Widget 1: Who Where - Search */}
+                <div className="glass-panel p-6 rounded-3xl flex flex-col h-full relative overflow-hidden card-hover">
+                    <div className="flex items-center gap-3 mb-6">
+                        <div className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white p-3 rounded-2xl shadow-lg shadow-indigo-500/20">
+                            <Icon name="Search" size={22}/>
+                        </div>
+                        <h3 className="font-bold text-xl text-slate-800 dark:text-white">Поиск</h3>
                     </div>
+                    
+                    <div className="flex gap-2 mb-4">
+                        <input 
+                            placeholder="Учитель или класс..." 
+                            value={searchQuery} 
+                            onChange={e => setSearchQuery(e.target.value)} 
+                            onKeyDown={e => e.key === 'Enter' && handleSearch()} 
+                            className="w-full bg-slate-50/80 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-600 rounded-xl p-3.5 text-sm outline-none focus:ring-2 ring-indigo-500/50 dark:text-white transition-all placeholder:text-slate-400" 
+                        />
+                        <button onClick={handleSearch} className="bg-slate-800 dark:bg-indigo-600 hover:bg-slate-700 text-white p-3.5 rounded-xl transition-all shadow-md active:scale-95">
+                            <Icon name="Search" size={20}/>
+                        </button>
+                    </div>
+
                     {searchResult && (
-                        <div className="mt-auto p-3 bg-slate-50 dark:bg-slate-700/30 rounded-xl border border-slate-100 dark:border-slate-700 animate-fade-in">
-                            <div className={`text-xs font-bold uppercase mb-2 flex items-center gap-2 ${searchResult.color}`}><Icon name={searchResult.icon || 'Info'} size={14}/> {searchResult.status}</div>
+                        <div className="mt-auto p-4 bg-slate-50/80 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-700 animate-fade-in backdrop-blur-sm">
+                            <div className={`text-xs font-bold uppercase mb-3 flex items-center gap-2 ${searchResult.color}`}>
+                                <Icon name={searchResult.icon || 'Info'} size={16}/> {searchResult.status}
+                            </div>
                             {searchResult.items && searchResult.items.length > 0 ? (
-                                <div className="space-y-2">
+                                <div className="space-y-2.5">
                                     {searchResult.items.map((item, idx) => (
-                                        <div key={`${item.room}-${item.subject}-${item.entityName}-${idx}`} className="bg-white dark:bg-dark-800 p-2 rounded-lg border border-slate-100 dark:border-slate-600 text-xs shadow-sm">
-                                            {item.direction && <div className="text-[10px] font-bold text-indigo-500 mb-0.5">{item.direction}</div>}
-                                            <div className="font-bold text-slate-700 dark:text-slate-200">{item.subject}</div>
+                                        <div key={`${item.room}-${item.subject}-${item.entityName}-${idx}`} className="bg-white dark:bg-dark-900/80 p-3 rounded-xl border border-slate-100 dark:border-slate-600 text-sm shadow-sm">
+                                            <div className="flex justify-between items-start">
+                                                <div className="font-bold text-slate-700 dark:text-slate-200">{item.subject}</div>
+                                                {item.direction && <div className="text-[10px] font-bold text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-0.5 rounded-md">{item.direction}</div>}
+                                            </div>
                                             {item.isSubstitution && (
-                                                <div className="text-[10px] font-bold text-orange-500">
-                                                    {item.originalTeacherName ? `Замена (вместо ${item.originalTeacherName})` : 'Замена кабинета'}
+                                                <div className="text-[10px] font-bold text-orange-500 mt-1">
+                                                    {item.originalTeacherName ? `Замена (${item.originalTeacherName})` : 'Замена кабинета'}
                                                 </div>
                                             )}
-                                            <div className="flex justify-between items-center mt-1 text-slate-500 dark:text-slate-400">
+                                            <div className="flex justify-between items-center mt-2 text-slate-500 dark:text-slate-400 text-xs">
                                                 <span>{item.entityName}</span>
-                                                <span className="bg-slate-100 dark:bg-slate-700 px-1.5 rounded font-mono">{item.room}</span>
+                                                <span className="bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded-lg font-mono font-bold text-slate-600 dark:text-slate-300">{item.room}</span>
                                             </div>
                                         </div>
                                     ))}
                                 </div>
-                            ) : ( <div className="font-bold text-slate-800 dark:text-white text-sm leading-snug">{searchResult.detail}</div> )}
+                            ) : ( <div className="font-bold text-slate-800 dark:text-white text-base leading-snug">{searchResult.detail}</div> )}
                         </div>
                     )}
                 </div>
 
-                {/* Widget 2: Unresolved Substitutions */}
-                <div className="bg-white dark:bg-dark-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col h-full">
-                    <div className="flex items-center gap-3 mb-4"><div className="bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 p-2 rounded-lg"><Icon name="AlertTriangle" size={20}/></div><h3 className="font-bold text-lg dark:text-white">Неразрешенные Замены</h3></div>
-                    <div className="flex-1 flex flex-col items-center justify-center text-center">
+                {/* Widget 2: Unresolved Substitutions - Priority */}
+                <div className={`glass-panel p-6 rounded-3xl flex flex-col h-full card-hover relative overflow-hidden ${unresolvedSubstitutions > 0 ? 'ring-2 ring-red-500/20 dark:ring-red-500/30' : ''}`}>
+                    {unresolvedSubstitutions > 0 && <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/10 blur-2xl -mr-10 -mt-10 rounded-full"></div>}
+                    <div className="flex items-center gap-3 mb-4 relative z-10">
+                        <div className={`p-3 rounded-2xl shadow-lg ${unresolvedSubstitutions > 0 ? 'bg-gradient-to-br from-red-500 to-orange-600 text-white shadow-red-500/30' : 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-emerald-500/30'}`}>
+                            <Icon name={unresolvedSubstitutions > 0 ? "AlertTriangle" : "CheckCircle"} size={22}/>
+                        </div>
+                        <h3 className="font-bold text-xl dark:text-white">Замены</h3>
+                    </div>
+                    <div className="flex-1 flex flex-col items-center justify-center text-center relative z-10">
                         {unresolvedSubstitutions > 0 ? (
                             <>
-                                <div className="text-5xl font-black text-red-500 mb-2">{unresolvedSubstitutions}</div>
-                                <div className="text-sm text-slate-500 dark:text-slate-400 mb-4">уроков требуют замены сегодня</div>
-                                <button onClick={() => navigate('/substitutions')} className="px-6 py-2 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition shadow-lg shadow-red-200 dark:shadow-none flex items-center gap-2">
-                                    <Icon name="ArrowRight" size={16}/> Перейти к заменам
+                                <div className="text-6xl font-black text-slate-800 dark:text-white mb-2 tracking-tighter">{unresolvedSubstitutions}</div>
+                                <div className="text-sm font-bold text-red-500 uppercase tracking-wider mb-6">Требуют внимания</div>
+                                <button onClick={() => navigate('/substitutions')} className="w-full py-3 bg-slate-800 dark:bg-white text-white dark:text-slate-900 rounded-xl font-bold hover:opacity-90 transition-all shadow-xl flex items-center justify-center gap-2 group">
+                                    Перейти <Icon name="ArrowRight" size={18} className="group-hover:translate-x-1 transition-transform"/>
                                 </button>
                             </>
                         ) : (
                             <>
-                                <Icon name="CheckCircle" size={48} className="mb-4 text-emerald-400"/>
-                                <p className="text-sm text-slate-400">Сегодня нет уроков, требующих замены</p>
+                                <div className="text-slate-200 dark:text-slate-700 mb-4 transform scale-125 opacity-50"><Icon name="CheckCircle" size={64} /></div>
+                                <p className="text-base font-medium text-slate-500 dark:text-slate-400">Все замены разрешены</p>
                             </>
                         )}
                     </div>
                 </div>
 
-                {/* Widget 3: Occupancy */}
-                <div className="bg-white dark:bg-dark-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col h-full">
-                    <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-3"><div className="bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 p-2 rounded-lg"><Icon name="PieChart" size={20}/></div><h3 className="font-bold text-lg dark:text-white">Наполняемость</h3></div>
-                        <button onClick={() => setShowAbsentList(!showAbsentList)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-lg transition-colors" title={showAbsentList ? "Показать график" : "Список отсутствующих"}>
+                {/* Widget 3: Occupancy & Absences */}
+                <div className="glass-panel p-6 rounded-3xl flex flex-col h-full card-hover">
+                    <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-3">
+                            <div className="bg-gradient-to-br from-blue-500 to-cyan-500 text-white p-3 rounded-2xl shadow-lg shadow-blue-500/20">
+                                <Icon name="PieChart" size={22}/>
+                            </div>
+                            <h3 className="font-bold text-xl dark:text-white">Штат</h3>
+                        </div>
+                        <button onClick={() => setShowAbsentList(!showAbsentList)} className="p-2.5 text-slate-400 hover:text-indigo-600 bg-white dark:bg-slate-700/50 rounded-xl transition-all hover:shadow-md" title={showAbsentList ? "Показать график" : "Список отсутствующих"}>
                             <Icon name={showAbsentList ? "PieChart" : "List"} size={20}/>
                         </button>
                     </div>
+                    
                     {showAbsentList ? (
-                        <div className="flex-1 overflow-y-auto custom-scrollbar animate-fade-in">
+                        <div className="flex-1 overflow-y-auto custom-scrollbar animate-fade-in -mr-2 pr-2">
                             {occupancyStats.absentTeachersList.length > 0 ? (
-                                <div className="space-y-2">
+                                <div className="space-y-3">
                                     {occupancyStats.absentTeachersList.map(t => (
-                                        <div key={t.id} className="flex justify-between items-center text-sm border-b border-slate-50 dark:border-slate-700 pb-1 mb-1 last:border-0">
-                                            <span className="font-medium text-slate-700 dark:text-slate-300 truncate pr-2">{t.name}</span>
-                                            <span className="text-xs text-red-500 font-bold whitespace-nowrap">{t.displayReason}</span>
+                                        <div key={t.id} className="flex justify-between items-center text-sm p-2 rounded-lg bg-slate-50 dark:bg-slate-800/50">
+                                            <span className="font-bold text-slate-700 dark:text-slate-300 truncate pr-2">{t.name}</span>
+                                            <span className="text-[10px] uppercase font-bold text-red-500 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded">{t.displayReason}</span>
                                         </div>
                                     ))}
                                 </div>
-                            ) : ( <div className="h-full flex flex-col items-center justify-center text-center text-slate-400"><Icon name="CheckCircle" size={32} className="text-emerald-400 mb-2"/><p className="text-sm">Все учителя на месте</p></div> )}
+                            ) : ( <div className="h-full flex flex-col items-center justify-center text-center text-slate-400"><p className="text-sm font-medium">Все учителя на месте</p></div> )}
                         </div>
                     ) : (
-                        <div className="flex items-center justify-between flex-1 animate-fade-in">
-                            <div className="relative w-24 h-24">
-                                 <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
-                                    <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#f1f5f9" strokeWidth="4" className="dark:stroke-slate-700" />
-                                    <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#10b981" strokeWidth="4" strokeDasharray={`${occupancyStats.presentPercent}, 100`} />
+                        <div className="flex items-center justify-between flex-1 animate-fade-in px-2">
+                            <div className="relative w-28 h-28">
+                                 <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90 drop-shadow-md">
+                                    <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#e2e8f0" strokeWidth="3" className="dark:stroke-slate-700" strokeLinecap="round"/>
+                                    <path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="url(#gradient)" strokeWidth="3" strokeDasharray={`${occupancyStats.presentPercent}, 100`} strokeLinecap="round" />
+                                    <defs>
+                                        <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                            <stop offset="0%" stopColor="#3b82f6" />
+                                            <stop offset="100%" stopColor="#06b6d4" />
+                                        </linearGradient>
+                                    </defs>
                                  </svg>
-                                 <div className="absolute inset-0 flex flex-col items-center justify-center"><span className="text-xs text-slate-400 font-bold">Присут.</span><span className="font-black text-slate-700 dark:text-white">{occupancyStats.presentPercent}%</span></div>
+                                 <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                     <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">На месте</span>
+                                     <span className="text-2xl font-black text-slate-800 dark:text-white">{occupancyStats.presentPercent}%</span>
+                                 </div>
                             </div>
-                            <div className="text-right"><div className="text-3xl font-black text-red-500">{occupancyStats.absentCount}</div><div className="text-xs text-slate-400 font-bold uppercase leading-tight">Учителей<br/>отсутствует</div></div>
+                            <div className="text-right">
+                                <div className="text-4xl font-black text-slate-800 dark:text-white mb-1">{occupancyStats.absentCount}</div>
+                                <div className="text-xs text-slate-400 font-bold uppercase leading-tight">Отсутствуют<br/>сегодня</div>
+                            </div>
                         </div>
                     )}
                 </div>
 
-                {/* Widget 3: Birthdays */}
-                <div className="bg-white dark:bg-dark-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col h-full">
-                    <div className="flex items-center gap-3 mb-4"><div className="bg-rose-100 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 p-2 rounded-lg"><Icon name="Gift" size={20}/></div><h3 className="font-bold text-lg dark:text-white">Дни рождения</h3></div>
-                    <div className="flex-1 overflow-y-auto max-h-40 custom-scrollbar space-y-3">{upcomingBirthdays.length ? upcomingBirthdays.map(t => <div key={t.id} className="flex justify-between text-sm text-slate-700 dark:text-slate-300"><span>{t.name}</span><span className="font-bold text-slate-400">{t.diff === 0 ? 'Сегодня!' : `${t.diff} дн.`}</span></div>) : <div className="text-slate-400 text-sm text-center">Нет ближайших</div>}</div>
-                </div>
-
-                {/* Widget 4: Conflicts */}
-                <div className="bg-white dark:bg-dark-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col h-full">
-                    <div className="flex items-center gap-3 mb-4"><div className="bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 p-2 rounded-lg"><Icon name="AlertTriangle" size={20}/></div><h3 className="font-bold text-lg dark:text-white">Конфликты</h3></div>
-                    <div className="flex-1 overflow-y-auto max-h-40 custom-scrollbar space-y-2">{problemZones.length ? problemZones.map((p) => <div key={`${p.class}-${p.issue}`} className="flex justify-between text-sm text-slate-700 dark:text-slate-300"><span>{p.class}</span><span className="text-amber-600 text-xs font-bold">{p.issue}</span></div>) : <div className="text-slate-400 text-sm text-center">Расписание в порядке</div>}</div>
-                </div>
-
-                {/* Notes */}
-                <div className="md:col-span-2 lg:col-span-4 bg-white dark:bg-dark-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col relative group">
+                {/* Widget 4: Quick Notes */}
+                <div className="glass-panel p-6 rounded-3xl flex flex-col h-full group card-hover relative">
                     <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-3"><div className="bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 p-2 rounded-lg"><Icon name="CheckSquare" size={20}/></div><h3 className="font-bold text-lg dark:text-white">Быстрые заметки</h3></div>
-                        <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => { navigator.clipboard.writeText(notes); alert('Скопировано'); }} className="text-xs bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded font-bold text-slate-500 hover:text-indigo-600">Копировать</button>
-                            <button onClick={() => { if(confirm('Очистить заметки?')) setNotes(''); }} className="text-xs bg-red-50 dark:bg-red-900/30 px-2 py-1 rounded font-bold text-red-500 hover:text-red-700">Очистить</button>
+                        <div className="flex items-center gap-3">
+                            <div className="bg-gradient-to-br from-yellow-400 to-orange-500 text-white p-3 rounded-2xl shadow-lg shadow-orange-500/20">
+                                <Icon name="Edit2" size={22}/>
+                            </div>
+                            <h3 className="font-bold text-xl dark:text-white">Заметки</h3>
+                        </div>
+                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={() => { navigator.clipboard.writeText(notes); alert('Скопировано'); }} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg"><Icon name="Copy" size={16}/></button>
+                            <button onClick={() => { if(confirm('Очистить заметки?')) setNotes(''); }} className="p-2 text-slate-400 hover:text-red-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg"><Icon name="Trash2" size={16}/></button>
                         </div>
                     </div>
-                    <div className="relative flex-1">
+                    <div className="relative flex-1 bg-yellow-50/50 dark:bg-slate-800/50 rounded-2xl p-1">
                         <textarea 
-                            className="w-full h-48 p-6 rounded-xl bg-yellow-50 dark:bg-slate-700 border border-yellow-200 dark:border-slate-600 outline-none font-medium text-slate-700 dark:text-slate-200 resize-none focus:ring-4 ring-yellow-100 dark:ring-slate-600/50 transition-shadow leading-relaxed shadow-inner" 
-                            placeholder="Список задач на сегодня..." 
+                            className="w-full h-full p-4 bg-transparent border-none outline-none font-medium text-slate-700 dark:text-slate-200 resize-none text-sm leading-relaxed" 
+                            placeholder="Напишите что-нибудь..." 
                             value={notes} 
                             onChange={e => setNotes(e.target.value)}
-                            style={{ backgroundImage: 'linear-gradient(transparent, transparent 27px, #e5e7eb 28px)', backgroundSize: '100% 28px', lineHeight: '28px' }}
                         />
-                        {saveStatus && <div className="absolute bottom-4 right-4 text-[10px] font-bold uppercase tracking-widest text-slate-400 animate-fade-in flex items-center gap-1"><Icon name="Save" size={12}/> {saveStatus}</div>}
+                        {saveStatus && <div className="absolute bottom-3 right-3 text-[10px] font-bold uppercase tracking-widest text-emerald-500 animate-fade-in flex items-center gap-1 bg-white dark:bg-slate-800 px-2 py-1 rounded-full shadow-sm"><Icon name="CheckCircle" size={10}/> {saveStatus}</div>}
                     </div>
                 </div>
             </div>
-            <Modal isOpen={isFeedbackModalOpen} onClose={() => setIsFeedbackModalOpen(false)} title="Обратная связь и предложения">
+
+            {/* Additional Info Row */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 {/* Conflicts */}
+                 <div className="glass-panel p-6 rounded-3xl">
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="bg-amber-100 dark:bg-amber-900/30 text-amber-600 p-2 rounded-xl"><Icon name="AlertTriangle" size={20}/></div>
+                        <h3 className="font-bold text-lg dark:text-white">Возможные конфликты</h3>
+                    </div>
+                    <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar pr-2">
+                        {problemZones.length ? problemZones.map((p) => (
+                            <div key={`${p.class}-${p.issue}`} className="flex justify-between items-center p-3 bg-white dark:bg-dark-900/50 rounded-xl border border-slate-100 dark:border-slate-700">
+                                <span className="font-bold text-slate-700 dark:text-slate-200">{p.class}</span>
+                                <span className="text-xs font-bold text-amber-600 bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded-lg">{p.issue}</span>
+                            </div>
+                        )) : <div className="p-4 text-center text-slate-400 text-sm italic">В расписании не найдено критических ошибок</div>}
+                    </div>
+                 </div>
+
+                 {/* Birthdays */}
+                 <div className="glass-panel p-6 rounded-3xl">
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="bg-rose-100 dark:bg-rose-900/30 text-rose-600 p-2 rounded-xl"><Icon name="Gift" size={20}/></div>
+                        <h3 className="font-bold text-lg dark:text-white">Ближайшие праздники</h3>
+                    </div>
+                    <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar pr-2">
+                        {upcomingBirthdays.length ? upcomingBirthdays.map(t => (
+                            <div key={t.id} className="flex justify-between items-center p-3 bg-white dark:bg-dark-900/50 rounded-xl border border-slate-100 dark:border-slate-700">
+                                <span className="font-medium text-slate-700 dark:text-slate-300 text-sm">{t.name}</span>
+                                <span className={`text-xs font-bold px-2 py-1 rounded-lg ${t.diff === 0 ? 'bg-rose-500 text-white shadow-md shadow-rose-500/30' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'}`}>
+                                    {t.diff === 0 ? 'Сегодня!' : `через ${t.diff} дн.`}
+                                </span>
+                            </div>
+                        )) : <div className="p-4 text-center text-slate-400 text-sm italic">Нет дней рождения в ближайший месяц</div>}
+                    </div>
+                 </div>
+            </div>
+
+            <Modal isOpen={isFeedbackModalOpen} onClose={() => setIsFeedbackModalOpen(false)} title="Обратная связь">
                 <div className="space-y-4">
                     <p className="text-sm text-slate-500 dark:text-slate-400">
-                        Есть идеи по улучшению приложения или нашли ошибку? Напишите нам! Ваше сообщение будет отправлено напрямую администратору.
+                        Есть идеи по улучшению приложения или нашли ошибку? Напишите нам!
                     </p>
                     <textarea
                         value={feedbackMessage}
                         onChange={(e) => setFeedbackMessage(e.target.value)}
-                        rows={6}
-                        className="w-full border border-slate-200 dark:border-slate-600 rounded-xl p-3 text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500 resize-y"
+                        rows={5}
+                        className="w-full border border-slate-200 dark:border-slate-600 rounded-xl p-3 text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:ring-2 ring-indigo-500/50 resize-y"
                         placeholder="Ваше сообщение..."
                     />
                     <div className="flex justify-end">
                         <button
                             onClick={handleSendFeedback}
                             disabled={isSendingFeedback}
-                            className="px-6 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 text-sm font-bold shadow-lg shadow-indigo-200 dark:shadow-none flex items-center gap-2 disabled:opacity-50"
+                            className="px-6 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 text-sm font-bold shadow-lg shadow-indigo-500/30 flex items-center gap-2 disabled:opacity-50"
                         >
                             {isSendingFeedback ? <Icon name="Loader" size={16} className="animate-spin" /> : <Icon name="Send" size={16} />}
                             {isSendingFeedback ? 'Отправка...' : 'Отправить'}

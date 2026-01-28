@@ -1,9 +1,10 @@
+
 import React, { useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate, NavLink, Outlet, useSearchParams } from 'react-router-dom';
 import { DataProvider, useStaticData, StaticDataProvider, ScheduleDataProvider } from './context/DataContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Icon } from './components/Icons';
-import { StatusWidget } from './components/UI';
+import { StatusWidget, BottomNavigation } from './components/UI';
 import { DashboardPage } from './pages/Dashboard';
 import { SchedulePage } from './pages/Schedule';
 import { DirectoryPage } from './pages/Directory';
@@ -62,8 +63,8 @@ const Layout = () => {
 
     const menuItems = [
         { to: '/dashboard', label: 'Рабочий стол', icon: 'Home', roles: ['admin', 'teacher'] },
-        { to: '/schedule', label: 'Расписание 1 полугодие', icon: 'Calendar', roles: ['admin', 'teacher', 'guest'] },
-        { to: '/schedule2', label: 'Расписание 2 полугодие', icon: 'Calendar', roles: ['admin', 'teacher', 'guest'] },
+        { to: '/schedule', label: 'Расписание 1 пол.', icon: 'Calendar', roles: ['admin', 'teacher', 'guest'] },
+        { to: '/schedule2', label: 'Расписание 2 пол.', icon: 'Calendar', roles: ['admin', 'teacher', 'guest'] },
         { to: '/substitutions', label: 'Замены', icon: 'Repeat', roles: ['admin'] }, 
         { to: '/directory', label: 'Справочники', icon: 'BookOpen', roles: ['admin'] },
         { to: '/reports', label: 'Отчеты', icon: 'BarChart2', roles: ['admin'] }, 
@@ -74,11 +75,12 @@ const Layout = () => {
     const filteredMenu = menuItems.filter(item => item.roles.includes(role || ''));
 
     return (
-        <div className={`flex h-screen bg-slate-50 dark:bg-dark-950 overflow-hidden transition-colors duration-300 ${isNewYear ? 'festive-bg' : ''}`}>
+        <div className={`flex h-screen bg-slate-50 dark:bg-dark-950 overflow-hidden transition-colors duration-300 ${isNewYear ? 'festive-bg' : 'mesh-gradient-bg'}`}>
             {isNewYear && <div className="snow-overlay no-print" />}
-            {isMobileMenuOpen && <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 lg:hidden" onClick={() => setIsMobileMenuOpen(false)} />}
+            {isMobileMenuOpen && <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 lg:hidden" onClick={() => setIsMobileMenuOpen(false)} />}
             
-            <aside className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-white dark:bg-dark-800 border-r border-slate-200 dark:border-slate-700 transform transition-all duration-300 ease-in-out ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} no-print`}>
+            {/* Sidebar - hidden on mobile unless opened via menu */}
+            <aside className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-white/80 dark:bg-dark-800/90 backdrop-blur-xl border-r border-slate-200/50 dark:border-slate-700/50 transform transition-transform duration-300 ease-in-out ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} no-print shadow-2xl lg:shadow-none`}>
                 <div className="h-full flex flex-col relative">
                     {isNewYear && <div className="bg-garland" />}
                     
@@ -87,7 +89,7 @@ const Layout = () => {
                             <Icon name="GraduationCap" size={24} />
                             {isNewYear && <div className="absolute -top-3 -right-3 text-2xl animate-bounce">🎅</div>}
                         </div>
-                        <div><h1 className="text-lg font-black text-slate-800 dark:text-white">Гимназия Pro22</h1><p className="text-[10px] font-bold text-slate-400 uppercase">Управление V1.0</p></div>
+                        <div><h1 className="text-lg font-black text-slate-800 dark:text-white">Гимназия Pro22</h1><p className="text-[10px] font-bold text-slate-400 uppercase">Управление V2.0</p></div>
                     </div>
                     
                     <nav className="flex-1 p-4 space-y-1 overflow-y-auto custom-scrollbar">
@@ -101,7 +103,10 @@ const Layout = () => {
                         ))}
                     </nav>
 
-                    <StatusWidget />
+                    {/* Status widget only visible on desktop here, mobile has its own layout */}
+                    <div className="hidden lg:block">
+                        <StatusWidget />
+                    </div>
 
                     <div className="p-4 border-t border-slate-100 dark:border-slate-700 space-y-3">
                          <div className="flex items-center justify-between px-2">
@@ -120,15 +125,17 @@ const Layout = () => {
                 </div>
             </aside>
 
-            <main className="flex-1 flex flex-col min-w-0 bg-slate-50/50 dark:bg-dark-950">
-                <header className="lg:hidden p-4 flex items-center gap-3 bg-white dark:bg-dark-800 border-b border-slate-200 dark:border-slate-700 no-print">
-                    <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 text-slate-600 dark:text-slate-300"><Icon name="Menu" size={24} /></button>
-                    <span className="font-bold text-slate-800 dark:text-white">Гимназия Pro22</span>
+            <main className="flex-1 flex flex-col min-w-0 bg-transparent relative">
+                <header className="lg:hidden p-4 flex items-center gap-3 bg-white/80 dark:bg-dark-800/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-700 no-print sticky top-0 z-30">
+                    <span className="font-bold text-slate-800 dark:text-white text-lg">Гимназия Pro22</span>
                     {isNewYear && <div className="ml-auto text-xl">🎄</div>}
                 </header>
-                <div className="flex-1 overflow-auto p-4 lg:p-8 custom-scrollbar relative">
+                
+                <div className="flex-1 overflow-auto p-4 lg:p-8 pb-24 lg:pb-8 custom-scrollbar relative">
                     <Outlet />
                 </div>
+
+                <BottomNavigation onMenuClick={() => setIsMobileMenuOpen(true)} role={role} />
             </main>
         </div>
     );
