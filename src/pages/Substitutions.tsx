@@ -5,10 +5,10 @@ import { useStaticData, useScheduleData } from '../context/DataContext';
 import { Icon } from '../components/Icons';
 import { Modal } from '../components/UI';
 import { DAYS, Shift, Teacher, ScheduleItem, ClassEntity, Subject, Room } from '../types';
+import useMedia from 'use-media';
 
 export const SubstitutionsPage = () => {
     const { subjects, teachers, classes, rooms, settings, saveStaticData } = useStaticData(); 
-    // Получаем оба расписания, чтобы выбирать нужное в зависимости от даты
     const { schedule1, schedule2, substitutions, saveScheduleData } = useScheduleData();
 
     const location = useLocation();
@@ -30,17 +30,17 @@ export const SubstitutionsPage = () => {
     const [selectedRoomId, setSelectedRoomId] = useState<string>('');
     const [lessonAbsenceReason, setLessonAbsenceReason] = useState<string>('');
     
-    // State to track refusals in the current modal session
     const [refusedTeacherIds, setRefusedTeacherIds] = useState<string[]>([]);
     const [showSwapOptions, setShowSwapOptions] = useState(false);
     const [showMergeOptions, setShowMergeOptions] = useState(false);
-    // State for swap configuration
     const [swapKeepRooms, setSwapKeepRooms] = useState(false);
 
-    // Определяем актуальное расписание на основе выбранной даты
+    // Mobile state
+    const isMobile = useMedia({ maxWidth: 767 });
+    const [mobileTab, setMobileTab] = useState<'lessons' | 'teachers'>('lessons');
+
     const activeSchedule = useMemo(() => {
         const month = new Date(selectedDate).getMonth();
-        // Январь(0) - Май(4) = 2 полугодие. Остальное (включая лето по дефолту) = 1 полугодие
         const isSecondSemester = month >= 0 && month <= 4;
         return isSecondSemester ? schedule2 : schedule1;
     }, [selectedDate, schedule1, schedule2]);
@@ -59,7 +59,6 @@ export const SubstitutionsPage = () => {
         }
     }, [location.state]);
 
-    // When opening modal manually, try to load existing refusals if a substitution already exists
     useEffect(() => {
         if (isModalOpen && currentSubParams) {
             const existingSub = substitutions.find(s => s.scheduleItemId === currentSubParams.scheduleItemId && s.date === selectedDate);
@@ -95,7 +94,6 @@ export const SubstitutionsPage = () => {
         if (!selectedDayOfWeek) return []; 
         
         const absentIds = absentTeachers.map(t => t.id); 
-        // Используем activeSchedule вместо schedule
         const lessonsOfAbsent = activeSchedule.filter(s => s.day === selectedDayOfWeek && absentIds.includes(s.teacherId));
 
         const subsOnDate = substitutions.filter(s => s.date === selectedDate);
@@ -148,20 +146,17 @@ export const SubstitutionsPage = () => {
     
     const assignSubstitution = useCallback(async (replacementId: string, isMerger: boolean = false) => { 
         if (!currentSubParams) {
-            alert("Ошибка: Невозможно назначить замену. Параметры урока не определены. Пожалуйста, попробуйте еще раз.");
+            alert("Ошибка: Невозможно назначить замену. Параметры урока не определены.");
             return;
         }
 
         const newSubs = [...substitutions];
-
-        // Используем activeSchedule для поиска урока
         const item = activeSchedule.find(s => s.id === currentSubParams.scheduleItemId);
         if (!item) {
-            alert("Ошибка: Урок не найден в расписании. Возможно, он был удален или вы переключили полугодие.");
+            alert("Ошибка: Урок не найден в расписании.");
             return;
         }
         
-        // Remove ANY existing substitutions for this lesson on this date
         const filteredSubs = newSubs.filter(s => !(s.scheduleItemId === currentSubParams.scheduleItemId && s.date === selectedDate));
         
         const subData = { 
@@ -172,14 +167,11 @@ export const SubstitutionsPage = () => {
             replacementTeacherId: replacementId,
             replacementRoomId: selectedRoomId || undefined, 
             isMerger: isMerger,
-            lessonAbsenceReason: (replacementId !== 'conducted' && replacementId !== 'cancelled' && lessonAbsenceReason)
-                ? lessonAbsenceReason
-                : undefined,
-            refusals: refusedTeacherIds // Save the list of refusals
+            lessonAbsenceReason: (replacementId !== 'conducted' && replacementId !== 'cancelled' && lessonAbsenceReason) ? lessonAbsenceReason : undefined,
+            refusals: refusedTeacherIds
         }; 
         
         filteredSubs.push(subData);
-        
         await saveScheduleData({ substitutions: filteredSubs }); 
         
         setIsModalOpen(false); 
@@ -193,7 +185,6 @@ export const SubstitutionsPage = () => {
     const handleBatchClassMerge = useCallback(async (targetClassId: string) => {
         if (!currentSubParams || !selectedDayOfWeek) return;
 
-        // 1. Находим все уроки целевого класса (7А) в это время
         const targetLessons = activeSchedule.filter(s => 
             s.classId === targetClassId &&
             s.day === selectedDayOfWeek &&
@@ -206,10 +197,8 @@ export const SubstitutionsPage = () => {
             return;
         }
 
-        // 2. Удаляем старые замены для текущего урока
         const newSubs = substitutions.filter(s => !(s.scheduleItemId === currentSubParams.scheduleItemId && s.date === selectedDate));
 
-        // 3. Создаем замену для КАЖДОГО учителя целевого класса
         targetLessons.forEach(lesson => {
             const subData = {
                 id: Math.random().toString(36).substr(2, 9),
@@ -240,9 +229,7 @@ export const SubstitutionsPage = () => {
     const swapLessons = useCallback(async (targetLessonId: string) => {
         if (!currentSubParams) return;
 
-        // Source Lesson
         const sourceLesson = activeSchedule.find(s => s.id === currentSubParams.scheduleItemId);
-        // Target Lesson
         const targetLesson = activeSchedule.find(s => s.id === targetLessonId);
 
         if (!sourceLesson || !targetLesson) {
@@ -252,7 +239,6 @@ export const SubstitutionsPage = () => {
 
         const newSubs = [...substitutions];
 
-        // Logic for room assignment:
         let effectiveRoomForSource: string | undefined;
         if (selectedRoomId) {
             effectiveRoomForSource = selectedRoomId;
@@ -262,28 +248,26 @@ export const SubstitutionsPage = () => {
 
         const effectiveRoomForTarget = swapKeepRooms ? targetLesson.roomId : sourceLesson.roomId;
 
-        // 1. Create Sub for Source Lesson
         const sourceSubIndex = newSubs.findIndex(s => s.scheduleItemId === sourceLesson.id && s.date === selectedDate);
         const sourceSubData = {
             id: sourceSubIndex >= 0 ? newSubs[sourceSubIndex].id : Math.random().toString(36).substr(2, 9),
             date: selectedDate,
             scheduleItemId: sourceLesson.id,
             originalTeacherId: sourceLesson.teacherId,
-            replacementTeacherId: sourceLesson.teacherId, // Same teacher
+            replacementTeacherId: sourceLesson.teacherId, 
             replacementClassId: targetLesson.classId,
             replacementSubjectId: targetLesson.subjectId,
             replacementRoomId: effectiveRoomForSource !== sourceLesson.roomId ? effectiveRoomForSource : undefined, 
         };
         if (sourceSubIndex >= 0) newSubs[sourceSubIndex] = sourceSubData; else newSubs.push(sourceSubData);
 
-        // 2. Create Sub for Target Lesson
         const targetSubIndex = newSubs.findIndex(s => s.scheduleItemId === targetLesson.id && s.date === selectedDate);
         const targetSubData = {
             id: targetSubIndex >= 0 ? newSubs[targetSubIndex].id : Math.random().toString(36).substr(2, 9),
             date: selectedDate,
             scheduleItemId: targetLesson.id,
             originalTeacherId: targetLesson.teacherId,
-            replacementTeacherId: targetLesson.teacherId, // Same teacher
+            replacementTeacherId: targetLesson.teacherId,
             replacementClassId: sourceLesson.classId,
             replacementSubjectId: sourceLesson.subjectId,
             replacementRoomId: effectiveRoomForTarget !== targetLesson.roomId ? effectiveRoomForTarget : undefined,
@@ -294,7 +278,7 @@ export const SubstitutionsPage = () => {
         
         setIsModalOpen(false); 
         setCurrentSubParams(null);
-        setSelectedRoomId(''); // Reset room selection
+        setSelectedRoomId(''); 
         setShowSwapOptions(false);
         setSwapKeepRooms(false);
 
@@ -462,7 +446,6 @@ export const SubstitutionsPage = () => {
 
                 activeLessonsInShift.forEach(l => {
                     const subs = substitutions.filter(s => s.scheduleItemId === l.id && s.date === selectedDate);
-                    
                     const isMerger = subs.some(s => s.isMerger);
 
                     if (isMerger) {
@@ -486,27 +469,20 @@ export const SubstitutionsPage = () => {
                     } else {
                         subs.forEach(sub => {
                             if (!sub) return;
-
                             const cls = classes.find(c => c.id === l.classId);
                             const subj = subjects.find(s => s.id === l.subjectId);
                             const originalTeacher = teachers.find(t => t.id === sub.originalTeacherId);
                             const replacementTeacher = teachers.find(t => t.id === sub.replacementTeacherId);
-
                             const dayAbsenceReason = originalTeacher?.absenceReasons?.[selectedDate];
                             const lessonSpecificReason = sub.lessonAbsenceReason;
-
                             const effectiveDayAbsenceDisplay = (dayAbsenceReason === 'Без записи') ? dayAbsenceReason : null;
                             const effectiveLessonSpecificDisplay = (lessonSpecificReason === 'Без записи') ? lessonSpecificReason : null;
                             const effectiveReasonDisplay = effectiveLessonSpecificDisplay || effectiveDayAbsenceDisplay;
-
                             const origTeacherNameWithReason = originalTeacher?.name + (effectiveReasonDisplay ? ` (${effectiveReasonDisplay})` : '');
-                            
                             const oldRoomName = rooms.find(r => r.id === l.roomId)?.name || l.roomId || '—';
                             const newRoomName = sub.replacementRoomId ? (rooms.find(r => r.id === sub.replacementRoomId)?.name || sub.replacementRoomId) : oldRoomName;
-                            
                             const swappedClass = sub.replacementClassId ? classes.find(c => c.id === sub.replacementClassId) : null;
                             const swappedSubj = sub.replacementSubjectId ? subjects.find(s => s.id === sub.replacementSubjectId) : null;
-                            
                             const isSwap = swappedClass && swappedSubj && !sub.isMerger;
 
                             let lessonLine = `${l.period} урок (${cls?.name} ${subj?.name}${l.direction ? ` ${l.direction}` : ''}): `;
@@ -728,12 +704,12 @@ export const SubstitutionsPage = () => {
         const foundTeachers = teachers.filter(t => t.name.toLowerCase().includes(searchLower));
         const foundClasses = classes.filter(c => c.name.toLowerCase().includes(searchLower));
         
-        interface SearchResult extends ScheduleItem {
+        interface ManualSearchResult extends ScheduleItem {
             entityName: string;
             subInfo?: string;
             subjectName?: string;
         }
-        const results: SearchResult[] = [];
+        const results: ManualSearchResult[] = [];
 
         foundTeachers.forEach(t => {
             const lessons = activeSchedule.filter(s => s.teacherId === t.id && s.day === selectedDayOfWeek);
@@ -779,185 +755,223 @@ export const SubstitutionsPage = () => {
 
 
     return (
-        <div className="h-full flex flex-col md:flex-row gap-6">
-            <div className="w-full md:w-80 flex flex-col gap-6">
-                <div className="bg-white dark:bg-dark-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
-                    <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2 block">Дата замены</label>
-                    <div className="relative"><Icon name="Calendar" className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18}/><input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} className="w-full pl-10 border border-slate-200 dark:border-slate-600 p-3 rounded-xl text-sm font-bold outline-none focus:border-indigo-500 bg-transparent dark:text-white"/></div>
-                    <button onClick={() => setShowHistory(!showHistory)} className={`mt-3 w-full py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 border transition-all ${showHistory ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-white border-indigo-200 dark:border-slate-500'}`}><Icon name="History" size={16}/> {showHistory ? 'Скрыть историю' : 'История замен'}</button>
-                </div>
-                
-                {showHistory ? (
-                     <div className="bg-white dark:bg-dark-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex-1 overflow-hidden flex flex-col">
-                        <h3 className="font-bold text-slate-800 dark:text-slate-100 mb-2">История</h3>
-                        <input placeholder="Поиск по дате/учителю..." value={historySearch} onChange={e=>setHistorySearch(e.target.value)} className="mb-4 w-full bg-slate-100 dark:bg-slate-700 border-none rounded-lg p-2 text-xs" />
-                        <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2">
-                            {substitutions.filter(s => s.date.includes(historySearch) || teachers.find(t=>t.id===s.replacementTeacherId)?.name.toLowerCase().includes(historySearch.toLowerCase())).map(s => {
-                                 const r = teachers.find(t=>t.id===s.replacementTeacherId);
-                                 const room = rooms.find(rm => rm.id === s.replacementRoomId);
-                                 return (
-                                    <div key={s.id} className="p-2 border border-slate-100 dark:border-slate-700 rounded-lg text-xs">
-                                        <div className="font-bold">{s.date}</div>
-                                        <div>
-                                            {r?.name || (s.replacementTeacherId === 'cancelled' ? 'Снят' : 'Проведен')}
-                                            {s.isMerger && <span className="text-purple-600 font-bold ml-1">(Объед.)</span>}
-                                        </div>
-                                        {room && <div className="text-indigo-500">Каб. {room.name}</div>}
-                                    </div>
-                                 );
-                            })}
-                        </div>
-                     </div>
-                ) : (
-                    <div className="bg-white dark:bg-dark-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex-1 overflow-hidden flex flex-col">
-                        <h3 className="font-bold text-slate-800 dark:text-slate-100 mb-4 flex items-center gap-2"><Icon name="UserX" size={18} className="text-red-500"/> Отсутствующие</h3>
-                        
-                        <div className="mb-3 space-y-2">
-                            <div className="flex bg-slate-100 dark:bg-slate-700 p-1 rounded-lg">
-                                <button onClick={() => setTeacherShiftFilter('all')} className={`flex-1 py-1 text-xs font-bold rounded-md ${teacherShiftFilter === 'all' ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>Все</button>
-                                <button onClick={() => setTeacherShiftFilter(Shift.First)} className={`flex-1 py-1 text-xs font-bold rounded-md ${teacherShiftFilter === Shift.First ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>1 см</button>
-                                <button onClick={() => setTeacherShiftFilter(Shift.Second)} className={`flex-1 py-1 text-xs font-bold rounded-md ${teacherShiftFilter === Shift.Second ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>2 см</button>
-                            </div>
+        <div className="h-full flex flex-col gap-6">
+            {/* Top Bar: Date Picker & Mobile Tabs */}
+            <div className="flex flex-col gap-4">
+                <div className="bg-white dark:bg-dark-800 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
+                    <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center">
+                        <div className="flex-1">
+                            <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2 block">Дата замены</label>
                             <div className="relative">
-                                <Icon name="Search" className="absolute left-3 top-2.5 text-slate-400" size={14}/>
-                                <input placeholder="Найти учителя..." value={teacherSearch} onChange={e => setTeacherSearch(e.target.value)} className="w-full pl-8 pr-3 py-2 bg-slate-50 dark:bg-slate-700 border border-slate-100 dark:border-slate-600 rounded-xl text-xs outline-none focus:ring-1 ring-indigo-500 dark:text-white"/>
+                                <Icon name="Calendar" className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18}/>
+                                <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} className="w-full pl-10 border border-slate-200 dark:border-slate-600 p-3 rounded-xl text-sm font-bold outline-none focus:border-indigo-500 bg-transparent dark:text-white"/>
                             </div>
                         </div>
+                        {/* Mobile Tabs */}
+                        <div className="flex md:hidden bg-slate-100 dark:bg-slate-700 p-1 rounded-xl w-full">
+                            <button 
+                                onClick={() => setMobileTab('lessons')} 
+                                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${mobileTab === 'lessons' ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}
+                            >
+                                Найти замену {affectedLessons.length > 0 && `(${affectedLessons.length})`}
+                            </button>
+                            <button 
+                                onClick={() => setMobileTab('teachers')} 
+                                className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${mobileTab === 'teachers' ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}
+                            >
+                                Отсутствующие
+                            </button>
+                        </div>
+                        {/* Desktop History Button */}
+                        <div className="hidden md:block">
+                            <button onClick={() => setShowHistory(!showHistory)} className={`h-[50px] px-4 rounded-xl text-sm font-bold flex items-center justify-center gap-2 border transition-all mt-6 ${showHistory ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-50 dark:bg-slate-700 text-indigo-600 dark:text-white border-slate-200 dark:border-slate-600'}`}>
+                                <Icon name="History" size={18}/> {showHistory ? 'Скрыть историю' : 'История'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-                        <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 space-y-2">
-                            {filteredTeachersList.map(t => {
-                                const isAbsent = t.unavailableDates.includes(selectedDate); 
-                                const reason = t.absenceReasons ? t.absenceReasons[selectedDate] : '';
-                                return (
-                                <div key={t.id} className={`flex flex-col p-3 rounded-xl border transition-all ${isAbsent ? 'bg-red-50 dark:bg-red-900/20 border-red-100 dark:border-red-900' : 'bg-slate-50 dark:bg-slate-700/50 border-slate-100 dark:border-slate-600'}`}>
-                                    <div className="flex items-center justify-between mb-1">
-                                        <span className={`text-sm font-medium ${isAbsent ? 'text-red-700 dark:text-red-400' : 'text-slate-600 dark:text-slate-300'}`}>{t.name}</span>
-                                        <button onClick={() => isAbsent ? removeAbsence(t.id) : openAbsenceModal(t.id)} className={`text-xs px-2 py-1 rounded-lg font-bold transition-colors ${isAbsent ? 'bg-white dark:bg-dark-800 text-red-600 dark:text-red-400 shadow-sm' : 'text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600'}`}>
-                                            {isAbsent ? 'Вернуть' : 'Нет'}
-                                        </button>
-                                    </div>
-                                    <div className="flex justify-between items-end">
-                                        <div className="flex gap-1">{t.shifts.map(s => <span key={s} className="text-[9px] bg-white dark:bg-slate-600 px-1 rounded border border-slate-100 dark:border-slate-500 text-slate-400">{s === Shift.First ? '1' : '2'}</span>)}</div>
-                                        {isAbsent && (
-                                            <div className="flex items-center gap-1">
-                                                {reason && <div className="text-[10px] text-red-500 dark:text-red-400 italic">{reason}</div>}
-                                                <button onClick={() => openAbsenceModal(t.id)} className="w-6 h-6 flex items-center justify-center bg-white dark:bg-dark-800 text-red-600 dark:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full shadow-sm border border-slate-200 dark:border-slate-600" title="Изменить причину">
-                                                    <Icon name="Edit2" size={14}/>
-                                                </button>
+            <div className="flex-1 flex flex-col md:flex-row gap-6 min-h-0">
+                {/* Left Column: Teachers List / History (Hidden on mobile if tab is 'lessons') */}
+                <div className={`w-full md:w-80 flex-col gap-4 ${isMobile && mobileTab !== 'teachers' ? 'hidden' : 'flex'}`}>
+                    
+                    {/* Mobile History Toggle */}
+                    <div className="md:hidden">
+                        <button onClick={() => setShowHistory(!showHistory)} className={`w-full py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 border transition-all ${showHistory ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white dark:bg-dark-800 text-indigo-600 dark:text-white border-slate-200 dark:border-slate-700'}`}>
+                            <Icon name="History" size={18}/> {showHistory ? 'Скрыть историю' : 'Показать историю замен'}
+                        </button>
+                    </div>
+
+                    {showHistory ? (
+                         <div className="bg-white dark:bg-dark-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex-1 overflow-hidden flex flex-col h-[600px] md:h-auto">
+                            <h3 className="font-bold text-slate-800 dark:text-slate-100 mb-2">История</h3>
+                            <input placeholder="Поиск по дате/учителю..." value={historySearch} onChange={e=>setHistorySearch(e.target.value)} className="mb-4 w-full bg-slate-100 dark:bg-slate-700 border-none rounded-lg p-2 text-xs" />
+                            <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2">
+                                {substitutions.filter(s => s.date.includes(historySearch) || teachers.find(t=>t.id===s.replacementTeacherId)?.name.toLowerCase().includes(historySearch.toLowerCase())).map(s => {
+                                     const r = teachers.find(t=>t.id===s.replacementTeacherId);
+                                     const room = rooms.find(rm => rm.id === s.replacementRoomId);
+                                     return (
+                                        <div key={s.id} className="p-2 border border-slate-100 dark:border-slate-700 rounded-lg text-xs">
+                                            <div className="font-bold">{s.date}</div>
+                                            <div>
+                                                {r?.name || (s.replacementTeacherId === 'cancelled' ? 'Снят' : 'Проведен')}
+                                                {s.isMerger && <span className="text-purple-600 font-bold ml-1">(Объед.)</span>}
+                                            </div>
+                                            {room && <div className="text-indigo-500">Каб. {room.name}</div>}
+                                        </div>
+                                     );
+                                })}
+                            </div>
+                         </div>
+                    ) : (
+                        <div className="bg-white dark:bg-dark-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex-1 overflow-hidden flex flex-col h-[600px] md:h-auto">
+                            <h3 className="font-bold text-slate-800 dark:text-slate-100 mb-4 flex items-center gap-2"><Icon name="UserX" size={18} className="text-red-500"/> Отсутствующие</h3>
+                            
+                            <div className="mb-3 space-y-2">
+                                <div className="flex bg-slate-100 dark:bg-slate-700 p-1 rounded-lg">
+                                    <button onClick={() => setTeacherShiftFilter('all')} className={`flex-1 py-1 text-xs font-bold rounded-md ${teacherShiftFilter === 'all' ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>Все</button>
+                                    <button onClick={() => setTeacherShiftFilter(Shift.First)} className={`flex-1 py-1 text-xs font-bold rounded-md ${teacherShiftFilter === Shift.First ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>1 см</button>
+                                    <button onClick={() => setTeacherShiftFilter(Shift.Second)} className={`flex-1 py-1 text-xs font-bold rounded-md ${teacherShiftFilter === Shift.Second ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>2 см</button>
+                                </div>
+                                <div className="relative">
+                                    <Icon name="Search" className="absolute left-3 top-2.5 text-slate-400" size={14}/>
+                                    <input placeholder="Найти учителя..." value={teacherSearch} onChange={e => setTeacherSearch(e.target.value)} className="w-full pl-8 pr-3 py-2 bg-slate-50 dark:bg-slate-700 border border-slate-100 dark:border-slate-600 rounded-xl text-xs outline-none focus:ring-1 ring-indigo-500 dark:text-white"/>
+                                </div>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 space-y-2">
+                                {filteredTeachersList.map(t => {
+                                    const isAbsent = t.unavailableDates.includes(selectedDate); 
+                                    const reason = t.absenceReasons ? t.absenceReasons[selectedDate] : '';
+                                    return (
+                                    <div key={t.id} className={`flex flex-col p-3 rounded-xl border transition-all ${isAbsent ? 'bg-red-50 dark:bg-red-900/20 border-red-100 dark:border-red-900' : 'bg-slate-50 dark:bg-slate-700/50 border-slate-100 dark:border-slate-600'}`}>
+                                        <div className="flex items-center justify-between mb-1">
+                                            <span className={`text-sm font-medium ${isAbsent ? 'text-red-700 dark:text-red-400' : 'text-slate-600 dark:text-slate-300'}`}>{t.name}</span>
+                                            <button onClick={() => isAbsent ? removeAbsence(t.id) : openAbsenceModal(t.id)} className={`text-xs px-2 py-1 rounded-lg font-bold transition-colors ${isAbsent ? 'bg-white dark:bg-dark-800 text-red-600 dark:text-red-400 shadow-sm' : 'text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600'}`}>
+                                                {isAbsent ? 'Вернуть' : 'Нет'}
+                                            </button>
+                                        </div>
+                                        <div className="flex justify-between items-end">
+                                            <div className="flex gap-1">{t.shifts.map(s => <span key={s} className="text-[9px] bg-white dark:bg-slate-600 px-1 rounded border border-slate-100 dark:border-slate-500 text-slate-400">{s === Shift.First ? '1' : '2'}</span>)}</div>
+                                            {isAbsent && (
+                                                <div className="flex items-center gap-1">
+                                                    {reason && <div className="text-[10px] text-red-500 dark:text-red-400 italic">{reason}</div>}
+                                                    <button onClick={() => openAbsenceModal(t.id)} className="w-6 h-6 flex items-center justify-center bg-white dark:bg-dark-800 text-red-600 dark:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-full shadow-sm border border-slate-200 dark:border-slate-600" title="Изменить причину">
+                                                        <Icon name="Edit2" size={14}/>
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>)
+                                })}
+                                {filteredTeachersList.length === 0 && <div className="text-center text-xs text-slate-400 py-4">Не найдено</div>}
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Right Column: Lessons (Hidden on mobile if tab is 'teachers') */}
+                <div className={`flex-1 bg-white dark:bg-dark-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col overflow-hidden ${isMobile && mobileTab !== 'lessons' ? 'hidden' : 'flex'}`}>
+                    <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-6">
+                        <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">Уроки под замену ({affectedLessons.length})</h2>
+                        <div className="flex flex-wrap gap-2 w-full xl:w-auto">
+                            <button onClick={generateICal} className="flex items-center gap-2 px-3 py-2 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-xl text-xs font-bold hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"><Icon name="Calendar" size={16}/> iCal</button>
+                            {affectedLessons.length > 0 && <button onClick={copyForMessenger} className="flex items-center gap-2 px-3 py-2 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-xl text-xs font-bold hover:bg-green-100 dark:hover:bg-green-900/50 transition-colors"><Icon name="Copy" size={16}/> Копия</button>}
+                            <button onClick={sendToTelegram} className="px-3 py-2 bg-blue-500 text-white rounded-xl text-xs font-bold hover:bg-blue-600 transition shadow-lg shadow-blue-200 dark:shadow-none flex items-center gap-2">
+                                <Icon name="Send" size={16} /> Telegram
+                            </button>
+                            <button onClick={() => { 
+                                setManualLessonSearch(''); 
+                                setManualSearchModalOpen(true); 
+                            }} className="flex items-center gap-2 px-3 py-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 rounded-xl text-xs font-bold hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors">
+                                <Icon name="Search" size={16}/> Поиск
+                            </button>
+                        </div>
+                    </div>
+                    <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-4">
+                        {affectedLessons.length === 0 ? <div className="h-full flex flex-col items-center justify-center text-slate-400"><Icon name="CheckCircle" size={48} className="mb-4 text-slate-200 dark:text-slate-700"/><p>Нет уроков, требующих замены на эту дату</p></div> : affectedLessons.map(l => {
+                            const subs = substitutions.filter(s => s.scheduleItemId === l.id && s.date === selectedDate);
+                            const hasSubs = subs.length > 0;
+                            const firstSub = hasSubs ? subs[0] : null;
+
+                            const rep = firstSub && firstSub.replacementTeacherId !== 'cancelled' && firstSub.replacementTeacherId !== 'conducted' ? teachers.find(t => t.id === firstSub.replacementTeacherId) : null; 
+                            const orig = teachers.find(t => t.id === l.teacherId);
+                            const subj = subjects.find(s => s.id === l.subjectId); const cls = classes.find(c => c.id === l.classId);
+                            const room = rooms.find(r => r.id === l.roomId);
+                            const roomName = room ? room.name : l.roomId;
+                            
+                            const newRoomId = firstSub?.replacementRoomId;
+                            const newRoomName = newRoomId ? (rooms.find(r => r.id === newRoomId)?.name || newRoomId) : undefined;
+                            
+                            const swappedClass = firstSub?.replacementClassId ? classes.find(c => c.id === firstSub.replacementClassId) : null;
+                            const swappedSubj = firstSub?.replacementSubjectId ? subjects.find(s => s.id === firstSub.replacementSubjectId) : null;
+
+                            let statusEl = null;
+                            if (firstSub?.replacementTeacherId === 'conducted') {
+                                statusEl = <div className="flex items-center gap-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900 pl-4 pr-2 py-2 rounded-xl"><div className="text-blue-700 dark:text-blue-400 font-bold text-sm">Урок проведен</div><button onClick={() => removeSubstitution(l.id)} className="p-2 bg-white dark:bg-dark-800 rounded-lg text-blue-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors shadow-sm"><Icon name="X" size={16}/></button></div>;
+                            } else if (firstSub?.replacementTeacherId === 'cancelled') {
+                                statusEl = <div className="flex items-center gap-3 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900 pl-4 pr-2 py-2 rounded-xl"><div className="text-red-700 dark:text-red-400 font-bold text-sm">УРОК СНЯТ</div><button onClick={() => removeSubstitution(l.id)} className="p-2 bg-white dark:bg-dark-800 rounded-lg text-red-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors shadow-sm"><Icon name="X" size={16}/></button></div>;
+                            } else if (hasSubs) {
+                                const isRoomChangeOnly = firstSub?.replacementTeacherId === firstSub?.originalTeacherId && newRoomId && !swappedClass;
+                                const isSwap = swappedClass && swappedSubj && !firstSub?.isMerger;
+                                const replacementNames = subs.map(s => teachers.find(t => t.id === s.replacementTeacherId)?.name).filter(Boolean).join(', ');
+
+                                statusEl = <div className="flex items-center gap-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-900 pl-4 pr-2 py-2 rounded-xl flex-1 justify-between">
+                                    <div className="min-w-0">
+                                        <div className="text-[10px] uppercase font-bold text-emerald-600 dark:text-emerald-400 tracking-wider">
+                                            {isRoomChangeOnly ? 'Замена кабинета' : isSwap ? 'Обмен уроками' : 'Замена назначена'}
+                                        </div>
+                                        <div className="font-bold text-emerald-900 dark:text-emerald-200 text-sm truncate" title={replacementNames}>
+                                            {isRoomChangeOnly ? 'Учитель тот же' : isSwap ? `Урок ${swappedClass?.name}` : replacementNames}
+                                        </div>
+                                        {firstSub?.isMerger && (
+                                            <div className="text-[10px] font-black text-purple-600 dark:text-purple-400 uppercase tracking-widest mt-0.5">
+                                                ОБЪЕДИНЕНИЕ {swappedClass ? `(вместе с ${swappedClass.name})` : ''}
                                             </div>
                                         )}
+                                        {firstSub?.lessonAbsenceReason && ( 
+                                            <div className="text-[10px] text-red-500 dark:text-red-400 italic mt-0.5">Причина: {firstSub.lessonAbsenceReason}</div>
+                                        )}
                                     </div>
-                                </div>)
-                            })}
-                            {filteredTeachersList.length === 0 && <div className="text-center text-xs text-slate-400 py-4">Не найдено</div>}
-                        </div>
-                    </div>
-                )}
-            </div>
-            <div className="flex-1 bg-white dark:bg-dark-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col overflow-hidden">
-                <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">Требуют замены ({affectedLessons.length})</h2>
-                    <div className="flex gap-2">
-                        <button onClick={generateICal} className="flex items-center gap-2 px-3 py-2 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded-xl text-sm font-bold hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"><Icon name="Calendar" size={16}/> iCal</button>
-                        {affectedLessons.length > 0 && <button onClick={copyForMessenger} className="flex items-center gap-2 px-3 py-2 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-xl text-sm font-bold hover:bg-green-100 dark:hover:bg-green-900/50 transition-colors"><Icon name="Copy" size={16}/> Копировать</button>}
-                        <button onClick={sendToTelegram} className="px-4 py-2 bg-blue-500 text-white rounded-xl font-bold hover:bg-blue-600 transition shadow-lg shadow-blue-200 dark:shadow-none flex items-center gap-2">
-                            <Icon name="Send" size={16} /> Telegram
-                        </button>
-                        <button onClick={() => { 
-                            setManualLessonSearch(''); 
-                            setManualSearchModalOpen(true); 
-                        }} className="flex items-center gap-2 px-3 py-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 rounded-xl text-sm font-bold hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors">
-                            <Icon name="Search" size={16}/> Ручной выбор
-                        </button>
-                    </div>
-                </div>
-                <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-4">
-                    {affectedLessons.length === 0 ? <div className="h-full flex flex-col items-center justify-center text-slate-400"><Icon name="CheckCircle" size={48} className="mb-4 text-slate-200 dark:text-slate-700"/><p>Нет уроков, требующих замены на эту дату</p></div> : affectedLessons.map(l => {
-                        // FIX: Get ALL substitutions for this lesson (since merge can create multiple)
-                        const subs = substitutions.filter(s => s.scheduleItemId === l.id && s.date === selectedDate);
-                        const hasSubs = subs.length > 0;
-                        const firstSub = hasSubs ? subs[0] : null;
-
-                        const rep = firstSub && firstSub.replacementTeacherId !== 'cancelled' && firstSub.replacementTeacherId !== 'conducted' ? teachers.find(t => t.id === firstSub.replacementTeacherId) : null; 
-                        const orig = teachers.find(t => t.id === l.teacherId);
-                        const subj = subjects.find(s => s.id === l.subjectId); const cls = classes.find(c => c.id === l.classId);
-                        const room = rooms.find(r => r.id === l.roomId);
-                        const roomName = room ? room.name : l.roomId;
-                        
-                        const newRoomId = firstSub?.replacementRoomId;
-                        // FIX: Use undefined instead of null to match type signature
-                        const newRoomName = newRoomId ? (rooms.find(r => r.id === newRoomId)?.name || newRoomId) : undefined;
-                        
-                        // Check if content was swapped
-                        const swappedClass = firstSub?.replacementClassId ? classes.find(c => c.id === firstSub.replacementClassId) : null;
-                        const swappedSubj = firstSub?.replacementSubjectId ? subjects.find(s => s.id === firstSub.replacementSubjectId) : null;
-
-                        let statusEl = null;
-                        if (firstSub?.replacementTeacherId === 'conducted') {
-                            statusEl = <div className="flex items-center gap-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900 pl-4 pr-2 py-2 rounded-xl"><div className="text-blue-700 dark:text-blue-400 font-bold text-sm">Урок проведен</div><button onClick={() => removeSubstitution(l.id)} className="p-2 bg-white dark:bg-dark-800 rounded-lg text-blue-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors shadow-sm"><Icon name="X" size={16}/></button></div>;
-                        } else if (firstSub?.replacementTeacherId === 'cancelled') {
-                            statusEl = <div className="flex items-center gap-3 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900 pl-4 pr-2 py-2 rounded-xl"><div className="text-red-700 dark:text-red-400 font-bold text-sm">УРОК СНЯТ</div><button onClick={() => removeSubstitution(l.id)} className="p-2 bg-white dark:bg-dark-800 rounded-lg text-red-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors shadow-sm"><Icon name="X" size={16}/></button></div>;
-                        } else if (hasSubs) {
-                            const isRoomChangeOnly = firstSub?.replacementTeacherId === firstSub?.originalTeacherId && newRoomId && !swappedClass;
-                            
-                            // IMPORTANT FIX: Swap logic only applies if it is NOT a merger
-                            const isSwap = swappedClass && swappedSubj && !firstSub?.isMerger;
-                            
-                            // Multi-teacher display logic
-                            const replacementNames = subs.map(s => teachers.find(t => t.id === s.replacementTeacherId)?.name).filter(Boolean).join(', ');
-
-                            statusEl = <div className="flex items-center gap-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-900 pl-4 pr-2 py-2 rounded-xl">
-                                <div>
-                                    <div className="text-[10px] uppercase font-bold text-emerald-600 dark:text-emerald-400 tracking-wider">
-                                        {isRoomChangeOnly ? 'Замена кабинета' : isSwap ? 'Обмен уроками' : 'Замена назначена'}
+                                    <div className="flex gap-1 shrink-0">
+                                        <button onClick={() => { if(rep || orig) notifyTeacherFunction(rep || orig!, l, cls, subj, newRoomName || roomName || undefined, selectedDate); }} className="p-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600 shadow-sm transition-all" title="Отправить уведомление">
+                                            <Icon name="Send" size={18}/>
+                                        </button>
+                                        <button onClick={() => removeSubstitution(l.id)} className="p-2 rounded-lg bg-white dark:bg-slate-800 text-red-500 border border-red-100 dark:border-red-900/30 hover:bg-red-50 dark:hover:bg-red-900/20 shadow-sm transition-all" title="Отменить замену"><Icon name="UserX" size={18}/></button>
                                     </div>
-                                    <div className="font-bold text-emerald-900 dark:text-emerald-200 text-sm max-w-[200px] truncate" title={replacementNames}>
-                                        {isRoomChangeOnly ? 'Учитель тот же' : isSwap ? `Урок ${swappedClass?.name}` : replacementNames}
-                                    </div>
-                                    {firstSub?.isMerger && (
-                                        <div className="text-[10px] font-black text-purple-600 dark:text-purple-400 uppercase tracking-widest mt-0.5">
-                                            ОБЪЕДИНЕНИЕ {swappedClass ? `(вместе с ${swappedClass.name})` : ''}
+                                </div>;
+                            } else {
+                                statusEl = <button onClick={() => { setCurrentSubParams({ scheduleItemId: l.id, subjectId: l.subjectId, period: l.period, shift: l.shift, classId: l.classId, teacherId: l.teacherId, roomId: l.roomId, day: l.day }); setIsModalOpen(true); }} className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-xl text-sm font-bold shadow-lg shadow-indigo-200 dark:shadow-none transition-all flex items-center justify-center gap-2 xl:w-auto w-full">Найти замену <Icon name="ArrowRight" size={16}/></button>;
+                            }
+
+                            const isTeacherPresent = !absentTeachers.find(t => t.id === l.teacherId);
+
+                            return (<div key={l.id} className="p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 bg-white dark:bg-dark-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-600 flex flex-col items-center justify-center text-indigo-600 dark:text-indigo-400"><span className="text-[10px] font-bold uppercase text-slate-400 leading-none">Урок</span><span className="text-xl font-black leading-none mt-1 dark:text-slate-200">{l.period}</span></div>
+                                    <div>
+                                        <div className="flex items-center gap-2 mb-1"><span className="font-bold text-lg text-slate-800 dark:text-slate-100">{cls?.name}</span><div className="text-sm text-slate-500 dark:text-slate-400 flex items-center gap-2"><span className="text-xs font-bold text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 px-1 rounded">{l.shift === Shift.First ? '1см' : '2см'}</span><span className="text-slate-400">|</span><span>{subj?.name}</span></div></div>
+                                        <div className="text-sm text-slate-600 dark:text-slate-300 flex flex-wrap items-center gap-2">
+                                            <span className={isTeacherPresent ? 'font-semibold' : 'line-through decoration-red-400 decoration-2'}>{orig?.name}</span>
+                                            {roomName && <span className="text-xs bg-white dark:bg-slate-700 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-600 flex items-center gap-1">{roomName} {newRoomName && <span className="text-indigo-600 font-bold">→ {newRoomName}</span>}</span>}
+                                            {firstSub?.lessonAbsenceReason && (
+                                                <span className="text-xs bg-red-50 dark:bg-red-900/20 px-1.5 py-0.5 rounded border border-red-100 dark:border-red-900 text-red-500 dark:text-red-400 font-medium">({firstSub.lessonAbsenceReason})</span>
+                                            )}
+                                            {swappedClass && swappedSubj && !firstSub?.isMerger && (
+                                                <span className="text-xs bg-purple-50 dark:bg-purple-900/20 px-1.5 py-0.5 rounded border border-purple-100 dark:border-purple-900 text-purple-600 dark:text-purple-400 font-bold">
+                                                    Меняется на: {swappedClass.name}
+                                                </span>
+                                            )}
                                         </div>
-                                    )}
-                                    {firstSub?.lessonAbsenceReason && ( 
-                                        <div className="text-[10px] text-red-500 dark:text-red-400 italic mt-0.5">Причина: {firstSub.lessonAbsenceReason}</div>
-                                    )}
-                                </div>
-                                <div className="flex gap-1">
-                                    <button onClick={() => { if(rep || orig) notifyTeacherFunction(rep || orig!, l, cls, subj, newRoomName || roomName || undefined, selectedDate); }} className="p-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600 shadow-sm transition-all" title="Отправить уведомление">
-                                        <Icon name="Send" size={18}/>
-                                    </button>
-                                    <button onClick={() => removeSubstitution(l.id)} className="p-2 rounded-lg bg-white dark:bg-slate-800 text-red-500 border border-red-100 dark:border-red-900/30 hover:bg-red-50 dark:hover:bg-red-900/20 shadow-sm transition-all" title="Отменить замену"><Icon name="UserX" size={18}/></button>
-                                </div>
-                            </div>;
-                        } else {
-                            statusEl = <button onClick={() => { setCurrentSubParams({ scheduleItemId: l.id, subjectId: l.subjectId, period: l.period, shift: l.shift, classId: l.classId, teacherId: l.teacherId, roomId: l.roomId, day: l.day }); setIsModalOpen(true); }} className="bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-xl text-sm font-bold shadow-lg shadow-indigo-200 dark:shadow-none transition-all flex items-center justify-center gap-2 xl:w-auto w-full">Найти замену <Icon name="ArrowRight" size={16}/></button>;
-                        }
-
-                        const isTeacherPresent = !absentTeachers.find(t => t.id === l.teacherId);
-
-                        return (<div key={l.id} className="p-4 rounded-xl border border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-700/30 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 bg-white dark:bg-dark-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-600 flex flex-col items-center justify-center text-indigo-600 dark:text-indigo-400"><span className="text-[10px] font-bold uppercase text-slate-400 leading-none">Урок</span><span className="text-xl font-black leading-none mt-1 dark:text-slate-200">{l.period}</span></div>
-                                <div>
-                                    <div className="flex items-center gap-2 mb-1"><span className="font-bold text-lg text-slate-800 dark:text-slate-100">{cls?.name}</span><div className="text-sm text-slate-500 dark:text-slate-400 flex items-center gap-2"><span className="text-xs font-bold text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 px-1 rounded">{l.shift === Shift.First ? '1см' : '2см'}</span><span className="text-slate-400">|</span><span>{subj?.name}</span></div></div>
-                                    <div className="text-sm text-slate-600 dark:text-slate-300 flex items-center gap-2">
-                                        <span className={isTeacherPresent ? 'font-semibold' : 'line-through decoration-red-400 decoration-2'}>{orig?.name}</span>
-                                        {roomName && <span className="text-xs bg-white dark:bg-slate-700 px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-600 flex items-center gap-1">{roomName} {newRoomName && <span className="text-indigo-600 font-bold">→ {newRoomName}</span>}</span>}
-                                        {firstSub?.lessonAbsenceReason && ( // Always show lesson-specific reason
-                                            <span className="text-xs bg-red-50 dark:bg-red-900/20 px-1.5 py-0.5 rounded border border-red-100 dark:border-red-900 text-red-500 dark:text-red-400 font-medium">({firstSub.lessonAbsenceReason})</span>
-                                        )}
-                                        {swappedClass && swappedSubj && !firstSub?.isMerger && (
-                                            <span className="text-xs bg-purple-50 dark:bg-purple-900/20 px-1.5 py-0.5 rounded border border-purple-100 dark:border-purple-900 text-purple-600 dark:text-purple-400 font-bold">
-                                                Меняется на: {swappedClass.name}
-                                            </span>
-                                        )}
                                     </div>
                                 </div>
-                            </div>
-                            {statusEl}
-                        </div>)
-                    })}
+                                <div className="w-full xl:w-auto mt-2 xl:mt-0">
+                                    {statusEl}
+                                </div>
+                            </div>)
+                        })}
+                    </div>
                 </div>
             </div>
             
@@ -983,7 +997,6 @@ export const SubstitutionsPage = () => {
                     </select>
                 </div>
 
-                {/* NEW: Lesson-specific absence reason */}
                 {modalContext && !modalContext.isTeacherAbsent && (
                     <div className="mb-6">
                         <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Причина отсутствия на уроке (Опционально)</label>
@@ -1009,7 +1022,6 @@ export const SubstitutionsPage = () => {
                 </div>
                 
                 <div className="mb-4">
-                    {/* Expandable Merge Option */}
                     <button 
                         onClick={() => setShowMergeOptions(!showMergeOptions)} 
                         className="w-full p-3 mb-2 rounded-xl bg-amber-50 text-amber-700 font-bold text-sm hover:bg-amber-100 transition border border-amber-200 flex items-center justify-center gap-2"
