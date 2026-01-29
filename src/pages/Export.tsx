@@ -11,8 +11,8 @@ import { QRCodeSVG } from 'qrcode.react';
 import { Modal } from '../components/UI';
 
 export const ExportPage = () => {
-    const { subjects, teachers, classes, rooms, settings, bellSchedule, saveStaticData } = useStaticData();
-    const { schedule1, schedule2, substitutions, saveScheduleData } = useScheduleData();
+    const { subjects, teachers, classes, rooms, settings, bellSchedule, dutyZones, saveStaticData } = useStaticData();
+    const { schedule1, schedule2, substitutions, dutySchedule, saveScheduleData } = useScheduleData();
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const printRef1 = useRef<HTMLDivElement>(null);
@@ -35,11 +35,12 @@ export const ExportPage = () => {
     const [matrixGrade, setMatrixGrade] = useState<string>("");
 
     const fullAppData: AppData = useMemo(() => ({
-        subjects, teachers, classes, rooms, settings, bellSchedule,
+        subjects, teachers, classes, rooms, settings, bellSchedule, dutyZones,
         schedule: schedule1,
         schedule2ndHalf: schedule2,
-        substitutions
-    }), [subjects, teachers, classes, rooms, settings, bellSchedule, schedule1, schedule2, substitutions]);
+        substitutions,
+        dutySchedule
+    }), [subjects, teachers, classes, rooms, settings, bellSchedule, dutyZones, schedule1, schedule2, substitutions, dutySchedule]);
 
     // Получаем расписание для экспорта (Excel, Матрица) на основе селектора
     const getScheduleForExport = () => exportSemester === 2 ? schedule2 : schedule1;
@@ -85,6 +86,8 @@ export const ExportPage = () => {
                             teachers: json.teachers || [],
                             subjects: json.subjects || [],
                             substitutions: json.substitutions || [],
+                            dutyZones: json.dutyZones || INITIAL_DATA.dutyZones,
+                            dutySchedule: json.dutySchedule || [],
                             settings: { ...INITIAL_DATA.settings, ...json.settings }
                         };
                         await saveStaticData(mergedData as any);

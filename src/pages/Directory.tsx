@@ -1,18 +1,14 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useStaticData } from '../context/DataContext'; 
 import { Icon } from '../components/Icons';
 import { Modal, StaggerContainer } from '../components/UI';
-import { Shift, ROOM_TYPES, SHIFT_PERIODS, Teacher, Subject, ClassEntity, Room, Bell } from '../types';
-
-interface BellWithInheritance extends Partial<Bell> {
-    start: string;
-    end: string;
-    isInherited: boolean;
-}
+import { Shift, ROOM_TYPES, SHIFT_PERIODS, Teacher, Subject, ClassEntity, Room, BellPreset, Bell } from '../types';
+import { DEFAULT_BELLS, SHORT_BELLS } from '../constants';
+import html2canvas from 'html2canvas';
 
 export const DirectoryPage = () => {
-    const { subjects, teachers, classes, rooms, bellSchedule, saveStaticData } = useStaticData();
+    const { subjects, teachers, classes, rooms, bellSchedule, settings, saveStaticData } = useStaticData();
 
     const [activeTab, setActiveTab] = useState('teachers');
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -23,9 +19,28 @@ export const DirectoryPage = () => {
     const [subjectForm, setSubjectForm] = useState<Partial<Subject>>({});
     const [classForm, setClassForm] = useState<Partial<ClassEntity>>({});
     const [roomForm, setRoomForm] = useState<Partial<Room>>({});
-    const [activeBellDay, setActiveBellDay] = useState('default');
+    
+    // Bells State
+    const [selectedPresetId, setSelectedPresetId] = useState<string>('preset_normal');
+    const [currentPresetBells, setCurrentPresetBells] = useState<Bell[]>([]);
+    const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
+    const [newPresetName, setNewPresetName] = useState('');
+    const bellsPrintRef = useRef<HTMLDivElement>(null);
     
     const [draggedIdx, setDraggedIdx] = useState<number|null>(null);
+
+    // Initialize bells on load
+    useEffect(() => {
+        if (settings.bellPresets && settings.bellPresets.length > 0) {
+            const preset = settings.bellPresets.find(p => p.id === selectedPresetId);
+            if (preset) {
+                setCurrentPresetBells(preset.bells);
+                return;
+            }
+        }
+        // Fallback
+        setCurrentPresetBells(DEFAULT_BELLS);
+    }, [selectedPresetId, settings.bellPresets]);
 
     const openModal = (id?: string) => {
         setEditingId(id || null);
@@ -113,28 +128,102 @@ export const DirectoryPage = () => {
         setDraggedIdx(null); 
     };
 
-    // Bells logic
-    const getActiveBells = (shift: string, period: number) => {
-        const dayKey = activeBellDay;
-        let bell = bellSchedule.find(b => b.shift === shift && b.period === period && b.day === dayKey);
-        if (!bell && dayKey !== 'default') {
-             const defaultBell = bellSchedule.find(b => b.shift === shift && b.period === period && b.day === 'default');
-             return defaultBell ? { ...defaultBell, start: '', end: '', isInherited: true } : { start: '', end: '', isInherited: false };
-        }
-        return bell ? { ...bell, isInherited: false } : { start: '', end: '', isInherited: false };
-    };
+    // --- Bell Schedule Logic ---
 
-    const handleBellChange = async (shift: string, period: number, field: string, value: string) => {
-        let bells = [...bellSchedule];
-        const dayKey = activeBellDay;
-        const idx = bells.findIndex(b => b.shift === shift && b.period === period && b.day === dayKey);
+    const handleBellChange = (shift: string, period: number, field: string, value: string) => {
+        const newBells = [...currentPresetBells];
+        const idx = newBells.findIndex(b => b.shift === shift && b.period === period && b.day === 'default');
         
         if (idx >= 0) {
-            bells[idx] = { ...bells[idx], [field]: value };
+            newBells[idx] = { ...newBells[idx], [field]: value };
         } else {
-            bells.push({ shift, period, [field]: value, start: '00:00', end: '00:00', day: dayKey } as any);
+            // Need to create it if missing for some reason (rare for default day)
+            newBells.push({ shift, period, [field]: value, start: '00:00', end: '00:00', day: 'default' } as Bell);
         }
-        await saveStaticData({ bellSchedule: bells });
+        setCurrentPresetBells(newBells);
+    };
+
+    const toggleBellCancellation = (shift: string, period: number) => {
+        const newBells = [...currentPresetBells];
+        const idx = newBells.findIndex(b => b.shift === shift && b.period === period && b.day === 'default');
+        
+        if (idx >= 0) {
+            newBells[idx] = { ...newBells[idx], cancelled: !newBells[idx].cancelled };
+        } else {
+            newBells.push({ shift, period, start: '00:00', end: '00:00', day: 'default', cancelled: true } as Bell);
+        }
+        setCurrentPresetBells(newBells);
+    };
+
+    const savePreset = async () => {
+        let presets = [...(settings.bellPresets || [])];
+        const index = presets.findIndex(p => p.id === selectedPresetId);
+        
+        if (index >= 0) {
+            presets[index] = { ...presets[index], bells: currentPresetBells };
+        } else {
+            // Create new
+             presets.push({
+                id: selectedPresetId,
+                name: newPresetName || 'Новый режим',
+                bells: currentPresetBells
+            });
+        }
+        
+        await saveStaticData({ settings: { ...settings, bellPresets: presets } });
+        alert("Пресет сохранен!");
+    };
+
+    const createNewPreset = () => {
+        setNewPresetName('');
+        setIsPresetModalOpen(true);
+    };
+
+    const confirmCreatePreset = async () => {
+        if (!newPresetName) return;
+        const newId = `preset_${Math.random().toString(36).substr(2, 9)}`;
+        const presets = [...(settings.bellPresets || [])];
+        
+        // Clone current bells as base
+        presets.push({
+            id: newId,
+            name: newPresetName,
+            bells: JSON.parse(JSON.stringify(currentPresetBells))
+        });
+        
+        await saveStaticData({ settings: { ...settings, bellPresets: presets } });
+        setSelectedPresetId(newId);
+        setIsPresetModalOpen(false);
+    };
+
+    const deletePreset = async () => {
+        if (selectedPresetId === 'preset_normal') {
+            alert("Нельзя удалить базовый пресет.");
+            return;
+        }
+        if (!window.confirm("Удалить этот режим звонков?")) return;
+        
+        const presets = (settings.bellPresets || []).filter(p => p.id !== selectedPresetId);
+        await saveStaticData({ settings: { ...settings, bellPresets: presets } });
+        setSelectedPresetId('preset_normal');
+    };
+
+    const applyPreset = async () => {
+        if (window.confirm(`Применить режим звонков "${settings.bellPresets?.find(p=>p.id===selectedPresetId)?.name}" для всего расписания?`)) {
+            await saveStaticData({ bellSchedule: currentPresetBells });
+            alert("Режим звонков применен!");
+        }
+    };
+
+    const exportBellsToPng = async () => {
+        if (!bellsPrintRef.current) return;
+        const canvas = await html2canvas(bellsPrintRef.current, { scale: 2, backgroundColor: '#ffffff' });
+        const link = document.createElement('a');
+        link.href = canvas.toDataURL('image/png');
+        link.download = `Звонки_${settings.bellPresets?.find(p=>p.id===selectedPresetId)?.name}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     };
 
     const toggleShift = (shift: string) => {
@@ -256,34 +345,95 @@ export const DirectoryPage = () => {
                 
                 {activeTab === 'bells' && (
                     <div className="flex flex-col gap-6">
-                        <div className="flex justify-center">
-                            <div className="bg-slate-100 dark:bg-slate-700 p-1 rounded-xl flex gap-1">
-                                {['default', 'Ср', 'Чт'].map(d => (
-                                    <button key={d} onClick={() => setActiveBellDay(d)} className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${activeBellDay === d ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>{d === 'default' ? 'Стандартное' : d === 'Ср' ? 'Среда' : 'Четверг'}</button>
-                                ))}
+                        {/* Control Bar */}
+                        <div className="bg-white dark:bg-dark-800 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex flex-wrap items-center justify-between gap-4">
+                            <div className="flex items-center gap-2">
+                                <span className="text-sm font-bold text-slate-500 dark:text-slate-400">Режим:</span>
+                                <div className="relative">
+                                    <select 
+                                        value={selectedPresetId} 
+                                        onChange={(e) => setSelectedPresetId(e.target.value)} 
+                                        className="appearance-none bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 py-2 pl-4 pr-10 rounded-xl font-bold text-sm outline-none focus:ring-2 ring-indigo-500 cursor-pointer"
+                                    >
+                                        {(settings.bellPresets || []).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                    </select>
+                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500"><Icon name="Filter" size={14}/></div>
+                                </div>
+                                <button onClick={createNewPreset} className="p-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition" title="Создать новый режим"><Icon name="Plus" size={18}/></button>
+                                <button onClick={deletePreset} className="p-2 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/50 transition" title="Удалить режим"><Icon name="Trash2" size={18}/></button>
+                            </div>
+                            
+                            <div className="flex gap-2">
+                                <button onClick={savePreset} className="px-4 py-2 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border border-blue-100 dark:border-blue-900 rounded-xl font-bold hover:bg-blue-100 dark:hover:bg-blue-900/50 transition text-sm flex items-center gap-2">
+                                    <Icon name="Save" size={18}/> Сохранить изменения
+                                </button>
+                                <button onClick={applyPreset} className="px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition shadow-lg shadow-emerald-200 dark:shadow-none text-sm flex items-center gap-2">
+                                    <Icon name="CheckCircle" size={18}/> Применить режим
+                                </button>
+                                <button onClick={exportBellsToPng} className="px-4 py-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 rounded-xl font-bold hover:bg-slate-50 dark:hover:bg-slate-600 transition text-sm flex items-center gap-2">
+                                    <Icon name="Image" size={18}/> PNG
+                                </button>
                             </div>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            {[Shift.First, Shift.Second].map(shift => (
-                                <div key={shift} className="bg-white dark:bg-dark-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 overflow-hidden">
-                                    <div className={`p-4 font-bold text-lg text-white ${shift === Shift.First ? 'bg-indigo-600' : 'bg-purple-600'}`}>{shift}</div>
-                                    <div className="p-6 space-y-3">
-                                        {SHIFT_PERIODS[shift].map(period => {
-                                            const bell = getActiveBells(shift, period);
-                                            return (
-                                                <div key={period} className={`flex items-center gap-4 p-2 rounded-xl transition-colors ${bell.isInherited ? 'bg-slate-50/50 dark:bg-slate-800/50 opacity-60' : 'bg-slate-50 dark:bg-slate-700/50'}`}>
-                                                    <div className="w-10 h-10 rounded-lg bg-white dark:bg-slate-600 flex items-center justify-center font-black text-slate-500 dark:text-slate-300 shadow-sm">{period}</div>
-                                                    <div className="flex-1 flex items-center gap-2">
-                                                        <input type="time" className="flex-1 border-none bg-transparent font-bold text-slate-800 dark:text-white text-center focus:ring-0" value={bell.start} onChange={e => handleBellChange(shift, period, 'start', e.target.value)} />
-                                                        <span className="text-slate-300">—</span>
-                                                        <input type="time" className="flex-1 border-none bg-transparent font-bold text-slate-800 dark:text-white text-center focus:ring-0" value={bell.end} onChange={e => handleBellChange(shift, period, 'end', e.target.value)} />
+
+                        {/* Bell Editor */}
+                        <div ref={bellsPrintRef} className="bg-white p-8 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 text-slate-900">
+                             <h3 className="text-2xl font-black text-center mb-6 uppercase text-slate-800">
+                                Расписание звонков: {settings.bellPresets?.find(p=>p.id===selectedPresetId)?.name}
+                             </h3>
+                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                {[Shift.First, Shift.Second].map(shift => (
+                                    <div key={shift} className="rounded-xl overflow-hidden border border-slate-200">
+                                        <div className={`p-4 font-bold text-lg text-white text-center ${shift === Shift.First ? 'bg-indigo-600' : 'bg-purple-600'}`}>{shift}</div>
+                                        <div className="p-4 space-y-2 bg-white">
+                                            {SHIFT_PERIODS[shift].map(period => {
+                                                const bell = currentPresetBells.find(b => b.shift === shift && b.period === period && b.day === 'default') 
+                                                    || { start: '00:00', end: '00:00', cancelled: false } as Bell;
+                                                return (
+                                                    <div key={period} className={`flex items-center gap-4 p-2 rounded-lg border ${bell.cancelled ? 'bg-red-50 border-red-100' : 'bg-slate-50 border-slate-100'}`}>
+                                                        <div className="w-10 h-10 rounded bg-white flex items-center justify-center font-black text-slate-500 shadow-sm border border-slate-200">{period}</div>
+                                                        
+                                                        {bell.cancelled ? (
+                                                            <div className="flex-1 flex justify-center items-center">
+                                                                <span className="text-red-500 font-bold uppercase tracking-wider text-sm">УРОК СНЯТ</span>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex-1 flex items-center justify-center gap-2">
+                                                                <input 
+                                                                    type="time" 
+                                                                    className="border border-slate-200 rounded px-2 py-1 bg-white font-bold text-slate-800 text-center flex-1 min-w-[5rem] text-lg focus:ring-2 ring-indigo-200 outline-none" 
+                                                                    value={bell.start} 
+                                                                    onChange={e => handleBellChange(shift, period, 'start', e.target.value)} 
+                                                                />
+                                                                <span className="text-slate-400 font-bold">—</span>
+                                                                <input 
+                                                                    type="time" 
+                                                                    className="border border-slate-200 rounded px-2 py-1 bg-white font-bold text-slate-800 text-center flex-1 min-w-[5rem] text-lg focus:ring-2 ring-indigo-200 outline-none" 
+                                                                    value={bell.end} 
+                                                                    onChange={e => handleBellChange(shift, period, 'end', e.target.value)} 
+                                                                />
+                                                            </div>
+                                                        )}
+
+                                                        <button 
+                                                            onClick={() => toggleBellCancellation(shift, period)} 
+                                                            className={`w-8 h-8 rounded flex items-center justify-center transition-colors ${bell.cancelled ? 'bg-white text-emerald-500 hover:text-emerald-700' : 'text-slate-400 hover:text-red-500 hover:bg-red-50'}`}
+                                                            title={bell.cancelled ? "Вернуть урок" : "Снять урок"}
+                                                            data-html2canvas-ignore="true"
+                                                        >
+                                                            <Icon name={bell.cancelled ? "RotateCcw" : "X"} size={16} />
+                                                        </button>
                                                     </div>
-                                                </div>
-                                            );
-                                        })}
+                                                );
+                                            })}
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
+                                ))}
+                            </div>
+                            <div className="mt-8 pt-4 border-t border-slate-200 flex justify-between items-end text-sm font-bold text-slate-500">
+                                <div>УТВЕРЖДАЮ<br/>Директор гимназии</div>
+                                <div>____________</div>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -339,6 +489,24 @@ export const DirectoryPage = () => {
                     )}
 
                     <div className="flex justify-end pt-4"><button onClick={handleSave} className="px-6 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 text-sm font-bold shadow-lg shadow-indigo-200 dark:shadow-none">Сохранить</button></div>
+                </div>
+            </Modal>
+            
+            <Modal isOpen={isPresetModalOpen} onClose={() => setIsPresetModalOpen(false)} title="Новый режим звонков">
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Название режима</label>
+                        <input 
+                            className="w-full border border-slate-200 dark:border-slate-600 rounded-xl p-3 text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500" 
+                            placeholder="Например: Праздничный (30 мин)" 
+                            value={newPresetName} 
+                            onChange={e => setNewPresetName(e.target.value)} 
+                            autoFocus
+                        />
+                    </div>
+                    <div className="flex justify-end pt-2">
+                        <button onClick={confirmCreatePreset} className="px-6 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 text-sm font-bold">Создать</button>
+                    </div>
                 </div>
             </Modal>
         </div>

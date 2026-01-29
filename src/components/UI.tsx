@@ -1,9 +1,9 @@
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { Icon } from './Icons';
 import { useStaticData } from '../context/DataContext'; 
 import { DayOfWeek, Shift } from '../types';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 
 interface ModalProps {
     isOpen: boolean;
@@ -298,13 +298,13 @@ export const SearchableSelect = ({ options, value, onChange, placeholder = "Вы
                 <Icon name="Filter" size={14} className="text-slate-400" />
             </div>
             {isOpen && (
-                <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-600 rounded-xl shadow-xl max-h-60 overflow-auto">
-                    <div className="p-2 sticky top-0 bg-white dark:bg-slate-800">
+                <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-600 rounded-xl shadow-xl max-h-96 overflow-auto custom-scrollbar">
+                    <div className="p-2 sticky top-0 bg-white dark:bg-slate-800 z-10">
                         <input autoFocus value={search} onChange={e => setSearch(e.target.value)} placeholder="Поиск..." className="w-full bg-slate-100 dark:bg-slate-700 rounded-lg p-2 text-sm outline-none dark:text-white" />
                     </div>
                     {groupBy && filteredOptionsGroups ? filteredOptionsGroups.map((g) => (
                         <div key={g.id || g.label}>
-                            <div className="px-3 py-1 text-xs font-bold text-slate-400 bg-slate-50 dark:bg-slate-700/50">{g.label}</div>
+                            <div className="px-3 py-1 text-xs font-bold text-slate-400 bg-slate-50 dark:bg-slate-700/50 sticky top-10 z-0">{g.label}</div>
                             {g.options.map((opt) => (
                                 <div key={opt.value} onClick={() => { onChange(opt.value); setIsOpen(false); setSearch(""); }} className={`px-3 py-2 text-sm cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-900/30 dark:text-slate-200 ${value === opt.value ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600' : ''}`}>
                                     {opt.label}
@@ -409,6 +409,143 @@ export const BottomNavigation = ({ onMenuClick, role }: BottomNavProps) => {
                 <button onClick={onMenuClick} className="flex flex-col items-center gap-1 p-2 rounded-2xl text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 active:text-indigo-600 transition-all duration-300">
                     <Icon name="Menu" size={24} strokeWidth={2.5} />
                 </button>
+            </div>
+        </div>
+    );
+};
+
+interface CommandPaletteProps {
+    isOpen: boolean;
+    onClose: () => void;
+}
+
+export const CommandPalette = ({ isOpen, onClose }: CommandPaletteProps) => {
+    const navigate = useNavigate();
+    const { teachers, classes, subjects } = useStaticData();
+    const [query, setQuery] = useState('');
+    const [activeIndex, setActiveIndex] = useState(0);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    // Group actions
+    const filteredActions = useMemo(() => {
+        if (!isOpen) return [];
+        const q = query.toLowerCase().trim();
+        
+        const actions = [];
+        
+        // Navigation Actions
+        if (!q || 'рабочий стол'.includes(q)) actions.push({ type: 'nav', label: 'Рабочий стол', icon: 'Home', path: '/dashboard' });
+        if (!q || 'расписание'.includes(q)) actions.push({ type: 'nav', label: 'Расписание', icon: 'Calendar', path: '/schedule' });
+        if (!q || 'замены'.includes(q)) actions.push({ type: 'nav', label: 'Замены', icon: 'Repeat', path: '/substitutions' });
+        if (!q || 'администрация'.includes(q)) actions.push({ type: 'nav', label: 'Администрация', icon: 'Settings', path: '/admin' });
+
+        if (q) {
+            // Teachers
+            teachers.forEach(t => {
+                if (t.name.toLowerCase().includes(q)) {
+                    actions.push({ type: 'teacher', label: t.name, icon: 'User', id: t.id });
+                }
+            });
+            // Classes
+            classes.forEach(c => {
+                if (c.name.toLowerCase().includes(q)) {
+                    actions.push({ type: 'class', label: c.name, icon: 'GraduationCap', id: c.id });
+                }
+            });
+            // Subjects
+            subjects.forEach(s => {
+                if (s.name.toLowerCase().includes(q)) {
+                    actions.push({ type: 'subject', label: s.name, icon: 'BookOpen', id: s.id });
+                }
+            });
+        }
+        
+        return actions.slice(0, 10); // Limit results
+    }, [query, teachers, classes, subjects, isOpen]);
+
+    useEffect(() => {
+        if (isOpen) {
+            setTimeout(() => inputRef.current?.focus(), 50);
+            setQuery('');
+            setActiveIndex(0);
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = '';
+        }
+    }, [isOpen]);
+
+    useEffect(() => {
+        setActiveIndex(0);
+    }, [query]);
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setActiveIndex(prev => (prev + 1) % filteredActions.length);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setActiveIndex(prev => (prev - 1 + filteredActions.length) % filteredActions.length);
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            if (filteredActions[activeIndex]) {
+                executeAction(filteredActions[activeIndex]);
+            }
+        } else if (e.key === 'Escape') {
+            onClose();
+        }
+    };
+
+    const executeAction = (action: any) => {
+        if (action.type === 'nav') {
+            navigate(action.path);
+        } else if (action.type === 'teacher') {
+            navigate(`/schedule?view=teacher&id=${action.id}`);
+        } else if (action.type === 'class') {
+            navigate(`/schedule?view=class&id=${action.id}`);
+        } else if (action.type === 'subject') {
+            navigate(`/schedule?view=subject&id=${action.id}`);
+        }
+        onClose();
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh] px-4 bg-slate-900/60 backdrop-blur-sm transition-all" onClick={(e) => e.target === e.currentTarget && onClose()}>
+            <div className="w-full max-w-xl bg-white dark:bg-dark-800 rounded-2xl shadow-2xl overflow-hidden animate-fade-in ring-1 ring-slate-900/5">
+                <div className="flex items-center gap-3 p-4 border-b border-slate-100 dark:border-slate-700">
+                    <Icon name="Search" className="text-slate-400" size={20}/>
+                    <input 
+                        ref={inputRef}
+                        className="flex-1 bg-transparent outline-none text-lg text-slate-800 dark:text-white placeholder:text-slate-400"
+                        placeholder="Куда перейти? Или кого найти..."
+                        value={query}
+                        onChange={e => setQuery(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                    />
+                    <div className="text-xs font-bold bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 px-2 py-1 rounded-md">ESC</div>
+                </div>
+                <div className="max-h-[300px] overflow-y-auto custom-scrollbar p-2">
+                    {filteredActions.length === 0 ? (
+                        <div className="p-4 text-center text-slate-400 text-sm">Нет результатов</div>
+                    ) : (
+                        filteredActions.map((action, idx) => (
+                            <button 
+                                key={idx}
+                                onClick={() => executeAction(action)}
+                                className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition-colors ${idx === activeIndex ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}
+                            >
+                                <Icon name={action.icon} size={18} className={idx === activeIndex ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'}/>
+                                <div className="flex-1 font-medium">{action.label}</div>
+                                {action.type !== 'nav' && <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">{action.type}</span>}
+                            </button>
+                        ))
+                    )}
+                </div>
+                <div className="p-2 bg-slate-50 dark:bg-slate-700/50 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-4 text-[10px] text-slate-400 font-medium px-4">
+                    <span className="flex items-center gap-1"><span className="bg-white dark:bg-slate-600 px-1 rounded shadow-sm">↵</span> выбрать</span>
+                    <span className="flex items-center gap-1"><span className="bg-white dark:bg-slate-600 px-1 rounded shadow-sm">↑↓</span> навигация</span>
+                </div>
             </div>
         </div>
     );

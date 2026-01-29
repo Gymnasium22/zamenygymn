@@ -1,7 +1,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import { AppData, Shift, StaticAppData, ScheduleAndSubstitutionData, ScheduleItem } from '../types';
-import { INITIAL_DATA, DEFAULT_BELLS } from '../constants';
+import { AppData, Shift, StaticAppData, ScheduleAndSubstitutionData, ScheduleItem, DutyZone, DutyRecord } from '../types';
+import { INITIAL_DATA, DEFAULT_BELLS, DEFAULT_DUTY_ZONES } from '../constants';
 import { dbService } from '../services/db';
 import { useAuth } from './AuthContext';
 
@@ -85,6 +85,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                 if (!fixedData.schedule2ndHalf) fixedData.schedule2ndHalf = []; 
                 if (!fixedData.substitutions) fixedData.substitutions = [];
                 if (!fixedData.bellSchedule) fixedData.bellSchedule = DEFAULT_BELLS;
+                if (!fixedData.dutyZones || fixedData.dutyZones.length === 0) fixedData.dutyZones = DEFAULT_DUTY_ZONES;
+                if (!fixedData.dutySchedule) fixedData.dutySchedule = [];
                 
                 if (!fixedData.settings) fixedData.settings = INITIAL_DATA.settings;
                 else fixedData.settings = { ...INITIAL_DATA.settings, ...fixedData.settings };
@@ -140,11 +142,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                 console.error("Save failed:", e);
                 // Специальная обработка для исчерпания квоты
                 if (e?.code === 'resource-exhausted') {
-                    // Мы не показываем alert на каждое действие, чтобы не блокировать работу.
-                    // Данные сохранены в LocalStorage (шаг 2), поэтому пользователь может продолжать работать.
                     console.warn("Quota exceeded. Saved locally only.");
-                    
-                    // Можно показать ненавязчивое уведомление (toast), если бы был компонент
                 } else if (e?.code === 'permission-denied') {
                     alert("⚠️ Ошибка доступа. Изменения сохранены только локально.");
                 } else {
@@ -237,7 +235,8 @@ export const StaticDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         rooms: data.rooms,
         bellSchedule: data.bellSchedule,
         settings: data.settings,
-    }), [data.subjects, data.teachers, data.classes, data.rooms, data.bellSchedule, data.settings]);
+        dutyZones: data.dutyZones,
+    }), [data.subjects, data.teachers, data.classes, data.rooms, data.bellSchedule, data.settings, data.dutyZones]);
 
     const saveStaticData = useCallback(async (newData: Partial<StaticAppData>, addToHistory?: boolean) => {
         await saveData(newData, addToHistory);
@@ -279,9 +278,10 @@ export const ScheduleDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
         schedule1: data.schedule,
         schedule2: data.schedule2ndHalf || [],
         substitutions: data.substitutions,
+        dutySchedule: data.dutySchedule,
         saveSemesterSchedule,
         saveScheduleData
-    }), [activeSchedule, data.schedule, data.schedule2ndHalf, data.substitutions, saveSemesterSchedule, saveScheduleData]);
+    }), [activeSchedule, data.schedule, data.schedule2ndHalf, data.substitutions, data.dutySchedule, saveSemesterSchedule, saveScheduleData]);
 
     const contextValue = useMemo(() => ({
         ...scheduleData,

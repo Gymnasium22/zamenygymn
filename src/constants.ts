@@ -18,6 +18,59 @@ export const DEFAULT_BELLS = [
     { shift: Shift.Second, period: 6, start: "18:50", end: "19:35", day: "default" }
 ];
 
+export const SHORT_BELLS = [
+    { shift: Shift.First, period: 1, start: "08:00", end: "08:35", day: "default" },
+    { shift: Shift.First, period: 2, start: "08:45", end: "09:20", day: "default" },
+    { shift: Shift.First, period: 3, start: "09:30", end: "10:05", day: "default" },
+    { shift: Shift.First, period: 4, start: "10:15", end: "10:50", day: "default" },
+    { shift: Shift.First, period: 5, start: "11:00", end: "11:35", day: "default" },
+    { shift: Shift.First, period: 6, start: "11:45", end: "12:20", day: "default" },
+    { shift: Shift.First, period: 7, start: "12:30", end: "13:05", day: "default" },
+    { shift: Shift.Second, period: 0, start: "12:30", end: "13:05", day: "default" },
+    { shift: Shift.Second, period: 1, start: "13:15", end: "13:50", day: "default" },
+    { shift: Shift.Second, period: 2, start: "14:00", end: "14:35", day: "default" },
+    { shift: Shift.Second, period: 3, start: "14:45", end: "15:20", day: "default" },
+    { shift: Shift.Second, period: 4, start: "15:30", end: "16:05", day: "default" },
+    { shift: Shift.Second, period: 5, start: "16:15", end: "16:50", day: "default" },
+    { shift: Shift.Second, period: 6, start: "17:00", end: "17:35", day: "default" }
+];
+
+// Helper to generate room range array
+const range = (start: number, end: number) => Array.from({length: end - start + 1}, (_, i) => String(start + i));
+
+export const DEFAULT_DUTY_ZONES = [
+    { 
+        id: 'zone_2floor_1', 
+        name: '2 этаж (28-38)', 
+        includedRooms: range(28, 38),
+        order: 1
+    },
+    { 
+        id: 'zone_2floor_2', 
+        name: '2 этаж (42-44)', 
+        includedRooms: range(42, 44),
+        order: 2
+    },
+    { 
+        id: 'zone_3floor_1', 
+        name: '3 этаж (65-70)', 
+        includedRooms: range(65, 70),
+        order: 3
+    },
+    { 
+        id: 'zone_3floor_2', 
+        name: '3 этаж (72-75)', 
+        includedRooms: range(72, 75),
+        order: 4
+    },
+    { 
+        id: 'zone_3floor_3', 
+        name: '3 этаж (78-86)', 
+        includedRooms: range(78, 86),
+        order: 5
+    }
+];
+
 export const INITIAL_DATA: AppData = {
     subjects: [
         { id: 's1', name: 'Математика', color: '#e0e7ff', difficulty: 11, requiredRoomType: 'Обычный' },
@@ -35,9 +88,15 @@ export const INITIAL_DATA: AppData = {
     schedule2ndHalf: [], // 2 полугодие
     substitutions: [],
     bellSchedule: DEFAULT_BELLS,
+    dutyZones: DEFAULT_DUTY_ZONES,
+    dutySchedule: [],
     settings: {
         telegramToken: '',
         publicScheduleId: null,
-        feedbackChatId: ''
+        feedbackChatId: '',
+        bellPresets: [
+            { id: 'preset_normal', name: 'Обычный (45 мин)', bells: DEFAULT_BELLS },
+            { id: 'preset_short', name: 'Сокращенный (35 мин)', bells: SHORT_BELLS }
+        ]
     }
 };

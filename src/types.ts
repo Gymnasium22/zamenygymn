@@ -83,10 +83,34 @@ export interface Bell {
   day: string; // 'default' or DayOfWeek
 }
 
+export interface BellPreset {
+    id: string;
+    name: string;
+    bells: Bell[];
+}
+
 export interface Settings {
   telegramToken: string;
   publicScheduleId?: string | null; // ID for publicly published schedule
   feedbackChatId?: string;
+  bellPresets?: BellPreset[];
+}
+
+// --- NEW DUTY TYPES ---
+export interface DutyZone {
+    id: string;
+    name: string;
+    description?: string;
+    includedRooms: string[]; // Array of room names/numbers as strings
+    order?: number;
+}
+
+export interface DutyRecord {
+    id: string;
+    day: string; // DayOfWeek
+    shift: string; // Shift enum (Added for 2 shifts support)
+    zoneId: string;
+    teacherId: string;
 }
 
 // Interfaces for split contexts
@@ -97,6 +121,7 @@ export interface StaticAppData {
   rooms: Room[];
   bellSchedule: Bell[];
   settings: Settings;
+  dutyZones: DutyZone[]; // New
 }
 
 export interface ScheduleAndSubstitutionData {
@@ -104,6 +129,7 @@ export interface ScheduleAndSubstitutionData {
   schedule1: ScheduleItem[]; // Явное 1 полугодие
   schedule2: ScheduleItem[]; // Явное 2 полугодие
   substitutions: Substitution[];
+  dutySchedule: DutyRecord[]; // New
   saveSemesterSchedule: (semester: 1 | 2, newData: ScheduleItem[]) => Promise<void>;
   saveScheduleData: (newData: Partial<ScheduleAndSubstitutionData>, addToHistory?: boolean) => Promise<void>; // Legacy support
 }
@@ -112,6 +138,7 @@ export interface AppData extends StaticAppData {
     schedule: ScheduleItem[]; // 1 полугодие
     schedule2ndHalf: ScheduleItem[]; // 2 полугодие
     substitutions: Substitution[];
+    dutySchedule: DutyRecord[]; // New
 }
 
 export const DAYS = [DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday];

@@ -23,7 +23,9 @@ const COLLECTIONS = {
     SCHEDULE_2: 'schedule_sem2',
     SUBSTITUTIONS: 'substitutions',
     CONFIG: 'config', 
-    PUBLIC: 'publicSchedules'
+    PUBLIC: 'publicSchedules',
+    DUTY_ZONES: 'duty_zones',
+    DUTY_SCHEDULE: 'duty_schedule'
 };
 
 const chunkArray = <T>(array: T[], size: number): T[][] => {
@@ -127,6 +129,9 @@ export const dbService = {
         
         if (data.substitutions) promises.push(dbService.syncCollection(COLLECTIONS.SUBSTITUTIONS, data.substitutions));
 
+        if (data.dutyZones) promises.push(dbService.syncCollection(COLLECTIONS.DUTY_ZONES, data.dutyZones));
+        if (data.dutySchedule) promises.push(dbService.syncCollection(COLLECTIONS.DUTY_SCHEDULE, data.dutySchedule));
+
         if (data.settings) {
             promises.push(setDoc(doc(firestoreDB, COLLECTIONS.CONFIG, 'settings'), sanitizeForFirestore(data.settings)));
         }
@@ -182,6 +187,8 @@ export const dbService = {
         unsubs.push(subColl(COLLECTIONS.SCHEDULE_1, 'schedule'));
         unsubs.push(subColl(COLLECTIONS.SCHEDULE_2, 'schedule2ndHalf'));
         unsubs.push(subColl(COLLECTIONS.SUBSTITUTIONS, 'substitutions'));
+        unsubs.push(subColl(COLLECTIONS.DUTY_ZONES, 'dutyZones'));
+        unsubs.push(subColl(COLLECTIONS.DUTY_SCHEDULE, 'dutySchedule'));
 
         unsubs.push(onSnapshot(doc(firestoreDB, COLLECTIONS.CONFIG, 'settings'), (doc) => {
             if (doc.exists()) {
@@ -239,7 +246,10 @@ export const dbService = {
             settings: { 
                 telegramToken: '', 
                 publicScheduleId: data.settings.publicScheduleId
-            }
+            },
+            // Duty Schedule is usually public too
+            dutyZones: data.dutyZones,
+            dutySchedule: data.dutySchedule
         };
         // sanitize here too just in case
         const cleanData = sanitizeForFirestore(publicDataSubset);
