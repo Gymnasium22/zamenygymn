@@ -11,8 +11,8 @@ import { QRCodeSVG } from 'qrcode.react';
 import { Modal } from '../components/UI';
 
 export const ExportPage = () => {
-    const { subjects, teachers, classes, rooms, settings, bellSchedule, saveStaticData } = useStaticData();
-    const { schedule1, schedule2, substitutions, saveScheduleData } = useScheduleData();
+    const { subjects, teachers, classes, rooms, settings, bellSchedule, saveStaticData, dutyZones } = useStaticData();
+    const { schedule1, schedule2, substitutions, saveScheduleData, dutySchedule } = useScheduleData();
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const printRef1 = useRef<HTMLDivElement>(null);
@@ -39,9 +39,9 @@ export const ExportPage = () => {
         schedule: schedule1,
         schedule2ndHalf: schedule2,
         substitutions,
-        dutyZones: [],
-        dutySchedule: []
-    }), [subjects, teachers, classes, rooms, settings, bellSchedule, schedule1, schedule2, substitutions]);
+        dutyZones,
+        dutySchedule
+    }), [subjects, teachers, classes, rooms, settings, bellSchedule, schedule1, schedule2, substitutions, dutyZones, dutySchedule]);
 
     // Получаем расписание для экспорта (Excel, Матрица) на основе селектора
     const getScheduleForExport = () => exportSemester === 2 ? schedule2 : schedule1;

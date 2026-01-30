@@ -81,6 +81,7 @@ export interface Bell {
   start: string;
   end: string;
   day: string; // 'default' or DayOfWeek
+  cancelled?: boolean; // New field
 }
 
 export interface BellPreset {
@@ -103,6 +104,7 @@ export interface DutyZone {
     description?: string;
     includedRooms: string[]; // Array of room names/numbers as strings
     order?: number;
+    floor?: string; // Added optional floor property
 }
 
 export interface DutyRecord {

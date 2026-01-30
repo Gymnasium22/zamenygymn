@@ -1,6 +1,6 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import { AppData, Shift, StaticAppData, ScheduleAndSubstitutionData, ScheduleItem, DutyZone, DutyRecord } from '../types';
+import { AppData, Shift, StaticAppData, ScheduleAndSubstitutionData, ScheduleItem } from '../types';
 import { INITIAL_DATA, DEFAULT_BELLS, DEFAULT_DUTY_ZONES } from '../constants';
 import { dbService } from '../services/db';
 import { useAuth } from './AuthContext';

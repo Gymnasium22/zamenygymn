@@ -1,22 +1,20 @@
 
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { useStaticData, useScheduleData } from '../context/DataContext';
 import { Icon } from '../components/Icons';
 import { Modal, SearchableSelect } from '../components/UI';
-import { DAYS, DayOfWeek, DutyZone, Shift } from '../types';
+import { DAYS, Shift, DutyZone } from '../types';
 import html2canvas from 'html2canvas';
 
 export const DutyPage = () => {
     const { teachers, dutyZones, rooms, saveStaticData } = useStaticData();
-    const { dutySchedule, schedule1, schedule2, saveScheduleData } = useScheduleData();
+    const { dutySchedule, saveScheduleData, schedule1, schedule2 } = useScheduleData();
     
-    // Choose semester for logic (defaults to current)
     const [semester, setSemester] = useState<1 | 2>(() => {
         const month = new Date().getMonth();
         return (month >= 0 && month <= 4) ? 2 : 1;
     });
 
-    // Add Shift State
     const [selectedShift, setSelectedShift] = useState<Shift>(Shift.First);
 
     const activeSchedule = semester === 1 ? schedule1 : schedule2;
@@ -27,20 +25,32 @@ export const DutyPage = () => {
     const [isZoneModalOpen, setIsZoneModalOpen] = useState(false);
     const [selectedCell, setSelectedCell] = useState<{ zoneId: string, day: string } | null>(null);
     const [editingZone, setEditingZone] = useState<Partial<DutyZone>>({});
-    
-    // Local state for room string input to allow typing commas freely
     const [zoneStringInput, setZoneStringInput] = useState("");
-
-    // Filter teacher for modal
     const [selectedTeacherId, setSelectedTeacherId] = useState<string | null>(null);
 
     // --- LOGIC ---
 
+    const getTeacher = (zoneId: string, day: string, shift: string) => {
+        const record = dutySchedule.find(d => d.zoneId === zoneId && d.day === day && d.shift === shift);
+        if (!record) return null;
+        return teachers.find(t => t.id === record.teacherId);
+    };
+
+    const getConflict = (zoneId: string, day: string, shift: string, teacherId?: string) => {
+        if (!teacherId) return false;
+        const conflict = dutySchedule.find(d => 
+            d.teacherId === teacherId && 
+            d.day === day && 
+            d.shift === shift && 
+            d.zoneId !== zoneId
+        );
+        return !!conflict;
+    };
+
     const handleCellClick = (zoneId: string, day: string) => {
         setSelectedCell({ zoneId, day });
-        // Pre-select current teacher if any (Filtering by shift!)
-        const current = dutySchedule.find(d => d.zoneId === zoneId && d.day === day && d.shift === selectedShift);
-        setSelectedTeacherId(current?.teacherId || null);
+        const current = getTeacher(zoneId, day, selectedShift);
+        setSelectedTeacherId(current?.id || null);
         setIsModalOpen(true);
     };
 
@@ -48,7 +58,6 @@ export const DutyPage = () => {
         if (!selectedCell) return;
         
         let newSchedule = [...dutySchedule];
-        // Remove existing for this cell AND Shift
         newSchedule = newSchedule.filter(d => !(d.zoneId === selectedCell.zoneId && d.day === selectedCell.day && d.shift === selectedShift));
         
         if (selectedTeacherId) {
@@ -68,25 +77,17 @@ export const DutyPage = () => {
 
     const handleRemoveDuty = async () => {
         if (!selectedCell) return;
-        
         let newSchedule = [...dutySchedule];
-        // Remove existing for this cell AND Shift
         newSchedule = newSchedule.filter(d => !(d.zoneId === selectedCell.zoneId && d.day === selectedCell.day && d.shift === selectedShift));
-        
         await saveScheduleData({ dutySchedule: newSchedule });
         setIsModalOpen(false);
         setSelectedTeacherId(null);
     };
 
-    // Helper to check if room number is in range/list
     const isRoomInZone = (roomName: string, zone: DutyZone) => {
         if (!roomName || !zone.includedRooms) return false;
-        // Normalize room name (remove non-digits if mostly numeric)
         const num = parseInt(roomName.replace(/\D/g, ''));
-        if (!isNaN(num)) {
-            // Check if includedRooms contains this number (assuming zone.includedRooms are strings of numbers)
-            return zone.includedRooms.includes(String(num));
-        }
+        if (!isNaN(num)) return zone.includedRooms.includes(String(num));
         return zone.includedRooms.includes(roomName);
     };
 
@@ -101,43 +102,33 @@ export const DutyPage = () => {
 
         for (const day of DAYS) {
             for (const shift of shifts) {
-                // 1. Find candidates: Teachers active in THIS shift on THIS day
                 const candidates = teachers.filter(t => {
                     const lessonsCount = activeSchedule.filter(s => s.teacherId === t.id && s.day === day && s.shift === shift).length;
                     return lessonsCount >= 1; 
                 });
 
                 for (const zone of dutyZones) {
-                    // Score candidates for this zone
                     const scoredCandidates = candidates.map(t => {
                         let score = 0;
-                        
-                        // Already used today? Big penalty
                         if (usedTeachersPerDay[day].has(t.id)) score -= 2000;
 
-                        // Check lessons in this specific zone for this shift
                         const lessonsInZone = activeSchedule.filter(s => 
                             s.teacherId === t.id && 
                             s.day === day && 
-                            s.shift === shift &&
+                            s.shift === shift && 
                             s.roomId && 
                             isRoomInZone(rooms.find(r => r.id === s.roomId)?.name || s.roomId, zone)
                         ).length;
                         
-                        // Rule: Teacher MUST have lessons in this zone to be assigned
-                        if (lessonsInZone === 0) {
-                            return { teacher: t, score: -9999 }; // Disqualified
-                        }
+                        if (lessonsInZone === 0) return { teacher: t, score: -9999 };
                         
                         score += lessonsInZone * 10;
-                        
                         const totalLessons = activeSchedule.filter(s => s.teacherId === t.id && s.day === day && s.shift === shift).length;
                         if (totalLessons >= 4) score += 5;
 
                         return { teacher: t, score };
                     });
 
-                    // Sort by score desc
                     scoredCandidates.sort((a, b) => b.score - a.score);
 
                     const best = scoredCandidates[0];
@@ -154,7 +145,6 @@ export const DutyPage = () => {
                 }
             }
         }
-
         await saveScheduleData({ dutySchedule: newSchedule });
     };
 
@@ -166,23 +156,130 @@ export const DutyPage = () => {
 
     const exportToPng = async () => {
         if (!printRef.current) return;
-        const canvas = await html2canvas(printRef.current, { scale: 2, backgroundColor: '#ffffff' });
+        const canvas = await html2canvas(printRef.current, { 
+            scale: 2, 
+            backgroundColor: '#ffffff',
+            useCORS: true,
+            logging: false
+        });
         const link = document.createElement('a');
         link.href = canvas.toDataURL('image/png');
-        link.download = `Duty_Schedule_${semester}_sem_${selectedShift}.png`;
+        link.download = `Duty_Schedule_${semester}_sem.png`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
     };
 
-    // --- Zone Management ---
+    const exportToExcel = () => {
+        // Build the Excel HTML manually for maximum formatting control in spreadsheet applications
+        const zonesCount = allZonesSorted.length;
+        const totalColspan = zonesCount + 1;
+
+        let html = `
+            <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+            <head><meta charset="UTF-8">
+            <style>
+                table { border-collapse: collapse; width: 100%; font-family: 'Times New Roman', serif; }
+                td, th { border: 1px solid #000; padding: 6px; vertical-align: middle; text-align: center; font-size: 11pt; }
+                .title-row td { border: none !important; font-weight: bold; text-align: center; }
+                .title-main { font-size: 14pt; text-transform: uppercase; }
+                .title-sub { font-size: 12pt; }
+                .approval-cell { text-align: left; border: none !important; font-size: 11pt; line-height: 1.2; }
+                .header-cell { background-color: #F3F4F6; font-weight: bold; border: 2px solid #000; }
+                .floor-cell { background-color: #E5E7EB; font-weight: bold; text-transform: uppercase; font-size: 10pt; border: 2px solid #000; }
+                .shift-header { font-size: 13pt; font-weight: bold; text-decoration: underline; border: none !important; text-align: center; padding: 20px 0 10px 0; }
+                .day-label { font-weight: bold; background-color: #FAFAFA; text-align: left; border: 2px solid #000; }
+                .footer-cell { border: none !important; font-weight: bold; text-align: left; padding-top: 30px; font-size: 11pt; }
+                .empty-spacer { border: none !important; height: 15px; }
+            </style>
+            </head>
+            <body>
+        `;
+
+        // 1. Approval block (top right)
+        html += `
+            <table>
+                <tr>
+                    <td colspan="${Math.max(1, totalColspan - 3)}" style="border:none"></td>
+                    <td colspan="3" class="approval-cell">
+                        <b>УТВЕРЖДАЮ</b><br>
+                        Директор государственного<br>
+                        учреждения образования<br>
+                        «Гимназия № 22 г. Минска»<br><br>
+                        ____________________ Н.В.Кисель<br>
+                        "____" __________ 2025г.
+                    </td>
+                </tr>
+                <tr class="empty-spacer"><td colspan="${totalColspan}" style="border:none"></td></tr>
+                <tr class="title-row"><td colspan="${totalColspan}" class="title-main">ГРАФИК ДЕЖУРСТВА</td></tr>
+                <tr class="title-row"><td colspan="${totalColspan}" class="title-sub">учителей по государственному учреждению образования «Гимназия № 22 г. Минска»</td></tr>
+                <tr class="title-row"><td colspan="${totalColspan}" class="title-sub">на ${semester}-е полугодие ${new Date().getFullYear()}/${new Date().getFullYear()+1} учебного года</td></tr>
+                <tr class="empty-spacer"><td colspan="${totalColspan}" style="border:none"></td></tr>
+            </table>
+        `;
+
+        // 2. Generate tables for each shift
+        [Shift.First, Shift.Second].forEach(shift => {
+            html += `<table>`;
+            // Shift Title
+            html += `<tr><td colspan="${totalColspan}" class="shift-header">${shift.toUpperCase()}</td></tr>`;
+            
+            // Table Header - Floor Groups
+            html += `<tr>`;
+            html += `<th rowspan="2" class="header-cell" style="width: 120px;">День недели</th>`;
+            zonesByFloor.forEach(group => {
+                html += `<th colspan="${group.zones.length}" class="floor-cell">${group.floor}</th>`;
+            });
+            html += `</tr>`;
+
+            // Table Header - Zone Names
+            html += `<tr>`;
+            allZonesSorted.forEach(zone => {
+                html += `<th class="header-cell" style="width: 150px;">${zone.name}</th>`;
+            });
+            html += `</tr>`;
+
+            // Data rows for each day
+            DAYS.forEach(day => {
+                html += `<tr>`;
+                html += `<td class="day-label">${day}</td>`;
+                allZonesSorted.forEach(zone => {
+                    const teacher = getTeacher(zone.id, day, shift);
+                    html += `<td>${teacher ? teacher.name : '-'}</td>`;
+                });
+                html += `</tr>`;
+            });
+            html += `</table><br>`;
+        });
+
+        // 3. Footer Block
+        html += `
+            <table>
+                <tr class="empty-spacer"><td colspan="${totalColspan}" style="border:none"></td></tr>
+                <tr>
+                    <td colspan="${Math.floor(totalColspan/2)}" class="footer-cell">Секретарь учебной части гимназии №22 г.Минска</td>
+                    <td colspan="${Math.ceil(totalColspan/4)}" style="border-bottom: 1px solid #000; border-top:none; border-left:none; border-right:none;"></td>
+                    <td colspan="${Math.ceil(totalColspan/4)}" class="footer-cell" style="text-align: right;">Е.К.Шунто</td>
+                </tr>
+            </table>
+        `;
+
+        html += `</body></html>`;
+        
+        const blob = new Blob([html], { type: "application/vnd.ms-excel" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `График_дежурств_${semester}_полугодие.xls`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     const handleZoneSave = async () => {
         if (!editingZone.name) return;
-        
-        // Parse the comma-separated string back to array
         const roomsArray = zoneStringInput.split(',').map(s => s.trim()).filter(Boolean);
         const zoneToSave = { ...editingZone, includedRooms: roomsArray };
-
         let newZones = [...dutyZones];
         if (editingZone.id) {
             newZones = newZones.map(z => z.id === editingZone.id ? { ...z, ...zoneToSave } as DutyZone : z);
@@ -210,13 +307,6 @@ export const DutyPage = () => {
         setIsZoneModalOpen(true);
     };
 
-    // --- Render Helpers ---
-    const getTeacherForCell = (zoneId: string, day: string) => {
-        const record = dutySchedule.find(d => d.zoneId === zoneId && d.day === day && d.shift === selectedShift);
-        if (!record) return null;
-        return teachers.find(t => t.id === record.teacherId);
-    };
-
     const getRecommendations = () => {
         if (!selectedCell) return { recommended: [], others: [] };
         
@@ -225,10 +315,8 @@ export const DutyPage = () => {
         
         const candidates = teachers.map(t => {
             const lessonsCount = activeSchedule.filter(s => s.teacherId === t.id && s.day === day && s.shift === selectedShift).length;
-            // Check busy in THIS shift
             const isBusy = dutySchedule.some(d => d.day === day && d.teacherId === t.id && d.zoneId !== selectedCell.zoneId && d.shift === selectedShift);
             
-            // Check if teacher fits zone
              const lessonsInZone = zone && zone.includedRooms ? activeSchedule.filter(s => 
                 s.teacherId === t.id && 
                 s.day === day && 
@@ -254,10 +342,27 @@ export const DutyPage = () => {
 
     const { recommended, others } = getRecommendations();
 
+    const zonesByFloor = useMemo(() => {
+        const grouped: Record<string, DutyZone[]> = {};
+        dutyZones.forEach(z => {
+            const floor = z.floor || 'Без этажа';
+            if (!grouped[floor]) grouped[floor] = [];
+            grouped[floor].push(z);
+        });
+        const sortedFloors = Object.keys(grouped).sort();
+        return sortedFloors.map(floor => ({
+            floor,
+            zones: grouped[floor].sort((a,b) => (a.order || 0) - (b.order || 0))
+        }));
+    }, [dutyZones]);
+
+    const allZonesSorted = useMemo(() => {
+        return zonesByFloor.flatMap(g => g.zones);
+    }, [zonesByFloor]);
 
     return (
         <div className="max-w-7xl mx-auto w-full pb-20">
-            <div className="bg-white dark:bg-dark-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 mb-6">
+            <div className="bg-white dark:bg-dark-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 mb-6 no-print">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
                     <div>
                         <h1 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
@@ -295,13 +400,16 @@ export const DutyPage = () => {
                         <button onClick={exportToPng} className="px-4 py-2 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900 rounded-xl font-bold hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition text-sm flex items-center gap-2">
                             <Icon name="Image" size={16}/> PNG
                         </button>
+                        <button onClick={exportToExcel} className="px-4 py-2 bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400 border border-green-100 dark:border-green-900 rounded-xl font-bold hover:bg-green-100 dark:hover:bg-green-900/50 transition text-sm flex items-center gap-2">
+                            <Icon name="FileSpreadsheet" size={16}/> Excel
+                        </button>
                     </div>
                 </div>
 
                 <div className="mb-4 flex gap-2 overflow-x-auto custom-scrollbar pb-2">
                     {dutyZones.map(z => (
                         <div key={z.id} className="flex items-center gap-2 bg-slate-50 dark:bg-slate-700 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 shrink-0">
-                            <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{z.name}</span>
+                            <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{z.name} <span className="text-slate-400 text-xs">({z.floor || '?'})</span></span>
                             <button onClick={() => openZoneModal(z)} className="text-slate-400 hover:text-indigo-600"><Icon name="Edit2" size={12}/></button>
                         </div>
                     ))}
@@ -309,107 +417,132 @@ export const DutyPage = () => {
                         <Icon name="Plus" size={14}/> Зона
                     </button>
                 </div>
-            </div>
 
-            <div className="overflow-auto custom-scrollbar bg-slate-100 dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-700">
-                <div ref={printRef} className="bg-white p-8 min-w-[1000px] shadow-xl text-slate-900">
-                    
-                    {/* Official Approval Header */}
-                    <div className="flex justify-end mb-8">
-                        <div className="w-[320px] text-center text-sm font-bold text-slate-900 leading-relaxed">
-                            <div className="uppercase mb-1">УТВЕРЖДАЮ</div>
-                            <div className="mb-4">Директор ГУО "Гимназия №22 г.Минска"</div>
-                            <div className="flex items-end justify-between gap-2 mb-1">
-                                <div className="border-b border-slate-900 w-full mb-1"></div>
-                                <div className="whitespace-nowrap">Н.В.Кисель</div>
-                            </div>
-                            <div className="text-right">"___" ____________ {new Date().getFullYear()}г.</div>
-                        </div>
-                    </div>
-
-                    <div className="text-center mb-6">
-                        <h2 className="text-2xl font-black uppercase tracking-tight text-slate-800">График дежурства учителей</h2>
-                        <h3 className="text-lg font-bold text-slate-500 uppercase">{selectedShift}</h3>
-                    </div>
-                    
-                    <table className="w-full border-collapse border-2 border-slate-800">
+                <div className="overflow-x-auto custom-scrollbar border border-slate-200 dark:border-slate-700 rounded-xl">
+                    <table className="w-full border-collapse">
                         <thead>
-                            <tr>
-                                <th className="border-2 border-slate-800 p-3 bg-slate-100 w-64 text-left">Зона / Пост</th>
+                            <tr className="bg-slate-50 dark:bg-slate-700/50">
+                                <th className="p-3 text-left text-sm font-bold text-slate-500 dark:text-slate-400 w-64 border-b border-r border-slate-200 dark:border-slate-700">Зона / День</th>
                                 {DAYS.map(day => (
-                                    <th key={day} className="border-2 border-slate-800 p-3 bg-slate-100">{day}</th>
+                                    <th key={day} className="p-3 text-center text-sm font-bold text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700 min-w-[120px]">{day}</th>
                                 ))}
                             </tr>
                         </thead>
                         <tbody>
                             {dutyZones.map(zone => (
-                                <tr key={zone.id}>
-                                    <td className="border-2 border-slate-800 p-3 font-bold bg-slate-50 align-top">
-                                        <div className="text-base">{zone.name}</div>
-                                        <div className="text-xs font-normal text-slate-500 mt-1">
-                                            Каб: {zone.includedRooms?.join(', ')}
-                                        </div>
+                                <tr key={zone.id} className="border-b border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
+                                    <td className="p-3 border-r border-slate-200 dark:border-slate-700 font-bold text-slate-800 dark:text-slate-200">
+                                        <div>{zone.name}</div>
+                                        <div className="text-[10px] text-indigo-500 font-medium">{zone.floor}</div>
+                                        <div className="text-xs font-normal text-slate-400 mt-1">{zone.includedRooms?.join(', ')}</div>
                                     </td>
                                     {DAYS.map(day => {
-                                        const teacher = getTeacherForCell(zone.id, day);
-                                        const is2ndFloor = zone.name.toLowerCase().includes('2 этаж');
-                                        const is3rdFloor = zone.name.toLowerCase().includes('3 этаж');
-                                        const cellBg = teacher 
-                                            ? (is2ndFloor ? 'bg-emerald-50' : is3rdFloor ? 'bg-blue-50' : 'bg-white') 
-                                            : 'bg-white';
-                                        
-                                        // Warning if teacher is "far away" (has lesson but not in zone)
-                                        let hasWarning = false;
-                                        if (teacher) {
-                                            const lessons = activeSchedule.filter(s => 
-                                                s.teacherId === teacher.id && 
-                                                s.day === day && 
-                                                s.shift === selectedShift
-                                            );
-                                            
-                                            // Check if ANY lesson is in the zone range
-                                            const matchesZone = lessons.some(s => {
-                                                const roomName = rooms.find(r => r.id === s.roomId)?.name || s.roomId || '';
-                                                return isRoomInZone(roomName, zone);
-                                            });
-                                            
-                                            if (!matchesZone && lessons.length > 0) hasWarning = true;
-                                        }
-
+                                        const teacher = getTeacher(zone.id, day, selectedShift);
+                                        const hasConflict = teacher ? getConflict(zone.id, day, selectedShift, teacher.id) : false;
                                         return (
                                             <td 
                                                 key={`${zone.id}-${day}`} 
                                                 onClick={() => handleCellClick(zone.id, day)}
-                                                className={`border-2 border-slate-800 p-2 text-center cursor-pointer hover:bg-slate-100 transition-colors align-middle relative group ${cellBg}`}
+                                                className={`p-2 text-center border-l border-slate-100 dark:border-slate-700 cursor-pointer ${teacher ? (hasConflict ? 'bg-red-100 dark:bg-red-900/30' : 'bg-indigo-50/50 dark:bg-indigo-900/10') : ''} hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-colors relative group`}
                                             >
                                                 {teacher ? (
-                                                    <div className="flex flex-col items-center justify-center h-full">
-                                                        <div className="font-bold text-sm text-slate-900 leading-tight">{teacher.name}</div>
-                                                        {hasWarning && (
-                                                            <div className="text-[9px] text-red-600 font-bold mt-1 bg-red-100 px-1 rounded flex items-center gap-0.5 no-print" title="Учитель не ведет уроки в этой зоне в эту смену">
-                                                                <Icon name="AlertTriangle" size={10} /> Далеко
-                                                            </div>
-                                                        )}
+                                                    <div className={`font-bold text-sm ${hasConflict ? 'text-red-600 dark:text-red-400' : 'text-indigo-700 dark:text-indigo-400'}`}>
+                                                        {teacher.name}
+                                                        {hasConflict && <div className="text-[9px] uppercase">Конфликт</div>}
                                                     </div>
                                                 ) : (
-                                                    <div className="text-slate-200 text-xl font-bold opacity-0 group-hover:opacity-100 transition-opacity">+</div>
+                                                    <div className="text-slate-300 dark:text-slate-600 text-lg opacity-0 group-hover:opacity-100">+</div>
                                                 )}
                                             </td>
-                                        );
+                                        )
                                     })}
                                 </tr>
                             ))}
                         </tbody>
                     </table>
-                    
-                    <div className="mt-8 pt-4 flex justify-between items-end text-sm font-bold text-slate-600">
-                        <div>Зам. директора по УР</div>
-                        <div>____________</div>
+                </div>
+            </div>
+
+            <div className="mt-8 bg-slate-100 dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-700">
+                <h3 className="font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest text-xs mb-4 flex items-center gap-2">
+                    <Icon name="Image" size={16}/> Предпросмотр документа
+                </h3>
+                <div className="overflow-auto custom-scrollbar">
+                    <div ref={printRef} id="print-content-root" className="bg-white p-12 min-w-[1200px] text-black font-serif shadow-lg">
+                        
+                        <div className="flex justify-end items-start mb-8 text-sm leading-snug">
+                            <div className="w-[350px]" contentEditable suppressContentEditableWarning>
+                                <div className="font-bold mb-1">УТВЕРЖДАЮ</div>
+                                <div>Директор государственного</div>
+                                <div>учреждения образования</div>
+                                <div>«Гимназия № 22 г. Минска»</div>
+                                <div className="mt-8 flex items-end">
+                                    <div className="border-b border-black flex-grow h-4"></div>
+                                    <div className="ml-2 whitespace-nowrap">Н.В.Кисель</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="text-center mb-6" contentEditable suppressContentEditableWarning>
+                            <h1 className="text-xl font-bold uppercase">График дежурства</h1>
+                            <h2 className="text-lg">учителей по государственному учреждению образования «Гимназия № 22 г. Минска»</h2>
+                            <h3 className="text-lg font-bold mt-1">на {semester}-е полугодие {new Date().getFullYear()}/{new Date().getFullYear()+1} учебного года</h3>
+                        </div>
+
+                        {[Shift.First, Shift.Second].map((shift, idx) => (
+                            <div key={shift} className="mb-8">
+                                <div className="text-center font-bold text-lg mb-2 underline" contentEditable suppressContentEditableWarning>{shift}</div>
+                                <table className="w-full border-collapse border border-black text-sm text-center">
+                                    <thead>
+                                        <tr>
+                                            <th rowSpan={2} className="border border-black p-1 bg-gray-100 w-32 font-bold align-middle" contentEditable suppressContentEditableWarning>День недели</th>
+                                            {zonesByFloor.map(group => (
+                                                <th key={group.floor} colSpan={group.zones.length} className="border border-black p-1 bg-gray-200 font-bold uppercase text-xs align-middle" contentEditable suppressContentEditableWarning>
+                                                    {group.floor}
+                                                </th>
+                                            ))}
+                                        </tr>
+                                        <tr>
+                                            {allZonesSorted.map(zone => (
+                                                <th key={zone.id} className="border border-black p-1 bg-gray-100 font-bold align-middle" contentEditable suppressContentEditableWarning>
+                                                    {zone.name}
+                                                </th>
+                                            ))}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {DAYS.map(day => (
+                                            <tr key={day}>
+                                                <th className="border border-black p-2 font-bold bg-gray-50 text-left align-middle" contentEditable suppressContentEditableWarning>{day}</th>
+                                                {allZonesSorted.map(zone => {
+                                                    const teacher = getTeacher(zone.id, day, shift);
+                                                    return (
+                                                        <td 
+                                                            key={zone.id} 
+                                                            className="border border-black p-1 h-12 align-middle text-center" 
+                                                            contentEditable 
+                                                            suppressContentEditableWarning
+                                                        >
+                                                            {teacher ? teacher.name : '-'}
+                                                        </td>
+                                                    );
+                                                })}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ))}
+                        
+                        <div className="mt-8 flex items-end justify-between text-sm font-bold" contentEditable suppressContentEditableWarning>
+                            <div>Секретарь учебной части гимназии №22 г.Минска</div>
+                            <div className="border-b border-black flex-grow mx-4 mb-1"></div>
+                            <div>Е.К.Шунто</div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            {/* Modal for Selecting Teacher */}
             <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Назначить дежурного" maxWidth="max-w-2xl">
                 <div className="space-y-6 min-h-[550px] flex flex-col">
                     {selectedCell && (
@@ -444,18 +577,30 @@ export const DutyPage = () => {
                 </div>
             </Modal>
 
-            {/* Modal for Zone Editing */}
             <Modal isOpen={isZoneModalOpen} onClose={() => setIsZoneModalOpen(false)} title={editingZone.id ? 'Редактировать зону' : 'Добавить зону'}>
                 <div className="space-y-4">
-                    <input 
-                        className="w-full border border-slate-200 dark:border-slate-600 rounded-xl p-3 text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500" 
-                        placeholder="Название (напр. 2 этаж левое крыло)" 
-                        value={editingZone.name || ''} 
-                        onChange={e => setEditingZone({...editingZone, name: e.target.value})} 
-                    />
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Название зоны</label>
+                        <input 
+                            className="w-full border border-slate-200 dark:border-slate-600 rounded-xl p-3 text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500" 
+                            placeholder="Название (напр. Левое крыло)" 
+                            value={editingZone.name || ''} 
+                            onChange={e => setEditingZone({...editingZone, name: e.target.value})} 
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Этаж</label>
+                        <input 
+                            className="w-full border border-slate-200 dark:border-slate-600 rounded-xl p-3 text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500" 
+                            placeholder="Напр. 2 этаж" 
+                            value={editingZone.floor || ''} 
+                            onChange={e => setEditingZone({...editingZone, floor: e.target.value})} 
+                        />
+                    </div>
                     
                     <div>
-                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Кабинеты (через запятую)</label>
+                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Кабинеты (для автозаполнения)</label>
                         <input 
                             className="w-full border border-slate-200 dark:border-slate-600 rounded-xl p-3 text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500" 
                             placeholder="28, 29, 30..." 

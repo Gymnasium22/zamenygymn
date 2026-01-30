@@ -41,31 +41,36 @@ const range = (start: number, end: number) => Array.from({length: end - start + 
 export const DEFAULT_DUTY_ZONES = [
     { 
         id: 'zone_2floor_1', 
-        name: '2 этаж (28-38)', 
+        name: 'Левое крыло (28-38)',
+        floor: '2 этаж',
         includedRooms: range(28, 38),
         order: 1
     },
     { 
         id: 'zone_2floor_2', 
-        name: '2 этаж (42-44)', 
+        name: 'Правое крыло (42-44)',
+        floor: '2 этаж',
         includedRooms: range(42, 44),
         order: 2
     },
     { 
         id: 'zone_3floor_1', 
-        name: '3 этаж (65-70)', 
+        name: 'Центр (65-70)',
+        floor: '3 этаж',
         includedRooms: range(65, 70),
         order: 3
     },
     { 
         id: 'zone_3floor_2', 
-        name: '3 этаж (72-75)', 
+        name: 'Рекреация (72-75)',
+        floor: '3 этаж',
         includedRooms: range(72, 75),
         order: 4
     },
     { 
         id: 'zone_3floor_3', 
-        name: '3 этаж (78-86)', 
+        name: 'Правое крыло (78-86)',
+        floor: '3 этаж',
         includedRooms: range(78, 86),
         order: 5
     }
