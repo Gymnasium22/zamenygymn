@@ -3,7 +3,7 @@ import React, { useState, useMemo, useRef } from 'react';
 import { useStaticData, useScheduleData } from '../context/DataContext';
 import { Icon } from '../components/Icons';
 import { Modal, SearchableSelect } from '../components/UI';
-import { DAYS, DayOfWeek, DutyZone, Teacher, Shift } from '../types';
+import { DAYS, DayOfWeek, DutyZone, Shift } from '../types';
 import html2canvas from 'html2canvas';
 
 export const DutyPage = () => {
@@ -28,7 +28,7 @@ export const DutyPage = () => {
     const [selectedCell, setSelectedCell] = useState<{ zoneId: string, day: string } | null>(null);
     const [editingZone, setEditingZone] = useState<Partial<DutyZone>>({});
     
-    // Fix: Local state for room string input to allow typing commas freely
+    // Local state for room string input to allow typing commas freely
     const [zoneStringInput, setZoneStringInput] = useState("");
 
     // Filter teacher for modal
@@ -38,7 +38,7 @@ export const DutyPage = () => {
 
     const handleCellClick = (zoneId: string, day: string) => {
         setSelectedCell({ zoneId, day });
-        // Pre-select current teacher if any (Filtering by shift now!)
+        // Pre-select current teacher if any (Filtering by shift!)
         const current = dutySchedule.find(d => d.zoneId === zoneId && d.day === day && d.shift === selectedShift);
         setSelectedTeacherId(current?.teacherId || null);
         setIsModalOpen(true);
@@ -84,7 +84,7 @@ export const DutyPage = () => {
         // Normalize room name (remove non-digits if mostly numeric)
         const num = parseInt(roomName.replace(/\D/g, ''));
         if (!isNaN(num)) {
-            // Check if includedRooms contains this number
+            // Check if includedRooms contains this number (assuming zone.includedRooms are strings of numbers)
             return zone.includedRooms.includes(String(num));
         }
         return zone.includedRooms.includes(roomName);
@@ -93,15 +93,10 @@ export const DutyPage = () => {
     const autoGenerate = async () => {
         if (!window.confirm("Это перезапишет текущий график дежурств. Продолжить?")) return;
 
-        // Clear existing duties (or maybe keep manual ones? For simplicity, we regenerate all or just overwrite collisions)
-        // Let's clear to avoid stale data mess
         let newSchedule: any[] = [];
-        
         const shifts = [Shift.First, Shift.Second];
-        
-        // Track usage to minimize repetition per day (across all shifts or per shift? Usually per day is hard enough)
-        // Let's track per day to avoid a teacher having duty in shift 1 AND shift 2 if they work both
         const usedTeachersPerDay: Record<string, Set<string>> = {};
+        
         DAYS.forEach(d => usedTeachersPerDay[d] = new Set());
 
         for (const day of DAYS) {
@@ -109,7 +104,7 @@ export const DutyPage = () => {
                 // 1. Find candidates: Teachers active in THIS shift on THIS day
                 const candidates = teachers.filter(t => {
                     const lessonsCount = activeSchedule.filter(s => s.teacherId === t.id && s.day === day && s.shift === shift).length;
-                    return lessonsCount >= 1; // At least 1 lesson to be in school
+                    return lessonsCount >= 1; 
                 });
 
                 for (const zone of dutyZones) {
@@ -136,7 +131,6 @@ export const DutyPage = () => {
                         
                         score += lessonsInZone * 10;
                         
-                        // Bonus for having enough lessons total (e.g. not just coming for 1 lesson)
                         const totalLessons = activeSchedule.filter(s => s.teacherId === t.id && s.day === day && s.shift === shift).length;
                         if (totalLessons >= 4) score += 5;
 
@@ -147,7 +141,7 @@ export const DutyPage = () => {
                     scoredCandidates.sort((a, b) => b.score - a.score);
 
                     const best = scoredCandidates[0];
-                    if (best && best.score > -500) { // If valid candidate found
+                    if (best && best.score > -500) { 
                         newSchedule.push({
                             id: Math.random().toString(36).substr(2, 9),
                             zoneId: zone.id,
@@ -218,13 +212,11 @@ export const DutyPage = () => {
 
     // --- Render Helpers ---
     const getTeacherForCell = (zoneId: string, day: string) => {
-        // Filter by shift
         const record = dutySchedule.find(d => d.zoneId === zoneId && d.day === day && d.shift === selectedShift);
         if (!record) return null;
         return teachers.find(t => t.id === record.teacherId);
     };
 
-    // Calculate recommended teachers for the modal
     const getRecommendations = () => {
         if (!selectedCell) return { recommended: [], others: [] };
         
@@ -236,7 +228,7 @@ export const DutyPage = () => {
             // Check busy in THIS shift
             const isBusy = dutySchedule.some(d => d.day === day && d.teacherId === t.id && d.zoneId !== selectedCell.zoneId && d.shift === selectedShift);
             
-            // Check if teacher fits zone (simple check based on lessons location)
+            // Check if teacher fits zone
              const lessonsInZone = zone && zone.includedRooms ? activeSchedule.filter(s => 
                 s.teacherId === t.id && 
                 s.day === day && 
@@ -248,7 +240,6 @@ export const DutyPage = () => {
             return { t, lessonsCount, isBusy, lessonsInZone };
         });
 
-        // Recommended: Has lessons in zone AND is not busy
         const recommended = candidates
             .filter(c => c.lessonsInZone > 0 && !c.isBusy)
             .sort((a,b) => b.lessonsInZone - a.lessonsInZone)
@@ -296,7 +287,7 @@ export const DutyPage = () => {
                             </select>
                         </div>
                         <button onClick={autoGenerate} className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition shadow-lg shadow-indigo-200 dark:shadow-none text-sm flex items-center gap-2">
-                            <Icon name="Zap" size={16}/> Автозаполнение
+                            <Icon name="Zap" size={16}/> Авто
                         </button>
                         <button onClick={clearSchedule} className="px-4 py-2 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-100 dark:border-red-900 rounded-xl font-bold hover:bg-red-100 dark:hover:bg-red-900/50 transition text-sm">
                             <Icon name="Trash2" size={16}/>
@@ -307,7 +298,7 @@ export const DutyPage = () => {
                     </div>
                 </div>
 
-                <div className="mb-4 flex gap-2 overflow-x-auto">
+                <div className="mb-4 flex gap-2 overflow-x-auto custom-scrollbar pb-2">
                     {dutyZones.map(z => (
                         <div key={z.id} className="flex items-center gap-2 bg-slate-50 dark:bg-slate-700 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 shrink-0">
                             <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{z.name}</span>
@@ -321,7 +312,21 @@ export const DutyPage = () => {
             </div>
 
             <div className="overflow-auto custom-scrollbar bg-slate-100 dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-700">
-                <div ref={printRef} className="bg-white p-8 min-w-[800px] shadow-xl text-slate-900">
+                <div ref={printRef} className="bg-white p-8 min-w-[1000px] shadow-xl text-slate-900">
+                    
+                    {/* Official Approval Header */}
+                    <div className="flex justify-end mb-8">
+                        <div className="w-[320px] text-center text-sm font-bold text-slate-900 leading-relaxed">
+                            <div className="uppercase mb-1">УТВЕРЖДАЮ</div>
+                            <div className="mb-4">Директор ГУО "Гимназия №22 г.Минска"</div>
+                            <div className="flex items-end justify-between gap-2 mb-1">
+                                <div className="border-b border-slate-900 w-full mb-1"></div>
+                                <div className="whitespace-nowrap">Н.В.Кисель</div>
+                            </div>
+                            <div className="text-right">"___" ____________ {new Date().getFullYear()}г.</div>
+                        </div>
+                    </div>
+
                     <div className="text-center mb-6">
                         <h2 className="text-2xl font-black uppercase tracking-tight text-slate-800">График дежурства учителей</h2>
                         <h3 className="text-lg font-bold text-slate-500 uppercase">{selectedShift}</h3>
@@ -330,44 +335,64 @@ export const DutyPage = () => {
                     <table className="w-full border-collapse border-2 border-slate-800">
                         <thead>
                             <tr>
-                                <th className="border-2 border-slate-800 p-3 bg-slate-100 w-48 text-left">Зона / Пост</th>
+                                <th className="border-2 border-slate-800 p-3 bg-slate-100 w-64 text-left">Зона / Пост</th>
                                 {DAYS.map(day => (
-                                    <th key={day} className="border-2 border-slate-800 p-3 bg-slate-100 w-32">{day}</th>
+                                    <th key={day} className="border-2 border-slate-800 p-3 bg-slate-100">{day}</th>
                                 ))}
                             </tr>
                         </thead>
                         <tbody>
                             {dutyZones.map(zone => (
                                 <tr key={zone.id}>
-                                    <td className="border-2 border-slate-800 p-3 font-bold bg-slate-50">
-                                        {zone.name}
-                                        <div className="text-[10px] font-normal text-slate-500 mt-1">
+                                    <td className="border-2 border-slate-800 p-3 font-bold bg-slate-50 align-top">
+                                        <div className="text-base">{zone.name}</div>
+                                        <div className="text-xs font-normal text-slate-500 mt-1">
                                             Каб: {zone.includedRooms?.join(', ')}
                                         </div>
                                     </td>
                                     {DAYS.map(day => {
                                         const teacher = getTeacherForCell(zone.id, day);
-                                        // Auto-color based on "floor" logic (just simple heuristic here)
-                                        const is2ndFloor = zone.name.includes('2 этаж');
-                                        const is3rdFloor = zone.name.includes('3 этаж');
+                                        const is2ndFloor = zone.name.toLowerCase().includes('2 этаж');
+                                        const is3rdFloor = zone.name.toLowerCase().includes('3 этаж');
                                         const cellBg = teacher 
                                             ? (is2ndFloor ? 'bg-emerald-50' : is3rdFloor ? 'bg-blue-50' : 'bg-white') 
                                             : 'bg-white';
+                                        
+                                        // Warning if teacher is "far away" (has lesson but not in zone)
+                                        let hasWarning = false;
+                                        if (teacher) {
+                                            const lessons = activeSchedule.filter(s => 
+                                                s.teacherId === teacher.id && 
+                                                s.day === day && 
+                                                s.shift === selectedShift
+                                            );
+                                            
+                                            // Check if ANY lesson is in the zone range
+                                            const matchesZone = lessons.some(s => {
+                                                const roomName = rooms.find(r => r.id === s.roomId)?.name || s.roomId || '';
+                                                return isRoomInZone(roomName, zone);
+                                            });
+                                            
+                                            if (!matchesZone && lessons.length > 0) hasWarning = true;
+                                        }
 
                                         return (
                                             <td 
                                                 key={`${zone.id}-${day}`} 
                                                 onClick={() => handleCellClick(zone.id, day)}
-                                                className={`border-2 border-slate-800 p-2 text-center cursor-pointer hover:bg-slate-100 transition-colors ${cellBg}`}
+                                                className={`border-2 border-slate-800 p-2 text-center cursor-pointer hover:bg-slate-100 transition-colors align-middle relative group ${cellBg}`}
                                             >
                                                 {teacher ? (
-                                                    <div className="font-bold text-sm text-slate-800">{teacher.name}</div>
+                                                    <div className="flex flex-col items-center justify-center h-full">
+                                                        <div className="font-bold text-sm text-slate-900 leading-tight">{teacher.name}</div>
+                                                        {hasWarning && (
+                                                            <div className="text-[9px] text-red-600 font-bold mt-1 bg-red-100 px-1 rounded flex items-center gap-0.5 no-print" title="Учитель не ведет уроки в этой зоне в эту смену">
+                                                                <Icon name="AlertTriangle" size={10} /> Далеко
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 ) : (
-                                                    <div className="text-slate-300 text-xl font-bold">+</div>
-                                                )}
-                                                {/* Warning marker if teacher has NO lessons in this zone this shift */}
-                                                {teacher && activeSchedule.filter(s=>s.teacherId===teacher.id && s.day===day && s.shift === selectedShift && s.roomId && isRoomInZone(rooms.find(r => r.id === s.roomId)?.name || s.roomId, zone)).length === 0 && (
-                                                     <div className="text-[9px] text-red-600 font-bold" title="Нет уроков в этой зоне">⚠️ Нет ур.</div>
+                                                    <div className="text-slate-200 text-xl font-bold opacity-0 group-hover:opacity-100 transition-opacity">+</div>
                                                 )}
                                             </td>
                                         );
@@ -378,7 +403,7 @@ export const DutyPage = () => {
                     </table>
                     
                     <div className="mt-8 pt-4 flex justify-between items-end text-sm font-bold text-slate-600">
-                        <div>УТВЕРЖДАЮ<br/>Директор гимназии</div>
+                        <div>Зам. директора по УР</div>
                         <div>____________</div>
                     </div>
                 </div>
