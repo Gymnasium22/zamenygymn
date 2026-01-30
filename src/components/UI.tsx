@@ -89,8 +89,8 @@ export const ContextMenu = ({ x, y, onClose, actions }: ContextMenuProps) => {
 
     if (x === null || y === null) return null;
 
-    const style: React.CSSProperties = { top: y, left: x };
-    if (window.innerWidth - x < 200) style.left = x - 200;
+    const left = (window.innerWidth - x < 200) ? x - 200 : x;
+    const style: React.CSSProperties = { top: y, left };
 
     return (
         <div ref={ref} className="fixed z-[100] bg-white/90 dark:bg-slate-800/90 backdrop-blur-md shadow-xl rounded-2xl border border-slate-100 dark:border-slate-700 py-2 w-56 context-menu no-print" style={style}>

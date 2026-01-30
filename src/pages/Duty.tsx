@@ -66,6 +66,18 @@ export const DutyPage = () => {
         setSelectedTeacherId(null);
     };
 
+    const handleRemoveDuty = async () => {
+        if (!selectedCell) return;
+        
+        let newSchedule = [...dutySchedule];
+        // Remove existing for this cell AND Shift
+        newSchedule = newSchedule.filter(d => !(d.zoneId === selectedCell.zoneId && d.day === selectedCell.day && d.shift === selectedShift));
+        
+        await saveScheduleData({ dutySchedule: newSchedule });
+        setIsModalOpen(false);
+        setSelectedTeacherId(null);
+    };
+
     // Helper to check if room number is in range/list
     const isRoomInZone = (roomName: string, zone: DutyZone) => {
         if (!roomName || !zone.includedRooms) return false;
@@ -273,7 +285,7 @@ export const DutyPage = () => {
                         </div>
 
                          <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl p-1.5 pl-3">
-                            <span className="text-xs font-bold text-slate-500 dark:text-slate-400">Семестр:</span>
+                            <span className="text-xs font-bold text-slate-500 dark:text-slate-400">Полугодие:</span>
                             <select
                                 value={semester}
                                 onChange={(e) => setSemester(Number(e.target.value) as 1 | 2)}
@@ -401,7 +413,7 @@ export const DutyPage = () => {
                     </div>
 
                     <div className="flex justify-end gap-3 pt-4 mt-auto">
-                        <button onClick={() => { setSelectedTeacherId(null); handleTeacherSelect(); }} className="px-5 py-3 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl font-bold text-sm transition-colors">Снять дежурство</button>
+                        <button onClick={handleRemoveDuty} className="px-5 py-3 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl font-bold text-sm transition-colors">Снять дежурство</button>
                         <button onClick={handleTeacherSelect} className="px-8 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition shadow-lg shadow-indigo-200 dark:shadow-none">Сохранить</button>
                     </div>
                 </div>

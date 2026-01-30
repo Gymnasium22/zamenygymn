@@ -11,8 +11,8 @@ import { QRCodeSVG } from 'qrcode.react';
 import { Modal } from '../components/UI';
 
 export const ExportPage = () => {
-    const { subjects, teachers, classes, rooms, settings, bellSchedule, dutyZones, saveStaticData } = useStaticData();
-    const { schedule1, schedule2, substitutions, dutySchedule, saveScheduleData } = useScheduleData();
+    const { subjects, teachers, classes, rooms, settings, bellSchedule, saveStaticData } = useStaticData();
+    const { schedule1, schedule2, substitutions, saveScheduleData } = useScheduleData();
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const printRef1 = useRef<HTMLDivElement>(null);
@@ -35,12 +35,13 @@ export const ExportPage = () => {
     const [matrixGrade, setMatrixGrade] = useState<string>("");
 
     const fullAppData: AppData = useMemo(() => ({
-        subjects, teachers, classes, rooms, settings, bellSchedule, dutyZones,
+        subjects, teachers, classes, rooms, settings, bellSchedule,
         schedule: schedule1,
         schedule2ndHalf: schedule2,
         substitutions,
-        dutySchedule
-    }), [subjects, teachers, classes, rooms, settings, bellSchedule, dutyZones, schedule1, schedule2, substitutions, dutySchedule]);
+        dutyZones: [],
+        dutySchedule: []
+    }), [subjects, teachers, classes, rooms, settings, bellSchedule, schedule1, schedule2, substitutions]);
 
     // Получаем расписание для экспорта (Excel, Матрица) на основе селектора
     const getScheduleForExport = () => exportSemester === 2 ? schedule2 : schedule1;
@@ -86,8 +87,6 @@ export const ExportPage = () => {
                             teachers: json.teachers || [],
                             subjects: json.subjects || [],
                             substitutions: json.substitutions || [],
-                            dutyZones: json.dutyZones || INITIAL_DATA.dutyZones,
-                            dutySchedule: json.dutySchedule || [],
                             settings: { ...INITIAL_DATA.settings, ...json.settings }
                         };
                         await saveStaticData(mergedData as any);
@@ -318,7 +317,6 @@ export const ExportPage = () => {
         document.body.removeChild(link);
     };
 
-    // --- UPDATED POSTER EXPORT FUNCTION ---
     const exportPosterMatrixExcel = () => {
         const currentSchedule = getScheduleForExport();
 
@@ -331,26 +329,17 @@ export const ExportPage = () => {
             [DayOfWeek.Friday]:    { header: '#bfdbfe', cell: '#dbeafe' }, // Blue
         };
 
-        const abbreviateRoom = (name: string) => {
-            if (!name) return '';
-            const lower = name.toLowerCase();
-            if (lower.includes('спортзал')) return 'С/З'; // Shortened
-            if (lower.includes('актовый')) return 'Акт';
-            if (lower.includes('библиотека')) return 'Биб';
-            return name;
-        };
-
         // Увеличенные шрифты и размеры для плаката
         let html = `
             <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
             <head><meta charset="UTF-8"><style>
                 /* Poster scaling */
                 table { border-collapse: collapse; font-family: Arial, sans-serif; font-size: 16pt; margin-bottom: 40px; width: 100%; }
-                td, th { border: 2px solid #000; padding: 2px; vertical-align: middle; text-align: center; }
+                td, th { border: 2px solid #000; padding: 4px; vertical-align: middle; text-align: center; }
                 .header { font-weight: bold; }
                 .subject-cell { font-weight: bold; vertical-align: middle; background-color: #fff; font-size: 20pt; }
                 .teacher-cell { text-align: left; padding-left: 10px; font-size: 20pt; }
-                sub { font-size: 10pt; vertical-align: sub; display: block; line-height: 1; }
+                sub { font-size: 12pt; vertical-align: sub; }
                 
                 /* Doc Header/Footer Styles - Scaled */
                 .doc-table td { border: none !important; padding: 10px; vertical-align: top; font-size: 16pt; }
@@ -406,12 +395,11 @@ export const ExportPage = () => {
             });
             html += `</tr>`;
 
-            // --- ROW 3: "Урок" label (Merged per day to save space/clean look for poster) ---
+            // --- ROW 3: "Урок" label (Merged per day) ---
             html += `<tr>`;
             DAYS.forEach((day) => {
                 const bg = dayColors[day]?.header || '#f3f4f6';
-                // Одна ячейка "Урок" на весь день (как просили в одной из итераций)
-                // Если нужно как в обычной матрице - можно разбить на cells
+                // Одна ячейка "Урок" на весь день
                 html += `<th colspan="${periods.length}" class="header" style="border-bottom: 3px solid #000; background-color: ${bg}; font-size: 16pt;">Урок</th>`;
             });
             html += `</tr>`;
@@ -424,7 +412,7 @@ export const ExportPage = () => {
             `;
             DAYS.forEach((day) => {
                 const bg = dayColors[day]?.header || '#f3f4f6';
-                periods.forEach(p => html += `<th class="header" style="width: 25px; background-color: ${bg}; font-size: 16pt;">${p}</th>`);
+                periods.forEach(p => html += `<th class="header" style="width: 20px; background-color: ${bg}; font-size: 16pt;">${p}</th>`);
             });
             html += `</tr>`;
 
@@ -454,12 +442,11 @@ export const ExportPage = () => {
                             if (item) {
                                 const cls = classes.find(c => c.id === item.classId);
                                 const r = rooms.find(rm => rm.id === item.roomId);
-                                const rawRoomName = r ? r.name : item.roomId;
-                                const roomName = abbreviateRoom(rawRoomName || '');
+                                const roomName = r ? r.name : item.roomId;
                                 const room = roomName ? `<sub>${roomName}</sub>` : '';
-                                const dir = item.direction ? ` <span style="font-size:10pt">(${item.direction})</span>` : '';
+                                const dir = item.direction ? ` <span style="font-size:14px">(${item.direction})</span>` : '';
                                 
-                                html += `<td style="border: 1px solid #000; font-weight: bold; background-color: ${cellBg}; height: 60px; font-size: 18pt; line-height: 1.1;">${cls ? cls.name : ''}${dir}${room}</td>`;
+                                html += `<td style="border: 1px solid #000; font-weight: bold; background-color: ${cellBg}; height: 60px;">${cls ? cls.name : ''}${dir}${room}</td>`;
                             } else {
                                 html += `<td style="border: 1px solid #000; background-color: ${cellBg};"></td>`;
                             }
@@ -790,7 +777,7 @@ export const ExportPage = () => {
         }
 
         // --- NEW SUMMARY TABLE ---
-        const teacherStats = new Map<string, { name: string, total: number, withoutRecord: number, merger: number, other: number }>();
+        const teacherStats = new Map<string, { name: string, total: number, withoutRecord: number, merger: number, other: number, illness: number }>();
 
         monthlySubs.forEach(sub => {
             if (sub.replacementTeacherId === 'conducted' || 
@@ -802,7 +789,7 @@ export const ExportPage = () => {
             const teacher = teachers.find(t => t.id === sub.replacementTeacherId);
             if (!teacher) return;
 
-            const stats = teacherStats.get(teacher.id) || { name: teacher.name, total: 0, withoutRecord: 0, merger: 0, other: 0 };
+            const stats = teacherStats.get(teacher.id) || { name: teacher.name, total: 0, withoutRecord: 0, merger: 0, other: 0, illness: 0 };
             
             const origTeacher = teachers.find(t => t.id === sub.originalTeacherId);
             let reason = sub.lessonAbsenceReason || origTeacher?.absenceReasons?.[sub.date] || '';
@@ -811,9 +798,11 @@ export const ExportPage = () => {
 
             stats.total++;
             
-            // Priority: Merger > Without Record > Other
+            // Priority: Merger > Illness > Without Record > Other
             if (sub.isMerger) {
                 stats.merger++;
+            } else if (reason === 'Болезнь') {
+                stats.illness++;
             } else if (reason === 'Без записи') {
                 stats.withoutRecord++;
             } else {
@@ -829,11 +818,12 @@ export const ExportPage = () => {
              html += `<br/><br/>`;
              html += `<h3>Сводная ведомость заменяющих учителей</h3>`;
              html += `
-             <table style="border-collapse: collapse; width: 50%;">
+             <table style="border-collapse: collapse; width: 60%;">
              <thead>
                  <tr class="header">
                      <th style="border: 1px solid #999; padding: 4px;">ФИО Учителя</th>
                      <th style="text-align: center; border: 1px solid #999; padding: 4px;">Всего часов</th>
+                     <th style="text-align: center; border: 1px solid #999; padding: 4px;">Болезнь</th>
                      <th style="text-align: center; border: 1px solid #999; padding: 4px;">Без записи</th>
                      <th style="text-align: center; border: 1px solid #999; padding: 4px;">Объединение</th>
                      <th style="text-align: center; border: 1px solid #999; padding: 4px;">Другие причины</th>
@@ -846,6 +836,7 @@ export const ExportPage = () => {
                      <tr>
                          <td style="border: 1px solid #999; padding: 4px;">${stat.name}</td>
                          <td style="text-align: center; border: 1px solid #999; padding: 4px;">${stat.total}</td>
+                         <td style="text-align: center; border: 1px solid #999; padding: 4px;">${stat.illness}</td>
                          <td style="text-align: center; border: 1px solid #999; padding: 4px;">${stat.withoutRecord}</td>
                          <td style="text-align: center; border: 1px solid #999; padding: 4px;">${stat.merger}</td>
                          <td style="text-align: center; border: 1px solid #999; padding: 4px;">${stat.other}</td>
@@ -854,7 +845,6 @@ export const ExportPage = () => {
              });
              html += `</tbody></table>`;
         }
-        // -------------------------
 
         html += `</body></html>`;
         const blob = new Blob([html], { type: "application/vnd.ms-excel" });
@@ -1428,7 +1418,7 @@ export const ExportPage = () => {
                         </select>
                     </div>
                     <button onClick={() => setIsMatrixPrintOpen(true)} className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200 dark:shadow-none flex items-center gap-2">
-                        <Icon name="Printer" size={20}/> Стандартная печать
+                        <Icon name="Printer" size={20}/> Открыть версию для печати
                     </button>
                     <button onClick={downloadGradeMatrixExcel} className="px-6 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition shadow-lg shadow-emerald-200 dark:shadow-none flex items-center gap-2">
                         <Icon name="FileSpreadsheet" size={20}/> Скачать Excel
