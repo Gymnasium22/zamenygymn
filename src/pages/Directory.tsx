@@ -5,6 +5,7 @@ import { Icon } from '../components/Icons';
 import { Modal, StaggerContainer } from '../components/UI';
 import { Shift, ROOM_TYPES, SHIFT_PERIODS, Teacher, Subject, ClassEntity, Room, BellPreset, Bell } from '../types';
 import { DEFAULT_BELLS, SHORT_BELLS } from '../constants';
+import { generateId } from '../utils/helpers';
 import html2canvas from 'html2canvas';
 
 export const DirectoryPage = () => {
@@ -52,8 +53,6 @@ export const DirectoryPage = () => {
     };
 
     const handleSave = async () => {
-        const genId = () => Math.random().toString(36).substr(2, 9);
-        
         const configMap = {
             teachers: { list: teachers, form: teacherForm, key: 'teachers' as const },
             subjects: { list: subjects, form: subjectForm, key: 'subjects' as const },
@@ -74,8 +73,12 @@ export const DirectoryPage = () => {
         if (editingId) {
             newList = newList.map(item => (item.id === editingId ? { ...item, ...form } : item));
         } else {
-            const maxOrder = list.reduce((max, item) => Math.max(max, (item as any).order || 0), 0);
-            newList.push({ ...form, id: genId(), order: maxOrder + 1 } as any);
+            const maxOrder = list.reduce((max, item) => {
+                const itemWithOrder = item as { order?: number };
+                return Math.max(max, itemWithOrder.order || 0);
+            }, 0);
+            const newItem = { ...form, id: generateId(), order: maxOrder + 1 };
+            newList.push(newItem);
         }
         
         await saveStaticData({ [key]: newList });
@@ -181,7 +184,7 @@ export const DirectoryPage = () => {
 
     const confirmCreatePreset = async () => {
         if (!newPresetName) return;
-        const newId = `preset_${Math.random().toString(36).substr(2, 9)}`;
+        const newId = `preset_${generateId()}`;
         const presets = [...(settings.bellPresets || [])];
         
         // Clone current bells as base

@@ -4,8 +4,9 @@ import { useStaticData, useScheduleData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { Icon } from '../components/Icons';
 import { DayOfWeek, DAYS, ScheduleItem } from '../types';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, NavLink } from 'react-router-dom';
 import { Modal, useToast, SkeletonCard, SkeletonText } from '../components/UI';
+// Notifications component removed
 
 interface SearchItem {
     room?: string;
@@ -437,9 +438,46 @@ export const DashboardPage = () => {
                  </div>
             </header>
 
+            {/* Mobile Quick Actions - Only visible on phones */}
+            <div className="md:hidden grid grid-cols-3 gap-3 animate-fade-in">
+                <NavLink to="/schedule" className="p-4 rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/30 border border-blue-200 dark:border-blue-700 hover:shadow-lg transition-all flex flex-col items-center gap-2 active:scale-95">
+                    <div className="bg-blue-500 text-white p-3 rounded-xl">
+                        <Icon name="Calendar" size={20} />
+                    </div>
+                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300 text-center">Расписание</span>
+                </NavLink>
+                
+                {role === 'admin' && (
+                    <NavLink to="/substitutions" className="p-4 rounded-2xl bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/30 dark:to-orange-800/30 border border-orange-200 dark:border-orange-700 hover:shadow-lg transition-all flex flex-col items-center gap-2 active:scale-95">
+                        <div className="bg-orange-500 text-white p-3 rounded-xl">
+                            <Icon name="Repeat" size={20} />
+                        </div>
+                        <span className="text-xs font-bold text-slate-700 dark:text-slate-300 text-center">Замены</span>
+                    </NavLink>
+                )}
+
+                {role === 'admin' && (
+                    <NavLink to="/duty" className="p-4 rounded-2xl bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/30 border border-purple-200 dark:border-purple-700 hover:shadow-lg transition-all flex flex-col items-center gap-2 active:scale-95">
+                        <div className="bg-purple-500 text-white p-3 rounded-xl">
+                            <Icon name="Shield" size={20} />
+                        </div>
+                        <span className="text-xs font-bold text-slate-700 dark:text-slate-300 text-center">Дежурство</span>
+                    </NavLink>
+                )}
+
+                {role === 'guest' && (
+                    <NavLink to="/schedule" className="p-4 rounded-2xl bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/30 dark:to-emerald-800/30 border border-emerald-200 dark:border-emerald-700 hover:shadow-lg transition-all flex flex-col items-center gap-2 active:scale-95">
+                        <div className="bg-emerald-500 text-white p-3 rounded-xl">
+                            <Icon name="Users" size={20} />
+                        </div>
+                        <span className="text-xs font-bold text-slate-700 dark:text-slate-300 text-center">Информация</span>
+                    </NavLink>
+                )}
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {/* Widget 1: Who Where - Search */}
-                <div className="glass-panel p-6 rounded-3xl flex flex-col h-full relative overflow-hidden card-hover">
+                <div className="p-6 rounded-3xl flex flex-col h-full relative overflow-hidden card-hover bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
                     <div className="flex items-center gap-3 mb-6">
                         <div className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white p-3 rounded-2xl shadow-lg shadow-indigo-500/20">
                             <Icon name="Search" size={22}/>
@@ -449,6 +487,8 @@ export const DashboardPage = () => {
                     
                     <div className="flex gap-2 mb-4">
                         <input 
+                            type="text"
+                            inputMode="search"
                             placeholder="Учитель или класс..." 
                             value={searchQuery} 
                             onChange={e => setSearchQuery(e.target.value)} 
@@ -491,7 +531,7 @@ export const DashboardPage = () => {
                 </div>
 
                 {/* Widget 2: Unresolved Substitutions - Priority */}
-                <div className={`glass-panel p-6 rounded-3xl flex flex-col h-full card-hover relative overflow-hidden ${unresolvedSubstitutions > 0 ? 'ring-2 ring-red-500/20 dark:ring-red-500/30' : ''}`}>
+                <div className={`p-6 rounded-3xl flex flex-col h-full card-hover relative overflow-hidden bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 ${unresolvedSubstitutions > 0 ? 'ring-2 ring-red-500/20 dark:ring-red-500/30' : ''}`}>
                     {unresolvedSubstitutions > 0 && <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/10 blur-2xl -mr-10 -mt-10 rounded-full"></div>}
                     <div className="flex items-center gap-3 mb-4 relative z-10">
                         <div className={`p-3 rounded-2xl shadow-lg ${unresolvedSubstitutions > 0 ? 'bg-gradient-to-br from-red-500 to-orange-600 text-white shadow-red-500/30' : 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-emerald-500/30'}`}>
@@ -518,7 +558,7 @@ export const DashboardPage = () => {
                 </div>
 
                 {/* Widget 3: Occupancy & Absences */}
-                <div className="glass-panel p-6 rounded-3xl flex flex-col h-full card-hover">
+                <div className="p-6 rounded-3xl flex flex-col h-full card-hover bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
                     <div className="flex items-center justify-between mb-6">
                         <div className="flex items-center gap-3">
                             <div className="bg-gradient-to-br from-blue-500 to-cyan-500 text-white p-3 rounded-2xl shadow-lg shadow-blue-500/20">
@@ -571,7 +611,7 @@ export const DashboardPage = () => {
                 </div>
 
                 {/* Widget 4: Quick Notes */}
-                <div className="glass-panel p-6 rounded-3xl flex flex-col h-full group card-hover relative">
+                <div className="p-6 rounded-3xl flex flex-col h-full group card-hover relative bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
                     <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-3">
                             <div className="bg-gradient-to-br from-yellow-400 to-orange-500 text-white p-3 rounded-2xl shadow-lg shadow-orange-500/20">
@@ -598,6 +638,7 @@ export const DashboardPage = () => {
                     </div>
                     <div className="relative flex-1 bg-yellow-50/50 dark:bg-slate-800/50 rounded-2xl p-1">
                         <textarea
+                            inputMode="text"
                             className="w-full h-full p-4 bg-transparent border-none outline-none font-medium text-slate-700 dark:text-slate-200 resize-none text-sm leading-relaxed"
                             placeholder="Напишите что-нибудь..."
                             value={notes}
@@ -616,7 +657,7 @@ export const DashboardPage = () => {
             {/* Additional Info Row */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                  {/* Conflicts */}
-                 <div className="glass-panel p-6 rounded-3xl">
+                 <div className="p-6 rounded-3xl bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
                     <div className="flex items-center gap-3 mb-4">
                         <div className="bg-amber-100 dark:bg-amber-900/30 text-amber-600 p-2 rounded-xl"><Icon name="AlertTriangle" size={20}/></div>
                         <h3 className="font-bold text-lg dark:text-white">Возможные конфликты</h3>
@@ -632,7 +673,7 @@ export const DashboardPage = () => {
                  </div>
 
                  {/* Birthdays */}
-                 <div className="glass-panel p-6 rounded-3xl">
+                 <div className="p-6 rounded-3xl bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
                     <div className="flex items-center gap-3 mb-4">
                         <div className="bg-rose-100 dark:bg-rose-900/30 text-rose-600 p-2 rounded-xl"><Icon name="Gift" size={20}/></div>
                         <h3 className="font-bold text-lg dark:text-white">Ближайшие праздники</h3>
@@ -656,6 +697,7 @@ export const DashboardPage = () => {
                         Есть идеи по улучшению приложения или нашли ошибку? Напишите нам!
                     </p>
                     <textarea
+                        inputMode="text"
                         value={feedbackMessage}
                         onChange={(e) => setFeedbackMessage(e.target.value)}
                         rows={5}

@@ -3,6 +3,7 @@ import React, { useEffect, useState, useRef, useMemo, createContext, useContext,
 import { Icon } from './Icons';
 import { useStaticData } from '../context/DataContext';
 import { DayOfWeek, Shift } from '../types';
+import { generateId } from '../utils/helpers';
 import { NavLink, useNavigate } from 'react-router-dom';
 
 interface ToastData {
@@ -25,7 +26,7 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
     const [toasts, setToasts] = useState<ToastData[]>([]);
 
     const addToast = (toast: Omit<ToastData, 'id'>) => {
-        const id = Math.random().toString(36).substr(2, 9);
+        const id = generateId();
         setToasts(prev => [...prev, { ...toast, id }]);
     };
 
@@ -201,7 +202,7 @@ export const Modal = ({ isOpen, onClose, title, children, maxWidth = 'max-w-lg' 
     
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-fade-in no-print" onClick={(e) => e.target === e.currentTarget && onClose()}>
-            <div className={`glass-panel bg-white/90 dark:bg-dark-800/90 rounded-3xl shadow-2xl w-full ${maxWidth} flex flex-col max-h-[90vh] transition-colors duration-300`}>
+            <div className={`bg-white/90 dark:bg-dark-800/90 rounded-3xl shadow-2xl w-full ${maxWidth} flex flex-col max-h-[90vh] transition-colors duration-300`}>
                 <div className="flex items-center justify-between px-6 py-5 border-b border-slate-200/50 dark:border-slate-700/50">
                     <h2 className="text-xl font-bold text-slate-800 dark:text-white tracking-tight">{title}</h2>
                     <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700" aria-label="Закрыть">
@@ -491,7 +492,7 @@ export const StatusWidget = () => {
     }, [bellSchedule]); 
 
     return (
-        <div className="mx-4 mt-auto mb-20 md:mb-4 p-4 glass-panel rounded-2xl flex flex-col gap-3 relative overflow-hidden group">
+        <div className="mx-4 mt-auto mb-20 md:mb-4 p-4 rounded-2xl flex flex-col gap-3 relative overflow-hidden group">
             <div className={`absolute top-0 left-0 w-1 h-full ${color}`}></div>
             <div className="flex justify-between items-start z-10">
                 <div>
@@ -681,25 +682,29 @@ export const BottomNavigation = ({ onMenuClick, role }: BottomNavProps) => {
 
     return (
         <div className="fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-dark-800/90 backdrop-blur-xl border-t border-slate-200 dark:border-slate-700 z-40 pb-safe md:hidden transition-all duration-300 no-select">
-            <div className="flex justify-around items-center h-16">
+            <div className="flex justify-around items-center h-20">
                 {isAdminOrTeacher && (
-                    <NavLink to="/dashboard" className={({ isActive }) => `flex flex-col items-center gap-1 p-2 rounded-2xl transition-all duration-300 ${isActive ? 'text-indigo-600 dark:text-indigo-400 scale-110' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'}`}>
-                        <Icon name="Home" size={24} strokeWidth={2.5} />
+                    <NavLink to="/dashboard" className={({ isActive }) => `flex flex-col items-center justify-center gap-1.5 p-2.5 rounded-2xl transition-all duration-300 flex-1 h-full ${isActive ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/20' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100/50 dark:hover:bg-slate-700/30'}`}>
+                        <Icon name="Home" size={26} strokeWidth={2.5} />
+                        <span className="text-[10px] font-bold uppercase tracking-wider">Рабочий</span>
                     </NavLink>
                 )}
                 
-                <NavLink to="/schedule" className={({ isActive }) => `flex flex-col items-center gap-1 p-2 rounded-2xl transition-all duration-300 ${isActive ? 'text-indigo-600 dark:text-indigo-400 scale-110' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'}`}>
-                    <Icon name="Calendar" size={24} strokeWidth={2.5} />
+                <NavLink to="/schedule" className={({ isActive }) => `flex flex-col items-center justify-center gap-1.5 p-2.5 rounded-2xl transition-all duration-300 flex-1 h-full ${isActive ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/20' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100/50 dark:hover:bg-slate-700/30'}`}>
+                    <Icon name="Calendar" size={26} strokeWidth={2.5} />
+                    <span className="text-[10px] font-bold uppercase tracking-wider">Расписание</span>
                 </NavLink>
 
                 {isAdmin && (
-                    <NavLink to="/substitutions" className={({ isActive }) => `flex flex-col items-center gap-1 p-2 rounded-2xl transition-all duration-300 ${isActive ? 'text-indigo-600 dark:text-indigo-400 scale-110' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'}`}>
-                        <Icon name="Repeat" size={24} strokeWidth={2.5} />
+                    <NavLink to="/substitutions" className={({ isActive }) => `flex flex-col items-center justify-center gap-1.5 p-2.5 rounded-2xl transition-all duration-300 flex-1 h-full ${isActive ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/20' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100/50 dark:hover:bg-slate-700/30'}`}>
+                        <Icon name="Repeat" size={26} strokeWidth={2.5} />
+                        <span className="text-[10px] font-bold uppercase tracking-wider">Замены</span>
                     </NavLink>
                 )}
 
-                <button onClick={onMenuClick} className="flex flex-col items-center gap-1 p-2 rounded-2xl text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 active:text-indigo-600 transition-all duration-300">
-                    <Icon name="Menu" size={24} strokeWidth={2.5} />
+                <button onClick={onMenuClick} className="flex flex-col items-center justify-center gap-1.5 p-2.5 rounded-2xl text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 active:text-indigo-600 active:bg-indigo-50/50 dark:active:bg-indigo-900/20 transition-all duration-300 flex-1 h-full hover:bg-slate-100/50 dark:hover:bg-slate-700/30">
+                    <Icon name="Menu" size={26} strokeWidth={2.5} />
+                    <span className="text-[10px] font-bold uppercase tracking-wider">Меню</span>
                 </button>
             </div>
         </div>
@@ -809,6 +814,7 @@ export const CommandPalette = ({ isOpen, onClose }: CommandPaletteProps) => {
                     <Icon name="Search" className="text-slate-400" size={20}/>
                     <input 
                         ref={inputRef}
+                        inputMode="search"
                         className="flex-1 bg-transparent outline-none text-lg text-slate-800 dark:text-white placeholder:text-slate-400"
                         placeholder="Куда перейти? Или кого найти..."
                         value={query}

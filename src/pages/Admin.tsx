@@ -2,22 +2,14 @@ import { useState, useMemo, useEffect } from 'react';
 import { useStaticData, useScheduleData } from '../context/DataContext'; 
 import { Icon } from '../components/Icons';
 import { Shift, SHIFT_PERIODS, DAYS } from '../types';
+import { formatDateISO, getScheduleForDate } from '../utils/helpers';
 
 export const AdminPage = () => {
     const { subjects, teachers, classes, rooms, settings, saveStaticData } = useStaticData(); 
-    // Получаем оба расписания, чтобы выбирать нужное в зависимости от даты
     const { schedule1, schedule2 } = useScheduleData();
 
     const [activeTab, setActiveTab] = useState('teachers');
-    // Безопасная функция для получения локальной даты в формате YYYY-MM-DD
-    const getLocalDateString = (date: Date = new Date()): string => {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-    };
-
-    const [selectedDate, setSelectedDate] = useState(getLocalDateString());
+    const [selectedDate, setSelectedDate] = useState(formatDateISO());
     
     const [teacherShift, setTeacherShift] = useState(Shift.First);
     const [afterPeriod, setAfterPeriod] = useState(1);
@@ -29,11 +21,10 @@ export const AdminPage = () => {
 
     // Определяем актуальное расписание на основе выбранной даты
     const activeSchedule = useMemo(() => {
-        const month = new Date(selectedDate).getMonth();
-        // Январь(0) - Май(4) = 2 полугодие. Остальное = 1 полугодие
-        const isSecondSemester = month >= 0 && month <= 4;
-        return isSecondSemester ? schedule2 : schedule1;
-    }, [selectedDate, schedule1, schedule2]);
+        const data = { schedule: schedule1, schedule2, settings };
+        const schedule = getScheduleForDate(new Date(selectedDate), data as any);
+        return schedule;
+    }, [selectedDate, schedule1, schedule2, settings]);
 
     useEffect(() => {
         if (settings) {

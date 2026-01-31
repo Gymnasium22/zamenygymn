@@ -25,6 +25,65 @@ body {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
+/* Mobile Touch Optimization */
+@media (max-width: 1024px) {
+  /* Minimal touch target size: 44x44px (iOS HIG) */
+  button, a, [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  
+  /* Touch ripple effect */
+  .btn-touch::active {
+    opacity: 0.7;
+    transform: scale(0.98);
+  }
+  
+  /* Improved mobile text rendering */
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+  
+  /* Better input field handling */
+  input, textarea, select {
+    font-size: 16px; /* Prevent zoom on focus iOS */
+    padding: 12px 16px;
+  }
+  
+  /* Disable auto-zoom on double-tap */
+  button, a {
+    touch-action: manipulation;
+  }
+}
+
+/* Mobile form optimization */
+@media (max-width: 1024px) {
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="search"],
+  input[type="number"],
+  textarea,
+  select {
+    font-size: 16px;
+    border-radius: 12px;
+    padding: 14px 16px;
+    line-height: 1.5;
+  }
+  
+  /* Larger tap targets for checkboxes/radios */
+  input[type="checkbox"],
+  input[type="radio"] {
+    width: 24px;
+    height: 24px;
+    margin: 8px;
+    cursor: pointer;
+  }
+}
+
 /* App-like feel: disable text selection on UI elements */
 .no-select {
   -webkit-user-select: none;
@@ -40,19 +99,7 @@ body {
 .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #475569; }
 
 /* Modern UI Utils */
-.glass-panel {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-}
-
-.dark .glass-panel {
-  background: rgba(30, 41, 59, 0.7); /* dark-800 with opacity */
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
-}
+/* Removed .glass-panel utility styles as requested */
 
 .mesh-gradient-bg {
   background-color: #f8fafc;
@@ -317,6 +364,8 @@ body {
   color: #f87171 !important;
 }
 
+/* Removed styles related to the removed status-system card and its helper animations */
+
 /* Enhanced Dark Theme Improvements */
 .dark {
   --bg-primary: #0f172a;
@@ -387,6 +436,40 @@ body {
     @apply min-h-[44px] min-w-[44px];
   }
 
+  /* Оптимизация меню для мобайла */
+  aside nav {
+    @apply space-y-0.5;
+  }
+
+  aside nav button[role="button"] {
+    @apply px-4 py-3 text-sm lg:text-xs;
+  }
+
+  aside nav a {
+    @apply px-3 py-3.5 lg:py-2.5 text-base lg:text-sm;
+    min-height: 48px;
+  }
+
+  @media (min-width: 1024px) {
+    aside nav a {
+      min-height: auto;
+    }
+  }
+
+  aside nav a span:nth-child(2) {
+    @apply text-sm lg:text-xs font-semibold;
+  }
+
+  /* Крупнее иконки на мобайле */
+  aside nav a [class*="icon"] {
+    @apply w-5 h-5 lg:w-[18px] lg:h-[18px];
+  }
+
+  /* Бейджи покрупнее на мобайле */
+  aside nav span[class*="badge"] {
+    @apply text-sm lg:text-xs min-w-[28px] lg:min-w-[24px] h-7 lg:h-6 text-center;
+  }
+
   /* Adjust toast positioning for mobile */
   .toast-mobile {
     @apply left-4 right-4 max-w-none;
@@ -444,6 +527,59 @@ body {
   }
 }
 
+/* PWA & Mobile Specific Enhancements */
+@media (max-width: 1024px) {
+  /* Improved visibility for mobile keyboard dismissal */
+  html {
+    scroll-behavior: auto;
+  }
+  
+  /* Scroll padding for fixed headers */
+  html {
+    scroll-padding-top: 4rem;
+  }
+  
+  /* Prevent layout shift from scrollbar */
+  body {
+    overflow-x: hidden;
+  }
+  
+  /* Mobile link focus states */
+  a, button {
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+  }
+  
+  a:focus-visible, button:focus-visible {
+    outline: 2px solid #4f46e5;
+    outline-offset: 2px;
+  }
+  
+  /* Improve contrast on mobile dark mode */
+  .dark {
+    color-scheme: dark;
+  }
+  
+  /* Tap highlight for better feedback */
+  * {
+    -webkit-tap-highlight-color: rgba(99, 102, 241, 0.2);
+  }
+}
+
+/* Swipe-friendly spacing */
+@media (max-width: 768px) {
+  /* Increase spacing for easier touch targets */
+  .space-y-3 > * + * {
+    margin-top: 1rem;
+  }
+  
+  /* Better bottom sheet heights */
+  .modal-content {
+    max-height: 90vh;
+    border-radius: 24px 24px 0 0;
+  }
+}
+
 /* Frosty effect on cards */
 .new-year-mode .bg-white.dark\:bg-dark-800 {
   position: relative;
@@ -465,4 +601,40 @@ body {
   background-image: 
     radial-gradient(circle at 10% 20%, rgba(5, 150, 105, 0.05) 0%, transparent 30%),
     radial-gradient(circle at 90% 80%, rgba(220, 38, 38, 0.05) 0%, transparent 30%);
+}
+
+/* Mobile Navigation Bar Optimization */
+@media (max-width: 1024px) {
+  /* Adjust bottom navigation spacing for reachability */
+  .pb-safe {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+}
+
+/* Gesture Support Indicators */
+.swipe-indicator {
+  position: relative;
+  pointer-events: none;
+}
+
+.swipe-indicator::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  width: 32px;
+  height: 4px;
+  background-color: currentColor;
+  border-radius: 2px;
+  opacity: 0;
+  transform: translateX(-50%);
+  transition: opacity 0.3s ease;
+}
+
+/* Optimize for device-specific notches */
+@supports (padding: max(0px)) {
+  .safe-area-inset {
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
+  }
 }

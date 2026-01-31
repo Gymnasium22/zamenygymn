@@ -1,5 +1,5 @@
 
-import { AppData } from '../types';
+import { AppData, Teacher, Subject, ClassEntity, Room, ScheduleItem, Substitution } from '../types';
 import { INITIAL_DATA } from '../constants';
 import { firestoreDB, auth } from './firebase';
 import { 
@@ -10,7 +10,8 @@ import {
     onSnapshot, 
     getDocs, 
     query,
-    deleteDoc
+    deleteDoc,
+    updateDoc
 } from "firebase/firestore";
 
 // Конфигурация коллекций
@@ -113,10 +114,14 @@ export const dbService = {
 
         // Создаем Map из новых элементов
         const newItemsMap = new Map<string, any>();
-        items.forEach(item => newItemsMap.set(item.id, sanitizeForFirestore(item)));
+        items.forEach(item => {
+            if (item && item.id) {
+                newItemsMap.set(item.id, sanitizeForFirestore(item));
+            }
+        });
 
-        // Вычисляем операции только на основе кеша (не запрашиваем базу!)
-        const operations: any[] = [];
+        // Вычисляем операции только на основе кеша
+        const operations: { type: 'create' | 'update' | 'delete', item?: any, id: string }[] = [];
 
         // Удаление элементов, которые есть в кеше, но нет в новых данных
         cachedItems.forEach((_, id) => {
@@ -139,12 +144,7 @@ export const dbService = {
             }
         });
 
-        if (operations.length === 0) {
-            console.log(`No changes in ${collectionName}`);
-            return;
-        }
-
-        console.log(`Syncing ${collectionName}: ${operations.length} operations (${operations.filter(op => op.type === 'create').length} create, ${operations.filter(op => op.type === 'update').length} update, ${operations.filter(op => op.type === 'delete').length} delete)`);
+        if (operations.length === 0) return;
 
         try {
             // Запись пачками
@@ -153,27 +153,21 @@ export const dbService = {
             for (const chunk of chunks) {
                 const batch = writeBatch(firestoreDB);
 
-                chunk.forEach((op: any) => {
+                chunk.forEach((op) => {
                     const docRef = doc(firestoreDB, collectionName, op.id);
 
                     if (op.type === 'delete') {
                         batch.delete(docRef);
                         cachedItems!.delete(op.id);
                     } else {
-                        // Используем updateDoc для существующих документов, setDoc для новых
-                        if (op.type === 'update') {
-                            batch.update(docRef, op.item);
-                        } else {
-                            batch.set(docRef, op.item);
-                        }
+                        // Используем setDoc с merge: true для надежности
+                        batch.set(docRef, op.item, { merge: true });
                         cachedItems!.set(op.id, op.item);
                     }
                 });
 
                 await batch.commit();
             }
-
-            console.log(`Successfully synced ${collectionName}`);
         } catch (error) {
             console.error(`Failed to sync ${collectionName}:`, error);
             throw error;
@@ -197,16 +191,10 @@ export const dbService = {
     },
 
     save: async (data: Partial<AppData>) => {
-        if (!firestoreDB) {
-            console.error("Database not initialized");
-            return;
-        }
+        if (!firestoreDB) return;
         
         const user = auth?.currentUser;
-        if (!user || user.email !== "admin@gymnasium22.com") {
-            console.warn("Отменено сохранение: нет прав администратора.");
-            return;
-        }
+        if (!user || user.email !== "admin@gymnasium22.com") return;
 
         const promises = [];
 
@@ -214,24 +202,20 @@ export const dbService = {
         if (data.subjects) promises.push(dbService.syncCollection(COLLECTIONS.SUBJECTS, data.subjects));
         if (data.classes) promises.push(dbService.syncCollection(COLLECTIONS.CLASSES, data.classes));
         if (data.rooms) promises.push(dbService.syncCollection(COLLECTIONS.ROOMS, data.rooms));
-        
         if (data.schedule) promises.push(dbService.syncCollection(COLLECTIONS.SCHEDULE_1, data.schedule));
         if (data.schedule2) promises.push(dbService.syncCollection(COLLECTIONS.SCHEDULE_2, data.schedule2));
-        
         if (data.substitutions) promises.push(dbService.syncCollection(COLLECTIONS.SUBSTITUTIONS, data.substitutions));
-
         if (data.dutyZones) promises.push(dbService.syncCollection(COLLECTIONS.DUTY_ZONES, data.dutyZones));
         if (data.dutySchedule) promises.push(dbService.syncCollection(COLLECTIONS.DUTY_SCHEDULE, data.dutySchedule));
 
         if (data.settings) {
-            promises.push(setDoc(doc(firestoreDB, COLLECTIONS.CONFIG, 'settings'), sanitizeForFirestore(data.settings)));
+            promises.push(setDoc(doc(firestoreDB, COLLECTIONS.CONFIG, 'settings'), sanitizeForFirestore(data.settings), { merge: true }));
         }
         if (data.bellSchedule) {
             promises.push(setDoc(doc(firestoreDB, COLLECTIONS.CONFIG, 'bells'), sanitizeForFirestore({ items: data.bellSchedule })));
         }
 
         await Promise.all(promises);
-        console.log("Data saved successfully to collections");
     },
 
     subscribe: (
@@ -277,13 +261,13 @@ export const dbService = {
                     } catch (error) {
                         console.error('Failed to sync initial cache (likely quota exceeded):', error);
                         // If this is a quota error, notify the UI
-                        const err = error as any;
-                        if (err?.message && err.message.includes('quota') ||
+                        const err = error as Error & { code?: string; message?: string };
+                        if ((err?.message && err.message.includes('quota')) ||
                             err?.code === 'resource-exhausted' ||
                             err?.code === 'quota-exceeded') {
                             onError(new Error('Превышен лимит запросов к базе данных. Попробуйте позже или обратитесь к администратору.'));
                         } else {
-                            onError(error as Error);
+                            onError(err);
                         }
                     }
                 }
@@ -292,7 +276,7 @@ export const dbService = {
             }, 50);
         };
 
-        const unsubs: any[] = [];
+        const unsubs: (() => void)[] = [];
 
         const subColl = (colName: string, key: keyof AppData) => {
             const q = query(collection(firestoreDB, colName));

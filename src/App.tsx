@@ -5,6 +5,7 @@ import { DataProvider, useStaticData, StaticDataProvider, ScheduleDataProvider }
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Icon } from './components/Icons';
 import { StatusWidget, BottomNavigation, ToastProvider } from './components/UI';
+import { useSwipeNavigation } from './hooks/useSwipeNavigation';
 import { DashboardPage } from './pages/Dashboard';
 import { SchedulePage } from './pages/Schedule';
 import { DirectoryPage } from './pages/Directory';
@@ -66,6 +67,9 @@ const Layout = () => {
     const { isLoading } = useStaticData();
     const { logout, role, user } = useAuth();
 
+    // Включаем поддержку свайпов на мобильных
+    useSwipeNavigation({ enabled: true, threshold: 50 });
+
     // Закрываем мобильное меню при изменении размера экрана
     useEffect(() => {
         const handleResize = () => {
@@ -92,19 +96,20 @@ const Layout = () => {
 
     if (isLoading) return <div className="h-screen flex items-center justify-center bg-slate-50 dark:bg-dark-950"><Icon name="Loader" className="animate-spin text-indigo-600" size={48} /></div>;
 
+    // Простое плоское меню без группировки
     const menuItems = [
         { to: '/dashboard', label: 'Рабочий стол', icon: 'Home', roles: ['admin', 'teacher'] },
         { to: '/schedule', label: 'Расписание 1 пол.', icon: 'Calendar', roles: ['admin', 'teacher', 'guest'] },
         { to: '/schedule2', label: 'Расписание 2 пол.', icon: 'Calendar', roles: ['admin', 'teacher', 'guest'] },
         { to: '/substitutions', label: 'Замены', icon: 'Repeat', roles: ['admin'] },
-        { to: '/duty', label: 'Дежурство', icon: 'Shield', roles: ['admin', 'teacher'] }, 
+        { to: '/duty', label: 'Дежурство', icon: 'Shield', roles: ['admin', 'teacher'] },
         { to: '/directory', label: 'Справочники', icon: 'BookOpen', roles: ['admin'] },
-        { to: '/reports', label: 'Отчеты', icon: 'BarChart2', roles: ['admin'] }, 
+        { to: '/reports', label: 'Отчеты', icon: 'BarChart2', roles: ['admin'] },
         { to: '/export', label: 'Экспорт', icon: 'Download', roles: ['admin'] },
         { to: '/admin', label: 'Администрация', icon: 'Settings', roles: ['admin'] },
     ];
 
-    const filteredMenu = menuItems.filter(item => item.roles.includes(role || ''));
+    const filteredMenuItems = menuItems.filter(item => item.roles.includes(role || ''));
 
     return (
         <div className={`flex h-screen bg-slate-50 dark:bg-dark-950 overflow-hidden transition-colors duration-300 ${isNewYear ? 'festive-bg' : 'mesh-gradient-bg'}`}>
@@ -112,7 +117,7 @@ const Layout = () => {
             {isMobileMenuOpen && <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 lg:hidden" onClick={() => setIsMobileMenuOpen(false)} />}
             
             {/* Sidebar - hidden on mobile unless opened via menu */}
-            <aside className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-white/80 dark:bg-dark-800/90 backdrop-blur-xl border-r border-slate-200/50 dark:border-slate-700/50 transform transition-transform duration-300 ease-in-out ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} no-print shadow-2xl lg:shadow-none`}>
+            <aside className={`fixed lg:static inset-y-0 left-0 z-50 w-64 lg:w-64 bg-white/80 dark:bg-dark-800/90 backdrop-blur-xl border-r border-slate-200/50 dark:border-slate-700/50 transform transition-transform duration-300 ease-in-out ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} no-print shadow-2xl lg:shadow-none overflow-hidden`}>
                 <div className="h-full flex flex-col relative">
                     {isNewYear && <div className="bg-garland" />}
                     
@@ -123,20 +128,31 @@ const Layout = () => {
                         </div>
                         <div><h1 className="text-lg font-black text-slate-800 dark:text-white">Гимназия Pro22</h1><p className="text-[10px] font-bold text-slate-400 uppercase">Управление V2.0</p></div>
                     </div>
-                    
+
                     <nav className="flex-1 p-4 space-y-1 overflow-y-auto custom-scrollbar">
-                        <div className="px-2 mb-2">
-                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Меню</div>
-                        </div>
-                        {filteredMenu.map((item) => (
-                            <NavLink key={item.to} to={item.to} onClick={() => setIsMobileMenuOpen(false)} className={({ isActive }) => `flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-bold transition-all ${isActive ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'}`}>
-                                <Icon name={item.icon} size={20} />{item.label}
+                        {filteredMenuItems.map((item) => (
+                            <NavLink
+                                key={item.to}
+                                to={item.to}
+                                onClick={() => setIsMobileMenuOpen(false)}
+                                className={({ isActive }) => `
+                                    group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-all relative
+                                    ${isActive
+                                        ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 shadow-sm'
+                                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/50 hover:text-slate-700 dark:hover:text-slate-300'
+                                    }
+                                `}
+                            >
+                                <Icon name={item.icon} size={18} className="flex-shrink-0" />
+                                <span className="flex-1 truncate">{item.label}</span>
                             </NavLink>
                         ))}
                     </nav>
 
-                    {/* Status widget only visible on desktop here, mobile has its own layout */}
-                    <div className="hidden lg:block">
+                    
+
+                    {/* Динамический StatusWidget — расположен выше панели пользователя/тем */}
+                    <div className="hidden lg:block mb-2">
                         <StatusWidget />
                     </div>
 
@@ -154,8 +170,8 @@ const Layout = () => {
                             </button>
                         </div>
                     </div>
-                </div>
-            </aside>
+                    </div>
+                </aside>
 
             <main className="flex-1 flex flex-col min-w-0 bg-transparent relative">
                 <header className="lg:hidden p-4 flex items-center gap-3 bg-white/80 dark:bg-dark-800/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-700 no-print sticky top-0 z-30">

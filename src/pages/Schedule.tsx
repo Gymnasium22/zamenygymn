@@ -4,6 +4,7 @@ import { useStaticData, useScheduleData } from '../context/DataContext';
 import { Icon } from '../components/Icons';
 import { Modal, SearchableSelect, ContextMenu } from '../components/UI';
 import { Shift, DayOfWeek, DAYS, SHIFT_PERIODS, ScheduleItem } from '../types';
+import { generateId } from '../utils/helpers';
 import useMedia from 'use-media';
 
 interface SchedulePageProps {
@@ -75,12 +76,20 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
 
     const getRows = () => rows;
 
-    const scheduleItemsCache = useMemo(() => new Map<string, ScheduleItem[]>(), []);
+    const [scheduleItemsCache] = useState(() => new Map<string, ScheduleItem[]>());
 
-    // Очищаем кеш при изменении расписания
+    // Очищаем кеш при изменении расписания, чтобы избежать утечки памяти
     useEffect(() => {
         scheduleItemsCache.clear();
     }, [schedule, scheduleItemsCache]);
+
+    // Ограничиваем размер кэша для предотвращения растущей памяти
+    useEffect(() => {
+        if (scheduleItemsCache.size > 500) {
+            scheduleItemsCache.clear();
+            console.warn('Schedule cache cleared to prevent memory leak');
+        }
+    }, [scheduleItemsCache]);
 
     const getScheduleItems = useCallback((rowId: string, colKey: string | number): ScheduleItem[] => {
         const cacheKey = `${viewMode}-${rowId}-${colKey}-${selectedShift}-${selectedDay}-${filterId}-${filterRoom}-${filterDirection}`;
@@ -92,11 +101,13 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
         let items: ScheduleItem[] = [];
         if (viewMode === 'week') {
              const period = parseInt(rowId);
-             const day = colKey as string;
+             if (isNaN(period)) return [];
+             const day = String(colKey);
              items = schedule.filter(s => s.shift === selectedShift && s.period === period && s.day === day);
              if (filterId) items = items.filter(s => s.classId === filterId);
         } else {
-            const period = colKey as number;
+            const period = typeof colKey === 'string' ? parseInt(colKey) : colKey;
+            if (isNaN(period)) return [];
             if (viewMode === 'class') items = schedule.filter(s => s.classId === rowId && s.period === period && s.day === selectedDay && s.shift === selectedShift);
             if (viewMode === 'teacher') items = schedule.filter(s => s.teacherId === rowId && s.period === period && s.day === selectedDay && s.shift === selectedShift);
             if (viewMode === 'subject') items = schedule.filter(s => s.subjectId === rowId && s.period === period && s.day === selectedDay && s.shift === selectedShift);
@@ -174,7 +185,7 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
     };
     const handleAddItem = (rowId: string, period: number, day: DayOfWeek = selectedDay) => {
         if(readOnly) return;
-        const base: Partial<ScheduleItem> = { period, day, shift: selectedShift, id: Math.random().toString(36).substr(2, 9) };
+        const base: Partial<ScheduleItem> = { period, day, shift: selectedShift, id: generateId() };
         if (viewMode === 'class') base.classId = rowId;
         if (viewMode === 'teacher') base.teacherId = rowId;
         if (viewMode === 'subject') base.subjectId = rowId;
@@ -381,7 +392,7 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
         const cell = contextMenu.cell;
         if (clipboard) {
             contextActions.push({ label: 'Вставить', icon: 'Clipboard', onClick: async () => {
-                 const newItem = { ...clipboard, id: Math.random().toString(36).substr(2, 9), day: selectedDay, shift: selectedShift, period: cell.colKey } as ScheduleItem; 
+                 const newItem = { ...clipboard, id: generateId(), day: selectedDay, shift: selectedShift, period: cell.colKey } as ScheduleItem; 
                  if(viewMode === 'week') { newItem.day = cell.colKey as string; newItem.period = parseInt(cell.rowId); }
                  if(viewMode === 'class') newItem.classId = cell.rowId;
                  else if (viewMode === 'teacher') newItem.teacherId = cell.rowId;

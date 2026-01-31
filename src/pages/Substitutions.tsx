@@ -5,6 +5,7 @@ import { useStaticData, useScheduleData } from '../context/DataContext';
 import { Icon } from '../components/Icons';
 import { Modal } from '../components/UI';
 import { DAYS, Shift, Teacher, ScheduleItem, ClassEntity, Subject, Room } from '../types';
+import { formatDateISO, getScheduleForDate, generateId } from '../utils/helpers';
 import useMedia from 'use-media';
 
 export const SubstitutionsPage = () => {
@@ -12,15 +13,7 @@ export const SubstitutionsPage = () => {
     const { schedule1, schedule2, substitutions, saveScheduleData } = useScheduleData();
 
     const location = useLocation();
-    // Безопасная функция для получения локальной даты в формате YYYY-MM-DD
-    const getLocalDateString = (date: Date = new Date()): string => {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-    };
-
-    const [selectedDate, setSelectedDate] = useState(getLocalDateString());
+    const [selectedDate, setSelectedDate] = useState(formatDateISO());
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [currentSubParams, setCurrentSubParams] = useState<any>(null);
     const [absenceModalOpen, setAbsenceModalOpen] = useState(false);
@@ -48,10 +41,10 @@ export const SubstitutionsPage = () => {
     const [mobileTab, setMobileTab] = useState<'lessons' | 'teachers'>('lessons');
 
     const activeSchedule = useMemo(() => {
-        const month = new Date(selectedDate).getMonth();
-        const isSecondSemester = month >= 0 && month <= 4;
-        return isSecondSemester ? schedule2 : schedule1;
-    }, [selectedDate, schedule1, schedule2]);
+        const data = { schedule: schedule1, schedule2, settings };
+        const schedule = getScheduleForDate(new Date(selectedDate), data as any);
+        return schedule;
+    }, [selectedDate, schedule1, schedule2, settings]);
 
     useEffect(() => {
         if(location.state?.subParams) {
@@ -158,17 +151,17 @@ export const SubstitutionsPage = () => {
             return;
         }
 
-        const newSubs = [...substitutions];
         const item = activeSchedule.find(s => s.id === currentSubParams.scheduleItemId);
         if (!item) {
             alert("Ошибка: Урок не найден в расписании.");
             return;
         }
         
-        const filteredSubs = newSubs.filter(s => !(s.scheduleItemId === currentSubParams.scheduleItemId && s.date === selectedDate));
+        // Используем актуальное состояние substitutions для избежания race condition
+        const filteredSubs = substitutions.filter(s => !(s.scheduleItemId === currentSubParams.scheduleItemId && s.date === selectedDate));
         
         const subData = { 
-            id: Math.random().toString(36).substr(2, 9), 
+            id: generateId(), 
             date: selectedDate, 
             scheduleItemId: currentSubParams.scheduleItemId, 
             originalTeacherId: item.teacherId, 
@@ -180,18 +173,25 @@ export const SubstitutionsPage = () => {
         }; 
         
         filteredSubs.push(subData);
-        await saveScheduleData({ substitutions: filteredSubs }); 
-        
-        setIsModalOpen(false); 
-        setCandidateSearch('');
-        setSelectedRoomId('');
-        setLessonAbsenceReason(''); 
-        setRefusedTeacherIds([]);
-        setCurrentSubParams(null);
+        try {
+            await saveScheduleData({ substitutions: filteredSubs });
+            setIsModalOpen(false); 
+            setCandidateSearch('');
+            setSelectedRoomId('');
+            setLessonAbsenceReason(''); 
+            setRefusedTeacherIds([]);
+            setCurrentSubParams(null);
+        } catch (error) {
+            console.error('Failed to save substitution:', error);
+            alert('Ошибка при сохранении замены. Попробуйте еще раз.');
+        }
     }, [currentSubParams, selectedDate, selectedRoomId, activeSchedule, substitutions, teachers, lessonAbsenceReason, refusedTeacherIds, saveScheduleData]);
 
     const handleBatchClassMerge = useCallback(async (targetClassId: string) => {
-        if (!currentSubParams || !selectedDayOfWeek) return;
+        if (!currentSubParams || !selectedDayOfWeek || !currentSubParams.period || !currentSubParams.shift || !currentSubParams.teacherId) {
+            alert("Ошибка: Неполные параметры урока.");
+            return;
+        }
 
         const targetLessons = activeSchedule.filter(s => 
             s.classId === targetClassId &&
@@ -209,7 +209,7 @@ export const SubstitutionsPage = () => {
 
         targetLessons.forEach(lesson => {
             const subData = {
-                id: Math.random().toString(36).substr(2, 9),
+                id: generateId(),
                 date: selectedDate,
                 scheduleItemId: currentSubParams.scheduleItemId, 
                 originalTeacherId: currentSubParams.teacherId, 
@@ -269,7 +269,7 @@ export const SubstitutionsPage = () => {
 
         const sourceSubIndex = newSubs.findIndex(s => s.scheduleItemId === sourceLesson.id && s.date === selectedDate);
         const sourceSubData = {
-            id: sourceSubIndex >= 0 ? newSubs[sourceSubIndex].id : Math.random().toString(36).substr(2, 9),
+            id: sourceSubIndex >= 0 ? newSubs[sourceSubIndex].id : generateId(),
             date: selectedDate,
             scheduleItemId: sourceLesson.id,
             originalTeacherId: sourceLesson.teacherId,
@@ -282,7 +282,7 @@ export const SubstitutionsPage = () => {
 
         const targetSubIndex = newSubs.findIndex(s => s.scheduleItemId === targetLesson.id && s.date === selectedDate);
         const targetSubData = {
-            id: targetSubIndex >= 0 ? newSubs[targetSubIndex].id : Math.random().toString(36).substr(2, 9),
+            id: targetSubIndex >= 0 ? newSubs[targetSubIndex].id : generateId(),
             date: selectedDate,
             scheduleItemId: targetLesson.id,
             originalTeacherId: targetLesson.teacherId,

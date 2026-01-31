@@ -4,6 +4,7 @@ import { useStaticData, useScheduleData } from '../context/DataContext';
 import { Icon } from '../components/Icons';
 import { Modal, SearchableSelect } from '../components/UI';
 import { DAYS, Shift, DutyZone } from '../types';
+import { generateId } from '../utils/helpers';
 import html2canvas from 'html2canvas';
 
 export const DutyPage = () => {
@@ -71,7 +72,7 @@ export const DutyPage = () => {
         
         if (selectedTeacherId) {
             newSchedule.push({
-                id: Math.random().toString(36).substr(2, 9),
+                id: generateId(),
                 zoneId: selectedCell.zoneId,
                 day: selectedCell.day,
                 shift: selectedShift,
@@ -143,7 +144,7 @@ export const DutyPage = () => {
                     const best = scoredCandidates[0];
                     if (best && best.score > -500) { 
                         newSchedule.push({
-                            id: Math.random().toString(36).substr(2, 9),
+                            id: generateId(),
                             zoneId: zone.id,
                             day: day,
                             shift: shift,
@@ -285,7 +286,7 @@ export const DutyPage = () => {
         if (editingZone.id) {
             newZones = newZones.map(z => z.id === editingZone.id ? { ...z, ...zoneToSave } as DutyZone : z);
         } else {
-            newZones.push({ ...zoneToSave, id: Math.random().toString(36).substr(2, 9) } as DutyZone);
+            newZones.push({ ...zoneToSave, id: generateId() } as DutyZone);
         }
         await saveStaticData({ dutyZones: newZones });
         setIsZoneModalOpen(false);

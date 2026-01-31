@@ -4,6 +4,7 @@ import { AppData, Shift, StaticAppData, ScheduleAndSubstitutionData, ScheduleIte
 import { INITIAL_DATA, DEFAULT_BELLS, DEFAULT_DUTY_ZONES } from '../constants';
 import { dbService } from '../services/db';
 import { useAuth } from './AuthContext';
+import { getActiveSemester, formatDateISO } from '../utils/helpers';
 
 interface FullDataContextType {
     data: AppData;
@@ -216,7 +217,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
     }, [initialData, user, role, authLoading]); 
 
     const saveData = useCallback(async (newData: Partial<AppData>, addToHistory = true) => {
-        const isGuest = !user && role === 'guest';
+        const isGuest = role === 'guest';
         setIsSaving(true);
 
         try {
@@ -229,9 +230,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                 safeLocalStorageSet(LOCAL_STORAGE_KEY, JSON.stringify(mergedData));
             }
 
-            // 3. Пробуем отправить в облако
+            // 3. Пробуем отправить в облако (только для авторизованных, не для гостей и не для публичных данных)
             if (!initialData && user && !isGuest) {
-                await dbService.save(newData);
+                try {
+                    await dbService.save(newData);
+                } catch (dbError: any) {
+                    // Откатываем оптимистичное обновление при ошибке
+                    setInternalData(data);
+                    throw dbError;
+                }
             } else if (isGuest) {
                 console.warn("Гости не могут сохранять изменения в базу данных.");
             }
@@ -240,19 +247,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                 const newHistory = history.slice(0, historyPointer + 1);
                 newHistory.push(mergedData);
 
-                // Improved history management: keep more history, trim less aggressively
-                const MAX_HISTORY = 100;
-                const MIN_HISTORY_TO_KEEP = 20;
-
+                // History management: keep reasonable limit to prevent memory bloat
+                const MAX_HISTORY = 50;
                 if (newHistory.length > MAX_HISTORY) {
-                    // Keep at least MIN_HISTORY_TO_KEEP items, remove older ones
+                    // Remove oldest items, keep the most recent MAX_HISTORY
                     const itemsToRemove = newHistory.length - MAX_HISTORY;
-                    const keepFromIndex = Math.min(itemsToRemove, newHistory.length - MIN_HISTORY_TO_KEEP);
-                    newHistory.splice(0, keepFromIndex);
-
-                    // Adjust history pointer accordingly
-                    const pointerAdjustment = keepFromIndex;
-                    setHistoryPointer(Math.max(0, (historyPointer + 1) - pointerAdjustment));
+                    newHistory.splice(0, itemsToRemove);
+                    setHistoryPointer(MAX_HISTORY - 1);
                 } else {
                     setHistoryPointer(newHistory.length - 1);
                 }
@@ -267,40 +268,46 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
     }, [data, history, historyPointer, user, role, initialData]);
 
     const undo = useCallback(async () => {
-        if (historyPointer > 0) {
-            const prevData = history[historyPointer - 1];
-            setHistoryPointer(historyPointer - 1);
-            setInternalData(prevData);
-            // Сохраняем локально
-            if (isLocalStorageAvailable()) {
-                safeLocalStorageSet(LOCAL_STORAGE_KEY, JSON.stringify(prevData));
+        setHistoryPointer(prev => {
+            if (prev > 0) {
+                const prevData = history[prev - 1];
+                setInternalData(prevData);
+                // Сохраняем локально
+                if (isLocalStorageAvailable()) {
+                    safeLocalStorageSet(LOCAL_STORAGE_KEY, JSON.stringify(prevData));
+                }
+                
+                if (!initialData && user) {
+                    try {
+                        dbService.save(prevData).catch(e => handleError.firebase(e, 'отмены изменений'));
+                    } catch(e) { handleError.firebase(e, 'отмены изменений'); }
+                }
+                return prev - 1;
             }
-            
-            if (!initialData && user) {
-                try {
-                    await dbService.save(prevData);
-                } catch(e) { handleError.firebase(e, 'отмены изменений'); }
-            }
-        }
-    }, [history, historyPointer, user, initialData]);
+            return prev;
+        });
+    }, [history, initialData, user]);
 
     const redo = useCallback(async () => {
-        if (historyPointer < history.length - 1) {
-            const nextData = history[historyPointer + 1];
-            setHistoryPointer(historyPointer + 1);
-            setInternalData(nextData);
-            // Сохраняем локально
-            if (isLocalStorageAvailable()) {
-                safeLocalStorageSet(LOCAL_STORAGE_KEY, JSON.stringify(nextData));
-            }
+        setHistoryPointer(prev => {
+            if (prev < history.length - 1) {
+                const nextData = history[prev + 1];
+                setInternalData(nextData);
+                // Сохраняем локально
+                if (isLocalStorageAvailable()) {
+                    safeLocalStorageSet(LOCAL_STORAGE_KEY, JSON.stringify(nextData));
+                }
 
-            if (!initialData && user) {
-                 try {
-                    await dbService.save(nextData);
-                } catch(e) { handleError.firebase(e, 'повтора изменений'); }
+                if (!initialData && user) {
+                    try {
+                        dbService.save(nextData).catch(e => handleError.firebase(e, 'повтора изменений'));
+                    } catch(e) { handleError.firebase(e, 'повтора изменений'); }
+                }
+                return prev + 1;
             }
-        }
-    }, [history, historyPointer, user, initialData]);
+            return prev;
+        });
+    }, [history, initialData, user]);
 
     const resetData = useCallback(async () => { await saveData(INITIAL_DATA); }, [saveData]);
 
@@ -365,16 +372,10 @@ export const StaticDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 export const ScheduleDataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { data, saveData } = useFullData();
 
-    // Определяем семестр по настройкам или по умолчанию: 1 семестр сентябрь-декабрь, 2 семестр январь-май
+    // Определяем текущий семестр на основе унифицированной функции
     const now = new Date();
-    const currentMonth = now.getMonth(); // 0-январь, 8-сентябрь
-
-    // Используем настройки семестров, если они есть
-    const semesterConfig = data.settings?.semesterConfig;
-    const isSecondSemester = semesterConfig
-        ? semesterConfig.secondSemesterMonths.includes(currentMonth)
-        : (currentMonth >= 0 && currentMonth <= 4); // По умолчанию: январь-май = 2 семестр
-    const activeSchedule = isSecondSemester ? (data.schedule2 || []) : (data.schedule || []);
+    const currentSemester = getActiveSemester(now, data.settings);
+    const activeSchedule = currentSemester === 2 ? (data.schedule2 || []) : (data.schedule || []);
 
     const saveSemesterSchedule = useCallback(async (semester: 1 | 2, newData: ScheduleItem[]) => {
         if (semester === 1) {

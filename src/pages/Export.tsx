@@ -5,6 +5,7 @@ import { Icon } from '../components/Icons';
 import { dbService } from '../services/db'; 
 import { DAYS, DayOfWeek, Shift, SHIFT_PERIODS, AppData, Substitution, ScheduleItem, ClassEntity, Subject, Teacher } from '../types';
 import { INITIAL_DATA } from '../constants';
+import { formatDateISO, generateId, getActiveSemester } from '../utils/helpers';
 import html2canvas from 'html2canvas';
 
 import { QRCodeSVG } from 'qrcode.react';
@@ -17,20 +18,12 @@ export const ExportPage = () => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const printRef1 = useRef<HTMLDivElement>(null);
     const printRef2 = useRef<HTMLDivElement>(null);
-    // Безопасная функция для получения локальной даты в формате YYYY-MM-DD
-    const getLocalDateString = (date: Date = new Date()): string => {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-    };
 
-    const [exportDate, setExportDate] = useState(getLocalDateString());
+    const [exportDate, setExportDate] = useState(formatDateISO());
     
     // Выбор полугодия для ручного экспорта (по умолчанию текущее)
     const [exportSemester, setExportSemester] = useState<1 | 2>(() => {
-        const month = new Date().getMonth();
-        return (month >= 0 && month <= 4) ? 2 : 1;
+        return getActiveSemester(new Date(), settings);
     });
 
     const [isGenerating, setIsGenerating] = useState(false);
@@ -1174,7 +1167,7 @@ export const ExportPage = () => {
     };
 
     const handlePublishSchedule = async () => {
-        const newPublicId = Math.random().toString(36).substr(2, 9);
+        const newPublicId = generateId();
         await dbService.setPublicData(newPublicId, fullAppData);
         
         await saveStaticData({ settings: { ...settings, publicScheduleId: newPublicId } });

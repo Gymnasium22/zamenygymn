@@ -81,7 +81,7 @@ export const LoginPage = () => {
             <div className="absolute top-20 right-20 w-72 h-72 bg-indigo-400 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000"></div>
             <div className="absolute -bottom-20 left-1/2 w-96 h-96 bg-pink-400 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-4000"></div>
 
-            <div className="glass-panel rounded-3xl shadow-2xl max-w-md w-full p-8 transition-all relative z-10">
+            <div className="rounded-3xl shadow-2xl max-w-md w-full p-8 transition-all relative z-10 bg-white/60 dark:bg-slate-800/60 border border-white/20 dark:border-slate-700 backdrop-blur-md">
                 <div className="text-center mb-8">
                     <div className="inline-flex p-4 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl text-white shadow-lg shadow-indigo-500/30 mb-4 transform hover:scale-105 transition-transform duration-300">
                         <Icon name="GraduationCap" size={48} />
@@ -136,7 +136,7 @@ export const LoginPage = () => {
                                 <label className="block text-xs font-bold uppercase text-slate-500 dark:text-slate-400 mb-2 ml-1">Email</label>
                                 <div className="relative">
                                     <Icon name="User" className="absolute left-4 top-3.5 text-slate-400" size={18}/>
-                                    <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50/50 dark:bg-slate-700/50 dark:text-white outline-none focus:ring-2 ring-indigo-500/50 transition-all font-medium" placeholder="admin@school.com" autoFocus required />
+                                    <input type="email" inputMode="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50/50 dark:bg-slate-700/50 dark:text-white outline-none focus:ring-2 ring-indigo-500/50 transition-all font-medium" placeholder="admin@school.com" autoFocus required />
                                 </div>
                             </div>
                         )}
@@ -145,7 +145,7 @@ export const LoginPage = () => {
                             <label className="block text-xs font-bold uppercase text-slate-500 dark:text-slate-400 mb-2 ml-1">Пароль</label>
                             <div className="relative">
                                 <Icon name="Briefcase" className="absolute left-4 top-3.5 text-slate-400" size={18}/>
-                                <input type="password" value={password} onChange={e => setPassword(e.target.value)} className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50/50 dark:bg-slate-700/50 dark:text-white outline-none focus:ring-2 ring-indigo-500/50 transition-all font-medium" placeholder="••••••••" required />
+                                <input type="password" inputMode="text" autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50/50 dark:bg-slate-700/50 dark:text-white outline-none focus:ring-2 ring-indigo-500/50 transition-all font-medium" placeholder="••••••••" required />
                             </div>
                         </div>
 
