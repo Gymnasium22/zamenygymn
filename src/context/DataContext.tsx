@@ -8,6 +8,7 @@ import { useAuth } from './AuthContext';
 interface FullDataContextType {
     data: AppData;
     isLoading: boolean;
+    isSaving: boolean;
     saveData: (newData: Partial<AppData>, addToHistory?: boolean) => Promise<void>;
     resetData: () => Promise<void>;
     undo: () => void;
@@ -20,9 +21,91 @@ const FullDataContext = createContext<FullDataContextType | undefined>(undefined
 
 const LOCAL_STORAGE_KEY = 'gym_data_local_backup_v2';
 
+// Вспомогательные функции для безопасной работы с localStorage
+const isLocalStorageAvailable = (): boolean => {
+    try {
+        const test = '__localStorage_test__';
+        localStorage.setItem(test, test);
+        localStorage.removeItem(test);
+        return true;
+    } catch {
+        return false;
+    }
+};
+
+const safeLocalStorageSet = (key: string, value: string): boolean => {
+    try {
+        // Проверяем размер данных (localStorage обычно имеет лимит 5-10MB)
+        const sizeInBytes = new Blob([value]).size;
+        const maxSize = 4 * 1024 * 1024; // 4MB лимит для безопасности
+
+        if (sizeInBytes > maxSize) {
+            console.warn('Data too large for localStorage, skipping backup');
+            return false;
+        }
+
+        localStorage.setItem(key, value);
+        return true;
+    } catch (e) {
+        console.warn('Failed to save to localStorage:', e);
+        return false;
+    }
+};
+
+const safeLocalStorageGet = (key: string): string | null => {
+    try {
+        return localStorage.getItem(key);
+    } catch (e) {
+        console.warn('Failed to read from localStorage:', e);
+        return null;
+    }
+};
+
+// Единообразная обработка ошибок
+const handleError = {
+    log: (message: string, error?: any) => {
+        console.error(message, error);
+    },
+
+    warn: (message: string, error?: any) => {
+        console.warn(message, error);
+    },
+
+    alert: (message: string, error?: any) => {
+        console.error(message, error);
+        alert(`⚠️ ${message}`);
+    },
+
+    firebase: (error: any, context: string) => {
+        const code = error?.code;
+        let message = 'Произошла неизвестная ошибка.';
+
+        switch (code) {
+            case 'resource-exhausted':
+                message = 'Превышен лимит запросов к базе данных.';
+                break;
+            case 'permission-denied':
+                message = 'Недостаточно прав доступа.';
+                break;
+            case 'unavailable':
+                message = 'Сервис временно недоступен. Попробуйте позже.';
+                break;
+            case 'deadline-exceeded':
+                message = 'Превышено время ожидания ответа.';
+                break;
+            default:
+                message = `Ошибка ${context}: ${error?.message || 'Неизвестная ошибка'}`;
+        }
+
+        console.error(`Firebase ${context}:`, error);
+        alert(message);
+    }
+};
+
 export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: AppData }> = ({ children, initialData }) => {
     const [data, setInternalData] = useState<AppData>(INITIAL_DATA);
     const [isLoading, setIsLoading] = useState(true);
+    const [isSaving, setIsSaving] = useState(false);
     const [history, setHistory] = useState<AppData[]>([]);
     const [historyPointer, setHistoryPointer] = useState(-1);
     
@@ -44,17 +127,20 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
         if (authLoading) return;
 
         // 2. Пытаемся загрузить локальную копию сразу, чтобы пользователь что-то видел
-        const localBackup = localStorage.getItem(LOCAL_STORAGE_KEY);
-        if (localBackup) {
-            try {
-                const parsed = JSON.parse(localBackup);
-                // Простая валидация
-                if (parsed && parsed.teachers) {
-                    setInternalData(prev => ({ ...prev, ...parsed }));
-                    console.log('Loaded from local storage backup');
+        let localBackup: string | null = null;
+        if (isLocalStorageAvailable()) {
+            localBackup = safeLocalStorageGet(LOCAL_STORAGE_KEY);
+            if (localBackup) {
+                try {
+                    const parsed = JSON.parse(localBackup);
+                    // Простая валидация
+                    if (parsed && parsed.teachers) {
+                        setInternalData(prev => ({ ...prev, ...parsed }));
+                        console.log('Loaded from local storage backup');
+                    }
+                } catch (e) {
+                    handleError.log('Error parsing local backup', e);
                 }
-            } catch (e) {
-                console.error('Error parsing local backup', e);
             }
         }
 
@@ -68,8 +154,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
         setIsLoading(true);
 
         // 3. Подписываемся на Firebase
-        const unsubscribe = dbService.subscribe(
-            (loaded) => {
+        let unsubscribe: (() => void) | undefined;
+        try {
+            unsubscribe = dbService.subscribe(
+                (loaded) => {
                 const fixedData = { ...INITIAL_DATA, ...loaded };
                 
                 // Нормализация данных
@@ -82,7 +170,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                 }));
 
                 if (!fixedData.schedule) fixedData.schedule = [];
-                if (!fixedData.schedule2ndHalf) fixedData.schedule2ndHalf = []; 
+                if (!fixedData.schedule2) fixedData.schedule2 = []; 
                 if (!fixedData.substitutions) fixedData.substitutions = [];
                 if (!fixedData.bellSchedule) fixedData.bellSchedule = DEFAULT_BELLS;
                 if (!fixedData.dutyZones || fixedData.dutyZones.length === 0) fixedData.dutyZones = DEFAULT_DUTY_ZONES;
@@ -94,7 +182,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                 setInternalData(fixedData);
                 
                 // Обновляем локальный бэкап актуальными данными из облака
-                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(fixedData));
+                if (isLocalStorageAvailable()) {
+                    safeLocalStorageSet(LOCAL_STORAGE_KEY, JSON.stringify(fixedData));
+                }
                 
                 setHistory(prev => {
                     if (prev.length === 0) return [fixedData];
@@ -108,11 +198,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                 setIsLoading(false);
             },
             (error) => {
-                console.error("Failed to subscribe to data:", error);
+                handleError.log("Failed to subscribe to data:", error);
                 // Если ошибка квоты или сети - мы уже загрузили localBackup выше, так что данные не пропадут
-                setIsLoading(false); 
+                setIsLoading(false);
             }
         );
+        } catch (error) {
+            handleError.log("Failed to initialize subscription:", error);
+            setIsLoading(false);
+            unsubscribe = undefined;
+        }
 
         return () => {
             if (unsubscribe) unsubscribe();
@@ -122,43 +217,52 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
 
     const saveData = useCallback(async (newData: Partial<AppData>, addToHistory = true) => {
         const isGuest = !user && role === 'guest';
-        
-        // 1. Оптимистичное обновление интерфейса (сразу меняем стейт)
-        const mergedData = { ...data, ...newData };
-        setInternalData(mergedData);
-        
-        // 2. Всегда сохраняем в LocalStorage как резерв
+        setIsSaving(true);
+
         try {
-            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(mergedData));
-        } catch (e) {
-            console.error("Local storage quota exceeded", e);
-        }
+            // 1. Оптимистичное обновление интерфейса (сразу меняем стейт)
+            const mergedData = { ...data, ...newData };
+            setInternalData(mergedData);
 
-        // 3. Пробуем отправить в облако
-        if (!initialData && user && !isGuest) {
-            try {
-                await dbService.save(newData); 
-            } catch (e: any) {
-                console.error("Save failed:", e);
-                // Специальная обработка для исчерпания квоты
-                if (e?.code === 'resource-exhausted') {
-                    console.warn("Quota exceeded. Saved locally only.");
-                } else if (e?.code === 'permission-denied') {
-                    alert("⚠️ Ошибка доступа. Изменения сохранены только локально.");
-                } else {
-                    console.warn("Cloud save error. Saved locally.", e.message);
-                }
+            // 2. Всегда сохраняем в LocalStorage как резерв
+            if (isLocalStorageAvailable()) {
+                safeLocalStorageSet(LOCAL_STORAGE_KEY, JSON.stringify(mergedData));
             }
-        } else if (isGuest) {
-            console.warn("Гости не могут сохранять изменения в базу данных.");
-        }
 
-        if (addToHistory) {
-            const newHistory = history.slice(0, historyPointer + 1);
-            newHistory.push(mergedData);
-            if (newHistory.length > 50) newHistory.shift(); 
-            setHistory(newHistory);
-            setHistoryPointer(newHistory.length - 1);
+            // 3. Пробуем отправить в облако
+            if (!initialData && user && !isGuest) {
+                await dbService.save(newData);
+            } else if (isGuest) {
+                console.warn("Гости не могут сохранять изменения в базу данных.");
+            }
+
+            if (addToHistory) {
+                const newHistory = history.slice(0, historyPointer + 1);
+                newHistory.push(mergedData);
+
+                // Improved history management: keep more history, trim less aggressively
+                const MAX_HISTORY = 100;
+                const MIN_HISTORY_TO_KEEP = 20;
+
+                if (newHistory.length > MAX_HISTORY) {
+                    // Keep at least MIN_HISTORY_TO_KEEP items, remove older ones
+                    const itemsToRemove = newHistory.length - MAX_HISTORY;
+                    const keepFromIndex = Math.min(itemsToRemove, newHistory.length - MIN_HISTORY_TO_KEEP);
+                    newHistory.splice(0, keepFromIndex);
+
+                    // Adjust history pointer accordingly
+                    const pointerAdjustment = keepFromIndex;
+                    setHistoryPointer(Math.max(0, (historyPointer + 1) - pointerAdjustment));
+                } else {
+                    setHistoryPointer(newHistory.length - 1);
+                }
+
+                setHistory(newHistory);
+            }
+        } catch (e: any) {
+            handleError.firebase(e, 'сохранения данных');
+        } finally {
+            setIsSaving(false);
         }
     }, [data, history, historyPointer, user, role, initialData]);
 
@@ -168,12 +272,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
             setHistoryPointer(historyPointer - 1);
             setInternalData(prevData);
             // Сохраняем локально
-            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(prevData));
+            if (isLocalStorageAvailable()) {
+                safeLocalStorageSet(LOCAL_STORAGE_KEY, JSON.stringify(prevData));
+            }
             
             if (!initialData && user) {
                 try {
                     await dbService.save(prevData);
-                } catch(e) { console.error(e); }
+                } catch(e) { handleError.firebase(e, 'отмены изменений'); }
             }
         }
     }, [history, historyPointer, user, initialData]);
@@ -184,12 +290,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
             setHistoryPointer(historyPointer + 1);
             setInternalData(nextData);
             // Сохраняем локально
-            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(nextData));
+            if (isLocalStorageAvailable()) {
+                safeLocalStorageSet(LOCAL_STORAGE_KEY, JSON.stringify(nextData));
+            }
 
             if (!initialData && user) {
                  try {
                     await dbService.save(nextData);
-                } catch(e) { console.error(e); }
+                } catch(e) { handleError.firebase(e, 'повтора изменений'); }
             }
         }
     }, [history, historyPointer, user, initialData]);
@@ -197,9 +305,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
     const resetData = useCallback(async () => { await saveData(INITIAL_DATA); }, [saveData]);
 
     const contextValue = useMemo(() => ({
-        data, isLoading, saveData, resetData,
+        data, isLoading, isSaving, saveData, resetData,
         undo, redo, canUndo: historyPointer > 0, canRedo: historyPointer < history.length - 1
-    }), [data, isLoading, saveData, resetData, undo, redo, historyPointer]);
+    }), [data, isLoading, isSaving, saveData, resetData, undo, redo, historyPointer]);
 
     return (
         <FullDataContext.Provider value={contextValue}>
@@ -257,15 +365,22 @@ export const StaticDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 export const ScheduleDataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { data, saveData } = useFullData();
 
-    const currentMonth = new Date().getMonth();
-    const isSecondSemester = currentMonth >= 0 && currentMonth <= 4;
-    const activeSchedule = isSecondSemester ? (data.schedule2ndHalf || []) : data.schedule;
+    // Определяем семестр по настройкам или по умолчанию: 1 семестр сентябрь-декабрь, 2 семестр январь-май
+    const now = new Date();
+    const currentMonth = now.getMonth(); // 0-январь, 8-сентябрь
+
+    // Используем настройки семестров, если они есть
+    const semesterConfig = data.settings?.semesterConfig;
+    const isSecondSemester = semesterConfig
+        ? semesterConfig.secondSemesterMonths.includes(currentMonth)
+        : (currentMonth >= 0 && currentMonth <= 4); // По умолчанию: январь-май = 2 семестр
+    const activeSchedule = isSecondSemester ? (data.schedule2 || []) : (data.schedule || []);
 
     const saveSemesterSchedule = useCallback(async (semester: 1 | 2, newData: ScheduleItem[]) => {
         if (semester === 1) {
             await saveData({ schedule: newData });
         } else {
-            await saveData({ schedule2ndHalf: newData });
+            await saveData({ schedule2: newData });
         }
     }, [saveData]);
 
@@ -276,12 +391,12 @@ export const ScheduleDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
     const scheduleData: ScheduleAndSubstitutionData = useMemo(() => ({
         schedule: activeSchedule,
         schedule1: data.schedule,
-        schedule2: data.schedule2ndHalf || [],
+        schedule2: data.schedule2 || [],
         substitutions: data.substitutions,
         dutySchedule: data.dutySchedule,
         saveSemesterSchedule,
         saveScheduleData
-    }), [activeSchedule, data.schedule, data.schedule2ndHalf, data.substitutions, data.dutySchedule, saveSemesterSchedule, saveScheduleData]);
+    }), [activeSchedule, data.schedule, data.schedule2, data.substitutions, data.dutySchedule, saveSemesterSchedule, saveScheduleData]);
 
     const contextValue = useMemo(() => ({
         ...scheduleData,
@@ -299,15 +414,39 @@ export const ScheduleDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
 export const useStaticData = () => {
     const context = useContext(StaticDataContext);
     if (!context) throw new Error("useStaticData must be used within StaticDataProvider");
-    const fullContext = useFullData(); 
-    return { ...context, isLoading: fullContext.isLoading, undo: fullContext.undo, redo: fullContext.redo, canUndo: fullContext.canUndo, canRedo: fullContext.canRedo, resetData: fullContext.resetData };
+    const fullContext = useFullData();
+
+    // Гарантируем, что массивы всегда определены
+    const safeContext = {
+        ...context,
+        subjects: context.subjects || [],
+        teachers: context.teachers || [],
+        classes: context.classes || [],
+        rooms: context.rooms || [],
+        bellSchedule: context.bellSchedule || [],
+        settings: context.settings || INITIAL_DATA.settings,
+        dutyZones: context.dutyZones || []
+    };
+
+    return { ...safeContext, isLoading: fullContext.isLoading, isSaving: fullContext.isSaving, undo: fullContext.undo, redo: fullContext.redo, canUndo: fullContext.canUndo, canRedo: fullContext.canRedo, resetData: fullContext.resetData };
 };
 
 export const useScheduleData = () => {
     const context = useContext(ScheduleDataContext);
     if (!context) throw new Error("useScheduleData must be used within ScheduleDataProvider");
-    const fullContext = useFullData(); 
-    return { ...context, isLoading: fullContext.isLoading, undo: fullContext.undo, redo: fullContext.redo, canUndo: fullContext.canUndo, canRedo: fullContext.canRedo, resetData: fullContext.resetData };
+    const fullContext = useFullData();
+
+    // Гарантируем, что массивы всегда определены
+    const safeContext = {
+        ...context,
+        schedule: context.schedule || [],
+        schedule1: context.schedule1 || [],
+        schedule2: context.schedule2 || [],
+        substitutions: context.substitutions || [],
+        dutySchedule: context.dutySchedule || []
+    };
+
+    return { ...safeContext, isLoading: fullContext.isLoading, isSaving: fullContext.isSaving, undo: fullContext.undo, redo: fullContext.redo, canUndo: fullContext.canUndo, canRedo: fullContext.canRedo, resetData: fullContext.resetData };
 };
 
 export const useData = () => {

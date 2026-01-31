@@ -90,7 +90,7 @@ export const INITIAL_DATA: AppData = {
         { id: 'r1', name: '101', capacity: 30, type: 'Обычный' },
     ],
     schedule: [], // 1 полугодие
-    schedule2ndHalf: [], // 2 полугодие
+    schedule2: [], // 2 полугодие
     substitutions: [],
     bellSchedule: DEFAULT_BELLS,
     dutyZones: DEFAULT_DUTY_ZONES,
@@ -102,6 +102,10 @@ export const INITIAL_DATA: AppData = {
         bellPresets: [
             { id: 'preset_normal', name: 'Обычный (45 мин)', bells: DEFAULT_BELLS },
             { id: 'preset_short', name: 'Сокращенный (35 мин)', bells: SHORT_BELLS }
-        ]
+        ],
+        semesterConfig: {
+            firstSemesterMonths: [8, 9, 10, 11], // сентябрь-декабрь
+            secondSemesterMonths: [0, 1, 2, 3, 4] // январь-май
+        }
     }
 };

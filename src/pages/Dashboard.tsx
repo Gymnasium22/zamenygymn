@@ -1,11 +1,11 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { useStaticData, useScheduleData } from '../context/DataContext'; 
+import { useStaticData, useScheduleData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { Icon } from '../components/Icons';
-import { DayOfWeek, DAYS, ScheduleItem } from '../types'; 
-import { useNavigate } from 'react-router-dom'; 
-import { Modal } from '../components/UI';
+import { DayOfWeek, DAYS, ScheduleItem } from '../types';
+import { useNavigate } from 'react-router-dom';
+import { Modal, useToast, SkeletonCard, SkeletonText } from '../components/UI';
 
 interface SearchItem {
     room?: string;
@@ -40,27 +40,65 @@ export const DashboardPage = () => {
     const { subjects, teachers, classes, rooms, bellSchedule, settings } = useStaticData();
     const { schedule, substitutions } = useScheduleData();
     const { role } = useAuth();
-    const navigate = useNavigate(); 
+    const navigate = useNavigate();
+    const { addToast } = useToast(); 
 
     const [notes, setNotes] = useState(localStorage.getItem('gym_notes') || '');
     const [currentDate] = useState(new Date());
     const [searchQuery, setSearchQuery] = useState("");
     const [searchResult, setSearchResult] = useState<SearchResult | null>(null);
     const [showAbsentList, setShowAbsentList] = useState(false);
-    const [saveStatus, setSaveStatus] = useState('');
-    
+    const [notesChanged, setNotesChanged] = useState(false);
+
+    // Безопасная функция для получения локальной даты в формате YYYY-MM-DD
+    const getLocalDateString = (date: Date = new Date()): string => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
     const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
     const [feedbackMessage, setFeedbackMessage] = useState('');
     const [isSendingFeedback, setIsSendingFeedback] = useState(false);
 
-    useEffect(() => { 
-        localStorage.setItem('gym_notes', notes); 
-        if(notes) {
-            setSaveStatus('Сохранено');
-            const t = setTimeout(() => setSaveStatus(''), 2000);
-            return () => clearTimeout(t);
-        }
-    }, [notes]);
+    // Базовая санитизация заметок (удаляем потенциально опасные HTML теги)
+    const sanitizeNotes = (text: string): string => {
+        return text
+            .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '') // Удаляем script теги
+            .replace(/<[^>]*>/g, '') // Удаляем остальные HTML теги
+            .slice(0, 10000); // Ограничиваем длину до 10KB
+    };
+
+    const handleNotesChange = (value: string) => {
+        const sanitized = sanitizeNotes(value);
+        setNotes(sanitized);
+        setNotesChanged(true);
+    };
+
+    const saveNotes = () => {
+        localStorage.setItem('gym_notes', notes);
+        setNotesChanged(false);
+        addToast({
+            type: 'success',
+            title: 'Заметки сохранены',
+            message: 'Ваши заметки успешно сохранены в браузере',
+            duration: 3000
+        });
+    };
+
+    // Автоматическое сохранение через 3 секунды без уведомления
+    useEffect(() => {
+        if (!notesChanged) return;
+
+        const timeoutId = setTimeout(() => {
+            localStorage.setItem('gym_notes', notes);
+            setNotesChanged(false);
+            // Тихое автосохранение без уведомления
+        }, 3000);
+
+        return () => clearTimeout(timeoutId);
+    }, [notes, notesChanged]);
 
     // Greeting logic
     const greeting = useMemo(() => {
@@ -70,11 +108,6 @@ export const DashboardPage = () => {
         if (hour < 18) return 'Добрый день';
         return 'Добрый вечер';
     }, [currentDate]);
-
-    const getLocalDateString = (date: Date) => {
-        const d = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
-        return d.toISOString().split('T')[0];
-    };
 
     const todayStr = useMemo(() => getLocalDateString(currentDate), [currentDate]);
     const todayDayOfWeek = useMemo(() => {
@@ -422,7 +455,7 @@ export const DashboardPage = () => {
                             onKeyDown={e => e.key === 'Enter' && handleSearch()} 
                             className="w-full bg-slate-50/80 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-600 rounded-xl p-3.5 text-sm outline-none focus:ring-2 ring-indigo-500/50 dark:text-white transition-all placeholder:text-slate-400" 
                         />
-                        <button onClick={handleSearch} className="bg-slate-800 dark:bg-indigo-600 hover:bg-slate-700 text-white p-3.5 rounded-xl transition-all shadow-md active:scale-95">
+                        <button onClick={handleSearch} className="btn-primary btn-ripple btn-touch p-3.5 mobile-optimized">
                             <Icon name="Search" size={20}/>
                         </button>
                     </div>
@@ -547,18 +580,35 @@ export const DashboardPage = () => {
                             <h3 className="font-bold text-xl dark:text-white">Заметки</h3>
                         </div>
                         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => { navigator.clipboard.writeText(notes); alert('Скопировано'); }} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg"><Icon name="Copy" size={16}/></button>
-                            <button onClick={() => { if(confirm('Очистить заметки?')) setNotes(''); }} className="p-2 text-slate-400 hover:text-red-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg"><Icon name="Trash2" size={16}/></button>
+                            <button
+                                onClick={saveNotes}
+                                disabled={!notesChanged}
+                                className={`p-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${
+                                    notesChanged
+                                        ? 'text-amber-500 hover:text-emerald-600 hover:bg-slate-100 dark:hover:bg-slate-700 animate-pulse'
+                                        : 'text-slate-400 hover:text-emerald-600 hover:bg-slate-100 dark:hover:bg-slate-700'
+                                }`}
+                                title={notesChanged ? "Сохранить изменения" : "Заметки сохранены"}
+                            >
+                                <Icon name="Save" size={16}/>
+                            </button>
+                            <button onClick={() => { navigator.clipboard.writeText(notes); addToast({type: 'success', title: 'Скопировано', message: 'Заметки скопированы в буфер обмена', duration: 2000}); }} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg"><Icon name="Copy" size={16}/></button>
+                            <button onClick={() => { if(confirm('Очистить заметки?')) { setNotes(''); setNotesChanged(false); }}} className="p-2 text-slate-400 hover:text-red-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg"><Icon name="Trash2" size={16}/></button>
                         </div>
                     </div>
                     <div className="relative flex-1 bg-yellow-50/50 dark:bg-slate-800/50 rounded-2xl p-1">
-                        <textarea 
-                            className="w-full h-full p-4 bg-transparent border-none outline-none font-medium text-slate-700 dark:text-slate-200 resize-none text-sm leading-relaxed" 
-                            placeholder="Напишите что-нибудь..." 
-                            value={notes} 
-                            onChange={e => setNotes(e.target.value)}
+                        <textarea
+                            className="w-full h-full p-4 bg-transparent border-none outline-none font-medium text-slate-700 dark:text-slate-200 resize-none text-sm leading-relaxed"
+                            placeholder="Напишите что-нибудь..."
+                            value={notes}
+                            onChange={e => handleNotesChange(e.target.value)}
+                            maxLength={10000}
                         />
-                        {saveStatus && <div className="absolute bottom-3 right-3 text-[10px] font-bold uppercase tracking-widest text-emerald-500 animate-fade-in flex items-center gap-1 bg-white dark:bg-slate-800 px-2 py-1 rounded-full shadow-sm"><Icon name="CheckCircle" size={10}/> {saveStatus}</div>}
+                        {notesChanged && (
+                            <div className="absolute bottom-3 right-3 text-[10px] font-bold uppercase tracking-widest text-amber-600 animate-pulse flex items-center gap-1 bg-white dark:bg-slate-800 px-2 py-1 rounded-full shadow-sm">
+                                <Icon name="Clock" size={10}/> Не сохранено
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -616,7 +666,7 @@ export const DashboardPage = () => {
                         <button
                             onClick={handleSendFeedback}
                             disabled={isSendingFeedback}
-                            className="px-6 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 text-sm font-bold shadow-lg shadow-indigo-500/30 flex items-center gap-2 disabled:opacity-50"
+                            className="btn-primary text-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:transform-none"
                         >
                             {isSendingFeedback ? <Icon name="Loader" size={16} className="animate-spin" /> : <Icon name="Send" size={16} />}
                             {isSendingFeedback ? 'Отправка...' : 'Отправить'}

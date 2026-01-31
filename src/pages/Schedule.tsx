@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useStaticData, useScheduleData } from '../context/DataContext'; 
 import { Icon } from '../components/Icons';
 import { Modal, SearchableSelect, ContextMenu } from '../components/UI';
@@ -64,16 +64,31 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
     const [massOpSelectedClass, setMassOpSelectedClass] = useState<string>('');
 
     const currentPeriods = SHIFT_PERIODS[selectedShift];
-    
-    const getRows = () => {
+
+    const rows = useMemo(() => {
         if (viewMode === 'week') return SHIFT_PERIODS[selectedShift].map(p => ({ id: p.toString(), name: `${p} урок` }));
         if (viewMode === 'class') return filterId ? classes.filter(c => c.id === filterId && c.shift === selectedShift) : classes.filter(c => c.shift === selectedShift);
         if (viewMode === 'teacher') return filterId ? teachers.filter(t => t.id === filterId) : teachers;
         if (viewMode === 'subject') return filterId ? subjects.filter(s => s.id === filterId) : subjects;
         return [];
-    };
+    }, [viewMode, filterId, classes, teachers, subjects, selectedShift]);
 
-    const getScheduleItems = (rowId: string, colKey: string | number): ScheduleItem[] => {
+    const getRows = () => rows;
+
+    const scheduleItemsCache = useMemo(() => new Map<string, ScheduleItem[]>(), []);
+
+    // Очищаем кеш при изменении расписания
+    useEffect(() => {
+        scheduleItemsCache.clear();
+    }, [schedule, scheduleItemsCache]);
+
+    const getScheduleItems = useCallback((rowId: string, colKey: string | number): ScheduleItem[] => {
+        const cacheKey = `${viewMode}-${rowId}-${colKey}-${selectedShift}-${selectedDay}-${filterId}-${filterRoom}-${filterDirection}`;
+
+        if (scheduleItemsCache.has(cacheKey)) {
+            return scheduleItemsCache.get(cacheKey)!;
+        }
+
         let items: ScheduleItem[] = [];
         if (viewMode === 'week') {
              const period = parseInt(rowId);
@@ -96,9 +111,10 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
             });
         }
         if (filterDirection) items = items.filter(s => s.direction?.toLowerCase().includes(filterDirection.toLowerCase()));
-        
+
+        scheduleItemsCache.set(cacheKey, items);
         return items;
-    };
+    }, [viewMode, schedule, selectedShift, selectedDay, filterId, filterRoom, filterDirection, rooms]);
 
     const checkConflicts = (item: ScheduleItem): string[] => {
         const conflicts: string[] = [];
@@ -173,6 +189,54 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
     };
     const handleSaveItem = async () => {
         if (!tempItem.subjectId || !tempItem.teacherId || !tempItem.classId) return;
+
+        // Валидация данных перед сохранением
+        const validationErrors: string[] = [];
+
+        // Проверяем корректность периода для выбранной смены
+        if (tempItem.period !== undefined) {
+            const shiftKey = (tempItem.shift || selectedShift) as Shift;
+            const validPeriods = SHIFT_PERIODS[shiftKey] || [];
+            if (!validPeriods.includes(tempItem.period)) {
+                validationErrors.push(`Период ${tempItem.period} недопустим для смены "${shiftKey}"`);
+            }
+        }
+
+        // Проверяем существование связанных данных
+        const teacher = teachers.find(t => t.id === tempItem.teacherId);
+        if (!teacher) validationErrors.push('Выбранный учитель не найден');
+
+        const subject = subjects.find(s => s.id === tempItem.subjectId);
+        if (!subject) validationErrors.push('Выбранный предмет не найден');
+
+        const classItem = classes.find(c => c.id === tempItem.classId);
+        if (!classItem) validationErrors.push('Выбранный класс не найден');
+
+        if (tempItem.roomId) {
+            const room = rooms.find(r => r.id === tempItem.roomId);
+            if (!room) validationErrors.push('Выбранный кабинет не найден');
+        }
+
+        if (validationErrors.length > 0) {
+            alert(`❌ Ошибки валидации:\n\n${validationErrors.join('\n')}`);
+            return;
+        }
+
+        // Проверяем конфликты перед сохранением
+        const conflicts = checkConflicts(tempItem as ScheduleItem);
+        if (conflicts.length > 0) {
+            const conflictNames = {
+                teacher: 'Учитель',
+                class: 'Класс',
+                room: 'Кабинет'
+            };
+            const conflictMessages = conflicts.map(type => conflictNames[type as keyof typeof conflictNames]).join(', ');
+
+            if (!confirm(`⚠️ Обнаружены конфликты: ${conflictMessages} уже заняты в это время.\n\nВсе равно сохранить урок?`)) {
+                return;
+            }
+        }
+
         let newSchedule = [...schedule];
         const idx = newSchedule.findIndex(s => s.id === tempItem.id);
         if (idx >= 0) newSchedule[idx] = tempItem as ScheduleItem; else newSchedule.push(tempItem as ScheduleItem);
@@ -218,7 +282,7 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
         if (!draggedItem || readOnly) return;
 
         const newItem = { ...draggedItem };
-        
+
         if (viewMode === 'week') {
             newItem.period = parseInt(cellInfo.rowId);
             newItem.day = cellInfo.colKey as string;
@@ -226,14 +290,84 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
             newItem.period = cellInfo.colKey as number;
             newItem.day = selectedDay;
             if (viewMode === 'class') newItem.classId = cellInfo.rowId;
-            if (viewMode === 'teacher') newItem.teacherId = cellInfo.rowId; 
+            if (viewMode === 'teacher') newItem.teacherId = cellInfo.rowId;
             if (viewMode === 'subject') newItem.subjectId = cellInfo.rowId;
         }
 
-        let newSchedule = schedule.map(s => s.id === newItem.id ? newItem : s);
+        // Check for conflicts before saving
+        const potentialSchedule = schedule.map(s => s.id === newItem.id ? newItem : s);
+        const conflicts = findScheduleConflicts(potentialSchedule, newItem);
+
+        if (conflicts.length > 0) {
+            const conflictMessages = conflicts.map(conflict => {
+                switch (conflict.type) {
+                    case 'teacher':
+                        return `Учитель ${conflict.entityName} уже занят в это время`;
+                    case 'room':
+                        return `Кабинет ${conflict.entityName} уже занят в это время`;
+                    case 'class':
+                        return `Класс ${conflict.entityName} уже имеет урок в это время`;
+                    default:
+                        return 'Обнаружен конфликт расписания';
+                }
+            });
+
+            alert(`Невозможно переместить урок:\n${conflictMessages.join('\n')}`);
+            setDraggedItem(null);
+            setDragOverCell(null);
+            return;
+        }
+
+        let newSchedule = potentialSchedule;
         await saveCurrentSchedule(newSchedule);
         setDraggedItem(null);
         setDragOverCell(null);
+    };
+
+    const findScheduleConflicts = (scheduleItems: ScheduleItem[], newItem: ScheduleItem) => {
+        const conflicts: Array<{ type: 'teacher' | 'room' | 'class', entityName: string }> = [];
+
+        // Check for conflicts at the same time slot (day, period, shift)
+        const conflictingItems = scheduleItems.filter(item =>
+            item.id !== newItem.id && // Don't conflict with itself
+            item.day === newItem.day &&
+            item.period === newItem.period &&
+            item.shift === newItem.shift
+        );
+
+        // Check teacher conflicts
+        const teacherConflict = conflictingItems.find(item => item.teacherId === newItem.teacherId);
+        if (teacherConflict) {
+            const teacher = teachers.find(t => t.id === newItem.teacherId);
+            conflicts.push({
+                type: 'teacher',
+                entityName: teacher?.name || newItem.teacherId
+            });
+        }
+
+        // Check room conflicts (only if both items have room assignments)
+        if (newItem.roomId) {
+            const roomConflict = conflictingItems.find(item => item.roomId === newItem.roomId);
+            if (roomConflict) {
+                const room = rooms.find(r => r.id === newItem.roomId);
+                conflicts.push({
+                    type: 'room',
+                    entityName: room?.name || newItem.roomId
+                });
+            }
+        }
+
+        // Check class conflicts
+        const classConflict = conflictingItems.find(item => item.classId === newItem.classId);
+        if (classConflict) {
+            const cls = classes.find(c => c.id === newItem.classId);
+            conflicts.push({
+                type: 'class',
+                entityName: cls?.name || newItem.classId
+            });
+        }
+
+        return conflicts;
     };
 
     const contextActions = [];
@@ -269,16 +403,28 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
         });
     }
 
-    const recommendedTeachers = tempItem.subjectId ? teachers.filter(t => t.subjectIds.includes(tempItem.subjectId)) : [];
-    const otherTeachers = tempItem.subjectId ? teachers.filter(t => !t.subjectIds.includes(tempItem.subjectId)) : teachers;
+    const recommendedTeachers = tempItem.subjectId ? teachers.filter(t => t.subjectIds && t.subjectIds.includes(tempItem.subjectId!)) : [];
+    const otherTeachers = tempItem.subjectId ? teachers.filter(t => !t.subjectIds || !t.subjectIds.includes(tempItem.subjectId!)) : teachers;
 
     const printTitle = useMemo(() => {
         const semesterSuffix = semester === 2 ? ' (2-е полугодие)' : '';
-        if (filterId) { 
-            if (viewMode === 'teacher') return teachers.find(t=>t.id===filterId)?.name + semesterSuffix; 
-            if (viewMode === 'class') return classes.find(c=>c.id===filterId)?.name + semesterSuffix; 
-            if (viewMode === 'subject') return subjects.find(s=>s.id===filterId)?.name + semesterSuffix;
-            if (viewMode === 'week') return classes.find(c=>c.id===filterId)?.name + semesterSuffix;
+        if (filterId) {
+            if (viewMode === 'teacher') {
+                const teacher = teachers.find(t=>t.id===filterId);
+                return teacher ? teacher.name + semesterSuffix : 'Учитель' + semesterSuffix;
+            }
+            if (viewMode === 'class') {
+                const classItem = classes.find(c=>c.id===filterId);
+                return classItem ? classItem.name + semesterSuffix : 'Класс' + semesterSuffix;
+            }
+            if (viewMode === 'subject') {
+                const subject = subjects.find(s=>s.id===filterId);
+                return subject ? subject.name + semesterSuffix : 'Предмет' + semesterSuffix;
+            }
+            if (viewMode === 'week') {
+                const classItem = classes.find(c=>c.id===filterId);
+                return classItem ? classItem.name + semesterSuffix : 'Неделя' + semesterSuffix;
+            }
         }
         return `Расписание на ${selectedDay}` + semesterSuffix;
     }, [filterId, viewMode, teachers, classes, subjects, selectedDay, semester]);
@@ -313,8 +459,6 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
     };
     // --- PRINT LOGIC END ---
 
-
-    const rows = getRows();
     const cols = viewMode === 'week' ? DAYS : currentPeriods;
 
     const handleMassClear = (type: string, day?: string, classId?: string) => {
@@ -492,7 +636,7 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
                     )}
 
                     {(filterId || viewMode === 'week') && (
-                        <button onClick={() => setIsPrintModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-bold shadow-lg shadow-indigo-200 dark:shadow-none transition-all">
+                        <button onClick={() => setIsPrintModalOpen(true)} className="btn-primary btn-ripple text-sm flex items-center gap-2">
                             <Icon name="Printer" size={16}/>
                         </button>
                     )}
@@ -614,7 +758,7 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
 
                     <div className="flex justify-end gap-2 mt-6">
                         {tempItem.id && <button onClick={() => handleDeleteItem()} className="px-4 py-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg font-bold text-sm">Удалить</button>}
-                        <button onClick={handleSaveItem} className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition">Сохранить</button>
+                        <button onClick={handleSaveItem} className="btn-primary btn-ripple">Сохранить</button>
                     </div>
                 </div>
             </Modal>

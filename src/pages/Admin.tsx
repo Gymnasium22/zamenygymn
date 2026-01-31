@@ -9,7 +9,15 @@ export const AdminPage = () => {
     const { schedule1, schedule2 } = useScheduleData();
 
     const [activeTab, setActiveTab] = useState('teachers');
-    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+    // Безопасная функция для получения локальной даты в формате YYYY-MM-DD
+    const getLocalDateString = (date: Date = new Date()): string => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
+    const [selectedDate, setSelectedDate] = useState(getLocalDateString());
     
     const [teacherShift, setTeacherShift] = useState(Shift.First);
     const [afterPeriod, setAfterPeriod] = useState(1);

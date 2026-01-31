@@ -83,14 +83,141 @@ body {
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
 }
 
-/* Animations */
+/* Modern Card Component */
+.modern-card {
+  @apply bg-white dark:bg-dark-800 rounded-2xl shadow-lg;
+  @apply border border-slate-200/50 dark:border-slate-700/50;
+  @apply backdrop-blur-xl bg-white/80 dark:bg-dark-800/80;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.modern-card:hover {
+  @apply shadow-xl scale-[1.02] border-indigo-200 dark:border-indigo-700;
+  transform: translateY(-4px) scale(1.02);
+}
+
+/* Enhanced Button Styles */
+.btn-primary {
+  @apply bg-gradient-to-r from-primary-600 to-purple-600 hover:from-primary-700 hover:to-purple-700;
+  @apply text-white font-semibold px-6 py-3 rounded-xl shadow-lg;
+  @apply transform transition-all duration-200 active:scale-95;
+  @apply hover:shadow-xl hover:-translate-y-0.5;
+}
+
+.btn-secondary {
+  @apply bg-white dark:bg-dark-800 border-2 border-slate-200 dark:border-slate-600;
+  @apply hover:border-primary-300 dark:hover:border-primary-500;
+  @apply text-slate-700 dark:text-slate-200 font-medium px-6 py-3 rounded-xl;
+  @apply transition-all duration-200 active:scale-95;
+}
+
+.btn-success {
+  @apply bg-gradient-to-r from-success-500 to-success-600 hover:from-success-600 hover:to-success-700;
+  @apply text-white font-semibold px-6 py-3 rounded-xl shadow-lg;
+  @apply transform transition-all duration-200 active:scale-95;
+}
+
+.btn-danger {
+  @apply bg-gradient-to-r from-danger-500 to-danger-600 hover:from-danger-600 hover:to-danger-700;
+  @apply text-white font-semibold px-6 py-3 rounded-xl shadow-lg;
+  @apply transform transition-all duration-200 active:scale-95;
+}
+
+/* Ripple Effect */
+.btn-ripple {
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-ripple::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transform: translate(-50%, -50%);
+  transition: width 0.6s, height 0.6s;
+}
+
+.btn-ripple:active::before {
+  width: 300px;
+  height: 300px;
+}
+
+/* Skeleton Loading */
+.skeleton {
+  @apply bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200;
+  @apply dark:from-slate-700 dark:via-slate-600 dark:to-slate-700;
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s infinite;
+}
+
+@keyframes skeleton-loading {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Loading Dots Animation */
+.loading-dots::after {
+  content: '';
+  animation: loading-dots 1.5s infinite;
+}
+
+@keyframes loading-dots {
+  0%, 20% { content: ''; }
+  40% { content: '.'; }
+  60% { content: '..'; }
+  80%, 100% { content: '...'; }
+}
+
+/* Enhanced Animations */
 @keyframes float {
   0% { transform: translateY(0px); }
   50% { transform: translateY(-10px); }
   100% { transform: translateY(0px); }
 }
+
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+  }
+  50% {
+    opacity: 0.8;
+    box-shadow: 0 0 30px rgba(99, 102, 241, 0.5);
+  }
+}
+
 .animate-float {
   animation: float 6s ease-in-out infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Improved Focus States */
+.focus-ring:focus {
+  @apply outline-none ring-2 ring-primary-500 ring-offset-2 ring-offset-white dark:ring-offset-dark-900;
+}
+
+/* Status Badges */
+.badge-success {
+  @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  @apply bg-success-100 text-success-800 dark:bg-success-900 dark:text-success-200;
+}
+
+.badge-warning {
+  @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  @apply bg-warning-100 text-warning-800 dark:bg-warning-900 dark:text-warning-200;
+}
+
+.badge-danger {
+  @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  @apply bg-danger-100 text-danger-800 dark:bg-danger-900 dark:text-danger-200;
 }
 
 /* --- NEW YEAR MODE ENHANCEMENTS --- */
@@ -188,6 +315,133 @@ body {
 .dark.new-year-mode aside nav a.active {
   background-color: rgba(153, 27, 27, 0.2) !important;
   color: #f87171 !important;
+}
+
+/* Enhanced Dark Theme Improvements */
+.dark {
+  --bg-primary: #0f172a;
+  --bg-secondary: #1e293b;
+  --bg-tertiary: #334155;
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+  --border-primary: #475569;
+  --border-secondary: #334155;
+}
+
+/* Better contrast for inputs and form elements */
+.dark input,
+.dark textarea,
+.dark select {
+  @apply bg-dark-800 border-slate-600 text-slate-200 placeholder-slate-400;
+  @apply focus:border-primary-500 focus:ring-primary-500/20;
+}
+
+/* Enhanced card shadows in dark mode */
+.dark .modern-card {
+  @apply shadow-slate-900/20;
+}
+
+.dark .modern-card:hover {
+  @apply shadow-slate-900/30;
+}
+
+/* Better button contrasts */
+.dark .btn-primary {
+  @apply shadow-primary-900/30;
+}
+
+.dark .btn-secondary {
+  @apply border-slate-600 hover:border-primary-300;
+}
+
+/* Improved scrollbar in dark mode */
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #475569;
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+/* Responsive Design Enhancements */
+@media (max-width: 640px) {
+  .mobile-optimized {
+    @apply px-4 py-2 text-sm;
+  }
+
+  .mobile-grid {
+    @apply grid-cols-1 sm:grid-cols-2 lg:grid-cols-3;
+  }
+
+  .mobile-stack {
+    @apply flex-col space-y-2 space-x-0 sm:flex-row sm:space-y-0 sm:space-x-2;
+  }
+
+  .mobile-text {
+    @apply text-sm sm:text-base;
+  }
+
+  /* Better touch targets on mobile */
+  button, .btn-touch {
+    @apply min-h-[44px] min-w-[44px];
+  }
+
+  /* Adjust toast positioning for mobile */
+  .toast-mobile {
+    @apply left-4 right-4 max-w-none;
+  }
+}
+
+@media (max-width: 768px) {
+  .tablet-optimized {
+    @apply px-6 py-3;
+  }
+
+  .tablet-grid {
+    @apply grid-cols-1 md:grid-cols-2 lg:grid-cols-3;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .btn-primary {
+    @apply border-2 border-primary-600 bg-primary-600 text-white;
+  }
+
+  .modern-card {
+    @apply border-2 border-slate-300 dark:border-slate-600;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .btn-primary,
+  .modern-card,
+  .animate-float,
+  .animate-pulse-glow {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .btn-ripple::before {
+    display: none !important;
+  }
+}
+
+/* Print optimizations */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  .print-break {
+    page-break-before: always;
+  }
+
+  .modern-card {
+    @apply shadow-none border border-slate-300;
+  }
 }
 
 /* Frosty effect on cards */

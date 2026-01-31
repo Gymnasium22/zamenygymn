@@ -1,0 +1,63 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper function to check if user is admin
+    function isAdmin() {
+      return request.auth != null &&
+             request.auth.token.email == 'admin@gymnasium22.com';
+    }
+
+    // Helper function to check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Admin-only collections: teachers, subjects, classes, rooms, schedules, substitutions, duty data, config
+    match /teachers/{document} {
+      allow read, write: if isAdmin();
+    }
+
+    match /subjects/{document} {
+      allow read, write: if isAdmin();
+    }
+
+    match /classes/{document} {
+      allow read, write: if isAdmin();
+    }
+
+    match /rooms/{document} {
+      allow read, write: if isAdmin();
+    }
+
+    match /schedule_sem1/{document} {
+      allow read, write: if isAdmin();
+    }
+
+    match /schedule_sem2/{document} {
+      allow read, write: if isAdmin();
+    }
+
+    match /substitutions/{document} {
+      allow read, write: if isAdmin();
+    }
+
+    match /duty_zones/{document} {
+      allow read, write: if isAdmin();
+    }
+
+    match /duty_schedule/{document} {
+      allow read, write: if isAdmin();
+    }
+
+    match /config/{document} {
+      allow read, write: if isAdmin();
+    }
+
+    // Public schedules: anyone can read, only admin can write
+    match /publicSchedules/{document} {
+      allow read: if true;  // Public read access
+      allow write: if isAdmin();
+    }
+  }
+}

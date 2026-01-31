@@ -10,6 +10,15 @@ export const DutyPage = () => {
     const { teachers, dutyZones, rooms, saveStaticData } = useStaticData();
     const { dutySchedule, saveScheduleData, schedule1, schedule2 } = useScheduleData();
     
+    // --- РУЧНАЯ РЕГУЛИРОВКА ВЫСОТЫ ДЛЯ PNG ЭКСПОРТА ---
+    const manualOffsets = {
+        approvalBlock: 0,    // Блок "УТВЕРЖДАЮ"
+        mainTitle: 0,        // Заголовки (График дежурства...)
+        tableHeaders: -40,     // Текст в шапке (Этажи, Зоны)
+        footerBlock: 0,      // Весь подвал (Секретарь...)
+        signatureLine: -4,   // Только линия подписи
+    };
+
     const [semester, setSemester] = useState<1 | 2>(() => {
         const month = new Date().getMonth();
         return (month >= 0 && month <= 4) ? 2 : 1;
@@ -86,8 +95,8 @@ export const DutyPage = () => {
 
     const isRoomInZone = (roomName: string, zone: DutyZone) => {
         if (!roomName || !zone.includedRooms) return false;
-        const num = parseInt(roomName.replace(/\D/g, ''));
-        if (!isNaN(num)) return zone.includedRooms.includes(String(num));
+        const num = roomName.replace(/\D/g, '');
+        if (num && zone.includedRooms.includes(num)) return true;
         return zone.includedRooms.includes(roomName);
     };
 
@@ -171,7 +180,6 @@ export const DutyPage = () => {
     };
 
     const exportToExcel = () => {
-        // Build the Excel HTML manually for maximum formatting control in spreadsheet applications
         const zonesCount = allZonesSorted.length;
         const totalColspan = zonesCount + 1;
 
@@ -196,7 +204,6 @@ export const DutyPage = () => {
             <body>
         `;
 
-        // 1. Approval block (top right)
         html += `
             <table>
                 <tr>
@@ -218,13 +225,10 @@ export const DutyPage = () => {
             </table>
         `;
 
-        // 2. Generate tables for each shift
         [Shift.First, Shift.Second].forEach(shift => {
             html += `<table>`;
-            // Shift Title
             html += `<tr><td colspan="${totalColspan}" class="shift-header">${shift.toUpperCase()}</td></tr>`;
             
-            // Table Header - Floor Groups
             html += `<tr>`;
             html += `<th rowspan="2" class="header-cell" style="width: 120px;">День недели</th>`;
             zonesByFloor.forEach(group => {
@@ -232,14 +236,12 @@ export const DutyPage = () => {
             });
             html += `</tr>`;
 
-            // Table Header - Zone Names
             html += `<tr>`;
             allZonesSorted.forEach(zone => {
                 html += `<th class="header-cell" style="width: 150px;">${zone.name}</th>`;
             });
             html += `</tr>`;
 
-            // Data rows for each day
             DAYS.forEach(day => {
                 html += `<tr>`;
                 html += `<td class="day-label">${day}</td>`;
@@ -252,7 +254,6 @@ export const DutyPage = () => {
             html += `</table><br>`;
         });
 
-        // 3. Footer Block
         html += `
             <table>
                 <tr class="empty-spacer"><td colspan="${totalColspan}" style="border:none"></td></tr>
@@ -322,7 +323,7 @@ export const DutyPage = () => {
                 s.day === day && 
                 s.shift === selectedShift &&
                 s.roomId && 
-                zone.includedRooms.includes(String(parseInt(rooms.find(r => r.id === s.roomId)?.name.replace(/\D/g, '') || '0')))
+                isRoomInZone(rooms.find(r => r.id === s.roomId)?.name || s.roomId, zone)
             ).length : 0;
 
             return { t, lessonsCount, isBusy, lessonsInZone };
@@ -470,21 +471,21 @@ export const DutyPage = () => {
                 <div className="overflow-auto custom-scrollbar">
                     <div ref={printRef} id="print-content-root" className="bg-white p-12 min-w-[1200px] text-black font-serif shadow-lg">
                         
-                        <div className="flex justify-end items-start mb-8 text-sm leading-snug">
+                        <div className="flex justify-end items-start mb-8 text-sm leading-snug" style={{ marginTop: manualOffsets.approvalBlock }}>
                             <div className="w-[350px]" contentEditable suppressContentEditableWarning>
                                 <div className="font-bold mb-1">УТВЕРЖДАЮ</div>
                                 <div>Директор государственного</div>
                                 <div>учреждения образования</div>
                                 <div>«Гимназия № 22 г. Минска»</div>
                                 <div className="mt-8 flex items-end">
-                                    <div className="border-b border-black flex-grow h-4"></div>
+                                    <div className="border-b border-black flex-grow h-4" style={{ marginBottom: manualOffsets.signatureLine }}></div>
                                     <div className="ml-2 whitespace-nowrap">Н.В.Кисель</div>
                                 </div>
                             </div>
                         </div>
 
-                        <div className="text-center mb-6" contentEditable suppressContentEditableWarning>
-                            <h1 className="text-xl font-bold uppercase">График дежурства</h1>
+                        <div className="text-center mb-6" contentEditable suppressContentEditableWarning style={{ marginTop: manualOffsets.mainTitle }}>
+                            <h1 className="text-xl font-bold uppercase">ГРАФИК ДЕЖУРСТВА</h1>
                             <h2 className="text-lg">учителей по государственному учреждению образования «Гимназия № 22 г. Минска»</h2>
                             <h3 className="text-lg font-bold mt-1">на {semester}-е полугодие {new Date().getFullYear()}/{new Date().getFullYear()+1} учебного года</h3>
                         </div>
@@ -495,16 +496,16 @@ export const DutyPage = () => {
                                 <table className="w-full border-collapse border border-black text-sm text-center">
                                     <thead>
                                         <tr>
-                                            <th rowSpan={2} className="border border-black p-1 bg-gray-100 w-32 font-bold align-middle" contentEditable suppressContentEditableWarning>День недели</th>
+                                            <th rowSpan={2} className="border border-black p-1 bg-gray-100 w-32 font-bold align-middle" contentEditable suppressContentEditableWarning style={{ paddingTop: manualOffsets.tableHeaders }}>День недели</th>
                                             {zonesByFloor.map(group => (
-                                                <th key={group.floor} colSpan={group.zones.length} className="border border-black p-1 bg-gray-200 font-bold uppercase text-xs align-middle" contentEditable suppressContentEditableWarning>
+                                                <th key={group.floor} colSpan={group.zones.length} className="border border-black p-1 bg-gray-200 font-bold uppercase text-xs align-middle" contentEditable suppressContentEditableWarning style={{ paddingTop: manualOffsets.tableHeaders }}>
                                                     {group.floor}
                                                 </th>
                                             ))}
                                         </tr>
                                         <tr>
                                             {allZonesSorted.map(zone => (
-                                                <th key={zone.id} className="border border-black p-1 bg-gray-100 font-bold align-middle" contentEditable suppressContentEditableWarning>
+                                                <th key={zone.id} className="border border-black p-1 bg-gray-100 font-bold align-middle" contentEditable suppressContentEditableWarning style={{ paddingTop: manualOffsets.tableHeaders }}>
                                                     {zone.name}
                                                 </th>
                                             ))}
@@ -534,9 +535,9 @@ export const DutyPage = () => {
                             </div>
                         ))}
                         
-                        <div className="mt-8 flex items-end justify-between text-sm font-bold" contentEditable suppressContentEditableWarning>
+                        <div className="mt-8 flex items-end justify-between text-sm font-bold" contentEditable suppressContentEditableWarning style={{ marginTop: manualOffsets.footerBlock }}>
                             <div>Секретарь учебной части гимназии №22 г.Минска</div>
-                            <div className="border-b border-black flex-grow mx-4 mb-1"></div>
+                            <div className="border-b border-black flex-grow mx-4 mb-1" style={{ marginBottom: manualOffsets.signatureLine }}></div>
                             <div>Е.К.Шунто</div>
                         </div>
                     </div>

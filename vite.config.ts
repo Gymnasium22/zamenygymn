@@ -87,8 +87,8 @@ export default defineConfig({
             options: {
               cacheName: 'firebase-cache',
               expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60 * 5 // 5 минут
+                maxEntries: 100,
+                maxAgeSeconds: 60 * 60 * 2 // 2 часа для данных расписания
               }
             }
           }

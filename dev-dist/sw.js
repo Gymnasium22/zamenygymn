@@ -82,7 +82,7 @@ define(['./workbox-21a80088'], (function (workbox) { 'use strict';
     "revision": "cdc3a2ab1e9a18cc01b5be9e541e5b38"
   }, {
     "url": "index.html",
-    "revision": "0.uuh701v7gs4"
+    "revision": "0.lmramvt4lf8"
   }], {});
   workbox.cleanupOutdatedCaches();
   workbox.registerRoute(new workbox.NavigationRoute(workbox.createHandlerBoundToURL("index.html"), {
@@ -109,8 +109,8 @@ define(['./workbox-21a80088'], (function (workbox) { 'use strict';
   workbox.registerRoute(/^https:\/\/.*\.firebaseio\.com\/.*/i, new workbox.NetworkFirst({
     "cacheName": "firebase-cache",
     plugins: [new workbox.ExpirationPlugin({
-      maxEntries: 50,
-      maxAgeSeconds: 300
+      maxEntries: 100,
+      maxAgeSeconds: 7200
     })]
   }), 'GET');
 

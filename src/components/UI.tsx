@@ -1,9 +1,167 @@
 
-import React, { useEffect, useState, useRef, useMemo } from 'react';
+import React, { useEffect, useState, useRef, useMemo, createContext, useContext, ReactNode } from 'react';
 import { Icon } from './Icons';
-import { useStaticData } from '../context/DataContext'; 
+import { useStaticData } from '../context/DataContext';
 import { DayOfWeek, Shift } from '../types';
 import { NavLink, useNavigate } from 'react-router-dom';
+
+interface ToastData {
+    id: string;
+    type: 'success' | 'warning' | 'danger' | 'info';
+    title: string;
+    message?: string;
+    duration?: number;
+}
+
+interface ToastContextType {
+    toasts: ToastData[];
+    addToast: (toast: Omit<ToastData, 'id'>) => void;
+    removeToast: (id: string) => void;
+}
+
+const ToastContext = createContext<ToastContextType | undefined>(undefined);
+
+export const ToastProvider = ({ children }: { children: ReactNode }) => {
+    const [toasts, setToasts] = useState<ToastData[]>([]);
+
+    const addToast = (toast: Omit<ToastData, 'id'>) => {
+        const id = Math.random().toString(36).substr(2, 9);
+        setToasts(prev => [...prev, { ...toast, id }]);
+    };
+
+    const removeToast = (id: string) => {
+        setToasts(prev => prev.filter(toast => toast.id !== id));
+    };
+
+    return (
+        <ToastContext.Provider value={{ toasts, addToast, removeToast }}>
+            {children}
+            <ToastContainer toasts={toasts} onRemoveToast={removeToast} />
+        </ToastContext.Provider>
+    );
+};
+
+export const useToast = () => {
+    const context = useContext(ToastContext);
+    if (!context) {
+        throw new Error('useToast must be used within a ToastProvider');
+    }
+    return context;
+};
+
+interface ToastContainerProps {
+    toasts: Array<{
+        id: string;
+        type: 'success' | 'warning' | 'danger' | 'info';
+        title: string;
+        message?: string;
+        duration?: number;
+    }>;
+    onRemoveToast: (id: string) => void;
+}
+
+export const ToastContainer = ({ toasts, onRemoveToast }: ToastContainerProps) => {
+    const clearAllToasts = () => {
+        toasts.forEach(toast => onRemoveToast(toast.id));
+    };
+
+    if (toasts.length === 0) return null;
+
+    return (
+        <div className="fixed top-4 right-4 z-[60] space-y-2">
+            {toasts.length > 1 && (
+                <div className="flex justify-end mb-2">
+                    <button
+                        onClick={clearAllToasts}
+                        className="text-xs text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 underline transition-colors"
+                    >
+                        Скрыть все ({toasts.length})
+                    </button>
+                </div>
+            )}
+            {toasts.map((toast) => (
+                <Toast
+                    key={toast.id}
+                    id={toast.id}
+                    type={toast.type}
+                    title={toast.title}
+                    message={toast.message}
+                    duration={toast.duration}
+                    onClose={onRemoveToast}
+                />
+            ))}
+        </div>
+    );
+};
+
+interface SkeletonProps {
+    className?: string;
+    variant?: 'text' | 'rectangular' | 'circular';
+    width?: string | number;
+    height?: string | number;
+    animation?: boolean;
+}
+
+export const Skeleton = ({
+    className = '',
+    variant = 'text',
+    width,
+    height,
+    animation = true
+}: SkeletonProps) => {
+    const baseClasses = 'skeleton';
+    const variantClasses = {
+        text: 'h-4 rounded',
+        rectangular: 'rounded-lg',
+        circular: 'rounded-full'
+    };
+
+    const style: React.CSSProperties = {};
+    if (width) style.width = typeof width === 'number' ? `${width}px` : width;
+    if (height) style.height = typeof height === 'number' ? `${height}px` : height;
+
+    return (
+        <div
+            className={`${baseClasses} ${variantClasses[variant]} ${className} ${animation ? '' : 'animate-none'}`}
+            style={style}
+        />
+    );
+};
+
+interface SkeletonTextProps {
+    lines?: number;
+    className?: string;
+}
+
+export const SkeletonText = ({ lines = 3, className = '' }: SkeletonTextProps) => (
+    <div className={`space-y-2 ${className}`}>
+        {Array.from({ length: lines }, (_, i) => (
+            <Skeleton
+                key={i}
+                variant="text"
+                width={i === lines - 1 ? '60%' : '100%'} // Last line shorter
+            />
+        ))}
+    </div>
+);
+
+interface SkeletonCardProps {
+    className?: string;
+    showAvatar?: boolean;
+    lines?: number;
+}
+
+export const SkeletonCard = ({ className = '', showAvatar = false, lines = 2 }: SkeletonCardProps) => (
+    <div className={`modern-card p-4 ${className}`}>
+        <div className="flex items-center space-x-4">
+            {showAvatar && <Skeleton variant="circular" width={40} height={40} />}
+            <div className="flex-1">
+                <Skeleton variant="text" width="60%" className="mb-2" />
+                <SkeletonText lines={lines} />
+            </div>
+        </div>
+    </div>
+);
 
 interface ModalProps {
     isOpen: boolean;
@@ -11,6 +169,15 @@ interface ModalProps {
     title: string;
     children?: React.ReactNode;
     maxWidth?: string;
+}
+
+interface ToastProps {
+    id: string;
+    type: 'success' | 'warning' | 'danger' | 'info';
+    title: string;
+    message?: string;
+    duration?: number;
+    onClose: (id: string) => void;
 }
 
 export const Modal = ({ isOpen, onClose, title, children, maxWidth = 'max-w-lg' }: ModalProps) => {
@@ -46,6 +213,125 @@ export const Modal = ({ isOpen, onClose, title, children, maxWidth = 'max-w-lg' 
         </div>
     );
 };
+
+export const Toast = ({ id, type, title, message, duration = 5000, onClose }: ToastProps) => {
+    const [isVisible, setIsVisible] = useState(true);
+    const [isExiting, setIsExiting] = useState(false);
+    const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+    useEffect(() => {
+        // Устанавливаем таймер только один раз при монтировании
+        timerRef.current = setTimeout(() => {
+            handleClose();
+        }, duration);
+
+        return () => {
+            if (timerRef.current) {
+                clearTimeout(timerRef.current);
+            }
+        };
+    }, []); // Пустой массив зависимостей
+
+    const handleClose = () => {
+        // Очищаем таймер при ручном закрытии
+        if (timerRef.current) {
+            clearTimeout(timerRef.current);
+            timerRef.current = null;
+        }
+
+        setIsExiting(true);
+        setTimeout(() => {
+            setIsVisible(false);
+            onClose(id);
+        }, 300);
+    };
+
+    if (!isVisible) return null;
+
+    const getTypeStyles = () => {
+        switch (type) {
+            case 'success':
+                return {
+                    bg: 'bg-success-50 dark:bg-success-900/20 border-success-200 dark:border-success-800',
+                    icon: 'text-success-600 dark:text-success-400',
+                    title: 'text-success-800 dark:text-success-200',
+                    message: 'text-success-700 dark:text-success-300'
+                };
+            case 'warning':
+                return {
+                    bg: 'bg-warning-50 dark:bg-warning-900/20 border-warning-200 dark:border-warning-800',
+                    icon: 'text-warning-600 dark:text-warning-400',
+                    title: 'text-warning-800 dark:text-warning-200',
+                    message: 'text-warning-700 dark:text-warning-300'
+                };
+            case 'danger':
+                return {
+                    bg: 'bg-danger-50 dark:bg-danger-900/20 border-danger-200 dark:border-danger-800',
+                    icon: 'text-danger-600 dark:text-danger-400',
+                    title: 'text-danger-800 dark:text-danger-200',
+                    message: 'text-danger-700 dark:text-danger-300'
+                };
+            case 'info':
+            default:
+                return {
+                    bg: 'bg-primary-50 dark:bg-primary-900/20 border-primary-200 dark:border-primary-800',
+                    icon: 'text-primary-600 dark:text-primary-400',
+                    title: 'text-primary-800 dark:text-primary-200',
+                    message: 'text-primary-700 dark:text-primary-300'
+                };
+        }
+    };
+
+    const styles = getTypeStyles();
+    const iconName = type === 'success' ? 'CheckCircle' :
+                    type === 'warning' ? 'AlertTriangle' :
+                    type === 'danger' ? 'XCircle' : 'Info';
+
+    return (
+        <div
+            className={`max-w-sm w-full animate-slide-in ${
+                isExiting ? 'animate-fade-out' : ''
+            }`}
+        >
+            <div className={`modern-card border p-4 ${styles.bg}`}>
+                <div className="flex items-start gap-3">
+                    <div className={`flex-shrink-0 ${styles.icon}`}>
+                        <Icon name={iconName} size={20} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <h4 className={`text-sm font-semibold ${styles.title}`}>
+                            {title}
+                        </h4>
+                        {message && (
+                            <p className={`text-sm mt-1 ${styles.message}`}>
+                                {message}
+                            </p>
+                        )}
+                    </div>
+                    <button
+                        onClick={handleClose}
+                        className="flex-shrink-0 text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 transition-colors"
+                        aria-label="Закрыть уведомление"
+                    >
+                        <Icon name="X" size={16} />
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+interface ToastContainerProps {
+    toasts: Array<{
+        id: string;
+        type: 'success' | 'warning' | 'danger' | 'info';
+        title: string;
+        message?: string;
+        duration?: number;
+    }>;
+    onRemoveToast: (id: string) => void;
+}
+
 
 interface ContextMenuAction {
     label: string;
@@ -113,7 +399,7 @@ export const ContextMenu = ({ x, y, onClose, actions }: ContextMenuProps) => {
 };
 
 export const StatusWidget = () => {
-    const { bellSchedule } = useStaticData();
+    const { bellSchedule, isSaving } = useStaticData();
     const [status, setStatus] = useState("Загрузка...");
     const [details, setDetails] = useState("");
     const [progress, setProgress] = useState(0);
@@ -213,15 +499,21 @@ export const StatusWidget = () => {
                     <div className="text-lg font-black text-slate-800 dark:text-white leading-none mb-1">{status}</div>
                     <div className="text-xs font-medium text-slate-500 dark:text-slate-400">{details}</div>
                 </div>
-                <div className={`w-8 h-8 rounded-full ${color} bg-opacity-10 dark:bg-opacity-20 flex items-center justify-center`}>
-                    <Icon 
-                        name="Clock" 
-                        size={16} 
+                <div className={`w-8 h-8 rounded-full ${color} bg-opacity-10 dark:bg-opacity-20 flex items-center justify-center relative`}>
+                    {isSaving && (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                            <Icon name="Loader" size={16} className="animate-spin text-indigo-600" />
+                        </div>
+                    )}
+                    <Icon
+                        name={isSaving ? "Loader" : "Clock"}
+                        size={16}
                         className={
+                            isSaving ? 'text-indigo-600 animate-spin' :
                             color === 'bg-indigo-600' ? 'text-indigo-600' :
                             color === 'bg-amber-500' ? 'text-amber-500' :
                             'text-slate-400'
-                        } 
+                        }
                     />
                 </div>
             </div>

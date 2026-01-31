@@ -17,7 +17,15 @@ export const ExportPage = () => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const printRef1 = useRef<HTMLDivElement>(null);
     const printRef2 = useRef<HTMLDivElement>(null);
-    const [exportDate, setExportDate] = useState(new Date().toISOString().split('T')[0]);
+    // Безопасная функция для получения локальной даты в формате YYYY-MM-DD
+    const getLocalDateString = (date: Date = new Date()): string => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
+    const [exportDate, setExportDate] = useState(getLocalDateString());
     
     // Выбор полугодия для ручного экспорта (по умолчанию текущее)
     const [exportSemester, setExportSemester] = useState<1 | 2>(() => {
@@ -37,7 +45,7 @@ export const ExportPage = () => {
     const fullAppData: AppData = useMemo(() => ({
         subjects, teachers, classes, rooms, settings, bellSchedule,
         schedule: schedule1,
-        schedule2ndHalf: schedule2,
+        schedule2: schedule2,
         substitutions,
         dutyZones,
         dutySchedule
@@ -75,7 +83,7 @@ export const ExportPage = () => {
         reader.onload = async (ev: ProgressEvent<FileReader>) => { 
             try { 
                 const json = JSON.parse(ev.target?.result as string); 
-                if (json.teachers && (json.schedule || json.schedule2ndHalf)) { 
+                if (json.teachers && (json.schedule || json.schedule2)) { 
                     if(window.confirm("Это перезапишет текущую базу данных. Продолжить?")) { 
                         const mergedData = {
                             ...INITIAL_DATA,
@@ -83,7 +91,7 @@ export const ExportPage = () => {
                             rooms: json.rooms || INITIAL_DATA.rooms,
                             classes: json.classes || [],
                             schedule: json.schedule || [],
-                            schedule2ndHalf: json.schedule2ndHalf || [],
+                            schedule2: json.schedule2 || [],
                             teachers: json.teachers || [],
                             subjects: json.subjects || [],
                             substitutions: json.substitutions || [],
@@ -610,13 +618,13 @@ export const ExportPage = () => {
 
     const exportMonthlySubstitutionsExcel = () => {
         const targetDate = new Date(exportDate);
-        const targetMonth = targetDate.getMonth();
-        const targetYear = targetDate.getFullYear();
+        const targetMonth = targetDate.getUTCMonth();
+        const targetYear = targetDate.getUTCFullYear();
 
         // Фильтруем замены за выбранный месяц
         const monthlySubs = substitutions.filter(s => {
             const sDate = new Date(s.date);
-            return sDate.getMonth() === targetMonth && sDate.getFullYear() === targetYear;
+            return sDate.getUTCMonth() === targetMonth && sDate.getUTCFullYear() === targetYear;
         }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
         if (monthlySubs.length === 0) {
@@ -859,12 +867,12 @@ export const ExportPage = () => {
 
     const exportRefusalsExcel = () => {
         const targetDate = new Date(exportDate);
-        const targetMonth = targetDate.getMonth();
-        const targetYear = targetDate.getFullYear();
+        const targetMonth = targetDate.getUTCMonth();
+        const targetYear = targetDate.getUTCFullYear();
 
         const refusalsData = substitutions.filter(s => {
             const sDate = new Date(s.date);
-            const inMonth = sDate.getMonth() === targetMonth && sDate.getFullYear() === targetYear;
+            const inMonth = sDate.getUTCMonth() === targetMonth && sDate.getUTCFullYear() === targetYear;
             const hasRefusals = s.refusals && s.refusals.length > 0;
             return inMonth && hasRefusals;
         }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -1334,7 +1342,7 @@ export const ExportPage = () => {
                     <Icon name="Download" className="text-indigo-600 dark:text-indigo-400"/> Резервное копирование
                 </h2>
                 <div className="flex flex-wrap gap-4">
-                    <button onClick={() => dbService.exportJson(fullAppData)} className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition shadow-lg shadow-indigo-200 dark:shadow-none flex items-center gap-2">
+                    <button onClick={() => dbService.exportJson(fullAppData)} className="btn-primary btn-ripple flex items-center gap-2">
                         <Icon name="Download" size={20}/> Скачать JSON
                     </button>
                     <div className="relative">
@@ -1359,14 +1367,14 @@ export const ExportPage = () => {
                         <button
                             onClick={handleDownloadPngShift1}
                             disabled={isGenerating || !subsForShift1}
-                            className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition shadow-lg shadow-indigo-200 dark:shadow-none flex items-center gap-2 disabled:opacity-50"
+                            className="btn-primary btn-ripple flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:transform-none"
                         >
                             {isGenerating ? <><Icon name="Loader" size={20} className="animate-spin"/> Создание...</> : <><Icon name="Download" size={20}/> 1-я смена</>}
                         </button>
                         <button
                             onClick={handleDownloadPngShift2}
                             disabled={isGenerating || !subsForShift2}
-                            className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition shadow-lg shadow-indigo-200 dark:shadow-none flex items-center gap-2 disabled:opacity-50"
+                            className="btn-primary btn-ripple flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:transform-none"
                         >
                             {isGenerating ? <><Icon name="Loader" size={20} className="animate-spin"/> Создание...</> : <><Icon name="Download" size={20}/> 2-я смена</>}
                         </button>
@@ -1516,7 +1524,7 @@ export const ExportPage = () => {
                     <div className="p-4 border-b flex justify-between items-center bg-slate-50 no-print">
                          <h2 className="font-bold text-lg text-slate-800">Печать сетки ({matrixGrade}-е классы)</h2>
                          <div className="flex gap-2">
-                             <button onClick={() => window.print()} className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold flex items-center gap-2 hover:bg-indigo-700"><Icon name="Printer" size={16}/> Печать</button>
+                             <button onClick={() => window.print()} className="btn-primary btn-ripple flex items-center gap-2"><Icon name="Printer" size={16}/> Печать</button>
                              <button onClick={() => setIsMatrixPrintOpen(false)} className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg font-bold hover:bg-slate-300">Закрыть</button>
                          </div>
                     </div>

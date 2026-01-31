@@ -12,7 +12,15 @@ export const SubstitutionsPage = () => {
     const { schedule1, schedule2, substitutions, saveScheduleData } = useScheduleData();
 
     const location = useLocation();
-    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+    // Безопасная функция для получения локальной даты в формате YYYY-MM-DD
+    const getLocalDateString = (date: Date = new Date()): string => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
+    const [selectedDate, setSelectedDate] = useState(getLocalDateString());
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [currentSubParams, setCurrentSubParams] = useState<any>(null);
     const [absenceModalOpen, setAbsenceModalOpen] = useState(false);
@@ -83,7 +91,7 @@ export const SubstitutionsPage = () => {
     const filteredTeachersList = useMemo(() => {
         return teachers.filter(t => {
             const matchesSearch = t.name.toLowerCase().includes(teacherSearch.toLowerCase());
-            const matchesShift = teacherShiftFilter === 'all' ? true : t.shifts.includes(teacherShiftFilter);
+            const matchesShift = teacherShiftFilter === 'all' ? true : (t.shifts && t.shifts.includes(teacherShiftFilter));
             return matchesSearch && matchesShift;
         });
     }, [teachers, teacherSearch, teacherShiftFilter]);
@@ -240,13 +248,24 @@ export const SubstitutionsPage = () => {
         const newSubs = [...substitutions];
 
         let effectiveRoomForSource: string | undefined;
-        if (selectedRoomId) {
-            effectiveRoomForSource = selectedRoomId;
-        } else {
-            effectiveRoomForSource = swapKeepRooms ? sourceLesson.roomId : targetLesson.roomId;
-        }
+        let effectiveRoomForTarget: string | undefined;
 
-        const effectiveRoomForTarget = swapKeepRooms ? targetLesson.roomId : sourceLesson.roomId;
+        if (selectedRoomId) {
+            // If a specific room is selected, apply it to the source lesson
+            effectiveRoomForSource = selectedRoomId;
+            effectiveRoomForTarget = swapKeepRooms ? targetLesson.roomId : sourceLesson.roomId;
+        } else {
+            // No specific room selected, handle room swapping logic
+            if (swapKeepRooms) {
+                // Keep original rooms for both lessons
+                effectiveRoomForSource = sourceLesson.roomId;
+                effectiveRoomForTarget = targetLesson.roomId;
+            } else {
+                // Swap rooms between lessons
+                effectiveRoomForSource = targetLesson.roomId;
+                effectiveRoomForTarget = sourceLesson.roomId;
+            }
+        }
 
         const sourceSubIndex = newSubs.findIndex(s => s.scheduleItemId === sourceLesson.id && s.date === selectedDate);
         const sourceSubData = {
@@ -1054,7 +1073,7 @@ export const SubstitutionsPage = () => {
 
                 {modalContext?.teacherId && !modalContext.isTeacherAbsent && (
                     <>
-                        <button onClick={() => assignSubstitution(modalContext.teacherId)} className="w-full p-3 mb-2 rounded-xl bg-emerald-50 text-emerald-700 font-bold text-sm hover:bg-emerald-100 transition border border-emerald-200">
+                        <button onClick={() => modalContext.teacherId && assignSubstitution(modalContext.teacherId)} className="w-full p-3 mb-2 rounded-xl bg-emerald-50 text-emerald-700 font-bold text-sm hover:bg-emerald-100 transition border border-emerald-200">
                             Оставить текущего учителя (Только замена кабинета)
                         </button>
                         

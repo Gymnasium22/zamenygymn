@@ -4,19 +4,37 @@ import { HashRouter, Routes, Route, Navigate, NavLink, Outlet, useSearchParams }
 import { DataProvider, useStaticData, StaticDataProvider, ScheduleDataProvider } from './context/DataContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Icon } from './components/Icons';
-import { StatusWidget, BottomNavigation } from './components/UI';
+import { StatusWidget, BottomNavigation, ToastProvider } from './components/UI';
 import { DashboardPage } from './pages/Dashboard';
 import { SchedulePage } from './pages/Schedule';
 import { DirectoryPage } from './pages/Directory';
 import { SubstitutionsPage } from './pages/Substitutions';
 import { AdminPage } from './pages/Admin';
-import { ExportPage } from './pages/Export'; 
+import { ExportPage } from './pages/Export';
 import { ReportsPage } from './pages/Reports';
-import { DutyPage } from './pages/Duty'; 
+import { DutyPage } from './pages/Duty';
 import { LoginPage } from './pages/Login';
 import { dbService } from './services/db';
-import { AppData } from './types'; 
-import { INITIAL_DATA } from './constants'; 
+import { AppData } from './types';
+import { INITIAL_DATA } from './constants';
+
+// Вспомогательные функции для localStorage (дублирование из DataContext для независимости)
+const safeLocalStorageGet = (key: string): string | null => {
+    try {
+        return localStorage.getItem(key);
+    } catch (e) {
+        console.warn('Failed to read from localStorage:', e);
+        return null;
+    }
+};
+
+const safeLocalStorageSet = (key: string, value: string): void => {
+    try {
+        localStorage.setItem(key, value);
+    } catch (e) {
+        console.warn('Failed to save to localStorage:', e);
+    }
+}; 
 
 const ProtectedRoute = ({ children, allowedRoles }: React.PropsWithChildren<{ allowedRoles?: string[] }>) => {
     const { user, role, loading } = useAuth();
@@ -43,21 +61,33 @@ const HomeRedirect = () => {
 
 const Layout = () => {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-    const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
-    const [isNewYear, setIsNewYear] = useState(localStorage.getItem('new_year_mode') === 'true');
-    const { isLoading } = useStaticData(); 
+    const [theme, setTheme] = useState(safeLocalStorageGet('theme') || 'light');
+    const [isNewYear, setIsNewYear] = useState(safeLocalStorageGet('new_year_mode') === 'true');
+    const { isLoading } = useStaticData();
     const { logout, role, user } = useAuth();
+
+    // Закрываем мобильное меню при изменении размера экрана
+    useEffect(() => {
+        const handleResize = () => {
+            if (window.innerWidth >= 1024) { // lg breakpoint
+                setIsMobileMenuOpen(false);
+            }
+        };
+
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     useEffect(() => {
         if (theme === 'dark') document.documentElement.classList.add('dark');
         else document.documentElement.classList.remove('dark');
-        localStorage.setItem('theme', theme);
+        safeLocalStorageSet('theme', theme);
     }, [theme]);
 
     useEffect(() => {
         if (isNewYear) document.documentElement.classList.add('new-year-mode');
         else document.documentElement.classList.remove('new-year-mode');
-        localStorage.setItem('new_year_mode', String(isNewYear));
+        safeLocalStorageSet('new_year_mode', String(isNewYear));
     }, [isNewYear]);
 
     if (isLoading) return <div className="h-screen flex items-center justify-center bg-slate-50 dark:bg-dark-950"><Icon name="Loader" className="animate-spin text-indigo-600" size={48} /></div>;
@@ -210,11 +240,12 @@ const PublicLayout = () => {
 
 export default function App() {
     return (
-        <AuthProvider>
-            <DataProvider> 
-                <StaticDataProvider>
-                    <ScheduleDataProvider>
-                        <HashRouter>
+        <ToastProvider>
+            <AuthProvider>
+                <DataProvider>
+                    <StaticDataProvider>
+                        <ScheduleDataProvider>
+                            <HashRouter>
                             <Routes>
                                 <Route path="/login" element={<LoginPage />} />
                                 <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
@@ -239,11 +270,12 @@ export default function App() {
                                 </Route>
                                 <Route path="/public" element={<PublicLayout />} />
                             </Routes>
-                        </HashRouter>
-                    </ScheduleDataProvider>
-                </StaticDataProvider>
-            </DataProvider>
-        </AuthProvider>
+                            </HashRouter>
+                        </ScheduleDataProvider>
+                    </StaticDataProvider>
+                </DataProvider>
+            </AuthProvider>
+        </ToastProvider>
     );
 }
 

@@ -22,11 +22,14 @@ const COLLECTIONS = {
     SCHEDULE_1: 'schedule_sem1',
     SCHEDULE_2: 'schedule_sem2',
     SUBSTITUTIONS: 'substitutions',
-    CONFIG: 'config', 
+    CONFIG: 'config',
     PUBLIC: 'publicSchedules',
     DUTY_ZONES: 'duty_zones',
     DUTY_SCHEDULE: 'duty_schedule'
 };
+
+// Кеш предыдущих состояний коллекций для оптимизации
+const collectionCache = new Map<string, Map<string, any>>();
 
 const chunkArray = <T>(array: T[], size: number): T[][] => {
     const chunked = [];
@@ -37,72 +40,160 @@ const chunkArray = <T>(array: T[], size: number): T[][] => {
 };
 
 // Helper to remove undefined values which Firebase doesn't support
-const sanitizeForFirestore = (data: any) => {
-    return JSON.parse(JSON.stringify(data));
+const sanitizeForFirestore = (data: any): any => {
+    if (data === null || data === undefined) {
+        return null; // Convert undefined to null for Firestore compatibility
+    }
+
+    if (typeof data === 'object') {
+        if (Array.isArray(data)) {
+            return data.map(item => sanitizeForFirestore(item)).filter(item => item !== undefined);
+        }
+
+        const sanitized: any = {};
+        for (const [key, value] of Object.entries(data)) {
+            const sanitizedValue = sanitizeForFirestore(value);
+            if (sanitizedValue !== undefined) {
+                sanitized[key] = sanitizedValue;
+            }
+        }
+        return sanitized;
+    }
+
+    return data;
+};
+
+// Глубокое сравнение объектов
+const deepEqual = (a: any, b: any): boolean => {
+    if (a === b) return true;
+    if (a == null || b == null) return a === b;
+    if (typeof a !== typeof b) return false;
+
+    if (typeof a === 'object') {
+        const keysA = Object.keys(a);
+        const keysB = Object.keys(b);
+
+        if (keysA.length !== keysB.length) return false;
+
+        for (const key of keysA) {
+            if (!keysB.includes(key)) return false;
+            if (!deepEqual(a[key], b[key])) return false;
+        }
+        return true;
+    }
+
+    return false;
+};
+
+// Wrapper to safely execute getDocs even if it fails
+async function awaitHZ(fn: Function, options: { throwOnError?: boolean } = {}) {
+    try {
+        return await fn();
+    } catch(e) {
+        console.error("Firestore read error (likely quota):", e);
+        if (options.throwOnError) {
+            throw e; // Re-throw for UI error handling
+        }
+        // Return empty snapshot structure to prevent crash in loop
+        return { docs: [] };
+    }
 };
 
 export const dbService = {
-    // Оптимизированная синхронизация: сравнивает данные перед записью
+    // Оптимизированная синхронизация с использованием локального кеша
     syncCollection: async (collectionName: string, items: any[]) => {
         if (!firestoreDB) return;
 
-        // 1. Получаем текущие данные из базы
-        const q = query(collection(firestoreDB, collectionName));
-        const querySnapshot = await awaitHZ(async() => await getDocs(q));
-        
-        const existingDocsMap = new Map();
-        querySnapshot.docs.forEach((doc: any) => {
-            existingDocsMap.set(doc.id, doc.data());
-        });
+        // Получаем кеш для этой коллекции
+        let cachedItems = collectionCache.get(collectionName);
+        if (!cachedItems) {
+            cachedItems = new Map();
+            collectionCache.set(collectionName, cachedItems);
+        }
 
-        const newItemsMap = new Map();
-        items.forEach(item => newItemsMap.set(item.id, item));
+        // Создаем Map из новых элементов
+        const newItemsMap = new Map<string, any>();
+        items.forEach(item => newItemsMap.set(item.id, sanitizeForFirestore(item)));
 
-        // 2. Вычисляем разницу
+        // Вычисляем операции только на основе кеша (не запрашиваем базу!)
         const operations: any[] = [];
 
-        // Удаление
-        existingDocsMap.forEach((_, id) => {
+        // Удаление элементов, которые есть в кеше, но нет в новых данных
+        cachedItems.forEach((_, id) => {
             if (!newItemsMap.has(id)) {
                 operations.push({ type: 'delete', id });
             }
         });
 
-        // Создание / Обновление
-        items.forEach(item => {
-            const existingData = existingDocsMap.get(item.id);
-            // Используем JSON.stringify для сравнения, это также игнорирует порядок ключей в простых объектах,
-            // но для надежности глубокого сравнения лучше использовать lodash.isEqual, 
-            // однако здесь мы полагаемся на то, что sanitize уберет undefined, который мог вызвать ложные срабатывания или ошибки.
-            const sanitizedItem = sanitizeForFirestore(item);
-            
-            if (!existingData || JSON.stringify(existingData) !== JSON.stringify(sanitizedItem)) {
-                operations.push({ type: 'set', item: sanitizedItem });
+        // Создание/обновление элементов
+        newItemsMap.forEach((item, id) => {
+            const cachedItem = cachedItems!.get(id);
+
+            // Сравниваем с кешем
+            if (!cachedItem || !deepEqual(cachedItem, item)) {
+                operations.push({
+                    type: cachedItem ? 'update' : 'create',
+                    item,
+                    id
+                });
             }
         });
 
         if (operations.length === 0) {
-            return; 
+            console.log(`No changes in ${collectionName}`);
+            return;
         }
 
-        console.log(`Syncing ${collectionName}: ${operations.length} changes.`);
+        console.log(`Syncing ${collectionName}: ${operations.length} operations (${operations.filter(op => op.type === 'create').length} create, ${operations.filter(op => op.type === 'update').length} update, ${operations.filter(op => op.type === 'delete').length} delete)`);
 
-        // 3. Запись пачками (Batch write)
-        const chunks = chunkArray(operations, 450); 
+        try {
+            // Запись пачками
+            const chunks = chunkArray(operations, 450);
 
-        for (const chunk of chunks) {
-            const batch = writeBatch(firestoreDB);
-            chunk.forEach((op: any) => {
-                const docRef = doc(firestoreDB, collectionName, op.id || op.item.id);
-                if (op.type === 'delete') {
-                    batch.delete(docRef);
-                } else {
-                    // Гарантируем, что undefined поля удалены перед записью
-                    batch.set(docRef, op.item);
-                }
-            });
-            await batch.commit();
+            for (const chunk of chunks) {
+                const batch = writeBatch(firestoreDB);
+
+                chunk.forEach((op: any) => {
+                    const docRef = doc(firestoreDB, collectionName, op.id);
+
+                    if (op.type === 'delete') {
+                        batch.delete(docRef);
+                        cachedItems!.delete(op.id);
+                    } else {
+                        // Используем updateDoc для существующих документов, setDoc для новых
+                        if (op.type === 'update') {
+                            batch.update(docRef, op.item);
+                        } else {
+                            batch.set(docRef, op.item);
+                        }
+                        cachedItems!.set(op.id, op.item);
+                    }
+                });
+
+                await batch.commit();
+            }
+
+            console.log(`Successfully synced ${collectionName}`);
+        } catch (error) {
+            console.error(`Failed to sync ${collectionName}:`, error);
+            throw error;
         }
+    },
+
+    // Метод для принудительной синхронизации кеша с базой данных (при первой загрузке)
+    syncCacheWithDatabase: async (collectionName: string) => {
+        if (!firestoreDB) return;
+
+        const q = query(collection(firestoreDB, collectionName));
+        const querySnapshot = await awaitHZ(async() => await getDocs(q), { throwOnError: true });
+
+        const cachedItems = new Map<string, any>();
+        querySnapshot.docs.forEach((doc: any) => {
+            cachedItems.set(doc.id, doc.data());
+        });
+
+        collectionCache.set(collectionName, cachedItems);
+        console.log(`Cache synced for ${collectionName} (${cachedItems.size} items)`);
     },
 
     save: async (data: Partial<AppData>) => {
@@ -125,7 +216,7 @@ export const dbService = {
         if (data.rooms) promises.push(dbService.syncCollection(COLLECTIONS.ROOMS, data.rooms));
         
         if (data.schedule) promises.push(dbService.syncCollection(COLLECTIONS.SCHEDULE_1, data.schedule));
-        if (data.schedule2ndHalf) promises.push(dbService.syncCollection(COLLECTIONS.SCHEDULE_2, data.schedule2ndHalf));
+        if (data.schedule2) promises.push(dbService.syncCollection(COLLECTIONS.SCHEDULE_2, data.schedule2));
         
         if (data.substitutions) promises.push(dbService.syncCollection(COLLECTIONS.SUBSTITUTIONS, data.substitutions));
 
@@ -152,13 +243,53 @@ export const dbService = {
         }
 
         let localData: AppData = { ...INITIAL_DATA };
-        
+        let isInitialLoad = true;
+
         let updateTimeout: any;
         const triggerUpdate = () => {
             clearTimeout(updateTimeout);
-            updateTimeout = setTimeout(() => {
-                onNext({ ...localData });
-            }, 50); 
+            updateTimeout = setTimeout(async () => {
+                const data = { ...localData };
+
+                // При первой загрузке инициализируем кеш актуальными данными из базы
+                if (isInitialLoad) {
+                    isInitialLoad = false;
+
+                    // Синхронизируем кеш с данными из базы (все коллекции)
+                    const cachePromises = [
+                        // Основные справочники
+                        dbService.syncCacheWithDatabase(COLLECTIONS.TEACHERS),
+                        dbService.syncCacheWithDatabase(COLLECTIONS.SUBJECTS),
+                        dbService.syncCacheWithDatabase(COLLECTIONS.CLASSES),
+                        dbService.syncCacheWithDatabase(COLLECTIONS.ROOMS),
+                        // Расписание
+                        dbService.syncCacheWithDatabase(COLLECTIONS.SCHEDULE_1),
+                        dbService.syncCacheWithDatabase(COLLECTIONS.SCHEDULE_2),
+                        // Замены и дежурства
+                        dbService.syncCacheWithDatabase(COLLECTIONS.SUBSTITUTIONS),
+                        dbService.syncCacheWithDatabase(COLLECTIONS.DUTY_ZONES),
+                        dbService.syncCacheWithDatabase(COLLECTIONS.DUTY_SCHEDULE),
+                    ];
+
+                    try {
+                        await Promise.all(cachePromises);
+                        console.log('Initial cache synchronization completed');
+                    } catch (error) {
+                        console.error('Failed to sync initial cache (likely quota exceeded):', error);
+                        // If this is a quota error, notify the UI
+                        const err = error as any;
+                        if (err?.message && err.message.includes('quota') ||
+                            err?.code === 'resource-exhausted' ||
+                            err?.code === 'quota-exceeded') {
+                            onError(new Error('Превышен лимит запросов к базе данных. Попробуйте позже или обратитесь к администратору.'));
+                        } else {
+                            onError(error as Error);
+                        }
+                    }
+                }
+
+                onNext(data);
+            }, 50);
         };
 
         const unsubs: any[] = [];
@@ -185,7 +316,7 @@ export const dbService = {
         unsubs.push(subColl(COLLECTIONS.CLASSES, 'classes'));
         unsubs.push(subColl(COLLECTIONS.ROOMS, 'rooms'));
         unsubs.push(subColl(COLLECTIONS.SCHEDULE_1, 'schedule'));
-        unsubs.push(subColl(COLLECTIONS.SCHEDULE_2, 'schedule2ndHalf'));
+        unsubs.push(subColl(COLLECTIONS.SCHEDULE_2, 'schedule2'));
         unsubs.push(subColl(COLLECTIONS.SUBSTITUTIONS, 'substitutions'));
         unsubs.push(subColl(COLLECTIONS.DUTY_ZONES, 'dutyZones'));
         unsubs.push(subColl(COLLECTIONS.DUTY_SCHEDULE, 'dutySchedule'));
@@ -216,7 +347,13 @@ export const dbService = {
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `gymnasium_backup_${new Date().toISOString().split('T')[0]}.json`;
+        const getLocalDateString = (date: Date = new Date()): string => {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+        link.download = `gymnasium_backup_${getLocalDateString()}.json`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -227,25 +364,45 @@ export const dbService = {
         const user = auth?.currentUser;
         if (!user || user.email !== "admin@gymnasium22.com") throw new Error("Нет прав.");
 
+        // Explicitly define public-safe versions of data structures
         const publicDataSubset = {
-            subjects: data.subjects,
-            teachers: data.teachers.map(t => ({ 
+            subjects: data.subjects.map(s => ({
+                id: s.id,
+                name: s.name,
+                color: s.color,
+                difficulty: s.difficulty,
+                requiredRoomType: s.requiredRoomType,
+                order: s.order
+            })),
+            teachers: data.teachers.map(t => ({
                 id: t.id,
                 name: t.name,
                 subjectIds: t.subjectIds,
                 shifts: t.shifts,
-                unavailableDates: [], 
-                telegramChatId: '', 
+                // Explicitly clear private fields
+                unavailableDates: [],
+                telegramChatId: '',
+                absenceReasons: undefined,
+                birthDate: undefined,
+                order: t.order // Keep order for display purposes
             })),
-            classes: data.classes,
+            classes: data.classes.map(c => ({
+                id: c.id,
+                name: c.name,
+                shift: c.shift,
+                studentsCount: c.studentsCount,
+                order: c.order
+            })),
             rooms: data.rooms,
             schedule: data.schedule,
-            schedule2ndHalf: data.schedule2ndHalf,
+            schedule2: data.schedule2,
             substitutions: data.substitutions,
             bellSchedule: data.bellSchedule,
-            settings: { 
-                telegramToken: '', 
-                publicScheduleId: data.settings.publicScheduleId
+            settings: {
+                telegramToken: '',
+                publicScheduleId: data.settings.publicScheduleId,
+                bellPresets: data.settings.bellPresets,
+                semesterConfig: data.settings.semesterConfig
             },
             // Duty Schedule is usually public too
             dutyZones: data.dutyZones,
@@ -273,14 +430,3 @@ export const dbService = {
         await deleteDoc(doc(firestoreDB, COLLECTIONS.PUBLIC, id));
     }
 };
-
-// Wrapper to safely execute getDocs even if it fails (simplistic retry logic could go here)
-async function awaitHZ(fn: Function) {
-    try {
-        return await fn();
-    } catch(e) {
-        // If query fails (quota), return empty snapshot structure to prevent crash in loop
-        console.error("Firestore read error (likely quota):", e);
-        return { docs: [] };
-    }
-}

@@ -95,6 +95,10 @@ export interface Settings {
   publicScheduleId?: string | null; // ID for publicly published schedule
   feedbackChatId?: string;
   bellPresets?: BellPreset[];
+  semesterConfig?: {
+    firstSemesterMonths: number[]; // Массив месяцев для 1 семестра (0-11)
+    secondSemesterMonths: number[]; // Массив месяцев для 2 семестра (0-11)
+  };
 }
 
 // --- NEW DUTY TYPES ---
@@ -137,10 +141,10 @@ export interface ScheduleAndSubstitutionData {
 }
 
 export interface AppData extends StaticAppData {
-    schedule: ScheduleItem[]; // 1 полугодие
-    schedule2ndHalf: ScheduleItem[]; // 2 полугодие
-    substitutions: Substitution[];
-    dutySchedule: DutyRecord[]; // New
+  schedule: ScheduleItem[]; // 1 полугодие
+  schedule2: ScheduleItem[]; // 2 полугодие
+  substitutions: Substitution[];
+  dutySchedule: DutyRecord[]; // New
 }
 
 export const DAYS = [DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday];
