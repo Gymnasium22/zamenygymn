@@ -19,7 +19,7 @@ import { dbService } from './services/db';
 import { AppData } from './types';
 import { INITIAL_DATA } from './constants';
 
-// Вспомогательные функции для localStorage (дублирование из DataContext для независимости)
+// Вспомогательные функции для localStorage (упрощенная версия для App.tsx)
 const safeLocalStorageGet = (key: string): string | null => {
     try {
         return localStorage.getItem(key);
@@ -149,8 +149,6 @@ const Layout = () => {
                         ))}
                     </nav>
 
-                    
-
                     {/* Динамический StatusWidget — расположен выше панели пользователя/тем */}
                     <div className="hidden lg:block mb-2">
                         <StatusWidget />
@@ -170,7 +168,7 @@ const Layout = () => {
                             </button>
                         </div>
                     </div>
-                    </div>
+                </div>
                 </aside>
 
             <main className="flex-1 flex flex-col min-w-0 bg-transparent relative">
