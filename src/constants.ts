@@ -95,6 +95,7 @@ export const INITIAL_DATA: AppData = {
     bellSchedule: DEFAULT_BELLS,
     dutyZones: DEFAULT_DUTY_ZONES,
     dutySchedule: [],
+    nutritionRecords: [], // New
     settings: {
         telegramToken: '',
         publicScheduleId: null,

@@ -145,8 +145,28 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
             }
         }
 
-        const canLoadData = user || role === 'guest';
-        if (!canLoadData) {
+        const canLoadFromFirebase = user && role !== 'guest';
+        const canUseLocalData = user || role === 'guest';
+
+        if (!canUseLocalData) {
+            setInternalData(INITIAL_DATA);
+            setIsLoading(false);
+            return;
+        }
+
+        // Для гостей используем только локальные данные
+        if (role === 'guest') {
+            if (localBackup) {
+                setInternalData(localBackup);
+            } else {
+                setInternalData(INITIAL_DATA);
+            }
+            setIsLoading(false);
+            return;
+        }
+
+        // Для авторизованных пользователей подписываемся на Firebase
+        if (!canLoadFromFirebase) {
             if (!localBackup) setInternalData(INITIAL_DATA);
             setIsLoading(false);
             return;
@@ -176,6 +196,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                 if (!fixedData.bellSchedule) fixedData.bellSchedule = DEFAULT_BELLS;
                 if (!fixedData.dutyZones || fixedData.dutyZones.length === 0) fixedData.dutyZones = DEFAULT_DUTY_ZONES;
                 if (!fixedData.dutySchedule) fixedData.dutySchedule = [];
+                if (!fixedData.nutritionRecords) fixedData.nutritionRecords = [];
                 
                 if (!fixedData.settings) fixedData.settings = INITIAL_DATA.settings;
                 else fixedData.settings = { ...INITIAL_DATA.settings, ...fixedData.settings };
@@ -233,7 +254,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
             // 3. Пробуем отправить в облако (только для авторизованных, не для гостей и не для публичных данных)
             if (!initialData && user && !isGuest) {
                 try {
-                    await dbService.save(newData);
+                    await dbService.save(newData, user);
                 } catch (dbError: any) {
                     // Откатываем оптимистичное обновление при ошибке
                     setInternalData(data);
@@ -279,7 +300,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                 
                 if (!initialData && user) {
                     try {
-                        dbService.save(prevData).catch(e => handleError.firebase(e, 'отмены изменений'));
+                        dbService.save(prevData, user).catch(e => handleError.firebase(e, 'отмены изменений'));
                     } catch(e) { handleError.firebase(e, 'отмены изменений'); }
                 }
                 return prev - 1;
@@ -300,7 +321,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
 
                 if (!initialData && user) {
                     try {
-                        dbService.save(nextData).catch(e => handleError.firebase(e, 'повтора изменений'));
+                        dbService.save(nextData, user).catch(e => handleError.firebase(e, 'повтора изменений'));
                     } catch(e) { handleError.firebase(e, 'повтора изменений'); }
                 }
                 return prev + 1;
@@ -395,9 +416,10 @@ export const ScheduleDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
         schedule2: data.schedule2 || [],
         substitutions: data.substitutions,
         dutySchedule: data.dutySchedule,
+        nutritionRecords: data.nutritionRecords || [],
         saveSemesterSchedule,
         saveScheduleData
-    }), [activeSchedule, data.schedule, data.schedule2, data.substitutions, data.dutySchedule, saveSemesterSchedule, saveScheduleData]);
+    }), [activeSchedule, data.schedule, data.schedule2, data.substitutions, data.dutySchedule, data.nutritionRecords, saveSemesterSchedule, saveScheduleData]);
 
     const contextValue = useMemo(() => ({
         ...scheduleData,
@@ -444,7 +466,8 @@ export const useScheduleData = () => {
         schedule1: context.schedule1 || [],
         schedule2: context.schedule2 || [],
         substitutions: context.substitutions || [],
-        dutySchedule: context.dutySchedule || []
+        dutySchedule: context.dutySchedule || [],
+        nutritionRecords: context.nutritionRecords || []
     };
 
     return { ...safeContext, isLoading: fullContext.isLoading, isSaving: fullContext.isSaving, undo: fullContext.undo, redo: fullContext.redo, canUndo: fullContext.canUndo, canRedo: fullContext.canRedo, resetData: fullContext.resetData };

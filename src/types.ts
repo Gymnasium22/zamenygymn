@@ -119,6 +119,27 @@ export interface DutyRecord {
     teacherId: string;
 }
 
+// --- NUTRITION TYPES ---
+export interface NutritionRecord {
+    id: string;
+    date: string; // ISO Date (YYYY-MM-DD)
+    classId: string;
+    totalCount: number; // Общее количество питающихся
+    benefitCount: number; // Количество льготников
+    regularCount: number; // Количество обычных (totalCount - benefitCount)
+    enteredBy?: string; // ID учителя, который внёс данные
+    enteredAt?: string; // ISO Date when record was created/updated
+}
+
+export interface NutritionStats {
+    date: string;
+    totalStudents: number;
+    totalBenefit: number;
+    totalRegular: number;
+    classCount: number;
+    records: NutritionRecord[];
+}
+
 // Interfaces for split contexts
 export interface StaticAppData {
   subjects: Subject[];
@@ -136,6 +157,7 @@ export interface ScheduleAndSubstitutionData {
   schedule2: ScheduleItem[]; // Явное 2 полугодие
   substitutions: Substitution[];
   dutySchedule: DutyRecord[]; // New
+  nutritionRecords: NutritionRecord[]; // New
   saveSemesterSchedule: (semester: 1 | 2, newData: ScheduleItem[]) => Promise<void>;
   saveScheduleData: (newData: Partial<ScheduleAndSubstitutionData>, addToHistory?: boolean) => Promise<void>; // Legacy support
 }
@@ -145,6 +167,7 @@ export interface AppData extends StaticAppData {
   schedule2: ScheduleItem[]; // 2 полугодие
   substitutions: Substitution[];
   dutySchedule: DutyRecord[]; // New
+  nutritionRecords: NutritionRecord[]; // New
 }
 
 export const DAYS = [DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday];

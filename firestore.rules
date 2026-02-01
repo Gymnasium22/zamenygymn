@@ -1,63 +1,62 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper function to check if user is admin
-    function isAdmin() {
-      return request.auth != null &&
-             request.auth.token.email == 'admin@gymnasium22.com';
-    }
-
-    // Helper function to check if user is authenticated
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-
-    // Admin-only collections: teachers, subjects, classes, rooms, schedules, substitutions, duty data, config
-    match /teachers/{document} {
-      allow read, write: if isAdmin();
-    }
-
-    match /subjects/{document} {
-      allow read, write: if isAdmin();
-    }
-
-    match /classes/{document} {
-      allow read, write: if isAdmin();
-    }
-
-    match /rooms/{document} {
-      allow read, write: if isAdmin();
-    }
-
-    match /schedule_sem1/{document} {
-      allow read, write: if isAdmin();
-    }
-
-    match /schedule_sem2/{document} {
-      allow read, write: if isAdmin();
-    }
-
-    match /substitutions/{document} {
-      allow read, write: if isAdmin();
-    }
-
-    match /duty_zones/{document} {
-      allow read, write: if isAdmin();
-    }
-
-    match /duty_schedule/{document} {
-      allow read, write: if isAdmin();
-    }
-
-    match /config/{document} {
-      allow read, write: if isAdmin();
-    }
-
-    // Public schedules: anyone can read, only admin can write
+    // Публичные расписания - доступны всем
     match /publicSchedules/{document} {
-      allow read: if true;  // Public read access
-      allow write: if isAdmin();
+      allow read: if true;
+    }
+
+    // Основные справочные данные - доступны всем авторизованным
+    match /teachers/{document} {
+      allow read: if request.auth != null;
+    }
+    match /subjects/{document} {
+      allow read: if request.auth != null;
+    }
+    match /classes/{document} {
+      allow read: if request.auth != null;
+    }
+    match /rooms/{document} {
+      allow read: if request.auth != null;
+    }
+    match /schedule_sem1/{document} {
+      allow read: if request.auth != null;
+    }
+    match /schedule_sem2/{document} {
+      allow read: if request.auth != null;
+    }
+    match /config/{document} {
+      allow read: if request.auth != null;
+    }
+
+    // Специальные правила для записей о питании
+    match /nutrition_records/{document} {
+      allow read: if request.auth != null;
+      // Администратор и учителя могут делать все, столовая - только читать
+      allow write: if request.auth != null && request.auth.token.email != "canteen@gymnasium22.com";
+      allow update: if request.auth != null && request.auth.token.email != "canteen@gymnasium22.com";
+      allow delete: if request.auth != null && request.auth.token.email != "canteen@gymnasium22.com";
+    }
+
+    // Замены и дежурства - только для админа и учителей
+    match /substitutions/{document} {
+      allow read: if request.auth != null && (request.auth.token.email == "admin@gymnasium22.com" || request.auth.token.email == "teacher@gymnasium22.com" || request.auth.token.email == "canteen@gymnasium22.com");
+      allow write: if request.auth != null && request.auth.token.email == "admin@gymnasium22.com";
+    }
+    match /duty_zones/{document} {
+      allow read: if request.auth != null && (request.auth.token.email == "admin@gymnasium22.com" || request.auth.token.email == "teacher@gymnasium22.com");
+      allow write: if request.auth != null && request.auth.token.email == "admin@gymnasium22.com";
+    }
+    match /duty_schedule/{document} {
+      allow read: if request.auth != null && (request.auth.token.email == "admin@gymnasium22.com" || request.auth.token.email == "teacher@gymnasium22.com");
+      allow write: if request.auth != null && request.auth.token.email == "admin@gymnasium22.com";
+    }
+
+    // Админ может писать во все коллекции
+    match /{document=**} {
+      allow write: if request.auth != null && request.auth.token.email == "admin@gymnasium22.com";
+      allow update: if request.auth != null && request.auth.token.email == "admin@gymnasium22.com";
+      allow delete: if request.auth != null && request.auth.token.email == "admin@gymnasium22.com";
     }
   }
 }

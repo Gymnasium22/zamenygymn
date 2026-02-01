@@ -425,7 +425,7 @@ export const DashboardPage = () => {
             <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 animate-fade-in">
                  <div>
                     <h1 className="text-4xl font-black text-slate-800 dark:text-white tracking-tight mb-1 bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400">
-                        {greeting}, {role === 'admin' ? 'Администратор' : 'Учитель'}!
+                        {greeting}, {role === 'admin' ? 'Администратор' : role === 'canteen' ? 'Столовая' : 'Учитель'}!
                     </h1>
                     <p className="text-slate-500 dark:text-slate-400 text-lg font-medium">
                         Сегодня {currentDate.toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' })}
@@ -465,6 +465,7 @@ export const DashboardPage = () => {
                     </NavLink>
                 )}
 
+
                 {role === 'guest' && (
                     <NavLink to="/schedule" className="p-4 rounded-2xl bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/30 dark:to-emerald-800/30 border border-emerald-200 dark:border-emerald-700 hover:shadow-lg transition-all flex flex-col items-center gap-2 active:scale-95">
                         <div className="bg-emerald-500 text-white p-3 rounded-xl">
@@ -475,6 +476,7 @@ export const DashboardPage = () => {
                 )}
             </div>
 
+            {/* Dashboard widgets */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {/* Widget 1: Who Where - Search */}
                 <div className="p-6 rounded-3xl flex flex-col h-full relative overflow-hidden card-hover bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
@@ -633,7 +635,14 @@ export const DashboardPage = () => {
                                 <Icon name="Save" size={16}/>
                             </button>
                             <button onClick={() => { navigator.clipboard.writeText(notes); addToast({type: 'success', title: 'Скопировано', message: 'Заметки скопированы в буфер обмена', duration: 2000}); }} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg"><Icon name="Copy" size={16}/></button>
-                            <button onClick={() => { if(confirm('Очистить заметки?')) { setNotes(''); setNotesChanged(false); }}} className="p-2 text-slate-400 hover:text-red-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg"><Icon name="Trash2" size={16}/></button>
+                            <button onClick={() => { 
+                                if(confirm('Очистить заметки?')) { 
+                                    setNotes(''); 
+                                    localStorage.setItem('gym_notes', ''); 
+                                    setNotesChanged(false);
+                                    addToast({type: 'success', title: 'Заметки очищены', duration: 2000});
+                                }
+                            }} className="p-2 text-slate-400 hover:text-red-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg"><Icon name="Trash2" size={16}/></button>
                         </div>
                     </div>
                     <div className="relative flex-1 bg-yellow-50/50 dark:bg-slate-800/50 rounded-2xl p-1">
@@ -688,7 +697,7 @@ export const DashboardPage = () => {
                             </div>
                         )) : <div className="p-4 text-center text-slate-400 text-sm italic">Нет дней рождения в ближайший месяц</div>}
                     </div>
-                 </div>
+                </div>
             </div>
 
             <Modal isOpen={isFeedbackModalOpen} onClose={() => setIsFeedbackModalOpen(false)} title="Обратная связь">

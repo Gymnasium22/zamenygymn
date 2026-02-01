@@ -17,7 +17,7 @@ export const LoginPage = () => {
 
     useEffect(() => {
         if (!authLoading && role) {
-            if (role === 'admin' || role === 'teacher') {
+            if (role === 'admin' || role === 'teacher' || role === 'canteen') {
                 navigate('/dashboard');
             }
         }
@@ -39,6 +39,8 @@ export const LoginPage = () => {
             
             if (mode === 'teacher') {
                 loginEmail = 'teacher@gymnasium22.com';
+            } else if (mode === 'canteen') {
+                loginEmail = 'canteen@gymnasium22.com';
             }
 
             await signInWithEmailAndPassword(auth, loginEmail, password);
@@ -112,12 +114,22 @@ export const LoginPage = () => {
                             <Icon name="ArrowRight" className="ml-auto text-slate-300 group-hover:text-indigo-500 transition-colors" size={20}/>
                         </button>
 
+                        <button onClick={() => setMode('canteen')} className="w-full p-4 rounded-2xl bg-white/60 dark:bg-slate-800/60 border border-white/50 dark:border-slate-700 shadow-sm hover:shadow-md hover:bg-white dark:hover:bg-slate-800 group transition-all text-left flex items-center gap-4 relative overflow-hidden">
+                            <div className="absolute inset-0 bg-gradient-to-r from-green-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                            <div className="bg-green-100 dark:bg-green-900/50 p-3 rounded-xl text-green-600 dark:text-green-400 group-hover:scale-110 transition-transform"><Icon name="Coffee" size={24}/></div>
+                            <div className="relative z-10">
+                                <div className="font-bold text-slate-800 dark:text-white text-lg">Столовая</div>
+                                <div className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Только пароль</div>
+                            </div>
+                            <Icon name="ArrowRight" className="ml-auto text-slate-300 group-hover:text-green-500 transition-colors" size={20}/>
+                        </button>
+
                         <button onClick={() => setMode('admin')} className="w-full p-4 rounded-2xl bg-white/60 dark:bg-slate-800/60 border border-white/50 dark:border-slate-700 shadow-sm hover:shadow-md hover:bg-white dark:hover:bg-slate-800 group transition-all text-left flex items-center gap-4 relative overflow-hidden">
                             <div className="absolute inset-0 bg-gradient-to-r from-purple-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                             <div className="bg-purple-100 dark:bg-purple-900/50 p-3 rounded-xl text-purple-600 dark:text-purple-400 group-hover:scale-110 transition-transform"><Icon name="Settings" size={24}/></div>
                             <div className="relative z-10">
                                 <div className="font-bold text-slate-800 dark:text-white text-lg">Администратор</div>
-                                <div className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Полный доступ</div>
+                                <div className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Вход по логину и паролю</div>
                             </div>
                             <Icon name="ArrowRight" className="ml-auto text-slate-300 group-hover:text-purple-500 transition-colors" size={20}/>
                         </button>
@@ -128,7 +140,11 @@ export const LoginPage = () => {
                     <form onSubmit={handleLogin} className="space-y-5 animate-fade-in">
                         <div className="flex items-center gap-2 mb-6">
                             <button type="button" onClick={() => { setMode('select'); setError(''); }} className="p-2 -ml-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors rounded-full hover:bg-slate-100 dark:hover:bg-slate-700"><Icon name="ArrowRight" className="rotate-180" size={24}/></button>
-                            <h2 className="font-bold text-xl dark:text-white">{mode === 'teacher' ? 'Вход для учителей' : 'Вход для администратора'}</h2>
+                            <h2 className="font-bold text-xl dark:text-white">
+                                {mode === 'teacher' ? 'Вход для учителей' :
+                                 mode === 'canteen' ? 'Вход для столовой' :
+                                 'Вход для администратора'}
+                            </h2>
                         </div>
                         
                         {mode === 'admin' && (
@@ -136,7 +152,7 @@ export const LoginPage = () => {
                                 <label className="block text-xs font-bold uppercase text-slate-500 dark:text-slate-400 mb-2 ml-1">Email</label>
                                 <div className="relative">
                                     <Icon name="User" className="absolute left-4 top-3.5 text-slate-400" size={18}/>
-                                    <input type="email" inputMode="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50/50 dark:bg-slate-700/50 dark:text-white outline-none focus:ring-2 ring-indigo-500/50 transition-all font-medium" placeholder="admin@school.com" autoFocus required />
+                                    <input type="email" inputMode="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50/50 dark:bg-slate-700/50 dark:text-white outline-none focus:ring-2 ring-indigo-500/50 transition-all font-medium" placeholder={mode === 'canteen' ? "canteen@gymnasium22.com" : "admin@school.com"} autoFocus required />
                                 </div>
                             </div>
                         )}

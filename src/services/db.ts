@@ -26,7 +26,8 @@ const COLLECTIONS = {
     CONFIG: 'config',
     PUBLIC: 'publicSchedules',
     DUTY_ZONES: 'duty_zones',
-    DUTY_SCHEDULE: 'duty_schedule'
+    DUTY_SCHEDULE: 'duty_schedule',
+    NUTRITION: 'nutrition_records'
 };
 
 // Кеш предыдущих состояний коллекций для оптимизации
@@ -178,23 +179,34 @@ export const dbService = {
     syncCacheWithDatabase: async (collectionName: string) => {
         if (!firestoreDB) return;
 
-        const q = query(collection(firestoreDB, collectionName));
-        const querySnapshot = await awaitHZ(async() => await getDocs(q), { throwOnError: true });
+        // Проверяем, есть ли уже данные в кеше, чтобы не делать лишние запросы
+        if (collectionCache.has(collectionName) && collectionCache.get(collectionName).size > 0) {
+            console.log(`Cache already exists for ${collectionName}, skipping sync`);
+            return;
+        }
 
-        const cachedItems = new Map<string, any>();
-        querySnapshot.docs.forEach((doc: any) => {
-            cachedItems.set(doc.id, doc.data());
-        });
+        try {
+            const q = query(collection(firestoreDB, collectionName));
+            const querySnapshot = await awaitHZ(async() => await getDocs(q), { throwOnError: true });
 
-        collectionCache.set(collectionName, cachedItems);
-        console.log(`Cache synced for ${collectionName} (${cachedItems.size} items)`);
+            const cachedItems = new Map<string, any>();
+            querySnapshot.docs.forEach((doc: any) => {
+                cachedItems.set(doc.id, doc.data());
+            });
+
+            collectionCache.set(collectionName, cachedItems);
+            console.log(`Cache synced for ${collectionName} (${cachedItems.size} items)`);
+        } catch (error) {
+            console.error(`Failed to sync cache for ${collectionName}:`, error);
+            // Не бросаем ошибку, чтобы не ломать загрузку
+        }
     },
 
-    save: async (data: Partial<AppData>) => {
+    save: async (data: Partial<AppData>, currentUser?: any) => {
         if (!firestoreDB) return;
-        
-        const user = auth?.currentUser;
-        if (!user || user.email !== "admin@gymnasium22.com") return;
+
+        const user = currentUser || auth?.currentUser;
+        if (!user) return;
 
         const promises = [];
 
@@ -207,6 +219,7 @@ export const dbService = {
         if (data.substitutions) promises.push(dbService.syncCollection(COLLECTIONS.SUBSTITUTIONS, data.substitutions));
         if (data.dutyZones) promises.push(dbService.syncCollection(COLLECTIONS.DUTY_ZONES, data.dutyZones));
         if (data.dutySchedule) promises.push(dbService.syncCollection(COLLECTIONS.DUTY_SCHEDULE, data.dutySchedule));
+        if (data.nutritionRecords) promises.push(dbService.syncCollection(COLLECTIONS.NUTRITION, data.nutritionRecords));
 
         if (data.settings) {
             promises.push(setDoc(doc(firestoreDB, COLLECTIONS.CONFIG, 'settings'), sanitizeForFirestore(data.settings), { merge: true }));
@@ -235,41 +248,11 @@ export const dbService = {
             updateTimeout = setTimeout(async () => {
                 const data = { ...localData };
 
-                // При первой загрузке инициализируем кеш актуальными данными из базы
+                // При первой загрузке НЕ делаем полную синхронизацию кеша
+                // Это экономит квоты Firestore - данные будут загружаться по требованию
                 if (isInitialLoad) {
                     isInitialLoad = false;
-
-                    // Синхронизируем кеш с данными из базы (все коллекции)
-                    const cachePromises = [
-                        // Основные справочники
-                        dbService.syncCacheWithDatabase(COLLECTIONS.TEACHERS),
-                        dbService.syncCacheWithDatabase(COLLECTIONS.SUBJECTS),
-                        dbService.syncCacheWithDatabase(COLLECTIONS.CLASSES),
-                        dbService.syncCacheWithDatabase(COLLECTIONS.ROOMS),
-                        // Расписание
-                        dbService.syncCacheWithDatabase(COLLECTIONS.SCHEDULE_1),
-                        dbService.syncCacheWithDatabase(COLLECTIONS.SCHEDULE_2),
-                        // Замены и дежурства
-                        dbService.syncCacheWithDatabase(COLLECTIONS.SUBSTITUTIONS),
-                        dbService.syncCacheWithDatabase(COLLECTIONS.DUTY_ZONES),
-                        dbService.syncCacheWithDatabase(COLLECTIONS.DUTY_SCHEDULE),
-                    ];
-
-                    try {
-                        await Promise.all(cachePromises);
-                        console.log('Initial cache synchronization completed');
-                    } catch (error) {
-                        console.error('Failed to sync initial cache (likely quota exceeded):', error);
-                        // If this is a quota error, notify the UI
-                        const err = error as Error & { code?: string; message?: string };
-                        if ((err?.message && err.message.includes('quota')) ||
-                            err?.code === 'resource-exhausted' ||
-                            err?.code === 'quota-exceeded') {
-                            onError(new Error('Превышен лимит запросов к базе данных. Попробуйте позже или обратитесь к администратору.'));
-                        } else {
-                            onError(err);
-                        }
-                    }
+                    console.log('Skipping initial cache synchronization to save Firestore quota');
                 }
 
                 onNext(data);
@@ -304,6 +287,7 @@ export const dbService = {
         unsubs.push(subColl(COLLECTIONS.SUBSTITUTIONS, 'substitutions'));
         unsubs.push(subColl(COLLECTIONS.DUTY_ZONES, 'dutyZones'));
         unsubs.push(subColl(COLLECTIONS.DUTY_SCHEDULE, 'dutySchedule'));
+        unsubs.push(subColl(COLLECTIONS.NUTRITION, 'nutritionRecords'));
 
         unsubs.push(onSnapshot(doc(firestoreDB, COLLECTIONS.CONFIG, 'settings'), (doc) => {
             if (doc.exists()) {

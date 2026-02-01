@@ -3,7 +3,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from '../services/firebase';
 
-export type UserRole = 'admin' | 'teacher' | 'guest' | null;
+export type UserRole = 'admin' | 'teacher' | 'canteen' | 'guest' | null;
 
 interface AuthContextType {
     user: User | null;
@@ -17,6 +17,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const ADMIN_EMAIL = 'admin@gymnasium22.com';
 const TEACHER_EMAIL = 'teacher@gymnasium22.com';
+const CANTEEN_EMAIL = 'canteen@gymnasium22.com';
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
@@ -35,11 +36,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (currentUser) {
                 if (currentUser.email === ADMIN_EMAIL) {
                     setRole('admin');
-                } else if (currentUser.email === TEACHER_EMAIL) {
+                } else if (currentUser.email === 'canteen@gymnasium22.com') {
+                    setRole('canteen');
+                } else if (currentUser.email && currentUser.email.includes('@')) {
                     setRole('teacher');
                 } else {
-                    setRole(null);
-                    signOut(auth);
+                    setRole('guest');
                 }
             } else {
                 setRole(null);

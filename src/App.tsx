@@ -14,6 +14,7 @@ import { AdminPage } from './pages/Admin';
 import { ExportPage } from './pages/Export';
 import { ReportsPage } from './pages/Reports';
 import { DutyPage } from './pages/Duty';
+import { NutritionPage } from './pages/Nutrition';
 import { LoginPage } from './pages/Login';
 import { dbService } from './services/db';
 import { AppData } from './types';
@@ -98,11 +99,12 @@ const Layout = () => {
 
     // Простое плоское меню без группировки
     const menuItems = [
-        { to: '/dashboard', label: 'Рабочий стол', icon: 'Home', roles: ['admin', 'teacher'] },
+        { to: '/dashboard', label: 'Рабочий стол', icon: 'Home', roles: ['admin', 'teacher', 'canteen'] },
         { to: '/schedule', label: 'Расписание 1 пол.', icon: 'Calendar', roles: ['admin', 'teacher', 'guest'] },
         { to: '/schedule2', label: 'Расписание 2 пол.', icon: 'Calendar', roles: ['admin', 'teacher', 'guest'] },
         { to: '/substitutions', label: 'Замены', icon: 'Repeat', roles: ['admin'] },
-        { to: '/duty', label: 'Дежурство', icon: 'Shield', roles: ['admin', 'teacher'] },
+        { to: '/duty', label: 'Дежурство', icon: 'Shield', roles: ['admin'] },
+        { to: '/nutrition', label: 'Питание', icon: 'Coffee', roles: ['admin', 'teacher', 'canteen'] },
         { to: '/directory', label: 'Справочники', icon: 'BookOpen', roles: ['admin'] },
         { to: '/reports', label: 'Отчеты', icon: 'BarChart2', roles: ['admin'] },
         { to: '/export', label: 'Экспорт', icon: 'Download', roles: ['admin'] },
@@ -276,7 +278,8 @@ export default function App() {
                                         <SchedulePageWrapper semester={2} />
                                     } />
                                     <Route path="substitutions" element={<ProtectedRoute allowedRoles={['admin']}><SubstitutionsPage /></ProtectedRoute>} />
-                                    <Route path="duty" element={<ProtectedRoute allowedRoles={['admin', 'teacher']}><DutyPage /></ProtectedRoute>} />
+                                    <Route path="duty" element={<ProtectedRoute allowedRoles={['admin']}><DutyPage /></ProtectedRoute>} />
+                                    <Route path="nutrition" element={<ProtectedRoute allowedRoles={['admin', 'teacher', 'canteen']}><NutritionPage /></ProtectedRoute>} />
                                     <Route path="directory" element={<ProtectedRoute allowedRoles={['admin']}><DirectoryPage /></ProtectedRoute>} />
                                     <Route path="admin" element={<ProtectedRoute allowedRoles={['admin']}><AdminPage /></ProtectedRoute>} />
                                     <Route path="reports" element={<ProtectedRoute allowedRoles={['admin']}><ReportsPage /></ProtectedRoute>} />
