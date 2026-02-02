@@ -678,6 +678,7 @@ export const NutritionPage = () => {
                         </label>
                         <SearchableSelect
                             options={teacherClasses
+                                .slice()
                                 .sort((a, b) => a.name.localeCompare(b.name))
                                 .map((cls) => ({
                                     value: cls.id,

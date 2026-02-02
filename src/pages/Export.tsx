@@ -13,7 +13,7 @@ import { Modal } from '../components/UI';
 
 export const ExportPage = () => {
     const { subjects, teachers, classes, rooms, settings, bellSchedule, saveStaticData, dutyZones } = useStaticData();
-    const { schedule1, schedule2, substitutions, saveScheduleData, dutySchedule } = useScheduleData();
+    const { schedule1, schedule2, substitutions, saveScheduleData, dutySchedule, nutritionRecords } = useScheduleData();
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const printRef1 = useRef<HTMLDivElement>(null);
@@ -36,13 +36,19 @@ export const ExportPage = () => {
     const [matrixGrade, setMatrixGrade] = useState<string>("");
 
     const fullAppData: AppData = useMemo(() => ({
-        subjects, teachers, classes, rooms, settings, bellSchedule,
+        subjects,
+        teachers,
+        classes,
+        rooms,
+        settings,
+        bellSchedule,
         schedule: schedule1,
-        schedule2: schedule2,
+        schedule2,
         substitutions,
         dutyZones,
-        dutySchedule
-    }), [subjects, teachers, classes, rooms, settings, bellSchedule, schedule1, schedule2, substitutions, dutyZones, dutySchedule]);
+        dutySchedule,
+        nutritionRecords
+    }), [subjects, teachers, classes, rooms, settings, bellSchedule, schedule1, schedule2, substitutions, dutyZones, dutySchedule, nutritionRecords]);
 
     // Получаем расписание для экспорта (Excel, Матрица) на основе селектора
     const getScheduleForExport = () => exportSemester === 2 ? schedule2 : schedule1;
