@@ -378,20 +378,33 @@ export const NutritionPage = () => {
                             </p>
                         </div>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                        {classesWithoutData.map((cls) => (
-                            <button
-                                key={cls.id}
-                                onClick={() => {
-                                    setSelectedDate(formatDateISO());
-                                    openModal(cls.id);
-                                }}
-                                className="px-4 py-2 bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-700 rounded-xl text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
-                            >
-                                {cls.name}
-                            </button>
-                        ))}
-                    </div>
+                    {(isTeacher || isAdmin) ? (
+                        <div className="flex flex-wrap gap-2">
+                            {classesWithoutData.map((cls) => (
+                                <button
+                                    key={cls.id}
+                                    onClick={() => {
+                                        setSelectedDate(formatDateISO());
+                                        openModal(cls.id);
+                                    }}
+                                    className="px-4 py-2 bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-700 rounded-xl text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
+                                >
+                                    {cls.name}
+                                </button>
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="flex flex-wrap gap-2">
+                            {classesWithoutData.map((cls) => (
+                                <span
+                                    key={cls.id}
+                                    className="px-4 py-2 bg-slate-100 dark:bg-slate-700 border border-amber-300 dark:border-amber-700 rounded-xl text-sm font-semibold text-slate-500 dark:text-slate-400"
+                                >
+                                    {cls.name}
+                                </span>
+                            ))}
+                        </div>
+                    )}
                 </div>
             )}
 
