@@ -677,23 +677,28 @@ interface BottomNavProps {
 }
 
 export const BottomNavigation = ({ onMenuClick, role }: BottomNavProps) => {
-    const isAdminOrTeacher = role === 'admin' || role === 'teacher';
     const isAdmin = role === 'admin';
+    const isTeacher = role === 'teacher';
+    const isGuest = role === 'guest';
+    const showDashboard = isAdmin || isTeacher;
+    const showSchedule = isAdmin || isTeacher || isGuest;
 
     return (
         <div className="fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-dark-800/90 backdrop-blur-xl border-t border-slate-200 dark:border-slate-700 z-40 pb-safe md:hidden transition-all duration-300 no-select">
             <div className="flex justify-around items-center h-20">
-                {isAdminOrTeacher && (
+                {showDashboard && (
                     <NavLink to="/dashboard" className={({ isActive }) => `flex flex-col items-center justify-center gap-1.5 p-2.5 rounded-2xl transition-all duration-300 flex-1 h-full ${isActive ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/20' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100/50 dark:hover:bg-slate-700/30'}`}>
                         <Icon name="Home" size={26} strokeWidth={2.5} />
                         <span className="text-[10px] font-bold uppercase tracking-wider">Рабочий</span>
                     </NavLink>
                 )}
                 
-                <NavLink to="/schedule" className={({ isActive }) => `flex flex-col items-center justify-center gap-1.5 p-2.5 rounded-2xl transition-all duration-300 flex-1 h-full ${isActive ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/20' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100/50 dark:hover:bg-slate-700/30'}`}>
-                    <Icon name="Calendar" size={26} strokeWidth={2.5} />
-                    <span className="text-[10px] font-bold uppercase tracking-wider">Расписание</span>
-                </NavLink>
+                {showSchedule && (
+                    <NavLink to="/schedule" className={({ isActive }) => `flex flex-col items-center justify-center gap-1.5 p-2.5 rounded-2xl transition-all duration-300 flex-1 h-full ${isActive ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/20' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100/50 dark:hover:bg-slate-700/30'}`}>
+                        <Icon name="Calendar" size={26} strokeWidth={2.5} />
+                        <span className="text-[10px] font-bold uppercase tracking-wider">Расписание</span>
+                    </NavLink>
+                )}
 
                 {isAdmin && (
                     <NavLink to="/substitutions" className={({ isActive }) => `flex flex-col items-center justify-center gap-1.5 p-2.5 rounded-2xl transition-all duration-300 flex-1 h-full ${isActive ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/20' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100/50 dark:hover:bg-slate-700/30'}`}>

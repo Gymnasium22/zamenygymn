@@ -154,17 +154,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
             return;
         }
 
-        // Для гостей используем только локальные данные
-        if (role === 'guest') {
-            if (localBackup) {
-                setInternalData(localBackup);
-            } else {
-                setInternalData(INITIAL_DATA);
-            }
-            setIsLoading(false);
-            return;
-        }
-
         // Для авторизованных пользователей подписываемся на Firebase
         if (!canLoadFromFirebase) {
             if (!localBackup) setInternalData(INITIAL_DATA);

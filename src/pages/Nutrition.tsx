@@ -99,9 +99,15 @@ export const NutritionPage = () => {
         };
     }, [recordsForMonth]);
 
-    // Get class name
+    // Get class name and order helpers to respect directory ordering
     const getClassName = (classId: string) => {
         return classes.find(c => c.id === classId)?.name || classId;
+    };
+
+    const getClassOrder = (classId: string) => {
+        const cls = classes.find(c => c.id === classId);
+        if (!cls) return Number.MAX_SAFE_INTEGER;
+        return typeof cls.order === 'number' ? cls.order : Number.MAX_SAFE_INTEGER;
     };
 
     // Get teacher name who entered
@@ -282,14 +288,19 @@ export const NutritionPage = () => {
         return classes;
     }, [classes, isAdmin, user]);
 
-    // Get classes without data for today
+    // Get classes without data for today (respect directory order)
     const classesWithoutData = useMemo(() => {
         if (viewMode !== 'day') return [];
         
         const todayRecords = recordsForDate.map(r => r.classId);
         return classes
             .filter(cls => !todayRecords.includes(cls.id))
-            .sort((a, b) => a.name.localeCompare(b.name));
+            .sort((a, b) => {
+                const orderA = typeof a.order === 'number' ? a.order : Number.MAX_SAFE_INTEGER;
+                const orderB = typeof b.order === 'number' ? b.order : Number.MAX_SAFE_INTEGER;
+                if (orderA !== orderB) return orderA - orderB;
+                return a.name.localeCompare(b.name);
+            });
     }, [classes, recordsForDate, viewMode]);
 
     return (
@@ -467,7 +478,13 @@ export const NutritionPage = () => {
                                     </tr>
                                 ) : (
                                     recordsForDate
-                                        .sort((a, b) => getClassName(a.classId).localeCompare(getClassName(b.classId)))
+                                        .slice()
+                                        .sort((a, b) => {
+                                            const orderA = getClassOrder(a.classId);
+                                            const orderB = getClassOrder(b.classId);
+                                            if (orderA !== orderB) return orderA - orderB;
+                                            return getClassName(a.classId).localeCompare(getClassName(b.classId));
+                                        })
                                         .map((record) => (
                                             <tr key={record.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
                                                 <td className="px-4 py-3 font-semibold text-slate-800 dark:text-white">
@@ -576,7 +593,13 @@ export const NutritionPage = () => {
                                 </thead>
                                 <tbody>
                                     {recordsForDate
-                                        .sort((a, b) => getClassName(a.classId).localeCompare(getClassName(b.classId)))
+                                        .slice()
+                                        .sort((a, b) => {
+                                            const orderA = getClassOrder(a.classId);
+                                            const orderB = getClassOrder(b.classId);
+                                            if (orderA !== orderB) return orderA - orderB;
+                                            return getClassName(a.classId).localeCompare(getClassName(b.classId));
+                                        })
                                         .map((record) => (
                                             <tr key={record.id}>
                                                 <td className="border border-slate-300 px-4 py-2">{getClassName(record.classId)}</td>

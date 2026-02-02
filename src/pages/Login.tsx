@@ -119,7 +119,7 @@ export const LoginPage = () => {
                             <div className="bg-green-100 dark:bg-green-900/50 p-3 rounded-xl text-green-600 dark:text-green-400 group-hover:scale-110 transition-transform"><Icon name="Coffee" size={24}/></div>
                             <div className="relative z-10">
                                 <div className="font-bold text-slate-800 dark:text-white text-lg">Столовая</div>
-                                <div className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Только пароль</div>
+                                <div className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Вход по общему паролю</div>
                             </div>
                             <Icon name="ArrowRight" className="ml-auto text-slate-300 group-hover:text-green-500 transition-colors" size={20}/>
                         </button>
