@@ -116,44 +116,6 @@ export const NutritionPage = () => {
         return teachers.find(t => t.id === record.enteredBy)?.name || 'Неизвестно';
     };
 
-    // Get smart defaults for new records
-    const getSmartDefaults = (suggestedClassId?: string) => {
-        const todayRecords = nutritionRecords.filter(r => r.date === selectedDate);
-
-        // First, try to find the last record for the suggested class today
-        if (suggestedClassId) {
-            const classRecord = todayRecords.find(r => r.classId === suggestedClassId);
-            if (classRecord) {
-                return {
-                    totalCount: classRecord.totalCount,
-                    benefitCount: classRecord.benefitCount
-                };
-            }
-        }
-
-        // If no record for suggested class, find the last record entered today
-        const lastRecord = todayRecords
-            .sort((a, b) => new Date(b.enteredAt || 0).getTime() - new Date(a.enteredAt || 0).getTime())[0];
-
-        if (lastRecord) {
-            return {
-                totalCount: lastRecord.totalCount,
-                benefitCount: lastRecord.benefitCount
-            };
-        }
-
-        // Fallback to class capacity if available
-        const suggestedClass = suggestedClassId ? classes.find(c => c.id === suggestedClassId) : null;
-        if (suggestedClass && suggestedClass.studentsCount) {
-            return {
-                totalCount: suggestedClass.studentsCount,
-                benefitCount: Math.floor(suggestedClass.studentsCount * 0.3) // Assume ~30% benefit students
-            };
-        }
-
-        return { totalCount: 0, benefitCount: 0 };
-    };
-
     // Open modal for editing/creating
     const openModal = (classId?: string, record?: NutritionRecord) => {
         if (record) {
@@ -164,11 +126,8 @@ export const NutritionPage = () => {
         } else {
             setEditingRecord(null);
             setSelectedClassId(classId || '');
-
-            // Use smart defaults for new records
-            const defaults = getSmartDefaults(classId);
-            setTotalCount(defaults.totalCount);
-            setBenefitCount(defaults.benefitCount);
+            setTotalCount(0);
+            setBenefitCount(0);
         }
         setIsModalOpen(true);
     };
@@ -788,19 +747,6 @@ export const NutritionPage = () => {
                             Отмена
                         </button>
                     </div>
-
-                    {/* Mobile-friendly bottom button - only visible on phones */}
-                    <div className="md:hidden fixed bottom-0 left-0 right-0 p-4 bg-white/90 dark:bg-slate-800/90 backdrop-blur-md border-t border-slate-200 dark:border-slate-700">
-                        <button
-                            onClick={saveRecord}
-                            className="w-full py-4 px-6 rounded-2xl bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800 transition-colors font-bold text-lg shadow-lg"
-                        >
-                            {editingRecord ? 'Сохранить изменения' : 'Добавить запись'}
-                        </button>
-                    </div>
-
-                    {/* Add padding bottom on mobile to account for fixed button */}
-                    <div className="md:hidden h-20"></div>
                 </div>
             </Modal>
         </div>
