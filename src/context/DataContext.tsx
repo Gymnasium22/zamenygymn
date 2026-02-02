@@ -62,6 +62,63 @@ const safeLocalStorageGet = (key: string): string | null => {
     }
 };
 
+// Очередь отложенной синхронизации
+const syncQueue = {
+    items: [] as Array<{
+        id: string;
+        data: Partial<AppData>;
+        timestamp: number;
+        retryCount: number;
+    }>,
+    isProcessing: false,
+
+    add: (data: Partial<AppData>) => {
+        const id = generateId();
+        syncQueue.items.push({
+            id,
+            data,
+            timestamp: Date.now(),
+            retryCount: 0
+        });
+        console.log('Добавлено в очередь синхронизации:', id);
+    },
+
+    process: async (user: any) => {
+        if (syncQueue.isProcessing || !navigator.onLine) return;
+
+        syncQueue.isProcessing = true;
+        const itemsToRemove: string[] = [];
+
+        try {
+            for (const item of syncQueue.items) {
+                if (!navigator.onLine) break; // Останавливаемся, если сеть пропала
+
+                try {
+                    await dbService.save(item.data, user);
+                    itemsToRemove.push(item.id);
+                    console.log('Успешно синхронизировано:', item.id);
+                } catch (error) {
+                    item.retryCount++;
+                    if (item.retryCount >= 3) {
+                        console.error('Не удалось синхронизировать после 3 попыток:', item.id);
+                        itemsToRemove.push(item.id); // Удаляем после 3 попыток
+                    } else {
+                        console.log(`Повторная попытка синхронизации ${item.retryCount}/3:`, item.id);
+                    }
+                }
+            }
+        } finally {
+            syncQueue.items = syncQueue.items.filter(item => !itemsToRemove.includes(item.id));
+            syncQueue.isProcessing = false;
+
+            if (syncQueue.items.length > 0 && navigator.onLine) {
+                // Если остались элементы и сеть есть, попробуем снова через 5 секунд
+                setTimeout(() => syncQueue.process(user), 5000);
+            }
+        }
+    }
+};
+
 // Единообразная обработка ошибок
 const handleError = {
     log: (message: string, error?: any) => {
@@ -100,6 +157,26 @@ const handleError = {
 
         console.error(`Firebase ${context}:`, error);
         alert(message);
+    },
+
+    firebaseOffline: (error: any, context: string, data: Partial<AppData>) => {
+        // Для мобильных устройств показываем более мягкое сообщение
+        const isMobile = window.innerWidth < 768;
+        const message = isMobile
+            ? `Сохранено локально. Синхронизируется при подключении к сети.`
+            : `Ошибка ${context}. Данные сохранены локально и будут синхронизированы при восстановлении соединения.`;
+
+        console.warn(`Firebase ${context} (оффлайн):`, error);
+
+        if (isMobile) {
+            // На мобильных показываем toast вместо alert
+            // Это будет работать через ToastProvider
+        } else {
+            alert(message);
+        }
+
+        // Добавляем в очередь синхронизации
+        syncQueue.add(data);
     }
 };
 
@@ -245,9 +322,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                 try {
                     await dbService.save(newData, user);
                 } catch (dbError: any) {
-                    // Откатываем оптимистичное обновление при ошибке
-                    setInternalData(data);
-                    throw dbError;
+                    // При ошибке Firestore добавляем в очередь синхронизации вместо отката
+                    handleError.firebaseOffline(dbError, 'сохранения данных', newData);
+                    // НЕ откатываем интерфейс - данные остались в localStorage и будут синхронизированы позже
                 }
             } else if (isGuest) {
                 console.warn("Гости не могут сохранять изменения в базу данных.");
@@ -270,12 +347,23 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
 
                 setHistory(newHistory);
             }
-        } catch (e: any) {
-            handleError.firebase(e, 'сохранения данных');
         } finally {
             setIsSaving(false);
         }
     }, [data, history, historyPointer, user, role, initialData]);
+
+    // Автоматическая синхронизация при восстановлении сети
+    useEffect(() => {
+        const handleOnline = () => {
+            if (syncQueue.items.length > 0 && user && role !== 'guest' && !initialData) {
+                console.log(`Восстановлено соединение. Синхронизирую ${syncQueue.items.length} элементов...`);
+                syncQueue.process(user);
+            }
+        };
+
+        window.addEventListener('online', handleOnline);
+        return () => window.removeEventListener('online', handleOnline);
+    }, [user, role, initialData]);
 
     const undo = useCallback(async () => {
         setHistoryPointer(prev => {

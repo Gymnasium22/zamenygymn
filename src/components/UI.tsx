@@ -406,6 +406,21 @@ export const StatusWidget = () => {
     const [progress, setProgress] = useState(0);
     const [color, setColor] = useState("bg-slate-500");
     const [currentDayName, setCurrentDayName] = useState("");
+    const [isOnline, setIsOnline] = useState(navigator.onLine);
+
+    // Online/offline status tracking
+    useEffect(() => {
+        const handleOnline = () => setIsOnline(true);
+        const handleOffline = () => setIsOnline(false);
+
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('offline', handleOffline);
+
+        return () => {
+            window.removeEventListener('online', handleOnline);
+            window.removeEventListener('offline', handleOffline);
+        };
+    }, []);
 
     useEffect(() => {
         const updateStatus = () => {
@@ -494,6 +509,15 @@ export const StatusWidget = () => {
     return (
         <div className="mx-4 mt-auto mb-20 md:mb-4 p-4 rounded-2xl flex flex-col gap-3 relative overflow-hidden group">
             <div className={`absolute top-0 left-0 w-1 h-full ${color}`}></div>
+
+            {/* Offline indicator - only visible when offline */}
+            {!isOnline && (
+                <div className="absolute top-0 left-0 right-0 bg-amber-500 text-white text-xs font-bold py-1 px-3 rounded-t-2xl text-center flex items-center justify-center gap-1">
+                    <Icon name="WifiOff" size={12} />
+                    <span>Работаем оффлайн — данные сохранятся при подключении</span>
+                </div>
+            )}
+
             <div className="flex justify-between items-start z-10">
                 <div>
                     <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-0.5">{currentDayName}</div>
@@ -506,11 +530,17 @@ export const StatusWidget = () => {
                             <Icon name="Loader" size={16} className="animate-spin text-indigo-600" />
                         </div>
                     )}
+                    {!isOnline && !isSaving && (
+                        <div className="absolute inset-0 flex items-center justify-center">
+                            <Icon name="WifiOff" size={16} className="text-amber-500" />
+                        </div>
+                    )}
                     <Icon
-                        name={isSaving ? "Loader" : "Clock"}
+                        name={isSaving ? "Loader" : (!isOnline ? "WifiOff" : "Clock")}
                         size={16}
                         className={
                             isSaving ? 'text-indigo-600 animate-spin' :
+                            !isOnline ? 'text-amber-500' :
                             color === 'bg-indigo-600' ? 'text-indigo-600' :
                             color === 'bg-amber-500' ? 'text-amber-500' :
                             'text-slate-400'
@@ -689,27 +719,27 @@ export const BottomNavigation = ({ onMenuClick, role }: BottomNavProps) => {
                 {showDashboard && (
                     <NavLink to="/dashboard" className={({ isActive }) => `flex flex-col items-center justify-center gap-1.5 p-2.5 rounded-2xl transition-all duration-300 flex-1 h-full ${isActive ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/20' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100/50 dark:hover:bg-slate-700/30'}`}>
                         <Icon name="Home" size={26} strokeWidth={2.5} />
-                        <span className="text-[10px] font-bold uppercase tracking-wider">Рабочий</span>
+                        <span className="text-[11px] md:text-[10px] font-bold uppercase tracking-wider">Рабочий</span>
                     </NavLink>
                 )}
                 
                 {showSchedule && (
                     <NavLink to="/schedule" className={({ isActive }) => `flex flex-col items-center justify-center gap-1.5 p-2.5 rounded-2xl transition-all duration-300 flex-1 h-full ${isActive ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/20' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100/50 dark:hover:bg-slate-700/30'}`}>
                         <Icon name="Calendar" size={26} strokeWidth={2.5} />
-                        <span className="text-[10px] font-bold uppercase tracking-wider">Расписание</span>
+                        <span className="text-[11px] md:text-[10px] font-bold uppercase tracking-wider">Расписание</span>
                     </NavLink>
                 )}
 
                 {isAdmin && (
                     <NavLink to="/substitutions" className={({ isActive }) => `flex flex-col items-center justify-center gap-1.5 p-2.5 rounded-2xl transition-all duration-300 flex-1 h-full ${isActive ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/20' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100/50 dark:hover:bg-slate-700/30'}`}>
                         <Icon name="Repeat" size={26} strokeWidth={2.5} />
-                        <span className="text-[10px] font-bold uppercase tracking-wider">Замены</span>
+                        <span className="text-[11px] md:text-[10px] font-bold uppercase tracking-wider">Замены</span>
                     </NavLink>
                 )}
 
                 <button onClick={onMenuClick} className="flex flex-col items-center justify-center gap-1.5 p-2.5 rounded-2xl text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 active:text-indigo-600 active:bg-indigo-50/50 dark:active:bg-indigo-900/20 transition-all duration-300 flex-1 h-full hover:bg-slate-100/50 dark:hover:bg-slate-700/30">
                     <Icon name="Menu" size={26} strokeWidth={2.5} />
-                    <span className="text-[10px] font-bold uppercase tracking-wider">Меню</span>
+                        <span className="text-[11px] md:text-[10px] font-bold uppercase tracking-wider">Меню</span>
                 </button>
             </div>
         </div>

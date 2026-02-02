@@ -5,7 +5,6 @@ import { DataProvider, useStaticData, StaticDataProvider, ScheduleDataProvider }
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Icon } from './components/Icons';
 import { StatusWidget, BottomNavigation, ToastProvider } from './components/UI';
-import { useSwipeNavigation } from './hooks/useSwipeNavigation';
 import { DashboardPage } from './pages/Dashboard';
 import { SchedulePage } from './pages/Schedule';
 import { DirectoryPage } from './pages/Directory';
@@ -68,8 +67,6 @@ const Layout = () => {
     const { isLoading } = useStaticData();
     const { logout, role, user } = useAuth();
 
-    // Включаем поддержку свайпов на мобильных
-    useSwipeNavigation({ enabled: true, threshold: 50 });
 
     // Закрываем мобильное меню при изменении размера экрана
     useEffect(() => {

@@ -39,7 +39,7 @@ interface ProblemZone {
 
 export const DashboardPage = () => {
     const { subjects, teachers, classes, rooms, bellSchedule, settings } = useStaticData();
-    const { schedule, substitutions } = useScheduleData();
+    const { schedule, substitutions, nutritionRecords } = useScheduleData();
     const { role } = useAuth();
     const navigate = useNavigate();
     const { addToast } = useToast(); 
@@ -240,9 +240,9 @@ export const DashboardPage = () => {
 
         for (const lesson of todaysSchedule) {
             const originalTeacher = teachers.find(t => t.id === lesson.teacherId);
-            
+
             if (originalTeacher && originalTeacher.unavailableDates.includes(todayStr)) {
-                const substitution = substitutions.find(sub => 
+                const substitution = substitutions.find(sub =>
                     sub.scheduleItemId === lesson.id && sub.date === todayStr
                 );
                 if (!substitution) {
@@ -252,6 +252,14 @@ export const DashboardPage = () => {
         }
         return count;
     }, [schedule, teachers, substitutions, todayStr, todayDayOfWeek]);
+
+    // Classes without nutrition data for today (for canteen role)
+    const classesWithoutDataForToday = useMemo(() => {
+        if (role !== 'canteen') return 0;
+        const todayRecords = nutritionRecords.filter(r => r.date === todayStr);
+        const classesWithData = new Set(todayRecords.map(r => r.classId));
+        return classes.filter(cls => !classesWithData.has(cls.id)).length;
+    }, [role, nutritionRecords, todayStr, classes]);
 
     const handleSearch = () => {
         if (!searchQuery) { setSearchResult(null); return; }
@@ -437,6 +445,55 @@ export const DashboardPage = () => {
                     </button>
                  </div>
             </header>
+
+            {/* Soft Notifications */}
+            {role === 'admin' && unresolvedSubstitutions > 0 && (
+                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl p-4 animate-fade-in">
+                    <div className="flex items-center gap-3">
+                        <div className="bg-amber-500 text-white p-2 rounded-xl">
+                            <Icon name="AlertTriangle" size={20} />
+                        </div>
+                        <div className="flex-1">
+                            <h3 className="font-bold text-slate-800 dark:text-white">
+                                {unresolvedSubstitutions} замен{unresolvedSubstitutions === 1 ? 'а' : unresolvedSubstitutions < 5 ? 'ы' : ''} требуют внимания
+                            </h3>
+                            <p className="text-sm text-slate-600 dark:text-slate-400">
+                                Проверьте раздел "Замены" для назначения преподавателей
+                            </p>
+                        </div>
+                        <NavLink
+                            to="/substitutions"
+                            className="px-4 py-2 bg-amber-500 text-white rounded-xl font-semibold hover:bg-amber-600 transition-colors text-sm"
+                        >
+                            Посмотреть
+                        </NavLink>
+                    </div>
+                </div>
+            )}
+
+            {role === 'canteen' && classesWithoutDataForToday > 0 && (
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-2xl p-4 animate-fade-in">
+                    <div className="flex items-center gap-3">
+                        <div className="bg-blue-500 text-white p-2 rounded-xl">
+                            <Icon name="Coffee" size={20} />
+                        </div>
+                        <div className="flex-1">
+                            <h3 className="font-bold text-slate-800 dark:text-white">
+                                {classesWithoutDataForToday} класс{classesWithoutDataForToday === 1 ? '' : classesWithoutDataForToday < 5 ? 'а' : 'ов'} без данных о питании
+                            </h3>
+                            <p className="text-sm text-slate-600 dark:text-slate-400">
+                                Добавьте данные о питании за сегодня для полного отчёта
+                            </p>
+                        </div>
+                        <NavLink
+                            to="/nutrition"
+                            className="px-4 py-2 bg-blue-500 text-white rounded-xl font-semibold hover:bg-blue-600 transition-colors text-sm"
+                        >
+                            Добавить
+                        </NavLink>
+                    </div>
+                </div>
+            )}
 
             {/* Mobile Quick Actions - Only visible on phones */}
             <div className="md:hidden grid grid-cols-3 gap-3 animate-fade-in">
