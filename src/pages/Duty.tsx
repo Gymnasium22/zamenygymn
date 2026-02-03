@@ -310,20 +310,20 @@ export const DutyPage = () => {
     };
 
     const getRecommendations = () => {
-        if (!selectedCell) return { recommended: [], others: [] };
-        
+        if (!selectedCell) return { recommended: [], others: [], allTeachers: [] };
+
         const day = selectedCell.day;
         const zone = dutyZones.find(z => z.id === selectedCell.zoneId);
-        
+
         const candidates = teachers.map(t => {
             const lessonsCount = activeSchedule.filter(s => s.teacherId === t.id && s.day === day && s.shift === selectedShift).length;
             const isBusy = dutySchedule.some(d => d.day === day && d.teacherId === t.id && d.zoneId !== selectedCell.zoneId && d.shift === selectedShift);
-            
-             const lessonsInZone = zone && zone.includedRooms ? activeSchedule.filter(s => 
-                s.teacherId === t.id && 
-                s.day === day && 
+
+             const lessonsInZone = zone && zone.includedRooms ? activeSchedule.filter(s =>
+                s.teacherId === t.id &&
+                s.day === day &&
                 s.shift === selectedShift &&
-                s.roomId && 
+                s.roomId &&
                 isRoomInZone(rooms.find(r => r.id === s.roomId)?.name || s.roomId, zone)
             ).length : 0;
 
@@ -334,15 +334,19 @@ export const DutyPage = () => {
             .filter(c => c.lessonsInZone > 0 && !c.isBusy)
             .sort((a,b) => b.lessonsInZone - a.lessonsInZone)
             .map(c => ({ value: c.t.id, label: `${c.t.name} (${c.lessonsInZone} ур. в зоне)` }));
-            
+
         const others = candidates
             .filter(c => (c.lessonsInZone === 0 || c.isBusy) && c.lessonsCount > 0)
             .map(c => ({ value: c.t.id, label: c.t.name + (c.isBusy ? ' (Занят)' : '') + (c.lessonsInZone === 0 ? ' (Нет уроков в зоне)' : '') }));
 
-        return { recommended, others };
+        const allTeachers = candidates
+            .filter(c => c.lessonsCount === 0) // Только те, у кого нет уроков в этот день
+            .map(c => ({ value: c.t.id, label: `${c.t.name} (Нет уроков)` }));
+
+        return { recommended, others, allTeachers };
     };
 
-    const { recommended, others } = getRecommendations();
+    const { recommended, others, allTeachers } = getRecommendations();
 
     const zonesByFloor = useMemo(() => {
         const grouped: Record<string, DutyZone[]> = {};
@@ -560,10 +564,12 @@ export const DutyPage = () => {
                     
                     <div>
                         <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2 tracking-wider">Учитель</label>
-                        <SearchableSelect 
+                        <p className="text-[10px] text-slate-400 mb-2">Можно назначать учителей даже без уроков в этот день</p>
+                        <SearchableSelect
                             options={[
                                 { label: 'Рекомендуемые (Есть уроки в зоне)', options: recommended },
-                                { label: 'Остальные', options: others }
+                                { label: 'Остальные (Есть уроки в этот день)', options: others },
+                                { label: 'Все учителя (Включая без уроков)', options: allTeachers }
                             ]}
                             value={selectedTeacherId}
                             onChange={(val) => setSelectedTeacherId(String(val))}
