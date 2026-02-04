@@ -265,6 +265,18 @@ export const dbService = {
             const q = query(collection(firestoreDB, colName));
             return onSnapshot(q, (snapshot) => {
                 const items = snapshot.docs.map(d => d.data());
+                
+                // IMPORTANT: Populate the internal cache with data from Firestore
+                // This ensures that when syncCollection runs (e.g. on delete),
+                // it knows what currently exists in the DB to calculate deletions correctly.
+                const cachedItems = new Map<string, any>();
+                items.forEach((item: any) => {
+                    if (item && item.id) {
+                        cachedItems.set(item.id, item);
+                    }
+                });
+                collectionCache.set(colName, cachedItems);
+                
                 // Sort items based on 'order' property client-side
                 items.sort((a: any, b: any) => {
                     const orderA = typeof a.order === 'number' ? a.order : 999999;
