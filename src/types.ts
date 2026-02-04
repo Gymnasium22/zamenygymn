@@ -74,6 +74,7 @@ export interface Substitution {
   refusals?: string[]; // IDs of teachers who refused
   replacementClassId?: string; // NEW: For swapping lessons (target class)
   replacementSubjectId?: string; // NEW: For swapping lessons (target subject)
+  isRead?: boolean; // NEW: Status of acknowledgement by the teacher
 }
 
 export interface Bell {

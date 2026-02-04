@@ -52,6 +52,13 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
     
     const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
     
+    // Interactive Conflicts State
+    const [conflictModalOpen, setConflictModalOpen] = useState(false);
+    const [activeConflictDetails, setActiveConflictDetails] = useState<{
+        item: ScheduleItem;
+        conflicts: Array<{ type: string; description: string }>;
+    } | null>(null);
+
     const [draggedItem, setDraggedItem] = useState<ScheduleItem | null>(null);
     const [dragOverCell, setDragOverCell] = useState<string|null>(null);
 
@@ -171,6 +178,58 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
         }
 
         return conflicts;
+    };
+
+    const getDetailedConflicts = (item: ScheduleItem) => {
+        const detailed: Array<{ type: string; description: string }> = [];
+        const others = schedule.filter(s => s.id !== item.id && s.day === item.day && s.period === item.period && s.shift === item.shift);
+
+        // Teacher Conflict
+        const teacherBusy = others.filter(s => s.teacherId === item.teacherId);
+        teacherBusy.forEach(t => {
+            const cls = classes.find(c => c.id === t.classId)?.name;
+            const rm = rooms.find(r => r.id === t.roomId)?.name || t.roomId;
+            detailed.push({
+                type: 'Учитель',
+                description: `Ведет урок у ${cls} в каб. ${rm || '?'}`
+            });
+        });
+
+        // Class Conflict
+        const classBusy = others.filter(s => {
+            if (s.classId !== item.classId) return false;
+            if (s.direction && item.direction && s.direction !== item.direction) return false;
+            return true;
+        });
+        classBusy.forEach(c => {
+             const subj = subjects.find(s => s.id === c.subjectId)?.name;
+             detailed.push({
+                 type: 'Класс',
+                 description: `Уже имеет урок "${subj}"`
+             });
+        });
+
+        // Room Conflict
+        if (item.roomId) {
+            const roomBusy = others.filter(s => s.roomId === item.roomId);
+            roomBusy.forEach(r => {
+                const teacher = teachers.find(t => t.id === r.teacherId)?.name;
+                const cls = classes.find(c => c.id === r.classId)?.name;
+                detailed.push({
+                    type: 'Кабинет',
+                    description: `Занят: ${cls}, ${teacher}`
+                });
+            });
+        }
+        
+        return detailed;
+    };
+
+    const handleConflictClick = (e: React.MouseEvent, item: ScheduleItem) => {
+        e.stopPropagation();
+        const details = getDetailedConflicts(item);
+        setActiveConflictDetails({ item, conflicts: details });
+        setConflictModalOpen(true);
     };
 
     const validateRoom = (classId: string, subjectId: string, roomId: string) => {
@@ -552,7 +611,15 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
                                 </div>
                                 {roomName && <div className="text-[9px] font-mono text-slate-400 bg-white/50 dark:bg-black/20 rounded px-1 flex items-center gap-0.5 shrink-0" title={room ? `Вмест: ${room.capacity}, Тип: ${room.type}` : ''}>{roomName}</div>}
                             </div>
-                            {conflicts.length > 0 && <div className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold" title={`Конфликт: ${conflicts.join(', ')}`}>!</div>}
+                            {conflicts.length > 0 && (
+                                <button 
+                                    onClick={(e) => handleConflictClick(e, item)}
+                                    className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-bold shadow-sm hover:bg-red-600 hover:scale-110 transition-all z-10" 
+                                    title="Нажмите для деталей конфликта"
+                                >
+                                    !
+                                </button>
+                            )}
                         </div>
                     )
                 })}
@@ -604,7 +671,14 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
                         >
                             <div className="flex items-center justify-between mb-2">
                                 <span className="text-sm font-bold text-slate-800 dark:text-slate-100">{item.period} урок</span>
-                                {conflicts.length > 0 && <span className="bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold" title={`Конфликт: ${conflicts.join(', ')}`}>!</span>}
+                                {conflicts.length > 0 && (
+                                    <button 
+                                        onClick={(e) => handleConflictClick(e, item)}
+                                        className="bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold shadow-sm"
+                                    >
+                                        !
+                                    </button>
+                                )}
                             </div>
                             <div className="text-lg font-black text-indigo-600 dark:text-indigo-400 mb-1">{subj?.name} {item.direction && `(${item.direction})`}</div>
                             <div className="text-sm text-slate-700 dark:text-slate-300">{cls?.name} • {teacher?.name}</div>
@@ -858,6 +932,35 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
                 <div className="flex justify-end gap-3">
                     <button onClick={() => setMassOpConfirm({ ...massOpConfirm, isOpen: false })} className="px-4 py-2 bg-slate-100 dark:bg-slate-700 rounded-lg font-bold text-slate-600 dark:text-slate-300">Отмена</button>
                     <button onClick={confirmMassClear} className="px-4 py-2 bg-red-600 text-white rounded-lg font-bold">Подтвердить</button>
+                </div>
+            </Modal>
+            
+            {/* Conflict Details Modal */}
+            <Modal isOpen={conflictModalOpen} onClose={() => setConflictModalOpen(false)} title="Детали конфликта">
+                <div className="space-y-4">
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                        Следующие уроки пересекаются с выбранным элементом:
+                    </p>
+                    <div className="space-y-3">
+                        {activeConflictDetails && activeConflictDetails.conflicts.length > 0 ? (
+                            activeConflictDetails.conflicts.map((conflict, idx) => (
+                                <div key={idx} className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-3 flex items-start gap-3">
+                                    <Icon name="AlertTriangle" className="text-red-500 shrink-0 mt-0.5" size={18} />
+                                    <div>
+                                        <h4 className="font-bold text-red-700 dark:text-red-300 text-sm mb-1">{conflict.type}</h4>
+                                        <p className="text-xs text-red-600 dark:text-red-400 font-medium">{conflict.description}</p>
+                                    </div>
+                                </div>
+                            ))
+                        ) : (
+                            <p className="text-center text-slate-400 py-4">Нет конфликтов</p>
+                        )}
+                    </div>
+                    <div className="flex justify-end">
+                        <button onClick={() => setConflictModalOpen(false)} className="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg font-bold hover:bg-slate-300 transition text-sm">
+                            Закрыть
+                        </button>
+                    </div>
                 </div>
             </Modal>
 

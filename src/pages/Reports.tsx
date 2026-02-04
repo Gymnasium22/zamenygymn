@@ -1,3 +1,4 @@
+
 import { useState, useMemo } from 'react';
 import { useStaticData, useScheduleData } from '../context/DataContext';
 import { Icon } from '../components/Icons';
@@ -17,6 +18,9 @@ export const ReportsPage = () => {
         const month = new Date().getMonth();
         return (month >= 0 && month <= 4) ? 2 : 1;
     });
+
+    // Report Builder State
+    const [selectedColumns, setSelectedColumns] = useState<string[]>(['name', 'weeklyHours', 'actualHours']);
 
     // Выбираем расписание на основе селектора
     const activeSchedule = useMemo(() => {
@@ -38,9 +42,32 @@ export const ReportsPage = () => {
                 const subj = subjects.find(sub => sub.id === s.subjectId); 
                 if(subj) subjectBreakdown[subj.name] = (subjectBreakdown[subj.name] || 0) + 1; 
             }); 
-            return { id: t.id, name: t.name, weeklyHours, subsTaken, subsMissed, actualHours, subjectBreakdown }; 
+            
+            const subjectsList = Object.keys(subjectBreakdown).join(', ');
+
+            return { 
+                id: t.id, 
+                name: t.name, 
+                weeklyHours, 
+                monthlyPlan,
+                subsTaken, 
+                subsMissed, 
+                actualHours, 
+                subjectBreakdown,
+                subjectsList 
+            }; 
         }).sort((a,b) => b.actualHours - a.actualHours); 
     }, [teachers, activeSchedule, substitutions, subjects]);
+
+    const reportColumns = [
+        { key: 'name', label: 'ФИО Учителя' },
+        { key: 'weeklyHours', label: 'Нагрузка (нед)' },
+        { key: 'monthlyPlan', label: 'План (мес)' },
+        { key: 'subsTaken', label: 'Замены (+)' },
+        { key: 'subsMissed', label: 'Пропуски (-)' },
+        { key: 'actualHours', label: 'Итог (мес)' },
+        { key: 'subjectsList', label: 'Предметы' }
+    ];
 
     const sanPinData = useMemo(() => { 
         if(!selectedClassId) return []; 
@@ -69,13 +96,28 @@ export const ReportsPage = () => {
         return { heroes, absentees }; 
     }, [teachers, substitutions]);
 
+    const toggleColumn = (key: string) => {
+        setSelectedColumns(prev => 
+            prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
+        );
+    };
+
     const downloadReport = () => { 
         let csv = ""; 
         if (reportTab === 'load') { 
             csv = "Teacher,Planned Weekly,Subs Taken,Absences (Lessons),Est. Monthly Actual,Details\n" + tariffData.map(r => `"${r.name}",${r.weeklyHours},${r.subsTaken},${r.subsMissed},${r.actualHours},"${Object.entries(r.subjectBreakdown).map(([k,v]) => k+': '+v).join(', ')}"`).join('\n'); 
         } else if (reportTab === 'sanpin') { 
             csv = "Day,Score\n" + sanPinData.map(r => `${r.label},${r.value}`).join('\n'); 
-        } 
+        } else if (reportTab === 'builder') {
+            const header = selectedColumns.map(key => reportColumns.find(c => c.key === key)?.label).join(',');
+            const rows = tariffData.map(r => {
+                return selectedColumns.map(key => {
+                    const val = r[key as keyof typeof r];
+                    return typeof val === 'string' && val.includes(',') ? `"${val}"` : val;
+                }).join(',');
+            }).join('\n');
+            csv = header + '\n' + rows;
+        }
         const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement("a"); 
         link.href = URL.createObjectURL(blob);
@@ -112,11 +154,13 @@ export const ReportsPage = () => {
                     </div>
                 </div>
                 <div className="flex gap-2 bg-slate-100 dark:bg-slate-700 p-1 rounded-xl w-fit overflow-x-auto max-w-full">
-                    <button onClick={() => setReportTab('load')} className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all ${reportTab === 'load' ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>Тарификация (Нагрузка)</button>
-                    <button onClick={() => setReportTab('sanpin')} className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all ${reportTab === 'sanpin' ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>СанПиН (Сложность)</button>
-                    <button onClick={() => setReportTab('rating')} className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all ${reportTab === 'rating' ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>Рейтинг замен</button>
+                    <button onClick={() => setReportTab('load')} className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all ${reportTab === 'load' ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>Тарификация</button>
+                    <button onClick={() => setReportTab('sanpin')} className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all ${reportTab === 'sanpin' ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>СанПиН</button>
+                    <button onClick={() => setReportTab('rating')} className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all ${reportTab === 'rating' ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>Рейтинг</button>
+                    <button onClick={() => setReportTab('builder')} className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all ${reportTab === 'builder' ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>Конструктор</button>
                 </div>
             </div>
+
             {reportTab === 'load' && (
                 <div className="bg-white dark:bg-dark-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 overflow-hidden">
                     <table className="w-full text-left border-collapse">
@@ -151,6 +195,7 @@ export const ReportsPage = () => {
                     </table>
                 </div>
             )}
+            
             {reportTab === 'sanpin' && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div className="lg:col-span-2 bg-white dark:bg-dark-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
@@ -173,6 +218,7 @@ export const ReportsPage = () => {
                     </div>
                 </div>
             )}
+            
             {reportTab === 'rating' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="bg-white dark:bg-dark-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
@@ -182,6 +228,53 @@ export const ReportsPage = () => {
                     <div className="bg-white dark:bg-dark-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
                         <h3 className="font-bold text-lg text-red-500 mb-4 flex items-center gap-2"><Icon name="Activity" size={20}/> Пропуски (Топ 5)</h3>
                         <BarChart items={ratings.absentees.map(h => ({ label: h.name, value: h.count }))} max={Math.max(...ratings.absentees.map(h=>h.count), 1)} barClassName="bg-red-500"/>
+                    </div>
+                </div>
+            )}
+
+            {reportTab === 'builder' && (
+                <div className="bg-white dark:bg-dark-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
+                    <div className="mb-6">
+                        <h3 className="font-bold text-lg text-slate-800 dark:text-white mb-2">Настройка колонок</h3>
+                        <div className="flex flex-wrap gap-2">
+                            {reportColumns.map(col => (
+                                <button
+                                    key={col.key}
+                                    onClick={() => toggleColumn(col.key)}
+                                    className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-all ${selectedColumns.includes(col.key) ? 'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-300' : 'bg-white border-slate-200 text-slate-500 hover:border-indigo-300 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-400'}`}
+                                >
+                                    {col.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-600">
+                        <table className="w-full text-left border-collapse">
+                            <thead className="bg-slate-50 dark:bg-slate-700">
+                                <tr>
+                                    {selectedColumns.map(colKey => (
+                                        <th key={colKey} className="p-3 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase border-b border-slate-200 dark:border-slate-600">
+                                            {reportColumns.find(c => c.key === colKey)?.label}
+                                        </th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                                {tariffData.map(row => (
+                                    <tr key={row.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                                        {selectedColumns.map(colKey => {
+                                            const cellValue = row[colKey as keyof typeof row];
+                                            return (
+                                                <td key={`${row.id}-${colKey}`} className="p-3 text-sm text-slate-700 dark:text-slate-300">
+                                                    {typeof cellValue === 'object' ? '' : cellValue}
+                                                </td>
+                                            );
+                                        })}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             )}
