@@ -91,6 +91,18 @@ export interface BellPreset {
     bells: Bell[];
 }
 
+export interface TelegramTemplates {
+    summary: string;
+    teacherNotification: string;
+    teacherSummary: string;
+}
+
+export interface AdminAnnouncement {
+    message: string;
+    active: boolean;
+    lastUpdated: string;
+}
+
 export interface Settings {
   telegramToken: string;
   publicScheduleId?: string | null; // ID for publicly published schedule
@@ -100,6 +112,10 @@ export interface Settings {
     firstSemesterMonths: number[]; // Массив месяцев для 1 семестра (0-11)
     secondSemesterMonths: number[]; // Массив месяцев для 2 семестра (0-11)
   };
+  telegramTemplates?: TelegramTemplates;
+  adminAnnouncement?: AdminAnnouncement;
+  weatherApiKey?: string; // OpenWeatherMap API Key
+  weatherCity?: string; // "Minsk,BY"
 }
 
 // --- NEW DUTY TYPES ---

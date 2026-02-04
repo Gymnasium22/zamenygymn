@@ -1,8 +1,10 @@
+
 import { useState, useMemo, useEffect } from 'react';
 import { useStaticData, useScheduleData } from '../context/DataContext'; 
 import { Icon } from '../components/Icons';
-import { Shift, SHIFT_PERIODS, DAYS } from '../types';
+import { Shift, SHIFT_PERIODS, DAYS, TelegramTemplates, AdminAnnouncement } from '../types';
 import { formatDateISO, getScheduleForDate } from '../utils/helpers';
+import { Modal } from '../components/UI';
 
 export const AdminPage = () => {
     const { subjects, teachers, classes, rooms, settings, saveStaticData } = useStaticData(); 
@@ -18,6 +20,17 @@ export const AdminPage = () => {
 
     const [telegramToken, setTelegramToken] = useState('');
     const [feedbackChatId, setFeedbackChatId] = useState('');
+    
+    // Weather Settings
+    const [weatherApiKey, setWeatherApiKey] = useState('');
+    const [weatherCity, setWeatherCity] = useState('');
+
+    // Telegram Templates State
+    const [templates, setTemplates] = useState<TelegramTemplates>({ summary: '', teacherNotification: '', teacherSummary: '' });
+    const [isTemplatesModalOpen, setIsTemplatesModalOpen] = useState(false);
+
+    // Admin Announcement State
+    const [announcement, setAnnouncement] = useState<AdminAnnouncement>({ message: '', active: false, lastUpdated: '' });
 
     // Определяем актуальное расписание на основе выбранной даты
     const activeSchedule = useMemo(() => {
@@ -30,6 +43,14 @@ export const AdminPage = () => {
         if (settings) {
             setTelegramToken(settings.telegramToken || '');
             setFeedbackChatId(settings.feedbackChatId || '');
+            setWeatherApiKey(settings.weatherApiKey || '');
+            setWeatherCity(settings.weatherCity || 'Minsk,BY');
+            setTemplates(settings.telegramTemplates || { 
+                summary: "⚡️ **ЗАМЕНЫ НА {{date}}** ⚡️\n\n{{content}}",
+                teacherNotification: "🔔 **Вам назначена замена!**\n📅 {{date}}\n\n{{content}}\n\nПожалуйста, ознакомьтесь с деталями.",
+                teacherSummary: "🔔 **Ваши замены на {{date}}**\n\n{{content}}Пожалуйста, ознакомьтесь с деталями."
+            });
+            setAnnouncement(settings.adminAnnouncement || { message: '', active: false, lastUpdated: '' });
         }
     }, [settings]);
 
@@ -79,8 +100,26 @@ export const AdminPage = () => {
     }, [activeSchedule, rooms, selectedDayOfWeek, roomPeriod, roomShift]);
 
     const saveSettings = async () => {
-        await saveStaticData({ settings: { ...settings, telegramToken, feedbackChatId } });
+        await saveStaticData({ 
+            settings: { 
+                ...settings, 
+                telegramToken, 
+                feedbackChatId,
+                weatherApiKey,
+                weatherCity,
+                telegramTemplates: templates,
+                adminAnnouncement: { 
+                    ...announcement, 
+                    lastUpdated: new Date().toISOString() 
+                } 
+            } 
+        });
         alert("Настройки сохранены!");
+        setIsTemplatesModalOpen(false);
+    };
+
+    const toggleAnnouncement = () => {
+        setAnnouncement(prev => ({ ...prev, active: !prev.active }));
     };
 
     return (
@@ -146,9 +185,10 @@ export const AdminPage = () => {
                 )}
                 
                 {activeTab === 'settings' && (
-                    <div className="space-y-6 max-w-xl mt-6">
-                        <div className="bg-slate-50 dark:bg-slate-700/30 p-6 rounded-2xl border border-slate-100 dark:border-slate-700">
-                            <h3 className="font-bold text-lg mb-4 text-slate-800 dark:text-white">Интеграция с Telegram</h3>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+                        <div className="bg-slate-50 dark:bg-slate-700/30 p-6 rounded-2xl border border-slate-100 dark:border-slate-700 space-y-6">
+                            <h3 className="font-bold text-lg text-slate-800 dark:text-white flex items-center gap-2"><Icon name="Zap" size={20}/> Основные настройки</h3>
+                            
                             <div className="space-y-4">
                                 <div>
                                     <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Bot Token</label>
@@ -170,13 +210,76 @@ export const AdminPage = () => {
                                         placeholder="-100123456789"
                                         className="w-full border border-slate-200 dark:border-slate-600 p-3 rounded-xl text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500" 
                                     />
-                                    <p className="text-[10px] text-slate-400 mt-1">ID чата или администратора, куда будут приходить сообщения из формы обратной связи</p>
+                                    <p className="text-[10px] text-slate-400 mt-1">ID чата или администратора</p>
+                                </div>
+
+                                <div className="pt-4 border-t border-slate-200 dark:border-slate-600">
+                                    <h4 className="font-bold text-sm text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-2"><Icon name="Cloud" size={16}/> Погода (OpenWeatherMap)</h4>
+                                    <div className="space-y-3">
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">API Key</label>
+                                            <input 
+                                                type="password" 
+                                                value={weatherApiKey} 
+                                                onChange={e => setWeatherApiKey(e.target.value)} 
+                                                placeholder="b6907d28..."
+                                                className="w-full border border-slate-200 dark:border-slate-600 p-3 rounded-xl text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500" 
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Город</label>
+                                            <input 
+                                                type="text" 
+                                                value={weatherCity} 
+                                                onChange={e => setWeatherCity(e.target.value)} 
+                                                placeholder="Minsk,BY"
+                                                className="w-full border border-slate-200 dark:border-slate-600 p-3 rounded-xl text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500" 
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <button onClick={() => setIsTemplatesModalOpen(true)} className="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-indigo-200 dark:border-slate-600 text-indigo-600 dark:text-indigo-400 rounded-xl font-bold hover:bg-indigo-50 dark:hover:bg-slate-600 transition flex items-center justify-center gap-2">
+                                    <Icon name="Edit" size={18} /> Редактировать шаблоны сообщений
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="bg-amber-50 dark:bg-amber-900/20 p-6 rounded-2xl border border-amber-100 dark:border-amber-900 space-y-6">
+                            <h3 className="font-bold text-lg text-amber-900 dark:text-amber-100 flex items-center gap-2"><Icon name="Bell" size={20}/> Доска объявлений</h3>
+                            <p className="text-sm text-amber-800 dark:text-amber-200">
+                                Сообщение, которое увидят все учителя на главной странице (Рабочий стол).
+                            </p>
+                            
+                            <div>
+                                <textarea
+                                    value={announcement.message}
+                                    onChange={e => setAnnouncement({ ...announcement, message: e.target.value })}
+                                    rows={4}
+                                    className="w-full border border-amber-200 dark:border-amber-800 rounded-xl p-3 text-sm bg-white dark:bg-slate-800 dark:text-white outline-none focus:border-amber-500 focus:ring-2 ring-amber-500/20 resize-none"
+                                    placeholder="Например: Срочный педсовет сегодня в 14:00..."
+                                />
+                            </div>
+
+                            <div className="flex items-center justify-between">
+                                <label className="flex items-center gap-3 cursor-pointer">
+                                    <div className={`w-12 h-6 rounded-full p-1 transition-colors ${announcement.active ? 'bg-amber-500' : 'bg-slate-300 dark:bg-slate-600'}`}>
+                                        <div className={`w-4 h-4 bg-white rounded-full shadow-sm transform transition-transform ${announcement.active ? 'translate-x-6' : 'translate-x-0'}`}></div>
+                                    </div>
+                                    <input type="checkbox" className="hidden" checked={announcement.active} onChange={toggleAnnouncement} />
+                                    <span className="text-sm font-bold text-slate-700 dark:text-slate-300">Активно</span>
+                                </label>
+                                <div className="text-xs text-slate-400">
+                                    {announcement.lastUpdated ? `Обновлено: ${new Date(announcement.lastUpdated).toLocaleDateString()}` : ''}
                                 </div>
                             </div>
                         </div>
-                        <button onClick={saveSettings} className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition shadow-lg shadow-indigo-200 dark:shadow-none flex items-center gap-2">
-                            <Icon name="Save" size={20} /> Сохранить настройки
-                        </button>
+
+                        <div className="lg:col-span-2">
+                             <button onClick={saveSettings} className="w-full px-6 py-4 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition shadow-lg shadow-indigo-200 dark:shadow-none flex items-center justify-center gap-2 text-lg">
+                                <Icon name="Save" size={22} /> Сохранить все настройки
+                            </button>
+                        </div>
                     </div>
                 )}
             </div>
@@ -222,6 +325,52 @@ export const AdminPage = () => {
                     )}
                 </div>
             )}
+
+            <Modal isOpen={isTemplatesModalOpen} onClose={() => setIsTemplatesModalOpen(false)} title="Шаблоны сообщений" maxWidth="max-w-3xl">
+                <div className="space-y-6">
+                    <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-900 text-sm text-blue-800 dark:text-blue-300">
+                        <p className="font-bold mb-1">Доступные переменные:</p>
+                        <ul className="list-disc list-inside space-y-1">
+                            <li><code>{`{{date}}`}</code> — Текущая дата (напр. "01.09.2023")</li>
+                            <li><code>{`{{content}}`}</code> — Сгенерированный список замен</li>
+                        </ul>
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Общая сводка (Канал/Группа)</label>
+                        <textarea
+                            value={templates.summary}
+                            onChange={e => setTemplates({...templates, summary: e.target.value})}
+                            rows={4}
+                            className="w-full border border-slate-200 dark:border-slate-600 rounded-xl p-3 text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500 font-mono"
+                        />
+                    </div>
+                    
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Личное уведомление (Один урок)</label>
+                        <textarea
+                            value={templates.teacherNotification}
+                            onChange={e => setTemplates({...templates, teacherNotification: e.target.value})}
+                            rows={4}
+                            className="w-full border border-slate-200 dark:border-slate-600 rounded-xl p-3 text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500 font-mono"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">Личная сводка (Все замены учителю)</label>
+                        <textarea
+                            value={templates.teacherSummary}
+                            onChange={e => setTemplates({...templates, teacherSummary: e.target.value})}
+                            rows={4}
+                            className="w-full border border-slate-200 dark:border-slate-600 rounded-xl p-3 text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500 font-mono"
+                        />
+                    </div>
+                    
+                    <div className="flex justify-end pt-4">
+                        <button onClick={saveSettings} className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition">Сохранить шаблоны</button>
+                    </div>
+                </div>
+            </Modal>
         </div>
     );
 };

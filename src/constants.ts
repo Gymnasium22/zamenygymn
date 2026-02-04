@@ -100,6 +100,8 @@ export const INITIAL_DATA: AppData = {
         telegramToken: '',
         publicScheduleId: null,
         feedbackChatId: '',
+        weatherApiKey: '',
+        weatherCity: 'Minsk,BY',
         bellPresets: [
             { id: 'preset_normal', name: 'Обычный (45 мин)', bells: DEFAULT_BELLS },
             { id: 'preset_short', name: 'Сокращенный (35 мин)', bells: SHORT_BELLS }
@@ -107,6 +109,16 @@ export const INITIAL_DATA: AppData = {
         semesterConfig: {
             firstSemesterMonths: [8, 9, 10, 11], // сентябрь-декабрь
             secondSemesterMonths: [0, 1, 2, 3, 4] // январь-май
+        },
+        telegramTemplates: {
+            summary: "⚡️ **ЗАМЕНЫ НА {{date}}** ⚡️\n\n{{content}}",
+            teacherNotification: "🔔 **Вам назначена замена!**\n📅 {{date}}\n\n{{content}}\n\nПожалуйста, ознакомьтесь с деталями.",
+            teacherSummary: "🔔 **Ваши замены на {{date}}**\n\n{{content}}Пожалуйста, ознакомьтесь с деталями."
+        },
+        adminAnnouncement: {
+            message: "",
+            active: false,
+            lastUpdated: ""
         }
     }
 };

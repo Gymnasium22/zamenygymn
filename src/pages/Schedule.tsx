@@ -6,6 +6,7 @@ import { Modal, SearchableSelect, ContextMenu } from '../components/UI';
 import { Shift, DayOfWeek, DAYS, SHIFT_PERIODS, ScheduleItem } from '../types';
 import { generateId } from '../utils/helpers';
 import useMedia from 'use-media';
+import { useSearchParams } from 'react-router-dom';
 
 interface SchedulePageProps {
     readOnly?: boolean;
@@ -63,6 +64,29 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
     // State for Mass Ops Modal Selections
     const [massOpSelectedDay, setMassOpSelectedDay] = useState<string>(DayOfWeek.Monday);
     const [massOpSelectedClass, setMassOpSelectedClass] = useState<string>('');
+
+    // --- NEW: URL Params Handling ---
+    const [searchParams] = useSearchParams();
+
+    useEffect(() => {
+        const view = searchParams.get('view');
+        const id = searchParams.get('id');
+        const day = searchParams.get('day');
+        const shift = searchParams.get('shift');
+        
+        if (view && ['class', 'teacher', 'subject', 'week'].includes(view)) {
+            setViewMode(view as any);
+            if (id) setFilterId(id);
+            if (day && DAYS.includes(day as DayOfWeek)) {
+                setSelectedDay(day as DayOfWeek);
+            }
+            if (shift) {
+                if (shift === '1') setSelectedShift(Shift.First);
+                if (shift === '2') setSelectedShift(Shift.Second);
+            }
+        }
+    }, [searchParams]);
+    // --------------------------------
 
     const currentPeriods = SHIFT_PERIODS[selectedShift];
 
@@ -708,7 +732,6 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
             </div>
 
             <Modal isOpen={isEditorOpen} onClose={() => setIsEditorOpen(false)} title={tempItem.id ? 'Редактирование урока' : 'Добавить урок'}>
-                {/* ... (Modal content unchanged) ... */}
                 <div className="space-y-4">
                     {/* Top Info Bar */}
                     <div className="bg-slate-50 dark:bg-slate-700/50 p-3 rounded-xl flex items-center gap-4 text-sm font-bold text-slate-600 dark:text-slate-300">
@@ -774,7 +797,7 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
                 </div>
             </Modal>
             
-            {/* ... (Mass Ops Modal and Print Overlay unchanged) ... */}
+            {/* Mass Operations Modal */}
             <Modal isOpen={isMassOperationsModalOpen} onClose={() => setIsMassOperationsModalOpen(false)} title="Массовые операции с расписанием">
                 <div className="space-y-6">
                     <p className="text-sm text-slate-500 dark:text-slate-400">
