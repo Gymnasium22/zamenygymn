@@ -929,6 +929,24 @@ export const SubstitutionsPage = () => {
                 </div>
             </div>
 
+            {/* Mobile Tabs Switcher */}
+            <div className="md:hidden flex bg-white dark:bg-dark-800 p-1 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 shrink-0">
+                <button 
+                    onClick={() => setMobileTab('lessons')} 
+                    className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${mobileTab === 'lessons' ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
+                >
+                    <Icon name="List" size={18} />
+                    Замены
+                </button>
+                <button 
+                    onClick={() => setMobileTab('teachers')} 
+                    className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${mobileTab === 'teachers' ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
+                >
+                    <Icon name="Users" size={18} />
+                    Учителя
+                </button>
+            </div>
+
             <div className="flex-1 flex flex-col md:flex-row gap-6 min-h-0">
                 {/* Left Column: Teachers List */}
                 <div className={`w-full md:w-80 flex-col gap-4 ${isMobile && mobileTab !== 'teachers' ? 'hidden' : 'flex'}`}>
