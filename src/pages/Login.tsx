@@ -9,7 +9,7 @@ import { signInWithEmailAndPassword } from 'firebase/auth';
 export const LoginPage = () => {
     const { setGuestRole, role, loading: authLoading } = useAuth();
     const navigate = useNavigate();
-    const [mode, setMode] = useState<'select' | 'teacher' | 'admin'>('select');
+    const [mode, setMode] = useState<'select' | 'teacher' | 'admin' | 'canteen'>('select');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
@@ -152,7 +152,7 @@ export const LoginPage = () => {
                                 <label className="block text-xs font-bold uppercase text-slate-500 dark:text-slate-400 mb-2 ml-1">Email</label>
                                 <div className="relative">
                                     <Icon name="User" className="absolute left-4 top-3.5 text-slate-400" size={18}/>
-                                    <input type="email" inputMode="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50/50 dark:bg-slate-700/50 dark:text-white outline-none focus:ring-2 ring-indigo-500/50 transition-all font-medium" placeholder={mode === 'canteen' ? "canteen@gymnasium22.com" : "admin@school.com"} autoFocus required />
+                                    <input type="email" inputMode="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50/50 dark:bg-slate-700/50 dark:text-white outline-none focus:ring-2 ring-indigo-500/50 transition-all font-medium" placeholder="admin@school.com" autoFocus required />
                                 </div>
                             </div>
                         )}

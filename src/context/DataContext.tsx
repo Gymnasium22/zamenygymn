@@ -4,7 +4,7 @@ import { AppData, Shift, StaticAppData, ScheduleAndSubstitutionData, ScheduleIte
 import { INITIAL_DATA, DEFAULT_BELLS, DEFAULT_DUTY_ZONES } from '../constants';
 import { dbService } from '../services/db';
 import { useAuth } from './AuthContext';
-import { getActiveSemester } from '../utils/helpers';
+import { getActiveSemester, generateId } from '../utils/helpers';
 
 interface FullDataContextType {
     data: AppData;

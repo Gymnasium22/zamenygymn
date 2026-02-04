@@ -3,7 +3,7 @@ import React, { useState, useRef, useMemo } from 'react';
 import { useStaticData, useScheduleData } from '../context/DataContext';
 import { Icon } from '../components/Icons';
 import { Modal, SearchableSelect } from '../components/UI';
-import { DAYS, Shift, DutyZone } from '../types';
+import { DAYS, Shift, DutyZone, DayOfWeek } from '../types';
 import { generateId } from '../utils/helpers';
 import html2canvas from 'html2canvas';
 
@@ -180,36 +180,164 @@ export const DutyPage = () => {
         document.body.removeChild(link);
     };
 
-    const exportToExcel = () => {
-        const zonesCount = allZonesSorted.length;
-        const totalColspan = zonesCount + 1;
+    // Цветовая схема для дней
+    const dayStyles: Record<string, { label: string, cell: string }> = {
+        [DayOfWeek.Monday]:    { label: '#fecaca', cell: '#fee2e2' }, // Red
+        [DayOfWeek.Tuesday]:   { label: '#fed7aa', cell: '#ffedd5' }, // Orange
+        [DayOfWeek.Wednesday]: { label: '#fef08a', cell: '#fef9c3' }, // Yellow
+        [DayOfWeek.Thursday]:  { label: '#bbf7d0', cell: '#dcfce7' }, // Green
+        [DayOfWeek.Friday]:    { label: '#bfdbfe', cell: '#dbeafe' }, // Blue
+    };
+
+    const exportPosterExcel = () => {
+        // Конфигурация для вертикального плаката (A4 Portrait)
+        // Строки = Зоны, Столбцы = Дни недели
+        const totalColspan = 6; // 1 (Зона) + 5 (Дней)
 
         let html = `
             <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-            <head><meta charset="UTF-8">
-            <style>
-                table { border-collapse: collapse; width: 100%; font-family: 'Times New Roman', serif; }
-                td, th { border: 1px solid #000; padding: 6px; vertical-align: middle; text-align: center; font-size: 11pt; }
-                .title-row td { border: none !important; font-weight: bold; text-align: center; }
-                .title-main { font-size: 14pt; text-transform: uppercase; }
-                .title-sub { font-size: 12pt; }
-                .approval-cell { text-align: left; border: none !important; font-size: 11pt; line-height: 1.2; }
-                .header-cell { background-color: #F3F4F6; font-weight: bold; border: 2px solid #000; }
-                .floor-cell { background-color: #E5E7EB; font-weight: bold; text-transform: uppercase; font-size: 10pt; border: 2px solid #000; }
-                .shift-header { font-size: 13pt; font-weight: bold; text-decoration: underline; border: none !important; text-align: center; padding: 20px 0 10px 0; }
-                .day-label { font-weight: bold; background-color: #FAFAFA; text-align: left; border: 2px solid #000; }
-                .footer-cell { border: none !important; font-weight: bold; text-align: left; padding-top: 30px; font-size: 11pt; }
-                .empty-spacer { border: none !important; height: 15px; }
-            </style>
+            <head>
+                <meta charset="UTF-8">
+                <style>
+                    table { border-collapse: collapse; font-family: Arial, sans-serif; width: 100%; text-align: center; }
+                    td, th { border: 2px solid #000000; padding: 6px; vertical-align: middle; text-align: center; }
+                    .title-main { font-size: 18pt; font-weight: bold; border: none; text-align: center; }
+                    .title-sub { font-size: 12pt; border: none; text-align: center; }
+                    .shift-header { font-size: 16pt; font-weight: bold; background-color: #312e81; color: white; border: 2px solid #000; text-transform: uppercase; }
+                    .floor-header { font-size: 12pt; font-weight: bold; background-color: #e5e7eb; border: 2px solid #000; text-align: left; padding-left: 10px; }
+                    .zone-cell { font-size: 11pt; font-weight: bold; background-color: #fff; text-align: left; width: 250px; }
+                    .day-header { font-weight: bold; font-size: 12pt; border: 2px solid #000; }
+                    .content-cell { font-size: 10pt; font-weight: bold; height: 35px; border: 1px solid #000; }
+                    .approval-block { text-align: left; border: none !important; font-family: "Times New Roman", serif; font-size: 11pt; }
+                    .footer-block { border: none !important; font-weight: bold; text-align: left; padding-top: 20px; font-size: 11pt; font-family: "Times New Roman", serif; }
+                    .empty-row { border: none !important; height: 15px; }
+                </style>
             </head>
             <body>
         `;
 
+        // Approval Block (Aligned right for narrow layout)
         html += `
             <table>
                 <tr>
                     <td colspan="${Math.max(1, totalColspan - 3)}" style="border:none"></td>
-                    <td colspan="3" class="approval-cell">
+                    <td colspan="3" class="approval-block">
+                        <b>УТВЕРЖДАЮ</b><br>
+                        Директор государственного<br>
+                        учреждения образования<br>
+                        «Гимназия № 22 г. Минска»<br><br>
+                        __________ Н.В.Кисель<br>
+                        "__" ______ 2025г.
+                    </td>
+                </tr>
+                <tr class="empty-row"><td colspan="${totalColspan}" style="border:none"></td></tr>
+            </table>
+        `;
+
+        // Title
+        html += `
+            <table>
+                <tr><td colspan="${totalColspan}" class="title-main">ГРАФИК ДЕЖУРСТВА</td></tr>
+                <tr><td colspan="${totalColspan}" class="title-sub">на ${semester}-е полугодие ${new Date().getFullYear()}/${new Date().getFullYear()+1} учебного года</td></tr>
+                <tr class="empty-row"><td colspan="${totalColspan}" style="border:none"></td></tr>
+            </table>
+        `;
+
+        [Shift.First, Shift.Second].forEach(shift => {
+            html += `<table>`;
+            // Shift Header
+            html += `<tr><th colspan="${totalColspan}" class="shift-header">${shift}</th></tr>`;
+            
+            // Header Row (Zone Name + Days)
+            html += `<tr>`;
+            html += `<th class="day-header" style="background-color: #f3f4f6;">Пост дежурства</th>`;
+            DAYS.forEach(day => {
+                const styles = dayStyles[day as string] || { label: '#ffffff', cell: '#ffffff' };
+                html += `<th class="day-header" style="background-color: ${styles.label};">${day}</th>`;
+            });
+            html += `</tr>`;
+
+            // Data Rows (Grouped by Floor)
+            zonesByFloor.forEach(group => {
+                // Floor Sub-Header
+                html += `<tr><td colspan="${totalColspan}" class="floor-header">${group.floor}</td></tr>`;
+
+                group.zones.forEach(zone => {
+                    html += `<tr>`;
+                    // Zone Name ONLY
+                    html += `<td class="zone-cell">${zone.name}</td>`;
+
+                    // Teacher cells for each day
+                    DAYS.forEach(day => {
+                        const styles = dayStyles[day as string] || { label: '#ffffff', cell: '#ffffff' };
+                        const teacher = getTeacher(zone.id, day, shift);
+                        html += `<td class="content-cell" style="background-color: ${styles.cell};">${teacher ? teacher.name : ''}</td>`;
+                    });
+                    html += `</tr>`;
+                });
+            });
+            
+            html += `</table><br/><br/>`;
+        });
+
+        // Footer
+        html += `
+            <table>
+                <tr>
+                    <td colspan="3" class="footer-block">Секретарь учебной части</td>
+                    <td colspan="1" style="border-bottom: 1px solid #000; border-top:none; border-left:none; border-right:none;"></td>
+                    <td colspan="2" class="footer-block" style="text-align: right;">Е.К.Шунто</td>
+                </tr>
+            </table>
+        `;
+
+        html += `</body></html>`;
+        
+        const blob = new Blob([html], { type: "application/vnd.ms-excel" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `Плакат_Дежурство_${semester}_полугодие_Вертикально.xls`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    const exportToExcel = () => {
+        const zonesCount = allZonesSorted.length;
+        const totalColspan = zonesCount + 1;
+
+        const headerColor = '#d1d5db'; // Темно-серый для шапки этажей
+        const zoneColor = '#f3f4f6'; // Светло-серый для зон
+
+        let html = `
+            <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+            <head>
+                <meta charset="UTF-8">
+                <style>
+                    table { border-collapse: collapse; font-family: Arial, sans-serif; width: 100%; text-align: center; }
+                    td, th { border: 2px solid #000000; padding: 5px; vertical-align: middle; text-align: center; }
+                    .title-main { font-size: 20pt; font-weight: bold; border: none; text-align: center; }
+                    .title-sub { font-size: 14pt; border: none; text-align: center; }
+                    .shift-header { font-size: 16pt; font-weight: bold; background-color: #e5e7eb; border: 3px solid #000; text-transform: uppercase; }
+                    .floor-header { font-size: 12pt; font-weight: bold; background-color: ${headerColor}; border: 2px solid #000; text-transform: uppercase; }
+                    .zone-header { font-size: 10pt; font-weight: bold; background-color: ${zoneColor}; border: 2px solid #000; }
+                    .day-label { font-weight: bold; font-size: 12pt; border: 2px solid #000; }
+                    .content-cell { font-size: 11pt; font-weight: bold; height: 40px; border: 1px solid #000; }
+                    .approval-block { text-align: left; border: none !important; font-family: "Times New Roman", serif; font-size: 12pt; }
+                    .footer-block { border: none !important; font-weight: bold; text-align: left; padding-top: 20px; font-size: 12pt; font-family: "Times New Roman", serif; }
+                    .empty-row { border: none !important; height: 20px; }
+                </style>
+            </head>
+            <body>
+        `;
+
+        // Approval Block
+        html += `
+            <table>
+                <tr>
+                    <td colspan="${Math.max(1, totalColspan - 4)}" style="border:none"></td>
+                    <td colspan="4" class="approval-block">
                         <b>УТВЕРЖДАЮ</b><br>
                         Директор государственного<br>
                         учреждения образования<br>
@@ -218,50 +346,72 @@ export const DutyPage = () => {
                         "____" __________ 2025г.
                     </td>
                 </tr>
-                <tr class="empty-spacer"><td colspan="${totalColspan}" style="border:none"></td></tr>
-                <tr class="title-row"><td colspan="${totalColspan}" class="title-main">ГРАФИК ДЕЖУРСТВА</td></tr>
-                <tr class="title-row"><td colspan="${totalColspan}" class="title-sub">учителей по государственному учреждению образования «Гимназия № 22 г. Минска»</td></tr>
-                <tr class="title-row"><td colspan="${totalColspan}" class="title-sub">на ${semester}-е полугодие ${new Date().getFullYear()}/${new Date().getFullYear()+1} учебного года</td></tr>
-                <tr class="empty-spacer"><td colspan="${totalColspan}" style="border:none"></td></tr>
+                <tr class="empty-row"><td colspan="${totalColspan}" style="border:none"></td></tr>
+            </table>
+        `;
+
+        // Title
+        html += `
+            <table>
+                <tr><td colspan="${totalColspan}" class="title-main">ГРАФИК ДЕЖУРСТВА</td></tr>
+                <tr><td colspan="${totalColspan}" class="title-sub">учителей по государственному учреждению образования «Гимназия № 22 г. Минска»</td></tr>
+                <tr><td colspan="${totalColspan}" class="title-sub">на ${semester}-е полугодие ${new Date().getFullYear()}/${new Date().getFullYear()+1} учебного года</td></tr>
+                <tr class="empty-row"><td colspan="${totalColspan}" style="border:none"></td></tr>
             </table>
         `;
 
         [Shift.First, Shift.Second].forEach(shift => {
             html += `<table>`;
-            html += `<tr><td colspan="${totalColspan}" class="shift-header">${shift.toUpperCase()}</td></tr>`;
+            // Shift Header
+            html += `<tr><th colspan="${totalColspan}" class="shift-header">${shift}</th></tr>`;
             
+            // Floor Headers
             html += `<tr>`;
-            html += `<th rowspan="2" class="header-cell" style="width: 120px;">День недели</th>`;
+            html += `<th rowspan="2" class="floor-header" style="width: 100px;">День недели</th>`; // Corner cell
             zonesByFloor.forEach(group => {
-                html += `<th colspan="${group.zones.length}" class="floor-cell">${group.floor}</th>`;
+                html += `<th colspan="${group.zones.length}" class="floor-header">${group.floor}</th>`;
             });
             html += `</tr>`;
 
+            // Zone Headers
             html += `<tr>`;
             allZonesSorted.forEach(zone => {
-                html += `<th class="header-cell" style="width: 150px;">${zone.name}</th>`;
+                html += `<th class="zone-header">${zone.name}</th>`;
             });
             html += `</tr>`;
 
+            // Data Rows
             DAYS.forEach(day => {
+                const styles = dayStyles[day as string] || { label: '#ffffff', cell: '#ffffff' };
+                
                 html += `<tr>`;
-                html += `<td class="day-label">${day}</td>`;
+                html += `<td class="day-label" style="background-color: ${styles.label};">${day}</td>`;
+                
                 allZonesSorted.forEach(zone => {
                     const teacher = getTeacher(zone.id, day, shift);
-                    html += `<td>${teacher ? teacher.name : '-'}</td>`;
+                    html += `<td class="content-cell" style="background-color: ${styles.cell};">${teacher ? teacher.name : ''}</td>`;
                 });
+                
                 html += `</tr>`;
             });
+            
+            // Black separator between shifts
+            html += `<tr><td colspan="${totalColspan}" style="height: 4px; background-color: #000; border:none;"></td></tr>`;
             html += `</table><br>`;
         });
 
+        // Footer signatures
+        const titleCols = Math.floor(totalColspan * 0.4);
+        const nameCols = Math.floor(totalColspan * 0.3);
+        const lineCols = totalColspan - titleCols - nameCols;
+
         html += `
             <table>
-                <tr class="empty-spacer"><td colspan="${totalColspan}" style="border:none"></td></tr>
+                 <tr class="empty-row"><td colspan="${totalColspan}" style="border:none"></td></tr>
                 <tr>
-                    <td colspan="${Math.floor(totalColspan/2)}" class="footer-cell">Секретарь учебной части гимназии №22 г.Минска</td>
-                    <td colspan="${Math.ceil(totalColspan/4)}" style="border-bottom: 1px solid #000; border-top:none; border-left:none; border-right:none;"></td>
-                    <td colspan="${Math.ceil(totalColspan/4)}" class="footer-cell" style="text-align: right;">Е.К.Шунто</td>
+                    <td colspan="${titleCols}" class="footer-block">Секретарь учебной части гимназии №22 г.Минска</td>
+                    <td colspan="${lineCols}" style="border-bottom: 1px solid #000; border-top:none; border-left:none; border-right:none;"></td>
+                    <td colspan="${nameCols}" class="footer-block" style="text-align: right;">Е.К.Шунто</td>
                 </tr>
             </table>
         `;
@@ -405,6 +555,9 @@ export const DutyPage = () => {
                         </button>
                         <button onClick={exportToPng} className="px-4 py-2 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900 rounded-xl font-bold hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition text-sm flex items-center gap-2">
                             <Icon name="Image" size={16}/> PNG
+                        </button>
+                        <button onClick={exportPosterExcel} className="px-4 py-2 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900 rounded-xl font-bold hover:bg-blue-100 dark:hover:bg-blue-900/50 transition text-sm flex items-center gap-2">
+                            <Icon name="Table" size={16}/> Плакат (XLS)
                         </button>
                         <button onClick={exportToExcel} className="px-4 py-2 bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400 border border-green-100 dark:border-green-900 rounded-xl font-bold hover:bg-green-100 dark:hover:bg-green-900/50 transition text-sm flex items-center gap-2">
                             <Icon name="FileSpreadsheet" size={16}/> Excel
