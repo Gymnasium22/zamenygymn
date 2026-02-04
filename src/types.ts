@@ -39,6 +39,7 @@ export interface ClassEntity {
   shift: string; // Shift enum
   studentsCount: number;
   order?: number;
+  excludeFromReports?: boolean; // New field to hide class from conflict checks
 }
 
 export interface Room {

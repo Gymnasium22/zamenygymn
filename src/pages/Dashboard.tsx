@@ -216,7 +216,11 @@ export const DashboardPage = () => {
         const nextDayName = dayMap[nextDay.getDay()];
         if (!nextDayName) return [];
         const problems: ProblemZone[] = [];
-        classes.forEach(cls => {
+        
+        // Filter out excluded classes
+        const checkableClasses = classes.filter(c => !c.excludeFromReports);
+
+        checkableClasses.forEach(cls => {
             const lessons = schedule.filter(s => s.classId === cls.id && s.day === nextDayName);
             if (lessons.length === 0) problems.push({ class: cls.name, issue: `Нет уроков на ${nextDayName}` });
             else if (lessons.length < 4) problems.push({ class: cls.name, issue: `Мало уроков (${lessons.length})` });
@@ -229,7 +233,8 @@ export const DashboardPage = () => {
                 }
             });
         });
-        return problems.filter((v,i,a)=>a.findIndex(t=>(t.class === v.class && t.issue === v.issue))===i).slice(0, 10);
+        // Remove .slice(0, 10) to show all
+        return problems.filter((v,i,a)=>a.findIndex(t=>(t.class === v.class && t.issue === v.issue))===i);
     }, [schedule, classes, teachers, rooms, currentDate]);
 
     const unresolvedSubstitutions = useMemo(() => {

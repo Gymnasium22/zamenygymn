@@ -47,7 +47,7 @@ export const DirectoryPage = () => {
         setEditingId(id || null);
         if (activeTab === 'teachers') setTeacherForm(id ? teachers.find(x => x.id === id) ?? {} : { subjectIds: [], unavailableDates: [], shifts: [Shift.First, Shift.Second], telegramChatId: '' });
         else if (activeTab === 'subjects') setSubjectForm(id ? subjects.find(x => x.id === id) ?? {} : { color: '#e0e7ff', difficulty: 5, requiredRoomType: 'Обычный' });
-        else if (activeTab === 'classes') setClassForm(id ? classes.find(x => x.id === id) ?? {} : { shift: Shift.First, studentsCount: 25 });
+        else if (activeTab === 'classes') setClassForm(id ? classes.find(x => x.id === id) ?? {} : { shift: Shift.First, studentsCount: 25, excludeFromReports: false });
         else if (activeTab === 'rooms') setRoomForm(id ? rooms.find(x => x.id === id) ?? {} : { capacity: 30, type: 'Обычный' });
         setIsModalOpen(true);
     };
@@ -311,11 +311,12 @@ export const DirectoryPage = () => {
                 {activeTab === 'classes' && (
                     <StaggerContainer className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
                         {classes.map((c, i) => (
-                            <div key={c.id} draggable onDragStart={(e)=>onDragStart(e,i)} onDragOver={onDragOver} onDrop={(e)=>onDrop(e,i)} className="bg-white dark:bg-dark-800 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm text-center group hover:shadow-md transition-all relative cursor-grab active:cursor-grabbing">
+                            <div key={c.id} draggable onDragStart={(e)=>onDragStart(e,i)} onDragOver={onDragOver} onDrop={(e)=>onDrop(e,i)} className={`bg-white dark:bg-dark-800 p-4 rounded-2xl border ${c.excludeFromReports ? 'border-dashed border-slate-300 bg-slate-50' : 'border-slate-100'} dark:border-slate-700 shadow-sm text-center group hover:shadow-md transition-all relative cursor-grab active:cursor-grabbing`}>
                                 <div className="absolute left-2 top-2 text-slate-300 dark:text-slate-600"><Icon name="GripVertical" size={14} /></div>
-                                <div className="text-2xl font-black text-slate-800 dark:text-slate-100 mb-1">{c.name}</div>
+                                <div className={`text-2xl font-black ${c.excludeFromReports ? 'text-slate-400' : 'text-slate-800 dark:text-slate-100'} mb-1`}>{c.name}</div>
                                 <div className="text-xs text-slate-500 mb-1">{c.studentsCount || 0} учеников</div>
                                 <div className={`text-xs font-bold px-2 py-0.5 rounded-full inline-block ${c.shift === Shift.First ? 'bg-blue-50 text-blue-600' : 'bg-orange-50 text-orange-600'}`}>{c.shift === Shift.First ? 'I' : 'II'} смена</div>
+                                {c.excludeFromReports && <div className="mt-2 text-[10px] text-slate-400 font-bold uppercase border border-slate-200 rounded px-1 inline-block">Исключен</div>}
                                 <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <button onClick={() => openModal(c.id)} className="p-1 text-slate-600 dark:text-slate-300 hover:text-indigo-600"><Icon name="Edit2" size={14}/></button>
                                     <button onClick={() => handleDelete(c.id)} className="p-1 text-slate-600 dark:text-slate-300 hover:text-red-600"><Icon name="Trash2" size={14}/></button>
@@ -480,6 +481,17 @@ export const DirectoryPage = () => {
                             <input className="w-full border border-slate-200 dark:border-slate-600 rounded-xl p-3 text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500" placeholder="Название класса (5А)" value={classForm.name || ''} onChange={e => setClassForm({...classForm, name: e.target.value})} />
                             <div><label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Количество учеников</label><input type="number" inputMode="numeric" className="w-full border border-slate-200 dark:border-slate-600 rounded-xl p-3 text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500" value={classForm.studentsCount || 25} onChange={e => setClassForm({...classForm, studentsCount: parseInt(e.target.value)})} /></div>
                             <div className="grid grid-cols-2 gap-3"><button onClick={() => setClassForm({...classForm, shift: Shift.First})} className={`p-3 rounded-xl border text-sm font-bold transition-all ${classForm.shift === Shift.First ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400' : 'border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400'}`}>1 смена</button><button onClick={() => setClassForm({...classForm, shift: Shift.Second})} className={`p-3 rounded-xl border text-sm font-bold transition-all ${classForm.shift === Shift.Second ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400' : 'border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400'}`}>2 смена</button></div>
+                            
+                            <label className="flex items-center gap-2 mt-4 cursor-pointer">
+                                <input 
+                                    type="checkbox" 
+                                    className="rounded text-indigo-600 focus:ring-indigo-500" 
+                                    checked={classForm.excludeFromReports || false} 
+                                    onChange={e => setClassForm({...classForm, excludeFromReports: e.target.checked})} 
+                                /> 
+                                <span className="text-sm font-medium dark:text-slate-300">Исключить из проверки конфликтов</span>
+                            </label>
+                            <p className="text-[10px] text-slate-500 mt-1">Класс не будет отображаться в виджете конфликтов, если у него нет уроков.</p>
                         </>
                     )}
 

@@ -180,7 +180,7 @@ export const dbService = {
         if (!firestoreDB) return;
 
         // Проверяем, есть ли уже данные в кеше, чтобы не делать лишние запросы
-        if (collectionCache.has(collectionName) && collectionCache.get(collectionName).size > 0) {
+        if (collectionCache.has(collectionName) && collectionCache.get(collectionName)!.size > 0) {
             console.log(`Cache already exists for ${collectionName}, skipping sync`);
             return;
         }
