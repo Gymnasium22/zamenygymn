@@ -36,6 +36,9 @@ export const DirectoryPage = () => {
     const [isPreviewMode, setIsPreviewMode] = useState(false);
     const [previewTitle, setPreviewTitle] = useState<string>('Расписание звонков');
     const [previewSubtitle, setPreviewSubtitle] = useState<string>('');
+    const [previewApproverTitle, setPreviewApproverTitle] = useState<string>('УТВЕРЖДАЮ');
+    const [previewApproverText, setPreviewApproverText] = useState<string>('Директор гимназии');
+    const [previewFooterText, setPreviewFooterText] = useState<string>('Создано с помощью системы управления гимназией');
 
     const [draggedIdx, setDraggedIdx] = useState<number|null>(null);
 
@@ -231,6 +234,9 @@ export const DirectoryPage = () => {
         const preset = settings.bellPresets?.find(p=>p.id===selectedPresetId);
         setPreviewTitle(`Расписание звонков: ${preset?.name || 'Обычное'}`);
         setPreviewSubtitle(exportDate ? `на ${new Date(exportDate).toLocaleDateString('ru-RU')}` : '');
+        setPreviewApproverTitle('УТВЕРЖДАЮ');
+        setPreviewApproverText('Директор гимназии');
+        setPreviewFooterText('Создано с помощью системы управления гимназией');
         setIsPreviewMode(true);
     };
 
@@ -253,9 +259,9 @@ export const DirectoryPage = () => {
         exportElement.innerHTML = `
             <div style="text-align: center; margin-bottom: 40px;">
                 <h1 style="font-size: 28px; font-weight: 900; text-transform: uppercase; color: #1e293b; margin-bottom: 8px;">
-                    Расписание звонков: ${preset?.name || 'Обычное'}
+                    ${previewTitle}
                 </h1>
-                ${exportDate ? `<p style="font-size: 20px; color: #64748b; font-weight: 600;">на ${new Date(exportDate).toLocaleDateString('ru-RU')}</p>` : ''}
+                ${previewSubtitle ? `<p style="font-size: 20px; color: #64748b; font-weight: 600;">${previewSubtitle}</p>` : ''}
                 <div style="height: 4px; width: 200px; background: linear-gradient(to right, #6366f1, #8b5cf6); margin: 20px auto; border-radius: 2px;"></div>
             </div>
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px;">
@@ -307,8 +313,8 @@ export const DirectoryPage = () => {
             </div>
             <div style="margin-top: 48px; padding-top: 24px; border-top: 4px solid #e2e8f0; display: flex; justify-content: space-between; align-items: flex-end; font-size: 12px; font-weight: 700; color: #64748b;">
                 <div style="text-align: left;">
-                    <div style="color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; font-size: 10px; margin-bottom: 4px;">УТВЕРЖДАЮ</div>
-                    <div style="color: #1e293b;">Директор гимназии</div>
+                    <div style="color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; font-size: 10px; margin-bottom: 4px;">${previewApproverTitle}</div>
+                    <div style="color: #1e293b;">${previewApproverText}</div>
                 </div>
                 <div style="text-align: right;">
                     <div style="border-bottom: 4px solid #cbd5e1; width: 240px; margin-bottom: 4px;"></div>
@@ -316,7 +322,7 @@ export const DirectoryPage = () => {
                 </div>
             </div>
             <div style="margin-top: 16px; text-align: center; font-size: 10px; color: #94a3b8;">
-                Создано с помощью системы управления гимназией • ${new Date().toLocaleDateString('ru-RU')}
+                ${previewFooterText} • ${new Date().toLocaleDateString('ru-RU')}
             </div>
         `;
 
@@ -449,7 +455,7 @@ export const DirectoryPage = () => {
         html += `
             <table>
                 <tr>
-                    <td colspan="3" style="border:none"></td>
+                    <td colspan="2" style="border:none"></td>
                     <td colspan="2" class="approval-block">
                         <b>УТВЕРЖДАЮ</b><br>
                         Директор государственного<br>
@@ -459,23 +465,22 @@ export const DirectoryPage = () => {
                         "__" ______ 2025г.
                     </td>
                 </tr>
-                <tr class="empty-row"><td colspan="5" style="border:none"></td></tr>
+                <tr class="empty-row"><td colspan="4" style="border:none"></td></tr>
             </table>
         `;
 
         // Заголовок
         html += `
             <table>
-                <tr><td colspan="5" class="title-main">РАСПИСАНИЕ ЗВОНКОВ</td></tr>
-                ${exportDate ? `<tr><td colspan="5" class="title-sub">на ${new Date(exportDate).toLocaleDateString('ru-RU')}</td></tr>` : ''}
-                <tr><td colspan="5" class="title-sub">Режим: ${preset?.name || 'Обычный'}</td></tr>
-                <tr class="empty-row"><td colspan="5" style="border:none"></td></tr>
+                <tr><td colspan="4" class="title-main">РАСПИСАНИЕ ЗВОНКОВ</td></tr>
+                ${exportDate ? `<tr><td colspan="4" class="title-sub">на ${new Date(exportDate).toLocaleDateString('ru-RU')}</td></tr>` : ''}
+                <tr><td colspan="4" class="title-sub">Режим: ${preset?.name || 'Обычный'}</td></tr>
+                <tr class="empty-row"><td colspan="4" style="border:none"></td></tr>
                 <tr>
                     <th class="lesson-header">Смена</th>
                     <th class="lesson-header">Урок №</th>
                     <th class="lesson-header">Время начала</th>
                     <th class="lesson-header">Время окончания</th>
-                    <th class="lesson-header">Статус</th>
                 </tr>
         `;
 
@@ -487,26 +492,37 @@ export const DirectoryPage = () => {
                 const bell = currentPresetBells.find(b => b.shift === shift && b.period === period && b.day === 'default')
                     || { start: '00:00', end: '00:00', cancelled: false };
 
-                html += `
-                    <tr>
-                        ${index === 0 ? `<td rowspan="${SHIFT_PERIODS[shift].length}" class="shift-header">${shiftName}</td>` : ''}
-                        <td class="lesson-header">${period}</td>
-                        <td class="time-cell">${bell.start}</td>
-                        <td class="time-cell">${bell.end}</td>
-                        <td class="status-cell ${bell.cancelled ? 'cancelled' : 'active'}">${bell.cancelled ? 'ОТМЕНЁН' : 'АКТИВЕН'}</td>
-                    </tr>
-                `;
+                if (bell.cancelled) {
+                    // Если урок снят - показываем "УРОК СНЯТ" во всех колонках времени
+                    html += `
+                        <tr>
+                            ${index === 0 ? `<td rowspan="${SHIFT_PERIODS[shift].length}" class="shift-header">${shiftName}</td>` : ''}
+                            <td class="lesson-header">${period}</td>
+                            <td colspan="2" class="status-cell cancelled" style="text-align: center; font-weight: bold;">УРОК СНЯТ</td>
+                        </tr>
+                    `;
+                } else {
+                    // Обычное отображение времени
+                    html += `
+                        <tr>
+                            ${index === 0 ? `<td rowspan="${SHIFT_PERIODS[shift].length}" class="shift-header">${shiftName}</td>` : ''}
+                            <td class="lesson-header">${period}</td>
+                            <td class="time-cell">${bell.start}</td>
+                            <td class="time-cell">${bell.end}</td>
+                        </tr>
+                    `;
+                }
             });
 
             // Пустая строка между сменами
-            html += '<tr class="empty-row"><td colspan="5" style="border:none"></td></tr>';
+            html += '<tr class="empty-row"><td colspan="4" style="border:none"></td></tr>';
         });
 
         // Подвал
         html += `
-                <tr class="empty-row"><td colspan="5" style="border:none"></td></tr>
+                <tr class="empty-row"><td colspan="4" style="border:none"></td></tr>
                 <tr>
-                    <td colspan="3" class="footer-block">
+                    <td colspan="2" class="footer-block">
                         Экспортировано: ${new Date().toLocaleDateString('ru-RU')} в ${new Date().toLocaleTimeString('ru-RU')}
                     </td>
                     <td colspan="2" style="border:none"></td>
@@ -721,13 +737,14 @@ export const DirectoryPage = () => {
                                 </div>
                                 <div className="p-6">
                                     {/* Edit fields */}
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600">
                                         <div>
                                             <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Заголовок</label>
                                             <input
                                                 className="w-full border border-slate-200 dark:border-slate-600 rounded-lg p-2 text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500"
                                                 value={previewTitle}
                                                 onChange={e => setPreviewTitle(e.target.value)}
+                                                placeholder="РАСПИСАНИЕ ЗВОНКОВ"
                                             />
                                         </div>
                                         <div>
@@ -736,7 +753,16 @@ export const DirectoryPage = () => {
                                                 className="w-full border border-slate-200 dark:border-slate-600 rounded-lg p-2 text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500"
                                                 value={previewSubtitle}
                                                 onChange={e => setPreviewSubtitle(e.target.value)}
-                                                placeholder="Например: на 15 марта 2024"
+                                                placeholder="на 15 марта 2024"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Текст подвала</label>
+                                            <input
+                                                className="w-full border border-slate-200 dark:border-slate-600 rounded-lg p-2 text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500"
+                                                value={previewFooterText}
+                                                onChange={e => setPreviewFooterText(e.target.value)}
+                                                placeholder="Создано с помощью..."
                                             />
                                         </div>
                                     </div>
@@ -744,14 +770,26 @@ export const DirectoryPage = () => {
                                     {/* Preview content */}
                                     <div className="flex justify-center mb-4">
                                         <div className="bg-white rounded-lg shadow-xl border-2 border-slate-300 overflow-hidden" style={{width: '900px'}}>
-                                            <div ref={exportRef} className="bg-white p-8 text-slate-900" style={{width: '100%', minHeight: '650px'}}>
-                                                 <div className="text-center mb-8">
-                                                    <h1 className="text-3xl font-black uppercase text-slate-800 mb-2">{previewTitle}</h1>
-                                                    {previewSubtitle && <p className="text-lg text-slate-600 font-medium">{previewSubtitle}</p>}
-                                                    <div className="mt-4 flex justify-center">
-                                                        <div className="h-1 w-32 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full"></div>
-                                                    </div>
-                                                 </div>
+                                <div ref={exportRef} className="bg-white p-8 text-slate-900" style={{width: '100%', minHeight: '650px'}}>
+                                     <div className="text-center mb-8">
+                                        <input
+                                            type="text"
+                                            className="text-3xl font-black uppercase text-slate-800 mb-2 text-center bg-transparent border-0 outline-none w-full"
+                                            value={previewTitle}
+                                            onChange={e => setPreviewTitle(e.target.value)}
+                                            placeholder="РАСПИСАНИЕ ЗВОНКОВ"
+                                        />
+                                        <input
+                                            type="text"
+                                            className="text-lg text-slate-600 font-medium text-center bg-transparent border-0 outline-none w-full"
+                                            value={previewSubtitle}
+                                            onChange={e => setPreviewSubtitle(e.target.value)}
+                                            placeholder="на 15 марта 2024"
+                                        />
+                                        <div className="mt-4 flex justify-center">
+                                            <div className="h-1 w-32 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full"></div>
+                                        </div>
+                                     </div>
                                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                                     {[Shift.First, Shift.Second].map(shift => (
                                                         <div key={shift} className="rounded-xl overflow-hidden border-2 border-slate-200 shadow-lg">
@@ -812,16 +850,40 @@ export const DirectoryPage = () => {
                                                 </div>
                                                 <div className="mt-12 pt-6 border-t-2 border-slate-300 flex justify-between items-end text-sm font-bold text-slate-600">
                                                     <div className="text-left">
-                                                        <div className="text-slate-500 uppercase tracking-wider text-xs mb-1">УТВЕРЖДАЮ</div>
-                                                        <div className="text-slate-800">Директор гимназии</div>
+                                                        <input
+                                                            type="text"
+                                                            className="text-slate-500 uppercase tracking-wider text-xs mb-1 bg-transparent border-0 outline-none w-full text-left"
+                                                            value={previewApproverTitle}
+                                                            onChange={e => setPreviewApproverTitle(e.target.value)}
+                                                            placeholder="УТВЕРЖДАЮ"
+                                                        />
+                                                        <input
+                                                            type="text"
+                                                            className="text-slate-800 bg-transparent border-0 outline-none w-full"
+                                                            value={previewApproverText}
+                                                            onChange={e => setPreviewApproverText(e.target.value)}
+                                                            placeholder="Директор гимназии"
+                                                        />
                                                     </div>
                                                     <div className="text-right">
                                                         <div className="border-b-2 border-slate-400 w-48 mb-1"></div>
-                                                        <div className="text-slate-500 text-xs uppercase tracking-wider">подпись</div>
+                                                        <input
+                                                            type="text"
+                                                            className="text-slate-500 text-xs uppercase tracking-wider bg-transparent border-0 outline-none w-full text-right"
+                                                            value="подпись"
+                                                            readOnly
+                                                        />
                                                     </div>
                                                 </div>
                                                 <div className="mt-4 text-center text-xs text-slate-400">
-                                                    Создано с помощью системы управления гимназией • {new Date().toLocaleDateString('ru-RU')}
+                                                    <input
+                                                        type="text"
+                                                        className="text-center bg-transparent border-0 outline-none w-full"
+                                                        value={previewFooterText}
+                                                        onChange={e => setPreviewFooterText(e.target.value)}
+                                                        placeholder="Создано с помощью..."
+                                                    />
+                                                    {' • ' + new Date().toLocaleDateString('ru-RU')}
                                                 </div>
                                             </div>
                                         </div>
