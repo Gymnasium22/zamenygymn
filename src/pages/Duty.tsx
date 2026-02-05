@@ -205,7 +205,7 @@ export const DutyPage = () => {
                     .title-sub { font-size: 12pt; border: none; text-align: center; }
                     .shift-header { font-size: 16pt; font-weight: bold; background-color: #312e81; color: white; border: 2px solid #000; text-transform: uppercase; }
                     .floor-header { font-size: 12pt; font-weight: bold; background-color: #e5e7eb; border: 2px solid #000; text-align: left; padding-left: 10px; }
-                    .zone-cell { font-size: 11pt; font-weight: bold; background-color: #fff; text-align: left; width: 250px; }
+                    .zone-cell { font-size: 11pt; font-weight: bold; background-color: #fff; text-align: left; width: 250px; mso-number-format: "\\@"; }
                     .day-header { font-weight: bold; font-size: 12pt; border: 2px solid #000; }
                     .content-cell { font-size: 10pt; font-weight: bold; height: 35px; border: 1px solid #000; }
                     .approval-block { text-align: left; border: none !important; font-family: "Times New Roman", serif; font-size: 11pt; }
@@ -321,7 +321,7 @@ export const DutyPage = () => {
                     .title-sub { font-size: 14pt; border: none; text-align: center; }
                     .shift-header { font-size: 16pt; font-weight: bold; background-color: #e5e7eb; border: 3px solid #000; text-transform: uppercase; }
                     .floor-header { font-size: 12pt; font-weight: bold; background-color: ${headerColor}; border: 2px solid #000; text-transform: uppercase; }
-                    .zone-header { font-size: 10pt; font-weight: bold; background-color: ${zoneColor}; border: 2px solid #000; }
+                    .zone-header { font-size: 10pt; font-weight: bold; background-color: ${zoneColor}; border: 2px solid #000; mso-number-format: "\\@"; }
                     .day-label { font-weight: bold; font-size: 12pt; border: 2px solid #000; }
                     .content-cell { font-size: 11pt; font-weight: bold; height: 40px; border: 1px solid #000; }
                     .approval-block { text-align: left; border: none !important; font-family: "Times New Roman", serif; font-size: 12pt; }
