@@ -300,7 +300,7 @@ export const DirectoryPage = () => {
                     <h1 style="font-size: 32px; font-weight: 900; text-transform: uppercase; color: #1e293b; margin: 0 0 5px 0; letter-spacing: -0.5px;">
                         Расписание звонков
                     </h1>
-                    <p style="font-size: 16px; color: #64748b; font-weight: 600; margin: 0;">
+                    <p style="font-size: 20px; color: #64748b; font-weight: 600; margin: 0;">
                         Режим: <span style="color: #4f46e5;">${preset?.name || 'Обычное'}</span>
                         ${exportDate ? `<br>на ${new Date(exportDate).toLocaleDateString('ru-RU')}` : ''}
                     </p>
@@ -322,7 +322,7 @@ export const DirectoryPage = () => {
                                         if (bell.cancelled) {
                                             return `
                                                 <div style="display: flex; align-items: center; margin-bottom: 10px; padding: 8px 12px; background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 10px;">
-                                                    <div style="width: 32px; height: 32px; line-height: 32px; text-align: center; border-radius: 50%; background: #fee2e2; color: #991b1b; font-weight: bold; margin-right: 12px; font-size: 14px; flex-shrink: 0;">${period}</div>
+                                                    <div style="width: 40px; height: 40px; line-height: 40px; text-align: center; border-radius: 50%; background: #fee2e2; color: #991b1b; font-weight: bold; margin-right: 15px; font-size: 20px; flex-shrink: 0;">${period}</div>
                                                     <div style="font-weight: 800; color: #dc2626; text-transform: uppercase; font-size: 13px; letter-spacing: 0.5px;">УРОК СНЯТ</div>
                                                 </div>
                                             `;
@@ -330,10 +330,10 @@ export const DirectoryPage = () => {
 
                                         return `
                                             <div style="display: flex; align-items: center; margin-bottom: 10px; padding: 8px 12px; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px;">
-                                                <div style="width: 32px; height: 32px; line-height: 32px; text-align: center; border-radius: 50%; background: #e2e8f0; color: #475569; font-weight: bold; margin-right: 12px; font-size: 14px; flex-shrink: 0;">${period}</div>
-                                                <div style="flex: 1; display: flex; justify-content: space-between; align-items: center; font-weight: bold; font-size: 18px; color: #0f172a; font-variant-numeric: tabular-nums;">
+                                                <div style="width: 40px; height: 40px; line-height: 40px; text-align: center; border-radius: 50%; background: #e2e8f0; color: #475569; font-weight: bold; margin-right: 15px; font-size: 20px; flex-shrink: 0;">${period}</div>
+                                                <div style="flex: 1; display: flex; justify-content: space-between; align-items: center; font-weight: bold; font-size: 28px; color: #0f172a; font-variant-numeric: tabular-nums;">
                                                     <span>${bell.start}</span>
-                                                    <span style="color: #cbd5e1; font-weight: normal; margin: 0 5px;">&mdash;</span>
+                                                    <span style="color: #cbd5e1; font-weight: normal; margin: 0 10px;">&mdash;</span>
                                                     <span>${bell.end}</span>
                                                 </div>
                                             </div>
@@ -392,10 +392,10 @@ export const DirectoryPage = () => {
                     table { border-collapse: collapse; font-family: Arial, sans-serif; width: 100%; text-align: center; }
                     td, th { border: 2px solid #000000; padding: 8px; vertical-align: middle; text-align: center; }
                     .title-main { font-size: 18pt; font-weight: bold; border: none; text-align: center; }
-                    .title-sub { font-size: 12pt; border: none; text-align: center; }
-                    .shift-header { font-size: 14pt; font-weight: bold; background-color: #312e81; color: white; border: 2px solid #000; }
-                    .lesson-header { font-size: 12pt; font-weight: bold; background-color: #e5e7eb; border: 2px solid #000; }
-                    .time-cell { font-size: 11pt; font-weight: bold; background-color: #fff; width: 120px; }
+                    .title-sub { font-size: 16pt; border: none; text-align: center; }
+                    .shift-header { font-size: 16pt; font-weight: bold; background-color: #312e81; color: white; border: 2px solid #000; }
+                    .lesson-header { font-size: 14pt; font-weight: bold; background-color: #e5e7eb; border: 2px solid #000; }
+                    .time-cell { font-size: 16pt; font-weight: bold; background-color: #fff; width: 150px; }
                     .cancelled-cell { font-size: 14pt; font-weight: bold; background-color: #fef2f2; color: #dc2626; text-transform: uppercase; letter-spacing: 0.1em; }
                     .approval-block { text-align: left; border: none !important; font-family: "Times New Roman", serif; font-size: 11pt; }
                     .footer-block { border: none !important; font-weight: bold; text-align: left; padding-top: 20px; font-size: 11pt; font-family: "Times New Roman", serif; }
