@@ -1,12 +1,14 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { useStaticData } from '../context/DataContext'; 
+import { useStaticData } from '../context/DataContext';
 import { Icon } from '../components/Icons';
 import { Modal, StaggerContainer } from '../components/UI';
 import { Shift, ROOM_TYPES, SHIFT_PERIODS, Teacher, Subject, ClassEntity, Room, BellPreset, Bell } from '../types';
 import { DEFAULT_BELLS, SHORT_BELLS } from '../constants';
 import { generateId } from '../utils/helpers';
 import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
+import * as XLSX from 'xlsx';
 
 export const DirectoryPage = () => {
     const { subjects, teachers, classes, rooms, bellSchedule, settings, saveStaticData } = useStaticData();
@@ -26,8 +28,15 @@ export const DirectoryPage = () => {
     const [currentPresetBells, setCurrentPresetBells] = useState<Bell[]>([]);
     const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
     const [newPresetName, setNewPresetName] = useState('');
-    const bellsPrintRef = useRef<HTMLDivElement>(null);
-    
+    const bellsPrintRef = useRef<HTMLDivElement>(null); // редактор
+    const exportRef = useRef<HTMLDivElement>(null); // чистый вариант для экспорта/предпросмотра
+
+    // Export State
+    const [exportDate, setExportDate] = useState<string>(new Date().toISOString().split('T')[0]);
+    const [isPreviewMode, setIsPreviewMode] = useState(false);
+    const [previewTitle, setPreviewTitle] = useState<string>('Расписание звонков');
+    const [previewSubtitle, setPreviewSubtitle] = useState<string>('');
+
     const [draggedIdx, setDraggedIdx] = useState<number|null>(null);
 
     // Initialize bells on load
@@ -218,15 +227,306 @@ export const DirectoryPage = () => {
         }
     };
 
+    const openExportPreview = () => {
+        const preset = settings.bellPresets?.find(p=>p.id===selectedPresetId);
+        setPreviewTitle(`Расписание звонков: ${preset?.name || 'Обычное'}`);
+        setPreviewSubtitle(exportDate ? `на ${new Date(exportDate).toLocaleDateString('ru-RU')}` : '');
+        setIsPreviewMode(true);
+    };
+
+    const createExportElement = () => {
+        const exportElement = document.createElement('div');
+        exportElement.style.width = '1200px';
+        exportElement.style.minHeight = '1000px';
+        exportElement.style.backgroundColor = '#ffffff';
+        exportElement.style.padding = '60px';
+        exportElement.style.fontFamily = 'Arial, sans-serif';
+        exportElement.style.position = 'absolute';
+        exportElement.style.left = '-9999px';
+        exportElement.style.top = '-9999px';
+        exportElement.style.boxSizing = 'border-box';
+        exportElement.style.display = 'flex';
+        exportElement.style.flexDirection = 'column';
+
+        const preset = settings.bellPresets?.find(p=>p.id===selectedPresetId);
+
+        exportElement.innerHTML = `
+            <div style="text-align: center; margin-bottom: 40px;">
+                <h1 style="font-size: 28px; font-weight: 900; text-transform: uppercase; color: #1e293b; margin-bottom: 8px;">
+                    Расписание звонков: ${preset?.name || 'Обычное'}
+                </h1>
+                ${exportDate ? `<p style="font-size: 20px; color: #64748b; font-weight: 600;">на ${new Date(exportDate).toLocaleDateString('ru-RU')}</p>` : ''}
+                <div style="height: 4px; width: 200px; background: linear-gradient(to right, #6366f1, #8b5cf6); margin: 20px auto; border-radius: 2px;"></div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px;">
+                ${[Shift.First, Shift.Second].map(shift => {
+                    // Получаем все уроки для данной смены
+                    const shiftBells = currentPresetBells.filter(b => b.shift === shift);
+                    return `
+                        <div style="border-radius: 12px; overflow: hidden; border: 2px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                            <div style="padding: 24px; font-weight: 700; font-size: 20px; color: white; text-align: center; background: linear-gradient(to right, ${shift === Shift.First ? '#6366f1, #4f46e5' : '#8b5cf6, #7c3aed'});">
+                                ${shift}
+                            </div>
+                            <div style="padding: 24px; background: white; display: flex; flex-direction: column; gap: 16px;">
+                                ${SHIFT_PERIODS[shift].map(period => {
+                                    const bell = shiftBells.find(b => b.period === period && b.day === 'default') || { start: '00:00', end: '00:00', cancelled: false };
+                                    return bell.cancelled ? `
+                                        <div style="display: flex; align-items: center; gap: 16px; padding: 12px; border-radius: 8px; border: 2px solid #fca5a5; background: #fef2f2; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);">
+                                            <div style="width: 48px; height: 48px; border-radius: 50%; background: linear-gradient(135deg, #e5e7eb, #f3f4f6); display: flex; align-items: center; justify-content: center; font-weight: 900; color: #6b7280; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); border: 2px solid white; font-size: 18px; flex-shrink: 0;">
+                                                ${period}
+                                            </div>
+                                            <div style="flex: 1; display: flex; align-items: center; justify-content: center; padding: 8px;">
+                                                <span style="color: #dc2626; font-weight: 900; font-size: 16px; text-transform: uppercase; letter-spacing: 0.05em; padding: 8px 16px; background: #fee2e2; border-radius: 20px; border: 2px solid #fca5a5;">УРОК СНЯТ</span>
+                                            </div>
+                                        </div>
+                                    ` : `
+                                        <div style="display: flex; align-items: center; gap: 16px; padding: 12px; border-radius: 8px; border: 2px solid #e2e8f0; background: #f8fafc; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);">
+                                            <div style="width: 48px; height: 48px; border-radius: 50%; background: linear-gradient(135deg, #e5e7eb, #f3f4f6); display: flex; align-items: center; justify-content: center; font-weight: 900; color: #6b7280; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); border: 2px solid white; font-size: 18px; flex-shrink: 0;">
+                                                ${period}
+                                            </div>
+                                            <div style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 16px; min-width: 0;">
+                                                <div style="text-align: center; flex-shrink: 0; width: 120px;">
+                                                    <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">Начало</div>
+                                                    <div style="border: 2px solid #cbd5e1; border-radius: 6px; padding: 8px 12px; background: white; font-weight: 900; color: #1e293b; text-align: center; font-size: 16px; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);">${bell.start}</div>
+                                                </div>
+                                                <div style="display: flex; align-items: center; padding: 0 8px;">
+                                                    <div style="width: 32px; height: 1px; background: #cbd5e1;"></div>
+                                                </div>
+                                                <div style="text-align: center; flex-shrink: 0; width: 120px;">
+                                                    <div style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">Конец</div>
+                                                    <div style="border: 2px solid #cbd5e1; border-radius: 6px; padding: 8px 12px; background: white; font-weight: 900; color: #1e293b; text-align: center; font-size: 16px; box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);">${bell.end}</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+            <div style="margin-top: 48px; padding-top: 24px; border-top: 4px solid #e2e8f0; display: flex; justify-content: space-between; align-items: flex-end; font-size: 12px; font-weight: 700; color: #64748b;">
+                <div style="text-align: left;">
+                    <div style="color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; font-size: 10px; margin-bottom: 4px;">УТВЕРЖДАЮ</div>
+                    <div style="color: #1e293b;">Директор гимназии</div>
+                </div>
+                <div style="text-align: right;">
+                    <div style="border-bottom: 4px solid #cbd5e1; width: 240px; margin-bottom: 4px;"></div>
+                    <div style="color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; font-size: 10px;">подпись</div>
+                </div>
+            </div>
+            <div style="margin-top: 16px; text-align: center; font-size: 10px; color: #94a3b8;">
+                Создано с помощью системы управления гимназией • ${new Date().toLocaleDateString('ru-RU')}
+            </div>
+        `;
+
+        return exportElement;
+    };
+
     const exportBellsToPng = async () => {
-        if (!bellsPrintRef.current) return;
-        const canvas = await html2canvas(bellsPrintRef.current, { scale: 2, backgroundColor: '#ffffff' });
+        const exportElement = createExportElement();
+        document.body.appendChild(exportElement);
+
+        try {
+            // Даем время на рендеринг
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            const canvas = await html2canvas(exportElement, {
+                scale: 2,
+                backgroundColor: '#ffffff',
+                useCORS: true,
+                allowTaint: true,
+                width: exportElement.offsetWidth,
+                height: exportElement.offsetHeight
+            });
+
+            const link = document.createElement('a');
+            link.href = canvas.toDataURL('image/png');
+            const preset = settings.bellPresets?.find(p=>p.id===selectedPresetId);
+            const dateStr = exportDate ? `_${new Date(exportDate).toLocaleDateString('ru-RU').replace(/\./g, '-')}` : '';
+            link.download = `Звонки_${preset?.name || 'Обычное'}${dateStr}.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } finally {
+            document.body.removeChild(exportElement);
+        }
+        setIsPreviewMode(false);
+    };
+
+    const exportBellsToPdf = async () => {
+        const exportElement = createExportElement();
+        document.body.appendChild(exportElement);
+
+        try {
+            // Даем время на рендеринг
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            // Создаем canvas с правильными размерами
+            const canvas = await html2canvas(exportElement, {
+                scale: 2,
+                backgroundColor: '#ffffff',
+                useCORS: true,
+                allowTaint: true,
+                width: exportElement.offsetWidth,
+                height: exportElement.offsetHeight
+            });
+
+            const imgData = canvas.toDataURL('image/png', 1.0);
+
+            // A4 dimensions in mm
+            const pdfWidth = 210;
+            const pdfHeight = 297;
+
+            const pdf = new jsPDF({
+                orientation: 'portrait',
+                unit: 'mm',
+                format: 'a4',
+                compress: true
+            });
+
+            // Вычисляем соотношение сторон для правильного размещения
+            const imgAspectRatio = canvas.width / canvas.height;
+            const pdfAspectRatio = pdfWidth / pdfHeight;
+
+            let finalWidth, finalHeight;
+            if (imgAspectRatio > pdfAspectRatio) {
+                // Изображение шире - подгоняем по ширине
+                finalWidth = pdfWidth;
+                finalHeight = pdfWidth / imgAspectRatio;
+            } else {
+                // Изображение выше - подгоняем по высоте
+                finalHeight = pdfHeight;
+                finalWidth = pdfHeight * imgAspectRatio;
+            }
+
+            // Центрируем на странице
+            const x = (pdfWidth - finalWidth) / 2;
+            const y = (pdfHeight - finalHeight) / 2;
+
+            pdf.addImage(imgData, 'PNG', x, y, finalWidth, finalHeight, '', 'FAST');
+
+            const preset = settings.bellPresets?.find(p=>p.id===selectedPresetId);
+            const dateStr = exportDate ? `_${new Date(exportDate).toLocaleDateString('ru-RU').replace(/\./g, '-')}` : '';
+            pdf.save(`Звонки_${preset?.name || 'Обычное'}${dateStr}.pdf`);
+        } catch (error) {
+            console.error('PDF export error:', error);
+            alert('Ошибка при экспорте в PDF');
+        } finally {
+            document.body.removeChild(exportElement);
+        }
+        setIsPreviewMode(false);
+    };
+
+    const exportBellsToExcel = () => {
+        const preset = settings.bellPresets?.find(p=>p.id===selectedPresetId);
+
+        // Создаем HTML таблицу как в дежурствах
+        let html = `
+            <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+            <head>
+                <meta charset="UTF-8">
+                <style>
+                    table { border-collapse: collapse; font-family: Arial, sans-serif; width: 100%; text-align: center; }
+                    td, th { border: 2px solid #000000; padding: 8px; vertical-align: middle; text-align: center; }
+                    .title-main { font-size: 18pt; font-weight: bold; border: none; text-align: center; }
+                    .title-sub { font-size: 12pt; border: none; text-align: center; }
+                    .shift-header { font-size: 14pt; font-weight: bold; background-color: #312e81; color: white; border: 2px solid #000; }
+                    .lesson-header { font-size: 12pt; font-weight: bold; background-color: #e5e7eb; border: 2px solid #000; }
+                    .time-cell { font-size: 11pt; font-weight: bold; background-color: #fff; width: 120px; }
+                    .status-cell { font-size: 11pt; font-weight: bold; width: 100px; }
+                    .cancelled { background-color: #fecaca; color: #dc2626; }
+                    .active { background-color: #d1fae5; color: #059669; }
+                    .approval-block { text-align: left; border: none !important; font-family: "Times New Roman", serif; font-size: 11pt; }
+                    .footer-block { border: none !important; font-weight: bold; text-align: left; padding-top: 20px; font-size: 11pt; font-family: "Times New Roman", serif; }
+                    .empty-row { border: none !important; height: 15px; }
+                </style>
+            </head>
+            <body>
+        `;
+
+        // Утверждение (справа)
+        html += `
+            <table>
+                <tr>
+                    <td colspan="3" style="border:none"></td>
+                    <td colspan="2" class="approval-block">
+                        <b>УТВЕРЖДАЮ</b><br>
+                        Директор государственного<br>
+                        учреждения образования<br>
+                        «Гимназия № 22 г. Минска»<br><br>
+                        __________ Н.В.Кисель<br>
+                        "__" ______ 2025г.
+                    </td>
+                </tr>
+                <tr class="empty-row"><td colspan="5" style="border:none"></td></tr>
+            </table>
+        `;
+
+        // Заголовок
+        html += `
+            <table>
+                <tr><td colspan="5" class="title-main">РАСПИСАНИЕ ЗВОНКОВ</td></tr>
+                ${exportDate ? `<tr><td colspan="5" class="title-sub">на ${new Date(exportDate).toLocaleDateString('ru-RU')}</td></tr>` : ''}
+                <tr><td colspan="5" class="title-sub">Режим: ${preset?.name || 'Обычный'}</td></tr>
+                <tr class="empty-row"><td colspan="5" style="border:none"></td></tr>
+                <tr>
+                    <th class="lesson-header">Смена</th>
+                    <th class="lesson-header">Урок №</th>
+                    <th class="lesson-header">Время начала</th>
+                    <th class="lesson-header">Время окончания</th>
+                    <th class="lesson-header">Статус</th>
+                </tr>
+        `;
+
+        // Данные по сменам
+        [Shift.First, Shift.Second].forEach(shift => {
+            const shiftName = shift === Shift.First ? '1-я смена' : '2-я смена';
+
+            SHIFT_PERIODS[shift].forEach((period, index) => {
+                const bell = currentPresetBells.find(b => b.shift === shift && b.period === period && b.day === 'default')
+                    || { start: '00:00', end: '00:00', cancelled: false };
+
+                html += `
+                    <tr>
+                        ${index === 0 ? `<td rowspan="${SHIFT_PERIODS[shift].length}" class="shift-header">${shiftName}</td>` : ''}
+                        <td class="lesson-header">${period}</td>
+                        <td class="time-cell">${bell.start}</td>
+                        <td class="time-cell">${bell.end}</td>
+                        <td class="status-cell ${bell.cancelled ? 'cancelled' : 'active'}">${bell.cancelled ? 'ОТМЕНЁН' : 'АКТИВЕН'}</td>
+                    </tr>
+                `;
+            });
+
+            // Пустая строка между сменами
+            html += '<tr class="empty-row"><td colspan="5" style="border:none"></td></tr>';
+        });
+
+        // Подвал
+        html += `
+                <tr class="empty-row"><td colspan="5" style="border:none"></td></tr>
+                <tr>
+                    <td colspan="3" class="footer-block">
+                        Экспортировано: ${new Date().toLocaleDateString('ru-RU')} в ${new Date().toLocaleTimeString('ru-RU')}
+                    </td>
+                    <td colspan="2" style="border:none"></td>
+                </tr>
+            </table>
+            </body>
+            </html>
+        `;
+
+        // Создаем и скачиваем файл
+        const blob = new Blob([html], { type: "application/vnd.ms-excel" });
         const link = document.createElement('a');
-        link.href = canvas.toDataURL('image/png');
-        link.download = `Звонки_${settings.bellPresets?.find(p=>p.id===selectedPresetId)?.name}.png`;
+        link.href = URL.createObjectURL(blob);
+        const dateStr = exportDate ? `_${new Date(exportDate).toLocaleDateString('ru-RU').replace(/\./g, '-')}` : '';
+        link.download = `Расписание_звонков_${preset?.name || 'Обычное'}${dateStr}.xls`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+
+        setIsPreviewMode(false);
     };
 
     const toggleShift = (shift: string) => {
@@ -367,76 +667,255 @@ export const DirectoryPage = () => {
                                 <button onClick={deletePreset} className="p-2 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/50 transition" title="Удалить режим"><Icon name="Trash2" size={18}/></button>
                             </div>
                             
-                            <div className="flex gap-2">
+                            <div className="flex gap-3 flex-wrap items-end">
+                                <div className="flex flex-col gap-1">
+                                    <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Дата экспорта</label>
+                                    <input
+                                        type="date"
+                                        value={exportDate}
+                                        onChange={e => setExportDate(e.target.value)}
+                                        className="px-3 py-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 rounded-xl font-bold text-sm outline-none focus:ring-2 ring-indigo-500"
+                                    />
+                                </div>
                                 <button onClick={savePreset} className="px-4 py-2 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border border-blue-100 dark:border-blue-900 rounded-xl font-bold hover:bg-blue-100 dark:hover:bg-blue-900/50 transition text-sm flex items-center gap-2">
                                     <Icon name="Save" size={18}/> Сохранить изменения
                                 </button>
                                 <button onClick={applyPreset} className="px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition shadow-lg shadow-emerald-200 dark:shadow-none text-sm flex items-center gap-2">
                                     <Icon name="CheckCircle" size={18}/> Применить режим
                                 </button>
-                                <button onClick={exportBellsToPng} className="px-4 py-2 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 rounded-xl font-bold hover:bg-slate-50 dark:hover:bg-slate-600 transition text-sm flex items-center gap-2">
-                                    <Icon name="Image" size={18}/> PNG
+                                <button onClick={openExportPreview} className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition shadow-lg shadow-indigo-200 dark:shadow-none text-sm flex items-center gap-2">
+                                    <Icon name="Eye" size={18}/> Предпросмотр экспорта
                                 </button>
                             </div>
                         </div>
 
-                        {/* Bell Editor */}
-                        <div ref={bellsPrintRef} className="bg-white p-8 rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 text-slate-900">
-                             <h3 className="text-2xl font-black text-center mb-6 uppercase text-slate-800">
-                                Расписание звонков: {settings.bellPresets?.find(p=>p.id===selectedPresetId)?.name}
-                             </h3>
-                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                {[Shift.First, Shift.Second].map(shift => (
-                                    <div key={shift} className="rounded-xl overflow-hidden border border-slate-200">
-                                        <div className={`p-4 font-bold text-lg text-white text-center ${shift === Shift.First ? 'bg-indigo-600' : 'bg-purple-600'}`}>{shift}</div>
-                                        <div className="p-4 space-y-2 bg-white">
-                                            {SHIFT_PERIODS[shift].map(period => {
-                                                const bell = currentPresetBells.find(b => b.shift === shift && b.period === period && b.day === 'default') 
-                                                    || { start: '00:00', end: '00:00', cancelled: false } as Bell;
-                                                return (
-                                                    <div key={period} className={`flex items-center gap-4 p-2 rounded-lg border ${bell.cancelled ? 'bg-red-50 border-red-100' : 'bg-slate-50 border-slate-100'}`}>
-                                                        <div className="w-10 h-10 rounded bg-white flex items-center justify-center font-black text-slate-500 shadow-sm border border-slate-200">{period}</div>
-                                                        
-                                                        {bell.cancelled ? (
-                                                            <div className="flex-1 flex justify-center items-center">
-                                                                <span className="text-red-500 font-bold uppercase tracking-wider text-sm">УРОК СНЯТ</span>
-                                                            </div>
-                                                        ) : (
-                                                            <div className="flex-1 flex items-center justify-center gap-2">
-                                                                <input 
-                                                                    type="time" 
-                                                                    className="border border-slate-200 rounded px-2 py-1 bg-white font-bold text-slate-800 text-center flex-1 min-w-[5rem] text-lg focus:ring-2 ring-indigo-200 outline-none" 
-                                                                    value={bell.start} 
-                                                                    onChange={e => handleBellChange(shift, period, 'start', e.target.value)} 
-                                                                />
-                                                                <span className="text-slate-400 font-bold">—</span>
-                                                                <input 
-                                                                    type="time" 
-                                                                    className="border border-slate-200 rounded px-2 py-1 bg-white font-bold text-slate-800 text-center flex-1 min-w-[5rem] text-lg focus:ring-2 ring-indigo-200 outline-none" 
-                                                                    value={bell.end} 
-                                                                    onChange={e => handleBellChange(shift, period, 'end', e.target.value)} 
-                                                                />
-                                                            </div>
-                                                        )}
+                        {/* Export buttons - visible without scrolling */}
+                        <div className="bg-white dark:bg-dark-800 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 mt-4">
+                            <div className="flex items-center justify-center gap-4 flex-wrap">
+                                <div className="flex items-center gap-2 text-sm font-bold text-slate-500 dark:text-slate-400">
+                                    <Icon name="Download" size={16}/>
+                                    Экспорт расписания:
+                                </div>
+                                <button onClick={exportBellsToExcel} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-bold shadow-lg shadow-green-200 dark:shadow-none flex items-center gap-2 transition">
+                                    <Icon name="FileSpreadsheet" size={16}/> Excel
+                                </button>
+                                <button onClick={exportBellsToPdf} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-bold shadow-lg shadow-red-200 dark:shadow-none flex items-center gap-2 transition">
+                                    <Icon name="FileText" size={16}/> PDF (A4)
+                                </button>
+                                <button onClick={exportBellsToPng} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 text-sm font-bold shadow-lg shadow-indigo-200 dark:shadow-none flex items-center gap-2 transition">
+                                    <Icon name="Image" size={16}/> PNG
+                                </button>
+                            </div>
+                        </div>
 
-                                                        <button 
-                                                            onClick={() => toggleBellCancellation(shift, period)} 
-                                                            className={`w-8 h-8 rounded flex items-center justify-center transition-colors ${bell.cancelled ? 'bg-white text-emerald-500 hover:text-emerald-700' : 'text-slate-400 hover:text-red-500 hover:bg-red-50'}`}
-                                                            title={bell.cancelled ? "Вернуть урок" : "Снять урок"}
-                                                            data-html2canvas-ignore="true"
-                                                        >
-                                                            <Icon name={bell.cancelled ? "RotateCcw" : "X"} size={16} />
-                                                        </button>
-                                                    </div>
-                                                );
-                                            })}
+                        {/* Preview section - always visible like in schedules */}
+                        {isPreviewMode && (
+                            <div className="bg-white dark:bg-dark-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 mt-6">
+                                <div className="p-6 border-b border-slate-100 dark:border-slate-700">
+                                    <div className="flex items-center justify-between">
+                                        <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">Предпросмотр экспорта</h3>
+                                        <button onClick={() => setIsPreviewMode(false)} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition">
+                                            <Icon name="X" size={20}/>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="p-6">
+                                    {/* Edit fields */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-600">
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Заголовок</label>
+                                            <input
+                                                className="w-full border border-slate-200 dark:border-slate-600 rounded-lg p-2 text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500"
+                                                value={previewTitle}
+                                                onChange={e => setPreviewTitle(e.target.value)}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Подзаголовок</label>
+                                            <input
+                                                className="w-full border border-slate-200 dark:border-slate-600 rounded-lg p-2 text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500"
+                                                value={previewSubtitle}
+                                                onChange={e => setPreviewSubtitle(e.target.value)}
+                                                placeholder="Например: на 15 марта 2024"
+                                            />
                                         </div>
                                     </div>
-                                ))}
+
+                                    {/* Preview content */}
+                                    <div className="flex justify-center mb-4">
+                                        <div className="bg-white rounded-lg shadow-xl border-2 border-slate-300 overflow-hidden" style={{width: '900px'}}>
+                                            <div ref={exportRef} className="bg-white p-8 text-slate-900" style={{width: '100%', minHeight: '650px'}}>
+                                                 <div className="text-center mb-8">
+                                                    <h1 className="text-3xl font-black uppercase text-slate-800 mb-2">{previewTitle}</h1>
+                                                    {previewSubtitle && <p className="text-lg text-slate-600 font-medium">{previewSubtitle}</p>}
+                                                    <div className="mt-4 flex justify-center">
+                                                        <div className="h-1 w-32 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full"></div>
+                                                    </div>
+                                                 </div>
+                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                                    {[Shift.First, Shift.Second].map(shift => (
+                                                        <div key={shift} className="rounded-xl overflow-hidden border-2 border-slate-200 shadow-lg">
+                                                            <div className={`p-6 font-bold text-xl text-white text-center bg-gradient-to-r ${shift === Shift.First ? 'from-indigo-600 to-indigo-700' : 'from-purple-600 to-purple-700'}`}>
+                                                                {shift}
+                                                            </div>
+                                                            <div className="p-6 space-y-4 bg-white">
+                                                                {SHIFT_PERIODS[shift].map(period => {
+                                                                    const bell = currentPresetBells.find(b => b.shift === shift && b.period === period && b.day === 'default')
+                                                                        || { start: '00:00', end: '00:00', cancelled: false };
+                                                                    return (
+                                                                        <div key={period} className={`flex items-center gap-4 p-4 rounded-lg border-2 ${bell.cancelled ? 'bg-red-50 border-red-200 shadow-sm' : 'bg-slate-50 border-slate-200 shadow-sm'}`}>
+                                                                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center font-black text-slate-600 shadow-md border-2 border-white text-lg flex-shrink-0">{period}</div>
+
+                                                                            {bell.cancelled ? (
+                                                                                <div className="flex-1 flex justify-center items-center py-2">
+                                                                                    <span className="text-red-600 font-black uppercase tracking-wider text-base px-4 py-2 bg-red-100 rounded-full border border-red-200">УРОК СНЯТ</span>
+                                                                                </div>
+                                                                            ) : (
+                                                                                <div className="flex-1 flex items-center justify-center gap-4 min-w-0">
+                                                                                    <div className="text-center flex-shrink-0 w-32">
+                                                                                        <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Начало</div>
+                                                                                        <input
+                                                                                            type="time"
+                                                                                            className="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white font-black text-slate-800 text-center text-lg focus:ring-2 ring-indigo-300 outline-none shadow-sm"
+                                                                                            value={bell.start}
+                                                                                            onChange={e => handleBellChange(shift, period, 'start', e.target.value)}
+                                                                                        />
+                                                                                    </div>
+                                                                                    <div className="flex items-center px-2">
+                                                                                        <div className="w-8 h-0.5 bg-slate-400"></div>
+                                                                                    </div>
+                                                                                    <div className="text-center flex-shrink-0 w-32">
+                                                                                        <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Конец</div>
+                                                                                        <input
+                                                                                            type="time"
+                                                                                            className="w-full border border-slate-300 rounded-lg px-3 py-2 bg-white font-black text-slate-800 text-center text-lg focus:ring-2 ring-indigo-300 outline-none shadow-sm"
+                                                                                            value={bell.end}
+                                                                                            onChange={e => handleBellChange(shift, period, 'end', e.target.value)}
+                                                                                        />
+                                                                                    </div>
+                                                                                </div>
+                                                                            )}
+
+                                                                            <button
+                                                                                onClick={() => toggleBellCancellation(shift, period)}
+                                                                                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-md flex-shrink-0 ${bell.cancelled ? 'bg-emerald-500 text-white hover:bg-emerald-600' : 'bg-white text-slate-400 hover:text-red-500 hover:bg-red-50 border-2 border-slate-200'}`}
+                                                                                title={bell.cancelled ? "Вернуть урок" : "Снять урок"}
+                                                                            >
+                                                                                <Icon name={bell.cancelled ? "RotateCcw" : "X"} size={18} />
+                                                                            </button>
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                <div className="mt-12 pt-6 border-t-2 border-slate-300 flex justify-between items-end text-sm font-bold text-slate-600">
+                                                    <div className="text-left">
+                                                        <div className="text-slate-500 uppercase tracking-wider text-xs mb-1">УТВЕРЖДАЮ</div>
+                                                        <div className="text-slate-800">Директор гимназии</div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <div className="border-b-2 border-slate-400 w-48 mb-1"></div>
+                                                        <div className="text-slate-500 text-xs uppercase tracking-wider">подпись</div>
+                                                    </div>
+                                                </div>
+                                                <div className="mt-4 text-center text-xs text-slate-400">
+                                                    Создано с помощью системы управления гимназией • {new Date().toLocaleDateString('ru-RU')}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                            <div className="mt-8 pt-4 border-t border-slate-200 flex justify-between items-end text-sm font-bold text-slate-500">
-                                <div>УТВЕРЖДАЮ<br/>Директор гимназии</div>
-                                <div>____________</div>
+                        )}
+
+                        {/* Bell Editor */}
+                        <div className="bg-white rounded-2xl shadow-xl border border-slate-100 dark:border-slate-700 w-full max-w-6xl mx-auto overflow-hidden">
+                            <div ref={bellsPrintRef} className="p-8 text-slate-900">
+                                <div className="text-center mb-8">
+                                    <h1 className="text-3xl font-black uppercase text-slate-800 mb-2">{previewTitle}</h1>
+                                    {previewSubtitle && <p className="text-lg text-slate-600 font-medium">{previewSubtitle}</p>}
+                                    <div className="mt-4 flex justify-center">
+                                        <div className="h-1 w-32 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full"></div>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {[Shift.First, Shift.Second].map(shift => (
+                                        <div key={shift} className="rounded-xl overflow-hidden border border-slate-200 shadow">
+                                            <div className={`p-5 font-bold text-lg text-white text-center bg-gradient-to-r ${shift === Shift.First ? 'from-indigo-600 to-indigo-700' : 'from-purple-600 to-purple-700'}`}>
+                                                {shift}
+                                            </div>
+                                            <div className="p-5 space-y-3 bg-white">
+                                                {SHIFT_PERIODS[shift].map(period => {
+                                                    const bell = currentPresetBells.find(b => b.shift === shift && b.period === period && b.day === 'default')
+                                                        || { start: '00:00', end: '00:00', cancelled: false } as Bell;
+                                                    return (
+                                                        <div key={period} className={`flex items-center gap-3 p-3 rounded-lg border ${bell.cancelled ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-200'}`}>
+                                                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center font-black text-slate-600 shadow-sm border border-white text-lg flex-shrink-0">
+                                                                {period}
+                                                            </div>
+
+                                                            {bell.cancelled ? (
+                                                                <div className="flex-1 flex justify-center items-center py-2">
+                                                                    <span className="text-red-600 font-black uppercase tracking-wider text-sm px-4 py-2 bg-red-100 rounded-full border border-red-200 text-center">УРОК СНЯТ</span>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="flex-1 grid grid-cols-[1fr_auto_1fr] items-center gap-3 min-w-0">
+                                                                    <div className="flex flex-col items-center gap-1 w-full">
+                                                                        <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Начало</div>
+                                                                        <input
+                                                                            type="time"
+                                                                            className="w-full max-w-[130px] border-2 border-slate-300 rounded-lg px-3 py-2 bg-white font-black text-slate-800 text-center text-lg focus:ring-2 ring-indigo-300 outline-none shadow-sm"
+                                                                            value={bell.start}
+                                                                            onChange={e => handleBellChange(shift, period, 'start', e.target.value)}
+                                                                            data-html2canvas-ignore="true"
+                                                                        />
+                                                                    </div>
+                                                                    <div className="flex items-center justify-center">
+                                                                        <div className="w-8 h-0.5 bg-slate-400"></div>
+                                                                    </div>
+                                                                    <div className="flex flex-col items-center gap-1 w-full">
+                                                                        <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Конец</div>
+                                                                        <input
+                                                                            type="time"
+                                                                            className="w-full max-w-[130px] border-2 border-slate-300 rounded-lg px-3 py-2 bg-white font-black text-slate-800 text-center text-lg focus:ring-2 ring-indigo-300 outline-none shadow-sm"
+                                                                            value={bell.end}
+                                                                            onChange={e => handleBellChange(shift, period, 'end', e.target.value)}
+                                                                            data-html2canvas-ignore="true"
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                            )}
+
+                                                            <button
+                                                                onClick={() => toggleBellCancellation(shift, period)}
+                                                                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all shadow-sm flex-shrink-0 ${bell.cancelled ? 'bg-emerald-500 text-white hover:bg-emerald-600' : 'bg-white text-slate-400 hover:text-red-500 hover:bg-red-50 border border-slate-200'}`}
+                                                                title={bell.cancelled ? "Вернуть урок" : "Снять урок"}
+                                                                data-html2canvas-ignore="true"
+                                                            >
+                                                                <Icon name={bell.cancelled ? "RotateCcw" : "X"} size={18} />
+                                                            </button>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="mt-10 pt-5 border-t border-slate-200 flex justify-between items-end text-sm font-bold text-slate-600">
+                                    <div className="text-left">
+                                        <div className="text-slate-500 uppercase tracking-wider text-xs mb-1">УТВЕРЖДАЮ</div>
+                                        <div className="text-slate-800">Директор гимназии</div>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="border-b border-slate-400 w-48 mb-1"></div>
+                                        <div className="text-slate-500 text-xs uppercase tracking-wider">подпись</div>
+                                    </div>
+                                </div>
+                                <div className="mt-3 text-center text-xs text-slate-400">
+                                    Создано с помощью системы управления гимназией • {new Date().toLocaleDateString('ru-RU')}
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -511,11 +990,11 @@ export const DirectoryPage = () => {
                 <div className="space-y-4">
                     <div>
                         <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Название режима</label>
-                        <input 
-                            className="w-full border border-slate-200 dark:border-slate-600 rounded-xl p-3 text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500" 
-                            placeholder="Например: Праздничный (30 мин)" 
-                            value={newPresetName} 
-                            onChange={e => setNewPresetName(e.target.value)} 
+                        <input
+                            className="w-full border border-slate-200 dark:border-slate-600 rounded-xl p-3 text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500"
+                            placeholder="Например: Праздничный (30 мин)"
+                            value={newPresetName}
+                            onChange={e => setNewPresetName(e.target.value)}
                             autoFocus
                         />
                     </div>
@@ -524,6 +1003,7 @@ export const DirectoryPage = () => {
                     </div>
                 </div>
             </Modal>
+
         </div>
     );
 };
