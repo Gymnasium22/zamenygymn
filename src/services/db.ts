@@ -27,7 +27,8 @@ const COLLECTIONS = {
     PUBLIC: 'publicSchedules',
     DUTY_ZONES: 'duty_zones',
     DUTY_SCHEDULE: 'duty_schedule',
-    NUTRITION: 'nutrition_records'
+    NUTRITION: 'nutrition_records',
+    ABSENTEEISM: 'absenteeism_records'
 };
 
 // Кеш предыдущих состояний коллекций для оптимизации
@@ -220,6 +221,7 @@ export const dbService = {
         if (data.dutyZones) promises.push(dbService.syncCollection(COLLECTIONS.DUTY_ZONES, data.dutyZones));
         if (data.dutySchedule) promises.push(dbService.syncCollection(COLLECTIONS.DUTY_SCHEDULE, data.dutySchedule));
         if (data.nutritionRecords) promises.push(dbService.syncCollection(COLLECTIONS.NUTRITION, data.nutritionRecords));
+        if (data.absenteeismRecords) promises.push(dbService.syncCollection(COLLECTIONS.ABSENTEEISM, data.absenteeismRecords));
 
         if (data.settings) {
             promises.push(setDoc(doc(firestoreDB, COLLECTIONS.CONFIG, 'settings'), sanitizeForFirestore(data.settings), { merge: true }));
@@ -232,14 +234,14 @@ export const dbService = {
     },
 
     subscribe: (
-        onNext: (data: AppData) => void,
+        onNext: (data: Partial<AppData>) => void,
         onError: (error: Error) => void
     ) => {
         if (!firestoreDB) {
             return () => {};
         }
 
-        let localData: AppData = { ...INITIAL_DATA };
+        let localData: Partial<AppData> = {};
         let isInitialLoad = true;
 
         let updateTimeout: any;
@@ -300,6 +302,7 @@ export const dbService = {
         unsubs.push(subColl(COLLECTIONS.DUTY_ZONES, 'dutyZones'));
         unsubs.push(subColl(COLLECTIONS.DUTY_SCHEDULE, 'dutySchedule'));
         unsubs.push(subColl(COLLECTIONS.NUTRITION, 'nutritionRecords'));
+        unsubs.push(subColl(COLLECTIONS.ABSENTEEISM, 'absenteeismRecords'));
 
         unsubs.push(onSnapshot(doc(firestoreDB, COLLECTIONS.CONFIG, 'settings'), (doc) => {
             if (doc.exists()) {

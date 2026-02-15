@@ -14,6 +14,7 @@ import { ExportPage } from './pages/Export';
 import { ReportsPage } from './pages/Reports';
 import { DutyPage } from './pages/Duty';
 import { NutritionPage } from './pages/Nutrition';
+import { AbsenteeismPage } from './pages/Absenteeism';
 import { LoginPage } from './pages/Login';
 import { dbService } from './services/db';
 import { AppData } from './types';
@@ -102,6 +103,7 @@ const Layout = () => {
         { to: '/substitutions', label: 'Замены', icon: 'Repeat', roles: ['admin'] },
         { to: '/duty', label: 'Дежурство', icon: 'Shield', roles: ['admin'] },
         { to: '/nutrition', label: 'Питание', icon: 'Coffee', roles: ['admin', 'teacher', 'canteen'] },
+        { to: '/absenteeism', label: 'Пропуски', icon: 'UserX', roles: ['admin', 'teacher'] },
         { to: '/directory', label: 'Справочники', icon: 'BookOpen', roles: ['admin'] },
         { to: '/reports', label: 'Отчеты', icon: 'BarChart2', roles: ['admin'] },
         { to: '/export', label: 'Экспорт', icon: 'Download', roles: ['admin'] },
@@ -277,6 +279,7 @@ export default function App() {
                                     <Route path="substitutions" element={<ProtectedRoute allowedRoles={['admin']}><SubstitutionsPage /></ProtectedRoute>} />
                                     <Route path="duty" element={<ProtectedRoute allowedRoles={['admin']}><DutyPage /></ProtectedRoute>} />
                                     <Route path="nutrition" element={<ProtectedRoute allowedRoles={['admin', 'teacher', 'canteen']}><NutritionPage /></ProtectedRoute>} />
+                                    <Route path="absenteeism" element={<ProtectedRoute allowedRoles={['admin', 'teacher']}><AbsenteeismPage /></ProtectedRoute>} />
                                     <Route path="directory" element={<ProtectedRoute allowedRoles={['admin']}><DirectoryPage /></ProtectedRoute>} />
                                     <Route path="admin" element={<ProtectedRoute allowedRoles={['admin']}><AdminPage /></ProtectedRoute>} />
                                     <Route path="reports" element={<ProtectedRoute allowedRoles={['admin']}><ReportsPage /></ProtectedRoute>} />

@@ -21,6 +21,7 @@ interface FullDataContextType {
 const FullDataContext = createContext<FullDataContextType | undefined>(undefined);
 
 const LOCAL_STORAGE_KEY = 'gym_data_local_backup_v2';
+const PERSISTENT_QUEUE_KEY = 'gym_sync_queue_backup';
 
 // Вспомогательные функции для безопасной работы с localStorage
 const isLocalStorageAvailable = (): boolean => {
@@ -72,6 +73,29 @@ const syncQueue = {
     }>,
     isProcessing: false,
 
+    load: () => {
+        const stored = safeLocalStorageGet(PERSISTENT_QUEUE_KEY);
+        if (stored) {
+            try {
+                const parsed = JSON.parse(stored);
+                if (Array.isArray(parsed)) {
+                    syncQueue.items = parsed;
+                    console.log(`Loaded ${parsed.length} pending items from sync queue`);
+                }
+            } catch (e) {
+                console.warn('Failed to parse persistent sync queue', e);
+            }
+        }
+    },
+
+    save: () => {
+        try {
+            safeLocalStorageSet(PERSISTENT_QUEUE_KEY, JSON.stringify(syncQueue.items));
+        } catch (e) {
+            console.warn('Failed to save sync queue', e);
+        }
+    },
+
     add: (data: Partial<AppData>) => {
         const id = generateId();
         syncQueue.items.push({
@@ -80,6 +104,7 @@ const syncQueue = {
             timestamp: Date.now(),
             retryCount: 0
         });
+        syncQueue.save();
         console.log('Добавлено в очередь синхронизации:', id);
     },
 
@@ -97,18 +122,27 @@ const syncQueue = {
                     await dbService.save(item.data, user);
                     itemsToRemove.push(item.id);
                     console.log('Успешно синхронизировано:', item.id);
-                } catch (error) {
+                } catch (error: any) {
                     item.retryCount++;
-                    if (item.retryCount >= 3) {
-                        console.error('Не удалось синхронизировать после 3 попыток:', item.id);
-                        itemsToRemove.push(item.id); // Удаляем после 3 попыток
+                    // Если ошибка квоты, оставляем в очереди но не удаляем
+                    if (error?.code === 'resource-exhausted') {
+                         console.warn('Quota exhausted, keeping item in queue:', item.id);
+                         break; // Stop processing to avoid spamming
+                    }
+
+                    if (item.retryCount >= 10) { // Increased from 3 to 10 for better resilience
+                        console.error('Не удалось синхронизировать после 10 попыток:', item.id);
+                        itemsToRemove.push(item.id); // Удаляем после 10 попыток
                     } else {
-                        console.log(`Повторная попытка синхронизации ${item.retryCount}/3:`, item.id);
+                        console.log(`Повторная попытка синхронизации ${item.retryCount}/10:`, item.id);
                     }
                 }
             }
         } finally {
-            syncQueue.items = syncQueue.items.filter(item => !itemsToRemove.includes(item.id));
+            if (itemsToRemove.length > 0) {
+                syncQueue.items = syncQueue.items.filter(item => !itemsToRemove.includes(item.id));
+                syncQueue.save();
+            }
             syncQueue.isProcessing = false;
 
             if (syncQueue.items.length > 0 && navigator.onLine) {
@@ -192,6 +226,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
 
     // Загрузка данных
     useEffect(() => {
+        // Initialize sync queue from storage
+        syncQueue.load();
+
         // 1. Если переданы начальные данные (публичный вид)
         if (initialData) {
             setInternalData(initialData);
@@ -245,42 +282,57 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
         try {
             unsubscribe = dbService.subscribe(
                 (loaded) => {
-                const fixedData = { ...INITIAL_DATA, ...loaded };
-                
-                // Нормализация данных
-                if (!fixedData.teachers) fixedData.teachers = [];
-                // Fix: apply defaults safely to avoid overwriting or TS warnings
-                fixedData.teachers = fixedData.teachers.map(t => ({ 
-                    telegramChatId: '', 
-                    ...t,
-                    shifts: t.shifts || [Shift.First, Shift.Second]
-                }));
+                setInternalData(prevData => {
+                    // Merge incoming partial data with previous data (which contains localStorage data)
+                    // This prevents overwriting existing data with empty defaults if a collection fails to load
+                    const fixedData = { ...prevData, ...loaded };
+                    
+                    // Нормализация данных (ensure arrays are not undefined if they were missing in both prev and loaded)
+                    if (!fixedData.teachers) fixedData.teachers = [];
+                    // Fix: apply defaults safely to avoid overwriting or TS warnings
+                    fixedData.teachers = fixedData.teachers.map(t => ({ 
+                        telegramChatId: '', 
+                        ...t,
+                        shifts: t.shifts || [Shift.First, Shift.Second]
+                    }));
 
-                if (!fixedData.schedule) fixedData.schedule = [];
-                if (!fixedData.schedule2) fixedData.schedule2 = []; 
-                if (!fixedData.substitutions) fixedData.substitutions = [];
-                if (!fixedData.bellSchedule) fixedData.bellSchedule = DEFAULT_BELLS;
-                if (!fixedData.dutyZones || fixedData.dutyZones.length === 0) fixedData.dutyZones = DEFAULT_DUTY_ZONES;
-                if (!fixedData.dutySchedule) fixedData.dutySchedule = [];
-                if (!fixedData.nutritionRecords) fixedData.nutritionRecords = [];
-                
-                if (!fixedData.settings) fixedData.settings = INITIAL_DATA.settings;
-                else fixedData.settings = { ...INITIAL_DATA.settings, ...fixedData.settings };
-                
-                setInternalData(fixedData);
-                
-                // Обновляем локальный бэкап актуальными данными из облака
-                if (isLocalStorageAvailable()) {
-                    safeLocalStorageSet(LOCAL_STORAGE_KEY, JSON.stringify(fixedData));
-                }
-                
-                setHistory(prev => {
-                    if (prev.length === 0) return [fixedData];
-                    return prev; 
-                });
-                setHistoryPointer(prev => {
-                    if (prev === -1) return 0;
-                    return prev;
+                    if (!fixedData.schedule) fixedData.schedule = [];
+                    if (!fixedData.schedule2) fixedData.schedule2 = []; 
+                    if (!fixedData.substitutions) fixedData.substitutions = [];
+                    if (!fixedData.bellSchedule) fixedData.bellSchedule = DEFAULT_BELLS;
+                    if (!fixedData.dutyZones || fixedData.dutyZones.length === 0) fixedData.dutyZones = DEFAULT_DUTY_ZONES;
+                    if (!fixedData.dutySchedule) fixedData.dutySchedule = [];
+                    if (!fixedData.nutritionRecords) fixedData.nutritionRecords = [];
+                    if (!fixedData.absenteeismRecords) fixedData.absenteeismRecords = [];
+                    
+                    if (!fixedData.settings) fixedData.settings = INITIAL_DATA.settings;
+                    else fixedData.settings = { ...INITIAL_DATA.settings, ...fixedData.settings };
+                    
+                    // Apply pending changes on top of Firebase data
+                    // This ensures that local changes are not overwritten by stale server data
+                    if (syncQueue.items.length > 0) {
+                         console.log(`Applying ${syncQueue.items.length} pending changes to incoming data`);
+                         syncQueue.items.forEach(item => {
+                             // Shallow merge of top-level keys (e.g. absenteeismRecords)
+                             // This assumes that the pending change contains the FULL array for that key
+                             Object.assign(fixedData, item.data);
+                         });
+                    }
+
+                    // Обновляем локальный бэкап актуальными данными из облака
+                    if (isLocalStorageAvailable()) {
+                        safeLocalStorageSet(LOCAL_STORAGE_KEY, JSON.stringify(fixedData));
+                    }
+                    
+                    // Update history inside the callback to access the latest state
+                    setHistory(prev => {
+                        if (prev.length === 0) return [fixedData];
+                        // Optional: Append to history if significant change? 
+                        // For now, let's just keep history consistent with current data if it's the first load
+                        return prev; 
+                    });
+                    
+                    return fixedData;
                 });
                 
                 setIsLoading(false);
@@ -494,9 +546,10 @@ export const ScheduleDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
         substitutions: data.substitutions,
         dutySchedule: data.dutySchedule,
         nutritionRecords: data.nutritionRecords || [],
+        absenteeismRecords: data.absenteeismRecords || [],
         saveSemesterSchedule,
         saveScheduleData
-    }), [activeSchedule, data.schedule, data.schedule2, data.substitutions, data.dutySchedule, data.nutritionRecords, saveSemesterSchedule, saveScheduleData]);
+    }), [activeSchedule, data.schedule, data.schedule2, data.substitutions, data.dutySchedule, data.nutritionRecords, data.absenteeismRecords, saveSemesterSchedule, saveScheduleData]);
 
     const contextValue = useMemo(() => ({
         ...scheduleData,
@@ -544,7 +597,8 @@ export const useScheduleData = () => {
         schedule2: context.schedule2 || [],
         substitutions: context.substitutions || [],
         dutySchedule: context.dutySchedule || [],
-        nutritionRecords: context.nutritionRecords || []
+        nutritionRecords: context.nutritionRecords || [],
+        absenteeismRecords: context.absenteeismRecords || []
     };
 
     return { ...safeContext, isLoading: fullContext.isLoading, isSaving: fullContext.isSaving, undo: fullContext.undo, redo: fullContext.redo, canUndo: fullContext.canUndo, canRedo: fullContext.canRedo, resetData: fullContext.resetData };

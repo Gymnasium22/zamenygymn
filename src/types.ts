@@ -158,6 +158,22 @@ export interface NutritionStats {
     records: NutritionRecord[];
 }
 
+// --- ABSENTEEISM TYPES ---
+export interface StudentAbsence {
+    studentName: string;
+    reason: 'statement' | 'illness' | 'abroad' | 'disrespectful' | 'other';
+    otherReason?: string;
+}
+
+export interface AbsenteeismRecord {
+    id: string;
+    date: string; // ISO Date (YYYY-MM-DD)
+    classId: string;
+    absences: StudentAbsence[];
+    enteredBy?: string; // ID of teacher/admin
+    enteredAt?: string; // ISO Date
+}
+
 // Interfaces for split contexts
 export interface StaticAppData {
   subjects: Subject[];
@@ -176,6 +192,7 @@ export interface ScheduleAndSubstitutionData {
   substitutions: Substitution[];
   dutySchedule: DutyRecord[]; // New
   nutritionRecords: NutritionRecord[]; // New
+  absenteeismRecords: AbsenteeismRecord[]; // New
   saveSemesterSchedule: (semester: 1 | 2, newData: ScheduleItem[]) => Promise<void>;
   saveScheduleData: (newData: Partial<ScheduleAndSubstitutionData>, addToHistory?: boolean) => Promise<void>; // Legacy support
 }
@@ -186,6 +203,7 @@ export interface AppData extends StaticAppData {
   substitutions: Substitution[];
   dutySchedule: DutyRecord[]; // New
   nutritionRecords: NutritionRecord[]; // New
+  absenteeismRecords: AbsenteeismRecord[]; // New
 }
 
 export const DAYS = [DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday];

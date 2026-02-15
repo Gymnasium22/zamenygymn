@@ -96,6 +96,7 @@ export const INITIAL_DATA: AppData = {
     dutyZones: DEFAULT_DUTY_ZONES,
     dutySchedule: [],
     nutritionRecords: [], // New
+    absenteeismRecords: [], // New
     settings: {
         telegramToken: '',
         publicScheduleId: null,
