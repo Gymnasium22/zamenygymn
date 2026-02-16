@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef, useCallback } from 'react';
 import { useStaticData, useScheduleData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
+import { dbService } from '../services/db';
 import { Icon } from '../components/Icons';
 import { Modal, useToast } from '../components/UI';
 import { AbsenteeismRecord, StudentAbsence } from '../types';
@@ -272,7 +273,17 @@ export const AbsenteeismPage = () => {
         
         if (window.confirm('Вы уверены, что хотите удалить запись? Класс вернется в список "Не заполнено".')) {
             const updatedRecords = absenteeismRecords.filter(r => r.id !== editingRecord.id);
+            
+            // 1. Update local state and attempt sync via standard method
             await saveScheduleData({ absenteeismRecords: updatedRecords });
+
+            // 2. Force delete from DB to handle cases where syncCollection cache is empty (e.g. read quota exhausted)
+            try {
+                await dbService.deleteDocument('absenteeism_records', editingRecord.id);
+            } catch (e) {
+                console.warn("Direct delete failed (possibly offline or permission issue):", e);
+            }
+
             addToast({ type: 'success', title: 'Запись удалена' });
             closeModal();
         }

@@ -1157,7 +1157,7 @@ export const SubstitutionsPage = () => {
                              
                              {(activeReplacementId || (modalContext?.teacherId && selectedRoomId)) && (
                                 <button 
-                                    onClick={() => assignSubstitution(activeReplacementId || modalContext!.teacherId)} 
+                                    onClick={() => assignSubstitution(activeReplacementId || modalContext?.teacherId || '')} 
                                     className="w-full py-3 bg-indigo-600 text-white rounded-xl text-base font-bold hover:bg-indigo-700 transition shadow-lg shadow-indigo-200"
                                 >
                                     Сохранить изменения

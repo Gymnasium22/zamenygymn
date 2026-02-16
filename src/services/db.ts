@@ -103,6 +103,22 @@ async function awaitHZ(fn: Function, options: { throwOnError?: boolean } = {}) {
 };
 
 export const dbService = {
+    // Helper for direct deletion (bypassing syncCollection cache dependency)
+    deleteDocument: async (collectionName: string, id: string) => {
+        if (!firestoreDB) return;
+        try {
+            await deleteDoc(doc(firestoreDB, collectionName, id));
+            // Update cache if exists to keep it in sync
+            const cache = collectionCache.get(collectionName);
+            if (cache) {
+                cache.delete(id);
+            }
+        } catch (error) {
+            console.error(`Failed to delete document ${collectionName}/${id}:`, error);
+            throw error;
+        }
+    },
+
     // Оптимизированная синхронизация с использованием локального кеша
     syncCollection: async (collectionName: string, items: any[]) => {
         if (!firestoreDB) return;
