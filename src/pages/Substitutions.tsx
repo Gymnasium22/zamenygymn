@@ -49,6 +49,7 @@ export const SubstitutionsPage = () => {
     const [historyFilterTeacher, setHistoryFilterTeacher] = useState('');
     const [teacherSearch, setTeacherSearch] = useState('');
     const [teacherShiftFilter, setTeacherShiftFilter] = useState('all');
+    const [teacherSubjectFilter, setTeacherSubjectFilter] = useState(''); // New: Subject filter
     const [candidateSearch, setCandidateSearch] = useState('');
     const [manualLessonSearch, setManualLessonSearch] = useState('');
 
@@ -60,6 +61,14 @@ export const SubstitutionsPage = () => {
     const [showSwapOptions, setShowSwapOptions] = useState(false);
     const [showMergeOptions, setShowMergeOptions] = useState(false);
     const [swapKeepRooms, setSwapKeepRooms] = useState(false);
+    
+    const [isCompactMode, setIsCompactMode] = useState(false); // New: Compact mode
+    const [viewScheduleTeacherId, setViewScheduleTeacherId] = useState<string | null>(null); // New: Quick view schedule
+
+    const [batchActionModalOpen, setBatchActionModalOpen] = useState(false);
+    const [batchActionType, setBatchActionType] = useState<'cancel' | 'replace' | null>(null);
+    const [batchReplacementId, setBatchReplacementId] = useState<string>('');
+    const [batchAbsenceReason, setBatchAbsenceReason] = useState<string>('Болезнь');
 
     // Drag & Drop State
     const [draggedTeacherId, setDraggedTeacherId] = useState<string | null>(null);
@@ -148,9 +157,10 @@ export const SubstitutionsPage = () => {
         return teachers.filter(t => {
             const matchesSearch = t.name.toLowerCase().includes(teacherSearch.toLowerCase());
             const matchesShift = teacherShiftFilter === 'all' ? true : (t.shifts && t.shifts.includes(teacherShiftFilter));
-            return matchesSearch && matchesShift;
+            const matchesSubject = teacherSubjectFilter ? t.subjectIds.includes(teacherSubjectFilter) : true;
+            return matchesSearch && matchesShift && matchesSubject;
         });
-    }, [teachers, teacherSearch, teacherShiftFilter]);
+    }, [teachers, teacherSearch, teacherShiftFilter, teacherSubjectFilter]);
 
     const absentTeachers = useMemo(() => teachers.filter(t => t.unavailableDates.includes(selectedDate)), [teachers, selectedDate]);
     
@@ -213,6 +223,50 @@ export const SubstitutionsPage = () => {
         await saveStaticData({ teachers: updatedTeachers }); 
         setAbsenceModalOpen(false); 
     }, [teachers, selectedTeacherId, selectedDate, absenceReason, saveStaticData]);
+
+    const openBatchActionModal = () => {
+        setBatchAbsenceReason(absenceReason);
+        setBatchActionModalOpen(true);
+    };
+
+    const confirmBatchAction = useCallback(async () => {
+        // 1. Mark as absent first if not already done (optional, but good for consistency)
+        let updatedTeachers = [...teachers]; 
+        const tIndex = updatedTeachers.findIndex(x => x.id === selectedTeacherId);
+        if (tIndex !== -1) {
+            const teacher = { ...updatedTeachers[tIndex] };
+            if (!teacher.unavailableDates.includes(selectedDate)) { 
+                teacher.unavailableDates = [...teacher.unavailableDates, selectedDate]; 
+            }
+            if(!teacher.absenceReasons) teacher.absenceReasons = {}; 
+            teacher.absenceReasons[selectedDate] = batchAbsenceReason; 
+            updatedTeachers[tIndex] = teacher;
+            await saveStaticData({ teachers: updatedTeachers }); 
+        }
+
+        // 2. Perform Batch Action
+        if (selectedDayOfWeek && batchActionType) {
+            const lessonsToProcess = activeSchedule.filter(s => s.teacherId === selectedTeacherId && s.day === selectedDayOfWeek);
+            const newSubs = substitutions.filter(s => !(s.originalTeacherId === selectedTeacherId && s.date === selectedDate));
+            
+            lessonsToProcess.forEach(l => {
+                newSubs.push({
+                    id: generateId(),
+                    date: selectedDate,
+                    scheduleItemId: l.id,
+                    originalTeacherId: l.teacherId,
+                    replacementTeacherId: batchActionType === 'cancel' ? 'cancelled' : batchReplacementId,
+                    lessonAbsenceReason: batchAbsenceReason
+                });
+            });
+            await saveScheduleData({ substitutions: newSubs });
+        }
+        
+        setBatchActionModalOpen(false);
+        setAbsenceModalOpen(false);
+        setBatchActionType(null);
+        setBatchReplacementId('');
+    }, [teachers, selectedTeacherId, selectedDate, batchAbsenceReason, saveStaticData, selectedDayOfWeek, activeSchedule, substitutions, saveScheduleData, batchActionType, batchReplacementId]);
 
     const removeAbsence = useCallback(async (id: string) => { 
         let updatedTeachers = [...teachers]; 
@@ -634,6 +688,19 @@ export const SubstitutionsPage = () => {
             const isBusyRegular = activeSchedule.some(s => s.teacherId === t.id && s.day === selectedDayOfWeek && s.period === currentSubParams.period && s.shift === currentSubParams.shift); 
             const isBusySub = activeSubstitutionsForSlot.has(t.id);
             const isBusy = isBusyRegular || isBusySub;
+            
+            // Detailed busy reason
+            let busyReason: { type: 'regular' | 'sub', details: string } | null = null;
+            if (isBusyRegular) {
+                const busyLesson = activeSchedule.find(s => s.teacherId === t.id && s.day === selectedDayOfWeek && s.period === currentSubParams.period && s.shift === currentSubParams.shift);
+                if (busyLesson) {
+                    const c = classes.find(cl => cl.id === busyLesson.classId)?.name;
+                    const r = rooms.find(rm => rm.id === busyLesson.roomId)?.name || busyLesson.roomId;
+                    busyReason = { type: 'regular', details: `${c}, каб. ${r}` };
+                }
+            } else if (isBusySub) {
+                 busyReason = { type: 'sub', details: 'Замена' };
+            }
 
             const isSpecialist = t.subjectIds.includes(currentSubParams.subjectId); 
             const subsCount = substitutions.filter(s => s.replacementTeacherId === t.id && s.date.startsWith(targetMonth)).length;
@@ -646,7 +713,7 @@ export const SubstitutionsPage = () => {
             if (!isBusy && !isAbsent) score += 100; // Free window
             score -= subsCount; // Prefer those with less subs
 
-            return { teacher: t, isAbsent, isBusy, isSpecialist, score, subsCount }; 
+            return { teacher: t, isAbsent, isBusy, busyReason, isSpecialist, score, subsCount }; 
         }).sort((a, b) => b.score - a.score); 
 
         // Split into top 3 recommended (must be free) and others
@@ -654,7 +721,7 @@ export const SubstitutionsPage = () => {
         const others = allCandidates.filter(c => !recommended.includes(c));
 
         return { recommended, others };
-    }, [teachers, currentSubParams, selectedDate, candidateSearch, selectedDayOfWeek, activeSchedule, substitutions, activeSubstitutionsForSlot]);
+    }, [teachers, currentSubParams, selectedDate, candidateSearch, selectedDayOfWeek, activeSchedule, substitutions, activeSubstitutionsForSlot, classes, rooms]);
     
     const mergeCandidates = useMemo(() => {
         if (!currentSubParams || !selectedDayOfWeek) return [];
@@ -801,14 +868,88 @@ export const SubstitutionsPage = () => {
         const isCancelled = firstSub?.replacementTeacherId === 'cancelled';
         const isConducted = firstSub?.replacementTeacherId === 'conducted';
         
+        // Compact Mode Render
+        if (isCompactMode) {
+            return (
+                <div 
+                    key={l.id} 
+                    onDragOver={(e) => handleDragOver(e, l.id)}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => handleDrop(e, l)}
+                    className={`relative flex items-center gap-3 p-2 rounded-lg border transition-all 
+                        ${dragOverLessonId === l.id ? 'ring-2 ring-indigo-500 bg-indigo-50 border-indigo-500 z-10' : 'bg-white dark:bg-dark-800 border-slate-100 dark:border-slate-700'} 
+                        ${draggedTeacherId && !isResolved && dragOverLessonId !== l.id ? 'border-dashed border-indigo-300' : ''} overflow-hidden`}
+                >
+                    {/* Visual Overlay for Drop Zone */}
+                    {draggedTeacherId && !isResolved && dragOverLessonId !== l.id && (
+                        <div className="absolute inset-0 bg-indigo-50/10 pointer-events-none" />
+                    )}
+                    
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm ${isResolved ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>{l.period}</div>
+                    <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                            <span className="font-bold text-slate-800 dark:text-slate-200 text-sm truncate">{cls?.name}</span>
+                            <span className="text-xs text-slate-400 truncate">{subj?.name}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs">
+                             <span className={`font-medium ${isResolved ? 'text-slate-400 line-through' : 'text-red-500'}`}>{orig?.name}</span>
+                             {isResolved && <Icon name="ArrowRight" size={10} className="text-slate-300"/>}
+                             {isResolved && (
+                                 <span className={`font-bold ${isCancelled ? 'text-red-600' : isConducted ? 'text-blue-600' : 'text-emerald-600'}`}>
+                                     {isCancelled ? 'СНЯТ' : isConducted ? 'ПРОВЕДЕН' : rep?.name}
+                                 </span>
+                             )}
+                        </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                         {/* Room Info */}
+                         {isRoomChanged ? (
+                             <div className="flex items-center gap-1 text-[10px] bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100">
+                                 <span className="line-through text-slate-400">{originalRoomName}</span>
+                                 <Icon name="ArrowRight" size={8} className="text-indigo-400"/>
+                                 <span className="font-bold text-indigo-700">{replacementRoomName}</span>
+                             </div>
+                         ) : (
+                             <div className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded font-bold text-slate-500">{originalRoomName}</div>
+                         )}
+
+                         {!isResolved ? (
+                            <button onClick={() => { setCurrentSubParams({ scheduleItemId: l.id, subjectId: l.subjectId, period: l.period, shift: l.shift, classId: l.classId, teacherId: l.teacherId, roomId: l.roomId, day: l.day }); setIsModalOpen(true); }} className="p-1.5 bg-indigo-100 text-indigo-600 rounded-lg hover:bg-indigo-200">
+                                <Icon name="Edit" size={14}/>
+                            </button>
+                         ) : (
+                            <div className="flex gap-1">
+                                {firstSub && (
+                                    <button onClick={() => handleEditSubstitution(l, firstSub)} className="p-1.5 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-slate-100">
+                                        <Icon name="Edit" size={14}/>
+                                    </button>
+                                )}
+                                <button onClick={() => removeSubstitution(l.id)} className="p-1.5 text-slate-300 hover:text-red-500 rounded-lg hover:bg-red-50">
+                                    <Icon name="X" size={14}/>
+                                </button>
+                            </div>
+                         )}
+                    </div>
+                </div>
+            );
+        }
+
         return (
             <div 
                 key={l.id} 
                 onDragOver={(e) => handleDragOver(e, l.id)}
                 onDragLeave={handleDragLeave}
                 onDrop={(e) => handleDrop(e, l)}
-                className={`p-5 rounded-2xl border transition-all ${dragOverLessonId === l.id ? 'ring-2 ring-indigo-500 bg-indigo-50 border-indigo-500' : 'bg-white dark:bg-dark-800 border-slate-100 dark:border-slate-700 shadow-sm'}`}
+                className={`relative p-5 rounded-2xl border transition-all overflow-hidden
+                    ${dragOverLessonId === l.id ? 'ring-2 ring-indigo-500 bg-indigo-50 border-indigo-500 z-10 scale-[1.02] shadow-md' : 'bg-white dark:bg-dark-800 border-slate-100 dark:border-slate-700 shadow-sm'} 
+                    ${draggedTeacherId && !isResolved && dragOverLessonId !== l.id ? 'border-dashed border-indigo-300' : ''}`}
             >
+                {/* Visual Overlay for Drop Zone */}
+                {draggedTeacherId && !isResolved && dragOverLessonId !== l.id && (
+                    <div className="absolute inset-0 bg-indigo-50/10 pointer-events-none z-10" />
+                )}
+                
                 <div className="flex justify-between items-start mb-3">
                     <div className="flex items-center gap-4">
                         <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-xl ${isResolved ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>{l.period}</div>
@@ -962,6 +1103,11 @@ export const SubstitutionsPage = () => {
                                 <button onClick={() => setTeacherShiftFilter(Shift.First)} className={`flex-1 py-2 text-xs font-bold rounded-md ${teacherShiftFilter === Shift.First ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>1 см</button>
                                 <button onClick={() => setTeacherShiftFilter(Shift.Second)} className={`flex-1 py-2 text-xs font-bold rounded-md ${teacherShiftFilter === Shift.Second ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>2 см</button>
                             </div>
+                            {/* Subject Filter */}
+                            <select value={teacherSubjectFilter} onChange={e => setTeacherSubjectFilter(e.target.value)} className="w-full p-2 bg-slate-50 dark:bg-slate-700 border border-slate-100 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 outline-none">
+                                <option value="">Все предметы</option>
+                                {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                            </select>
                             <div className="relative">
                                 <Icon name="Search" className="absolute left-3 top-3 text-slate-400" size={16}/>
                                 <input placeholder="Найти учителя..." value={teacherSearch} onChange={e => setTeacherSearch(e.target.value)} className="w-full pl-9 pr-3 py-2.5 bg-slate-50 dark:bg-slate-700 border border-slate-100 dark:border-slate-600 rounded-xl text-sm outline-none focus:ring-1 ring-indigo-500 dark:text-white"/>
@@ -1010,6 +1156,12 @@ export const SubstitutionsPage = () => {
                             </button>
                         </div>
                         <div className="flex gap-2">
+                             <button onClick={() => setIsCompactMode(!isCompactMode)} className={`p-3 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 ${isCompactMode ? 'text-indigo-600 bg-indigo-50 dark:bg-indigo-900/30' : 'text-slate-400'}`} title="Компактный вид">
+                                 <Icon name={isCompactMode ? "List" : "Grid"} size={20}/>
+                             </button>
+                             <button onClick={() => window.print()} className="p-3 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-600 print:hidden" title="Печать">
+                                 <Icon name="Printer" size={20}/>
+                             </button>
                              <button onClick={() => { setManualLessonSearch(''); setManualSearchModalOpen(true); }} className="p-3 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-100"><Icon name="Search" size={20}/></button>
                         </div>
                     </div>
@@ -1071,7 +1223,10 @@ export const SubstitutionsPage = () => {
                                                             <div className="text-xs text-emerald-600 font-bold uppercase">{isSpecialist ? 'Профиль' : 'Есть окно'}</div>
                                                         </div>
                                                     </div>
-                                                    <button onClick={() => assignSubstitution(teacher.id)} className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700">Выбрать</button>
+                                                    <div className="flex items-center gap-2">
+                                                        <button onClick={() => setViewScheduleTeacherId(teacher.id)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-white rounded-lg" title="Посмотреть расписание"><Icon name="Eye" size={16}/></button>
+                                                        <button onClick={() => assignSubstitution(teacher.id)} className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700">Выбрать</button>
+                                                    </div>
                                                 </div>
                                             ))}
                                         </div>
@@ -1085,16 +1240,22 @@ export const SubstitutionsPage = () => {
                                         <input placeholder="Найти учителя..." value={candidateSearch} onChange={e => setCandidateSearch(e.target.value)} className="w-full pl-10 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500"/>
                                     </div>
                                     <div className="space-y-1">
-                                        {candidates.others.map(({ teacher, isBusy, isAbsent, subsCount }) => {
+                                        {candidates.others.map(({ teacher, isBusy, busyReason, isAbsent, subsCount }) => {
                                             const isRefused = refusedTeacherIds.includes(teacher.id);
                                             return (
                                                 <div key={teacher.id} className={`flex items-center justify-between p-3 rounded-lg text-sm ${isAbsent ? 'opacity-50' : 'hover:bg-slate-50'}`}>
                                                     <div className="flex items-center gap-3">
                                                         <div className={`w-2 h-2 rounded-full ${isBusy ? 'bg-orange-400' : isAbsent ? 'bg-red-400' : 'bg-slate-300'}`}></div>
-                                                        <span className="font-bold text-base text-slate-700">{teacher.name}</span>
-                                                        {isRefused && <span className="text-[10px] bg-slate-200 px-1.5 py-0.5 rounded font-bold text-slate-500">Отказ</span>}
+                                                        <div className="flex flex-col">
+                                                            <span className="font-bold text-base text-slate-700">{teacher.name}</span>
+                                                            {isBusy && busyReason && (
+                                                                <span className="text-[10px] text-orange-500 font-bold">{busyReason.details}</span>
+                                                            )}
+                                                            {isRefused && <span className="text-[10px] bg-slate-200 px-1.5 py-0.5 rounded font-bold text-slate-500 w-fit">Отказ</span>}
+                                                        </div>
                                                     </div>
                                                     <div className="flex gap-2">
+                                                        {!isAbsent && <button onClick={() => setViewScheduleTeacherId(teacher.id)} className="p-1.5 text-slate-300 hover:text-indigo-600 hover:bg-slate-100 rounded" title="Посмотреть расписание"><Icon name="Eye" size={16}/></button>}
                                                         {!isAbsent && <button onClick={(e) => toggleRefusal(teacher.id, e)} className="p-1.5 text-slate-300 hover:text-slate-500 hover:bg-slate-100 rounded"><Icon name="X" size={16}/></button>}
                                                         {!isAbsent && <button onClick={() => handleCandidateClick(teacher.id, isBusy)} className={`px-3 py-1.5 rounded-lg text-xs font-bold ${isBusy ? 'text-orange-600 bg-orange-50' : 'text-indigo-600 bg-indigo-50'}`}>{isBusy ? 'Объед?' : 'Выбрать'}</button>}
                                                     </div>
@@ -1185,7 +1346,81 @@ export const SubstitutionsPage = () => {
             </Modal>
 
             {/* ABSENCE MODAL */}
-            <Modal isOpen={absenceModalOpen} onClose={() => setAbsenceModalOpen(false)} title="Причина отсутствия"><div className="space-y-4"><select value={absenceReason} onChange={e => setAbsenceReason(e.target.value)} className="w-full border p-3 rounded-xl outline-none font-bold text-slate-700 dark:text-white dark:bg-slate-700 dark:border-slate-600"><option>Болезнь</option><option>Курсы</option><option>Отгул</option><option>Семейные обстоятельства</option><option>Командировка</option><option>Без записи</option><option>Другое</option></select><div className="flex justify-end"><button onClick={confirmAbsence} className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-bold">Подтвердить</button></div></div></Modal>
+            <Modal isOpen={absenceModalOpen} onClose={() => setAbsenceModalOpen(false)} title="Причина отсутствия">
+                <div className="space-y-4">
+                    <select value={absenceReason} onChange={e => setAbsenceReason(e.target.value)} className="w-full border p-3 rounded-xl outline-none font-bold text-slate-700 dark:text-white dark:bg-slate-700 dark:border-slate-600">
+                        <option>Болезнь</option>
+                        <option>Курсы</option>
+                        <option>Отгул</option>
+                        <option>Семейные обстоятельства</option>
+                        <option>Командировка</option>
+                        <option>Без записи</option>
+                        <option>Другое</option>
+                    </select>
+                    <div className="flex flex-col gap-2">
+                         <button onClick={confirmAbsence} className="w-full px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition">
+                             Только отметить отсутствие
+                         </button>
+                         <button onClick={openBatchActionModal} className="w-full px-6 py-3 bg-purple-50 text-purple-700 border border-purple-100 rounded-xl font-bold hover:bg-purple-100 transition flex items-center justify-center gap-2">
+                             <Icon name="Layers" size={18}/> Пакетная обработка уроков
+                         </button>
+                    </div>
+                </div>
+            </Modal>
+            
+            {/* BATCH ACTION MODAL */}
+            <Modal isOpen={batchActionModalOpen} onClose={() => setBatchActionModalOpen(false)} title="Пакетная обработка">
+                <div className="space-y-6">
+                    <p className="text-slate-600 dark:text-slate-300">
+                        Выберите действие для <strong>всех уроков</strong> выбранного учителя на {new Date(selectedDate).toLocaleDateString('ru-RU')}.
+                    </p>
+                    
+                    <div className="grid grid-cols-1 gap-3">
+                        <button 
+                            onClick={() => setBatchActionType('cancel')}
+                            className={`p-4 rounded-xl border text-left transition-all ${batchActionType === 'cancel' ? 'bg-red-50 border-red-200 ring-2 ring-red-500' : 'bg-white border-slate-200 hover:border-red-300'}`}
+                        >
+                            <div className="font-bold text-red-600 mb-1 flex items-center gap-2"><Icon name="X" size={18}/> Снять все уроки</div>
+                            <div className="text-xs text-slate-500">Все уроки будут отмечены как отмененные.</div>
+                        </button>
+                        
+                        <button 
+                            onClick={() => setBatchActionType('replace')}
+                            className={`p-4 rounded-xl border text-left transition-all ${batchActionType === 'replace' ? 'bg-indigo-50 border-indigo-200 ring-2 ring-indigo-500' : 'bg-white border-slate-200 hover:border-indigo-300'}`}
+                        >
+                            <div className="font-bold text-indigo-600 mb-1 flex items-center gap-2"><Icon name="UserCheck" size={18}/> Назначить одного учителя</div>
+                            <div className="text-xs text-slate-500">Все уроки проведет один выбранный учитель.</div>
+                        </button>
+                    </div>
+
+                    {batchActionType === 'replace' && (
+                        <div className="animate-fadeIn">
+                            <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Выберите заменяющего учителя</label>
+                            <select 
+                                value={batchReplacementId} 
+                                onChange={e => setBatchReplacementId(e.target.value)} 
+                                className="w-full p-3 border border-slate-200 rounded-xl bg-white dark:bg-slate-700 dark:border-slate-600 dark:text-white outline-none focus:ring-2 ring-indigo-500"
+                            >
+                                <option value="">-- Выберите учителя --</option>
+                                {teachers.filter(t => t.id !== selectedTeacherId && !t.unavailableDates.includes(selectedDate)).map(t => (
+                                    <option key={t.id} value={t.id}>{t.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+                    
+                    <div className="pt-4 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-3">
+                        <button onClick={() => setBatchActionModalOpen(false)} className="px-4 py-2 text-slate-500 font-bold hover:bg-slate-100 rounded-lg">Отмена</button>
+                        <button 
+                            onClick={confirmBatchAction} 
+                            disabled={!batchActionType || (batchActionType === 'replace' && !batchReplacementId)}
+                            className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            Применить
+                        </button>
+                    </div>
+                </div>
+            </Modal>
             
             {/* MANUAL SEARCH MODAL */}
             <Modal isOpen={manualSearchModalOpen} onClose={() => setManualSearchModalOpen(false)} title="Ручной поиск урока">
@@ -1341,6 +1576,30 @@ export const SubstitutionsPage = () => {
                         </button>
                     </div>
                 </div>
+            </Modal>
+            {/* QUICK VIEW SCHEDULE MODAL */}
+            <Modal isOpen={!!viewScheduleTeacherId} onClose={() => setViewScheduleTeacherId(null)} title="Расписание учителя" maxWidth="max-w-md">
+                 <div className="space-y-3">
+                     {viewScheduleTeacherId && (() => {
+                         const t = teachers.find(x => x.id === viewScheduleTeacherId);
+                         const schedule = activeSchedule.filter(s => s.teacherId === viewScheduleTeacherId && s.day === selectedDayOfWeek).sort((a,b) => a.period - b.period);
+                         if (schedule.length === 0) return <div className="text-center text-slate-400 py-8">Уроков нет</div>;
+                         return schedule.map(s => {
+                             const c = classes.find(x => x.id === s.classId)?.name;
+                             const subj = subjects.find(x => x.id === s.subjectId)?.name;
+                             const r = rooms.find(x => x.id === s.roomId)?.name || s.roomId;
+                             return (
+                                 <div key={s.id} className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-700 rounded-xl">
+                                     <div className="w-8 h-8 rounded-lg bg-white dark:bg-slate-600 flex items-center justify-center font-bold text-slate-500">{s.period}</div>
+                                     <div>
+                                         <div className="font-bold text-slate-800 dark:text-white">{c}</div>
+                                         <div className="text-xs text-slate-500 dark:text-slate-400">{subj}, каб. {r}</div>
+                                     </div>
+                                 </div>
+                             )
+                         })
+                     })()}
+                 </div>
             </Modal>
         </div>
     );
