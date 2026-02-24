@@ -746,7 +746,7 @@ export const DashboardPage = () => {
                 );
             case 'conflicts':
                 return (
-                    <div key={widget.id} className="p-6 rounded-3xl bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+                    <div key={widget.id} className="p-6 rounded-3xl h-full card-hover bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
                         <div className="flex items-center gap-3 mb-4">
                             <div className="bg-amber-100 dark:bg-amber-900/30 text-amber-600 p-2 rounded-xl"><Icon name="AlertTriangle" size={20}/></div>
                             <h3 className="font-bold text-lg dark:text-white">Возможные конфликты</h3>
@@ -763,7 +763,7 @@ export const DashboardPage = () => {
                 );
             case 'birthdays':
                 return (
-                    <div key={widget.id} className="p-6 rounded-3xl bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+                    <div key={widget.id} className="p-6 rounded-3xl h-full card-hover bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
                         <div className="flex items-center gap-3 mb-4">
                             <div className="bg-rose-100 dark:bg-rose-900/30 text-rose-600 p-2 rounded-xl"><Icon name="Gift" size={20}/></div>
                             <h3 className="font-bold text-lg dark:text-white">Ближайшие праздники</h3>
