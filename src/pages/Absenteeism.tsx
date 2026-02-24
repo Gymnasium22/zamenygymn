@@ -234,37 +234,24 @@ export const AbsenteeismPage = () => {
             return;
         }
 
-        const now = new Date().toISOString();
-        let updatedRecords: AbsenteeismRecord[];
+        const record: AbsenteeismRecord = {
+            id: editingRecord ? editingRecord.id : generateId(),
+            date: selectedDate,
+            classId: selectedClassId,
+            absences,
+            enteredBy: editingRecord?.enteredBy || user?.uid,
+            enteredAt: editingRecord?.enteredAt || new Date().toISOString(),
+            updatedAt: new Date().toISOString(), // Ensure update timestamp for syncing
+            updatedBy: user?.email || 'unknown' // Track who updated
+        };
 
-        if (editingRecord) {
-            // Update existing
-            updatedRecords = absenteeismRecords.map(r =>
-                r.id === editingRecord.id
-                    ? {
-                          ...r,
-                          classId: selectedClassId,
-                          absences,
-                          enteredBy: user?.uid || r.enteredBy,
-                          enteredAt: now
-                      }
-                    : r
-            );
-        } else {
-            // Create new
-            const newRecord: AbsenteeismRecord = {
-                id: generateId(),
-                date: selectedDate,
-                classId: selectedClassId,
-                absences,
-                enteredBy: user?.uid,
-                enteredAt: now
-            };
-            updatedRecords = [...absenteeismRecords, newRecord];
-        }
+        const updatedRecords = editingRecord
+            ? absenteeismRecords.map(r => r.id === record.id ? record : r)
+            : [...absenteeismRecords, record];
 
         await saveScheduleData({ absenteeismRecords: updatedRecords });
-        addToast({ type: 'success', title: 'Данные сохранены' });
+        
+        addToast({ type: 'success', title: editingRecord ? 'Запись обновлена' : 'Запись сохранена' });
         closeModal();
     }, [selectedClassId, absences, editingRecord, absenteeismRecords, saveScheduleData, selectedDate, user, addToast]);
 
@@ -274,15 +261,9 @@ export const AbsenteeismPage = () => {
         if (window.confirm('Вы уверены, что хотите удалить запись? Класс вернется в список "Не заполнено".')) {
             const updatedRecords = absenteeismRecords.filter(r => r.id !== editingRecord.id);
             
-            // 1. Update local state and attempt sync via standard method
+            // Update local state and sync via standard method (just like Substitutions)
+            // This will trigger dbService.save -> syncCollection which handles both cache and Firestore
             await saveScheduleData({ absenteeismRecords: updatedRecords });
-
-            // 2. Force delete from DB to handle cases where syncCollection cache is empty (e.g. read quota exhausted)
-            try {
-                await dbService.deleteDocument('absenteeism_records', editingRecord.id);
-            } catch (e) {
-                console.warn("Direct delete failed (possibly offline or permission issue):", e);
-            }
 
             addToast({ type: 'success', title: 'Запись удалена' });
             closeModal();
