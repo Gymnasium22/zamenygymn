@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { useStaticData, useScheduleData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { dbService } from '../services/db';
@@ -7,11 +7,18 @@ import { Modal, useToast } from '../components/UI';
 import { AbsenteeismRecord, StudentAbsence } from '../types';
 import { formatDateISO, generateId } from '../utils/helpers';
 
+const MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+
 export const AbsenteeismPage = () => {
     const { classes, teachers } = useStaticData();
     const { absenteeismRecords, saveScheduleData } = useScheduleData();
     const { role, user } = useAuth();
     const { addToast } = useToast();
+
+    // Force sync cache on mount to ensure fresh data
+    useEffect(() => {
+        dbService.syncCacheWithDatabase('absenteeism_records');
+    }, []);
 
     // Check permissions - only teacher and admin can access
     const isAdmin = role === 'admin';
