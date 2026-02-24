@@ -627,7 +627,10 @@ export const SubstitutionsPage = () => {
         const allCandidates = teachers
             .filter(t => t.name.toLowerCase().includes(candidateSearch.toLowerCase()))
             .map(t => { 
-            const isAbsent = t.unavailableDates.includes(selectedDate); 
+            // Check if teacher has conducted a lesson on this day (overrides absence)
+            const hasConductedLesson = substitutions.some(s => s.date === selectedDate && s.originalTeacherId === t.id && s.replacementTeacherId === 'conducted');
+            const isAbsent = t.unavailableDates.includes(selectedDate) && !hasConductedLesson; 
+            
             const isBusyRegular = activeSchedule.some(s => s.teacherId === t.id && s.day === selectedDayOfWeek && s.period === currentSubParams.period && s.shift === currentSubParams.shift); 
             const isBusySub = activeSubstitutionsForSlot.has(t.id);
             const isBusy = isBusyRegular || isBusySub;
@@ -1151,7 +1154,20 @@ export const SubstitutionsPage = () => {
                              <div className="flex gap-4">
                                 <div className="flex-1">
                                     <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Кабинет (Опционально)</label>
-                                    <select value={selectedRoomId} onChange={e => setSelectedRoomId(e.target.value)} className="w-full border border-slate-200 p-3 rounded-xl text-sm bg-white font-medium outline-none focus:ring-2 ring-indigo-500"><option value="">Авто / Без изменений</option>{rooms.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}</select>
+                                    <select value={selectedRoomId} onChange={e => setSelectedRoomId(e.target.value)} className="w-full border border-slate-200 p-3 rounded-xl text-sm bg-white dark:bg-slate-700 dark:text-white font-medium outline-none focus:ring-2 ring-indigo-500"><option value="">Авто / Без изменений</option>{rooms.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}</select>
+                                </div>
+                                <div className="flex-1">
+                                    <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Причина (Опционально)</label>
+                                    <select value={lessonAbsenceReason} onChange={e => setLessonAbsenceReason(e.target.value)} className="w-full border border-slate-200 p-3 rounded-xl text-sm bg-white dark:bg-slate-700 dark:text-white font-medium outline-none focus:ring-2 ring-indigo-500">
+                                        <option value="">Не указана</option>
+                                        <option value="Болезнь">Болезнь</option>
+                                        <option value="Курсы">Курсы</option>
+                                        <option value="Отгул">Отгул</option>
+                                        <option value="Семейные обстоятельства">Семейные обстоятельства</option>
+                                        <option value="Командировка">Командировка</option>
+                                        <option value="Без записи">Без записи</option>
+                                        <option value="Другое">Другое</option>
+                                    </select>
                                 </div>
                              </div>
                              
