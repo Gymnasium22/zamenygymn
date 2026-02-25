@@ -52,6 +52,14 @@ service cloud.firestore {
       allow write: if request.auth != null && request.auth.token.email == "admin@gymnasium22.com";
     }
 
+    // Пропуски (absenteeism_records) - админ и учителя
+    match /absenteeism_records/{document} {
+      allow read: if request.auth != null && (request.auth.token.email == "admin@gymnasium22.com" || request.auth.token.email == "teacher@gymnasium22.com");
+      allow write: if request.auth != null && (request.auth.token.email == "admin@gymnasium22.com" || request.auth.token.email == "teacher@gymnasium22.com");
+      allow update: if request.auth != null && (request.auth.token.email == "admin@gymnasium22.com" || request.auth.token.email == "teacher@gymnasium22.com");
+      allow delete: if request.auth != null && request.auth.token.email == "admin@gymnasium22.com";
+    }
+
     // Админ может писать во все коллекции
     match /{document=**} {
       allow write: if request.auth != null && request.auth.token.email == "admin@gymnasium22.com";

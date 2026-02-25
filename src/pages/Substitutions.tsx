@@ -831,7 +831,11 @@ export const SubstitutionsPage = () => {
         setDragOverLessonId(null);
     };
 
-    const handleCandidateClick = (teacherId: string, isBusy: boolean) => {
+    const handleCandidateClick = (teacherId: string, isBusy: boolean, isAbsent: boolean) => {
+        if (isAbsent) {
+            if (!window.confirm("ВНИМАНИЕ: Этот учитель отмечен как отсутствующий на этот день! Вы уверены, что хотите назначить его?")) return;
+        }
+
         let isMerger = false;
         if (isBusy) {
             if (!window.confirm("Этот учитель занят. Назначить ОБЪЕДИНЕНИЕ классов?")) return;
@@ -1121,9 +1125,9 @@ export const SubstitutionsPage = () => {
                                 return (
                                 <div 
                                     key={t.id} 
-                                    draggable={!isAbsent}
+                                    draggable={true}
                                     onDragStart={(e) => handleDragStart(e, t.id)}
-                                    className={`flex flex-col p-4 rounded-xl border transition-all ${isAbsent ? 'bg-red-50 dark:bg-red-900/20 border-red-100 dark:border-red-900' : 'bg-slate-50 dark:bg-slate-700/50 border-slate-100 dark:border-slate-600 cursor-grab active:cursor-grabbing hover:border-indigo-300'}`}
+                                    className={`flex flex-col p-4 rounded-xl border transition-all ${isAbsent ? 'bg-red-50 dark:bg-red-900/20 border-red-100 dark:border-red-900 opacity-90' : 'bg-slate-50 dark:bg-slate-700/50 border-slate-100 dark:border-slate-600 cursor-grab active:cursor-grabbing hover:border-indigo-300'}`}
                                 >
                                     <div className="flex items-center justify-between mb-1">
                                         <span className={`text-base font-bold ${isAbsent ? 'text-red-700 dark:text-red-400' : 'text-slate-700 dark:text-slate-300'}`}>{t.name}</span>
@@ -1243,7 +1247,7 @@ export const SubstitutionsPage = () => {
                                         {candidates.others.map(({ teacher, isBusy, busyReason, isAbsent, subsCount }) => {
                                             const isRefused = refusedTeacherIds.includes(teacher.id);
                                             return (
-                                                <div key={teacher.id} className={`flex items-center justify-between p-3 rounded-lg text-sm ${isAbsent ? 'opacity-50' : 'hover:bg-slate-50'}`}>
+                                                <div key={teacher.id} className={`flex items-center justify-between p-3 rounded-lg text-sm ${isAbsent ? 'opacity-70 bg-red-50/50' : 'hover:bg-slate-50'}`}>
                                                     <div className="flex items-center gap-3">
                                                         <div className={`w-2 h-2 rounded-full ${isBusy ? 'bg-orange-400' : isAbsent ? 'bg-red-400' : 'bg-slate-300'}`}></div>
                                                         <div className="flex flex-col">
@@ -1255,9 +1259,15 @@ export const SubstitutionsPage = () => {
                                                         </div>
                                                     </div>
                                                     <div className="flex gap-2">
-                                                        {!isAbsent && <button onClick={() => setViewScheduleTeacherId(teacher.id)} className="p-1.5 text-slate-300 hover:text-indigo-600 hover:bg-slate-100 rounded" title="Посмотреть расписание"><Icon name="Eye" size={16}/></button>}
-                                                        {!isAbsent && <button onClick={(e) => toggleRefusal(teacher.id, e)} className="p-1.5 text-slate-300 hover:text-slate-500 hover:bg-slate-100 rounded"><Icon name="X" size={16}/></button>}
-                                                        {!isAbsent && <button onClick={() => handleCandidateClick(teacher.id, isBusy)} className={`px-3 py-1.5 rounded-lg text-xs font-bold ${isBusy ? 'text-orange-600 bg-orange-50' : 'text-indigo-600 bg-indigo-50'}`}>{isBusy ? 'Объед?' : 'Выбрать'}</button>}
+                                                        <button onClick={() => setViewScheduleTeacherId(teacher.id)} className="p-1.5 text-slate-300 hover:text-indigo-600 hover:bg-slate-100 rounded" title="Посмотреть расписание"><Icon name="Eye" size={16}/></button>
+                                                        <button onClick={(e) => toggleRefusal(teacher.id, e)} className="p-1.5 text-slate-300 hover:text-slate-500 hover:bg-slate-100 rounded"><Icon name="X" size={16}/></button>
+                                                        <button 
+                                                            onClick={() => handleCandidateClick(teacher.id, isBusy, isAbsent)} 
+                                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold ${isBusy ? 'text-orange-600 bg-orange-50' : isAbsent ? 'text-red-600 bg-red-100 hover:bg-red-200' : 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100'}`}
+                                                            title={isAbsent ? "Назначить несмотря на отсутствие" : "Назначить замену"}
+                                                        >
+                                                            {isBusy ? 'Объед?' : isAbsent ? 'Выбрать' : 'Выбрать'}
+                                                        </button>
                                                     </div>
                                                 </div>
                                             )
