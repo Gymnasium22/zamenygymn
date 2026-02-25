@@ -172,6 +172,8 @@ export interface AbsenteeismRecord {
     absences: StudentAbsence[];
     enteredBy?: string; // ID of teacher/admin
     enteredAt?: string; // ISO Date
+    updatedAt?: string; // ISO Date of last update
+    updatedBy?: string; // Email/ID of who updated
 }
 
 // Interfaces for split contexts
