@@ -849,42 +849,7 @@ export const DashboardPage = () => {
                 </div>
             )}
 
-            {/* Mobile Quick Actions - Only visible on phones */}
-            <div className="md:hidden grid grid-cols-3 gap-3 animate-fade-in">
-                <NavLink to="/schedule" className="p-4 rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/30 border border-blue-200 dark:border-blue-700 hover:shadow-lg transition-all flex flex-col items-center gap-2 active:scale-95">
-                    <div className="bg-blue-500 text-white p-3 rounded-xl">
-                        <Icon name="Calendar" size={20} />
-                    </div>
-                    <span className="text-xs font-bold text-slate-700 dark:text-slate-300 text-center">Расписание</span>
-                </NavLink>
-                
-                {role === 'admin' && (
-                    <NavLink to="/substitutions" className="p-4 rounded-2xl bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/30 dark:to-orange-800/30 border border-orange-200 dark:border-orange-700 hover:shadow-lg transition-all flex flex-col items-center gap-2 active:scale-95">
-                        <div className="bg-orange-500 text-white p-3 rounded-xl">
-                            <Icon name="Repeat" size={20} />
-                        </div>
-                        <span className="text-xs font-bold text-slate-700 dark:text-slate-300 text-center">Замены</span>
-                    </NavLink>
-                )}
 
-                {role === 'admin' && (
-                    <NavLink to="/duty" className="p-4 rounded-2xl bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/30 border border-purple-200 dark:border-purple-700 hover:shadow-lg transition-all flex flex-col items-center gap-2 active:scale-95">
-                        <div className="bg-purple-500 text-white p-3 rounded-xl">
-                            <Icon name="Shield" size={20} />
-                        </div>
-                        <span className="text-xs font-bold text-slate-700 dark:text-slate-300 text-center">Дежурство</span>
-                    </NavLink>
-                )}
-
-                {role === 'guest' && (
-                    <NavLink to="/schedule" className="p-4 rounded-2xl bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/30 dark:to-emerald-800/30 border border-emerald-200 dark:border-emerald-700 hover:shadow-lg transition-all flex flex-col items-center gap-2 active:scale-95">
-                        <div className="bg-emerald-500 text-white p-3 rounded-xl">
-                            <Icon name="Users" size={20} />
-                        </div>
-                        <span className="text-xs font-bold text-slate-700 dark:text-slate-300 text-center">Информация</span>
-                    </NavLink>
-                )}
-            </div>
 
             {/* Dashboard widgets - Grid Layout */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
