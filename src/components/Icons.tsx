@@ -35,6 +35,28 @@ const IconMap: Record<string, React.FC<React.SVGProps<SVGSVGElement>>> = {
     PieChart: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path><path d="M22 12A10 10 0 0 0 12 2v10z"></path></svg>,
     List: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>,
     Gift: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>,
+    Flower: (p) => (
+        <svg
+            {...p}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        >
+            <circle cx="12" cy="12" r="2.5" />
+            <path d="M12 4.5c-1.2 0-2.2.8-2.4 1.9-.2 1 .3 2.1 1.3 2.6.4.2.7.3 1.1.3s.7-.1 1.1-.3c1-.5 1.5-1.6 1.3-2.6-.2-1.1-1.2-1.9-2.4-1.9z" />
+            <path d="M7.1 7.1C6 8.2 6 9.9 7.1 11c.3.3.7.6 1.1.7.4.1.8.1 1.2 0 .4-.1.8-.3 1.1-.7.3-.3.5-.7.7-1.1.1-.4.1-.8 0-1.2-.1-.4-.4-.8-.7-1.1-1.1-1.1-2.8-1.1-3.9 0z" />
+            <path d="M4.5 12c0 1.2.8 2.2 1.9 2.4 1 .2 2.1-.3 2.6-1.3.2-.4.3-.7.3-1.1s-.1-.7-.3-1.1c-.5-1-1.6-1.5-2.6-1.3-1.1.2-1.9 1.2-1.9 2.4z" />
+            <path d="M7.1 16.9c1.1 1.1 2.8 1.1 3.9 0 .3-.3.6-.7.7-1.1.1-.4.1-.8 0-1.2-.1-.4-.3-.8-.7-1.1-.3-.3-.7-.5-1.1-.7-.4-.1-.8-.1-1.2 0-.4.1-.8.4-1.1.7-1.1 1.1-1.1 2.8 0 3.9z" />
+            <path d="M12 19.5c1.2 0 2.2-.8 2.4-1.9.2-1-.3-2.1-1.3-2.6-.4-.2-.7-.3-1.1-.3s-.7.1-1.1.3c-1 .5-1.5 1.6-1.3 2.6.2 1.1 1.2 1.9 2.4 1.9z" />
+            <path d="M16.9 16.9c1.1-1.1 1.1-2.8 0-3.9-.3-.3-.7-.6-1.1-.7-.4-.1-.8-.1-1.2 0-.4.1-.8.3-1.1.7-.3.3-.5.7-.7 1.1-.1.4-.1.8 0 1.2.1.4.4.8.7 1.1 1.1 1.1 2.8 1.1 3.9 0z" />
+            <path d="M19.5 12c0-1.2-.8-2.2-1.9-2.4-1-.2-2.1.3-2.6 1.3-.2.4-.3.7-.3 1.1s.1.7.3 1.1c.5 1 1.6 1.5 2.6 1.3 1.1-.2 1.9-1.2 1.9-2.4z" />
+            <path d="M16.9 7.1c-1.1-1.1-2.8-1.1-3.9 0-.3.3-.6.7-.7 1.1-.1.4-.1.8 0 1.2.1.4.3.8.7 1.1.3.3.7.5 1.1.7.4.1.8.1 1.2 0 .4-.1.8-.4 1.1-.7 1.1-1.1 1.1-2.8 0-3.9z" />
+            <path d="M12 14v5" />
+        </svg>
+    ),
     Save: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>,
     FileSpreadsheet: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M8 13h2"/><path d="M8 17h2"/><path d="M14 13h2"/><path d="M14 17h2"/></svg>,
     Activity: (p) => <svg {...p} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>,

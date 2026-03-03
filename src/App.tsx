@@ -64,7 +64,6 @@ const HomeRedirect = () => {
 const Layout = () => {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [theme, setTheme] = useState(safeLocalStorageGet('theme') || 'light');
-    const [isNewYear, setIsNewYear] = useState(safeLocalStorageGet('new_year_mode') === 'true');
     const { isLoading } = useStaticData();
     const { logout, role, user } = useAuth();
 
@@ -87,12 +86,6 @@ const Layout = () => {
         safeLocalStorageSet('theme', theme);
     }, [theme]);
 
-    useEffect(() => {
-        if (isNewYear) document.documentElement.classList.add('new-year-mode');
-        else document.documentElement.classList.remove('new-year-mode');
-        safeLocalStorageSet('new_year_mode', String(isNewYear));
-    }, [isNewYear]);
-
     if (isLoading) return <div className="h-screen flex items-center justify-center bg-slate-50 dark:bg-dark-950"><Icon name="Loader" className="animate-spin text-indigo-600" size={48} /></div>;
 
     // Простое плоское меню без группировки
@@ -113,19 +106,15 @@ const Layout = () => {
     const filteredMenuItems = menuItems.filter(item => item.roles.includes(role || ''));
 
     return (
-        <div className={`flex h-screen bg-slate-50 dark:bg-dark-950 overflow-hidden transition-colors duration-300 ${isNewYear ? 'festive-bg' : 'mesh-gradient-bg'}`}>
-            {isNewYear && <div className="snow-overlay no-print" />}
+        <div className="flex h-screen bg-slate-50 dark:bg-dark-950 overflow-hidden transition-colors duration-300 mesh-gradient-bg">
             {isMobileMenuOpen && <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 lg:hidden" onClick={() => setIsMobileMenuOpen(false)} />}
             
             {/* Sidebar - hidden on mobile unless opened via menu */}
-            <aside className={`fixed lg:static inset-y-0 left-0 z-50 w-64 lg:w-64 bg-white/80 dark:bg-dark-800/90 backdrop-blur-xl border-r border-slate-200/50 dark:border-slate-700/50 transform transition-transform duration-300 ease-in-out ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} no-print shadow-2xl lg:shadow-none overflow-hidden`}>
+                    <aside className={`fixed lg:static inset-y-0 left-0 z-50 w-64 lg:w-64 bg-white/80 dark:bg-dark-800/90 backdrop-blur-xl border-r border-slate-200/50 dark:border-slate-700/50 transform transition-transform duration-300 ease-in-out ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} no-print shadow-2xl lg:shadow-none overflow-hidden`}>
                 <div className="h-full flex flex-col relative">
-                    {isNewYear && <div className="bg-garland" />}
-                    
                     <div className="p-6 flex items-center gap-3 border-b border-slate-100 dark:border-slate-700 pt-8">
                         <div className="bg-indigo-600 p-2.5 rounded-xl text-white relative shadow-lg shadow-indigo-200 dark:shadow-none transition-colors duration-500">
                             <Icon name="GraduationCap" size={24} />
-                            {isNewYear && <div className="absolute -top-3 -right-3 text-2xl animate-bounce">🎅</div>}
                         </div>
                         <div><h1 className="text-lg font-black text-slate-800 dark:text-white">Гимназия Pro22</h1><p className="text-[10px] font-bold text-slate-400 uppercase">Управление V2.0</p></div>
                     </div>
@@ -164,9 +153,6 @@ const Layout = () => {
                             <button onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')} className="flex items-center justify-center gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:text-indigo-600 transition-all border border-slate-100 dark:border-slate-600 active:scale-95 shadow-sm">
                                 {theme === 'light' ? <Icon name="Moon" size={18} /> : <Icon name="Sun" size={18} />}
                             </button>
-                            <button onClick={() => setIsNewYear(!isNewYear)} className={`flex items-center justify-center gap-2 p-2.5 rounded-xl transition-all border active:scale-95 shadow-sm ${isNewYear ? 'bg-red-600 text-white border-red-700' : 'bg-slate-50 dark:bg-slate-700 text-slate-500 border-slate-100 dark:border-slate-600 hover:text-red-500'}`} title="Новогодний режим">
-                                <Icon name="Snowflake" size={18} className={isNewYear ? 'animate-spin-slow' : ''} />
-                            </button>
                         </div>
                     </div>
                 </div>
@@ -175,7 +161,6 @@ const Layout = () => {
             <main className="flex-1 flex flex-col min-w-0 bg-transparent relative">
                 <header className="lg:hidden p-4 flex items-center gap-3 bg-white/80 dark:bg-dark-800/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-700 no-print sticky top-0 z-30">
                     <span className="font-bold text-slate-800 dark:text-white text-lg">Гимназия Pro22</span>
-                    {isNewYear && <div className="ml-auto text-xl">🎄</div>}
                 </header>
                 
                 <div className="flex-1 overflow-auto p-4 lg:p-8 pb-24 lg:pb-8 custom-scrollbar relative">
