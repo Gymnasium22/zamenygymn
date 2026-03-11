@@ -8,6 +8,7 @@ import { StatusWidget, BottomNavigation, ToastProvider } from './components/UI';
 import { DashboardPage } from './pages/Dashboard';
 import { SchedulePage } from './pages/Schedule';
 import { DirectoryPage } from './pages/Directory';
+import { BellsPage } from './pages/Bells';
 import { SubstitutionsPage } from './pages/Substitutions';
 import { AdminPage } from './pages/Admin';
 import { ExportPage } from './pages/Export';
@@ -97,6 +98,7 @@ const Layout = () => {
         { to: '/duty', label: 'Дежурство', icon: 'Shield', roles: ['admin'] },
         { to: '/nutrition', label: 'Питание', icon: 'Coffee', roles: ['admin', 'teacher', 'canteen'] },
         { to: '/absenteeism', label: 'Пропуски', icon: 'UserX', roles: ['admin', 'teacher'] },
+        { to: '/bells', label: 'Звонки', icon: 'Bell', roles: ['admin'] },
         { to: '/directory', label: 'Справочники', icon: 'BookOpen', roles: ['admin'] },
         { to: '/reports', label: 'Отчеты', icon: 'BarChart2', roles: ['admin'] },
         { to: '/export', label: 'Экспорт', icon: 'Download', roles: ['admin'] },
@@ -266,6 +268,7 @@ export default function App() {
                                     <Route path="nutrition" element={<ProtectedRoute allowedRoles={['admin', 'teacher', 'canteen']}><NutritionPage /></ProtectedRoute>} />
                                     <Route path="absenteeism" element={<ProtectedRoute allowedRoles={['admin', 'teacher']}><AbsenteeismPage /></ProtectedRoute>} />
                                     <Route path="directory" element={<ProtectedRoute allowedRoles={['admin']}><DirectoryPage /></ProtectedRoute>} />
+                                    <Route path="bells" element={<ProtectedRoute allowedRoles={['admin']}><BellsPage /></ProtectedRoute>} />
                                     <Route path="admin" element={<ProtectedRoute allowedRoles={['admin']}><AdminPage /></ProtectedRoute>} />
                                     <Route path="reports" element={<ProtectedRoute allowedRoles={['admin']}><ReportsPage /></ProtectedRoute>} />
                                     <Route path="export" element={<ProtectedRoute allowedRoles={['admin']}><ExportPage /></ProtectedRoute>} />
