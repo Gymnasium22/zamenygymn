@@ -23,6 +23,34 @@ const minToTime = (m: number) => {
     return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
 };
 
+// Ключ для локального состояния инпута времени
+const getTimeKey = (shift: Shift, period: number, field: 'start' | 'end') => `${shift}_${period}_${field}`;
+
+// Преобразование введённых цифр в формат HH:MM (используется на blur)
+const formatDigitsToTime = (raw: string, fallback: string) => {
+    const digits = raw.replace(/\D/g, '').slice(0, 4);
+    if (!digits) return fallback;
+
+    let hours = 0;
+    let minutes = 0;
+
+    if (digits.length <= 2) {
+        hours = Number(digits);
+        minutes = 0;
+    } else if (digits.length === 3) {
+        hours = Number(digits.slice(0, 2));
+        minutes = Number(digits[2]) * 10;
+    } else {
+        hours = Number(digits.slice(0, 2));
+        minutes = Number(digits.slice(2, 4));
+    }
+
+    if (hours > 23) hours = 23;
+    if (minutes > 59) minutes = 59;
+
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+};
+
 const ShiftTimeline = ({
     shift,
     currentPresetBells,
@@ -30,6 +58,8 @@ const ShiftTimeline = ({
     bulkSetDuration,
     handleBellChange,
     toggleBellCancellation,
+    timeInputs,
+    setTimeInputValue,
 }: {
     shift: Shift;
     currentPresetBells: Bell[];
@@ -37,6 +67,8 @@ const ShiftTimeline = ({
     bulkSetDuration: (shift: Shift, duration: number) => void;
     handleBellChange: (shift: string, period: number, field: 'start' | 'end', value: string) => void;
     toggleBellCancellation: (shift: string, period: number) => void;
+    timeInputs: Record<string, string>;
+    setTimeInputValue: (key: string, value: string) => void;
 }) => {
     const periods = SHIFT_PERIODS[shift];
     const shiftBells = currentPresetBells.filter(b => b.shift === shift && b.day === 'default');
@@ -60,6 +92,10 @@ const ShiftTimeline = ({
 
                 {periods.map((period, index) => {
                     const bell = (shiftBells.find(b => b.period === period) || { start: '00:00', end: '00:00', cancelled: false }) as Bell;
+                    const startKey = getTimeKey(shift, period, 'start');
+                    const endKey = getTimeKey(shift, period, 'end');
+                    const startValue = timeInputs[startKey] ?? bell.start;
+                    const endValue = timeInputs[endKey] ?? bell.end;
                     const prevBell = index > 0 ? shiftBells.find(b => b.period === periods[index - 1]) : null;
 
                     const hasOverlap = !!(prevBell && timeToMin(bell.start) < timeToMin(prevBell.end));
@@ -116,9 +152,22 @@ const ShiftTimeline = ({
                                         <div className="flex-1 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
                                             <div className="relative">
                                                 <input
-                                                    type="time"
-                                                    value={bell.start}
-                                                    onChange={e => handleBellChange(shift, period, 'start', e.target.value)}
+                                                    type="text"
+                                                    value={startValue}
+                                                    inputMode="numeric"
+                                                    maxLength={5}
+                                                    placeholder="чч:мм"
+                                                    onChange={e => {
+                                                        const next = e.target.value.replace(/[^\d:]/g, '').slice(0, 5);
+                                                        setTimeInputValue(startKey, next);
+                                                    }}
+                                                    onBlur={() => {
+                                                        const formatted = formatDigitsToTime(startValue, bell.start);
+                                                        setTimeInputValue(startKey, formatted);
+                                                        if (formatted !== bell.start) {
+                                                            handleBellChange(shift, period, 'start', formatted);
+                                                        }
+                                                    }}
                                                     className={`w-full bg-slate-50 dark:bg-slate-800 border rounded-lg px-2 py-1 text-center font-mono font-bold text-lg outline-none focus:ring-2 focus:ring-indigo-500 ${
                                                         hasOverlap ? 'border-red-500 text-red-600' : 'border-slate-200 dark:border-slate-600 dark:text-white'
                                                     }`}
@@ -128,9 +177,22 @@ const ShiftTimeline = ({
                                             <span className="text-slate-300 dark:text-slate-600 font-bold">-</span>
                                             <div className="relative">
                                                 <input
-                                                    type="time"
-                                                    value={bell.end}
-                                                    onChange={e => handleBellChange(shift, period, 'end', e.target.value)}
+                                                    type="text"
+                                                    value={endValue}
+                                                    inputMode="numeric"
+                                                    maxLength={5}
+                                                    placeholder="чч:мм"
+                                                    onChange={e => {
+                                                        const next = e.target.value.replace(/[^\d:]/g, '').slice(0, 5);
+                                                        setTimeInputValue(endKey, next);
+                                                    }}
+                                                    onBlur={() => {
+                                                        const formatted = formatDigitsToTime(endValue, bell.end);
+                                                        setTimeInputValue(endKey, formatted);
+                                                        if (formatted !== bell.end) {
+                                                            handleBellChange(shift, period, 'end', formatted);
+                                                        }
+                                                    }}
                                                     className={`w-full bg-slate-50 dark:bg-slate-800 border rounded-lg px-2 py-1 text-center font-mono font-bold text-lg outline-none focus:ring-2 focus:ring-indigo-500 ${
                                                         isInvalid ? 'border-red-500 text-red-600' : 'border-slate-200 dark:border-slate-600 dark:text-white'
                                                     }`}
@@ -159,6 +221,7 @@ export const BellsPage = () => {
 
     const [selectedPresetId, setSelectedPresetId] = useState<string>('preset_normal');
     const [currentPresetBells, setCurrentPresetBells] = useState<Bell[]>([]);
+    const [timeInputs, setTimeInputs] = useState<Record<string, string>>({});
     const [activeBellShift, setActiveBellShift] = useState<Shift>(Shift.First);
 
     const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
@@ -174,11 +237,17 @@ export const BellsPage = () => {
             const preset = settings.bellPresets.find(p => p.id === selectedPresetId);
             if (preset) {
                 setCurrentPresetBells(preset.bells);
+                setTimeInputs({});
                 return;
             }
         }
         setCurrentPresetBells(DEFAULT_BELLS);
+        setTimeInputs({});
     }, [selectedPresetId, settings.bellPresets]);
+
+    const setTimeInputValue = (key: string, value: string) => {
+        setTimeInputs(prev => ({ ...prev, [key]: value }));
+    };
 
     const handleBellChange = (shift: string, period: number, field: 'start' | 'end', value: string) => {
         let newBells = [...currentPresetBells];
@@ -319,10 +388,13 @@ export const BellsPage = () => {
                     <h1 style="font-size: 32px; font-weight: 900; text-transform: uppercase; color: #1e293b; margin: 0 0 5px 0; letter-spacing: -0.5px;">
                         Расписание звонков
                     </h1>
-                    <p style="font-size: 20px; color: #64748b; font-weight: 600; margin: 0;">
-                        Режим: <span style="color: #4f46e5;">${preset?.name || 'Обычное'}</span>
-                        ${exportDate ? `<br>на ${new Date(exportDate).toLocaleDateString('ru-RU')}` : ''}
-                    </p>
+                    ${
+                        exportDate
+                            ? `<p style="font-size: 20px; color: #64748b; font-weight: 600; margin: 0;">
+                                на ${new Date(exportDate).toLocaleDateString('ru-RU')}
+                               </p>`
+                            : ''
+                    }
                     <div style="height: 6px; width: 80px; background: #4f46e5; margin: 15px auto 0; border-radius: 4px;"></div>
                 </div>
 
@@ -640,6 +712,8 @@ export const BellsPage = () => {
                                 bulkSetDuration={bulkSetDuration}
                                 handleBellChange={handleBellChange}
                                 toggleBellCancellation={toggleBellCancellation}
+                                timeInputs={timeInputs}
+                                setTimeInputValue={setTimeInputValue}
                             />
                         </div>
 
@@ -651,6 +725,8 @@ export const BellsPage = () => {
                                 bulkSetDuration={bulkSetDuration}
                                 handleBellChange={handleBellChange}
                                 toggleBellCancellation={toggleBellCancellation}
+                                timeInputs={timeInputs}
+                                setTimeInputValue={setTimeInputValue}
                             />
                         </div>
                     </div>
