@@ -1025,6 +1025,13 @@ export const ExportPage = () => {
 
     const subsForDate = useMemo(() => substitutions.filter(s => s.date === exportDate), [substitutions, exportDate]);
     
+    const dayComment = useMemo(() => {
+        const fromSettings = settings.substitutionDayComments?.[exportDate];
+        if (fromSettings) return fromSettings;
+        const fromSubs = subsForDate.find(s => s.dayComment)?.dayComment;
+        return fromSubs || '';
+    }, [settings.substitutionDayComments, exportDate, subsForDate]);
+    
     const subsForShift1 = useMemo(() => {
         const currentSchedule = getScheduleForDate(exportDate);
         return subsForDate.filter(sub => {
@@ -1102,6 +1109,7 @@ export const ExportPage = () => {
                             const isRoomChangeOnly = sub.replacementTeacherId === sub.originalTeacherId && newRoomId && !swappedClass;
                             const isSwap = swappedClass && swappedSubj && !sub.isMerger;
                             const isTeacherPresent = sub.replacementTeacherId === sub.originalTeacherId;
+                            const rowComment = sub.comment;
 
                             return (
                                 <tr key={String(lessonId)}>
@@ -1153,6 +1161,11 @@ export const ExportPage = () => {
                                                 )}
                                             </div>
                                         )}
+                                        {rowComment && (
+                                            <div className="mt-1 text-[10px] text-slate-500 italic max-w-xs">
+                                                {rowComment}
+                                            </div>
+                                        )}
                                     </td>
                                     <td className={`py-3 px-2 text-right font-mono font-black ${newRoomId ? 'text-indigo-600' : 'text-slate-700'}`}>
                                         {newRoomId && newRoomId !== s.roomId ? (
@@ -1196,17 +1209,26 @@ export const ExportPage = () => {
     };
 
     const ReportHeader = () => (
-        <div className="flex justify-between items-end border-b-2 border-slate-800 pb-4 mb-6">
-            <div>
-                <h1 className="text-3xl font-black uppercase tracking-tight mb-1 text-slate-800">Замена Учителей</h1>
-                <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">
-                    Гимназия №22 • Официальный документ
-                </p>
+        <div className="border-b-2 border-slate-800 pb-4 mb-6">
+            <div className="flex justify-between items-end gap-4">
+                <div>
+                    <h1 className="text-3xl font-black uppercase tracking-tight mb-1 text-slate-800">Замена Учителей</h1>
+                    <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">
+                        Гимназия №22 • Официальный документ
+                    </p>
+                </div>
+                <div className="text-right">
+                    <div className="text-xs text-slate-400 uppercase font-bold tracking-wider mb-1">Дата</div>
+                    <div className="text-xl font-bold text-slate-800">
+                        {new Date(exportDate).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
+                    </div>
+                </div>
             </div>
-            <div className="text-right">
-                <div className="text-xs text-slate-400 uppercase font-bold tracking-wider mb-1">Дата</div>
-                <div className="text-xl font-bold text-slate-800">{new Date(exportDate).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
-            </div>
+            {dayComment && (
+                <div className="mt-3 text-xs text-slate-600 max-w-3xl">
+                    {dayComment}
+                </div>
+            )}
         </div>
     );
 

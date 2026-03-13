@@ -120,6 +120,7 @@ export const INITIAL_DATA: AppData = {
             message: "",
             active: false,
             lastUpdated: ""
-        }
+        },
+        substitutionDayComments: {}
     }
 };

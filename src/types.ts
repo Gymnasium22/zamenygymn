@@ -75,6 +75,8 @@ export interface Substitution {
   replacementClassId?: string; // NEW: For swapping lessons (target class)
   replacementSubjectId?: string; // NEW: For swapping lessons (target subject)
   isRead?: boolean; // NEW: Status of acknowledgement by the teacher
+  comment?: string; // NEW: Per-substitution comment
+  dayComment?: string; // NEW: Common comment for all substitutions on this date
 }
 
 export interface Bell {
@@ -115,6 +117,7 @@ export interface Settings {
   };
   telegramTemplates?: TelegramTemplates;
   adminAnnouncement?: AdminAnnouncement;
+  substitutionDayComments?: Record<string, string>; // ISO date -> common comment for substitutions on that day
   weatherApiKey?: string; // OpenWeatherMap API Key
   weatherCity?: string; // "Minsk,BY"
 }

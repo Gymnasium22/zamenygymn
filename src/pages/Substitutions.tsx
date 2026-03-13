@@ -56,6 +56,7 @@ export const SubstitutionsPage = () => {
     const [selectedRoomId, setSelectedRoomId] = useState<string>('');
     const [lessonAbsenceReason, setLessonAbsenceReason] = useState<string>('');
     const [activeReplacementId, setActiveReplacementId] = useState<string | null>(null);
+    const [substitutionComment, setSubstitutionComment] = useState<string>(''); // New: per-substitution comment
     
     const [refusedTeacherIds, setRefusedTeacherIds] = useState<string[]>([]);
     const [showSwapOptions, setShowSwapOptions] = useState(false);
@@ -69,6 +70,9 @@ export const SubstitutionsPage = () => {
     const [batchActionType, setBatchActionType] = useState<'cancel' | 'replace' | null>(null);
     const [batchReplacementId, setBatchReplacementId] = useState<string>('');
     const [batchAbsenceReason, setBatchAbsenceReason] = useState<string>('Болезнь');
+
+    // New: common comment for all substitutions on the selected date
+    const [dayComment, setDayComment] = useState<string>('');
 
     // Drag & Drop State
     const [draggedTeacherId, setDraggedTeacherId] = useState<string | null>(null);
@@ -89,6 +93,7 @@ export const SubstitutionsPage = () => {
             setCurrentSubParams(location.state.subParams);
             setSelectedRoomId(''); 
             setLessonAbsenceReason(''); 
+            setSubstitutionComment('');
             setRefusedTeacherIds([]);
             setActiveReplacementId(null);
             setShowSwapOptions(false);
@@ -113,6 +118,9 @@ export const SubstitutionsPage = () => {
                 if (existingSub.replacementTeacherId === 'cancelled') setSubMode('cancel');
                 else if (existingSub.isMerger || existingSub.replacementClassId) setSubMode('advanced');
                 else setSubMode('teacher');
+
+                setSubstitutionComment(existingSub.comment || '');
+                if (existingSub.dayComment) setDayComment(existingSub.dayComment);
                 
                 // Set active replacement ID if editing via drag/drop on existing sub (rare case)
                 if (existingSub.replacementTeacherId && !['conducted', 'cancelled'].includes(existingSub.replacementTeacherId)) {
@@ -122,12 +130,40 @@ export const SubstitutionsPage = () => {
                 setRefusedTeacherIds([]);
                 setSubMode('teacher');
                 setActiveReplacementId(null);
+                setSubstitutionComment('');
             }
             setShowSwapOptions(false);
             setShowMergeOptions(false);
             setSwapKeepRooms(false);
         }
     }, [isModalOpen, currentSubParams, substitutions, selectedDate]);
+
+    // Load day-level comment from settings (persistent)
+    useEffect(() => {
+        const map = settings.substitutionDayComments || {};
+        setDayComment(map[selectedDate] || '');
+    }, [settings.substitutionDayComments, selectedDate]);
+
+    // Persist day-level comment to settings (debounced)
+    useEffect(() => {
+        const timer = window.setTimeout(() => {
+            const map = settings.substitutionDayComments || {};
+            const current = map[selectedDate] || '';
+            if (current === dayComment) return;
+
+            const next = { ...map };
+            const trimmed = dayComment.trim();
+            if (trimmed) next[selectedDate] = trimmed;
+            else delete next[selectedDate];
+
+            saveStaticData({ settings: { ...settings, substitutionDayComments: next } }, false).catch(() => {
+                // No toast spam; user will notice if it doesn't persist
+            });
+        }, 500);
+
+        return () => window.clearTimeout(timer);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [dayComment, selectedDate]);
 
 
     const selectedDayOfWeek = useMemo(() => { 
@@ -256,7 +292,8 @@ export const SubstitutionsPage = () => {
                     scheduleItemId: l.id,
                     originalTeacherId: l.teacherId,
                     replacementTeacherId: batchActionType === 'cancel' ? 'cancelled' : batchReplacementId,
-                    lessonAbsenceReason: batchAbsenceReason
+                    lessonAbsenceReason: batchAbsenceReason,
+                    dayComment: dayComment || undefined
                 });
             });
             await saveScheduleData({ substitutions: newSubs });
@@ -266,7 +303,7 @@ export const SubstitutionsPage = () => {
         setAbsenceModalOpen(false);
         setBatchActionType(null);
         setBatchReplacementId('');
-    }, [teachers, selectedTeacherId, selectedDate, batchAbsenceReason, saveStaticData, selectedDayOfWeek, activeSchedule, substitutions, saveScheduleData, batchActionType, batchReplacementId]);
+    }, [teachers, selectedTeacherId, selectedDate, batchAbsenceReason, saveStaticData, selectedDayOfWeek, activeSchedule, substitutions, saveScheduleData, batchActionType, batchReplacementId, dayComment]);
 
     const removeAbsence = useCallback(async (id: string) => { 
         let updatedTeachers = [...teachers]; 
@@ -303,7 +340,9 @@ export const SubstitutionsPage = () => {
             replacementRoomId: selectedRoomId || undefined, 
             isMerger: isMerger,
             lessonAbsenceReason: (replacementId !== 'conducted' && replacementId !== 'cancelled' && lessonAbsenceReason) ? lessonAbsenceReason : undefined,
-            refusals: refusedTeacherIds
+            refusals: refusedTeacherIds,
+            comment: substitutionComment || undefined,
+            dayComment: dayComment || undefined
         }; 
         
         filteredSubs.push(subData);
@@ -316,11 +355,12 @@ export const SubstitutionsPage = () => {
             setRefusedTeacherIds([]);
             setActiveReplacementId(null);
             setCurrentSubParams(null);
+            setSubstitutionComment('');
         } catch (error) {
             console.error('Failed to save substitution:', error);
             alert('Ошибка при сохранении замены. Попробуйте еще раз.');
         }
-    }, [currentSubParams, selectedDate, selectedRoomId, activeSchedule, substitutions, teachers, lessonAbsenceReason, refusedTeacherIds, saveScheduleData]);
+    }, [currentSubParams, selectedDate, selectedRoomId, activeSchedule, substitutions, teachers, lessonAbsenceReason, refusedTeacherIds, substitutionComment, dayComment, saveScheduleData]);
 
     const handleBatchClassMerge = useCallback(async (targetClassId: string) => {
         if (!currentSubParams || !selectedDayOfWeek || !currentSubParams.period || !currentSubParams.shift || !currentSubParams.teacherId) {
@@ -353,7 +393,8 @@ export const SubstitutionsPage = () => {
                 replacementSubjectId: lesson.subjectId, 
                 isMerger: true,
                 replacementRoomId: lesson.roomId, 
-                lessonAbsenceReason: lessonAbsenceReason || undefined
+                lessonAbsenceReason: lessonAbsenceReason || undefined,
+                dayComment: dayComment || undefined
             };
             newSubs.push(subData);
         });
@@ -408,6 +449,7 @@ export const SubstitutionsPage = () => {
             replacementClassId: targetLesson.classId,
             replacementSubjectId: targetLesson.subjectId,
             replacementRoomId: effectiveRoomForSource !== sourceLesson.roomId ? effectiveRoomForSource : undefined, 
+            dayComment: dayComment || undefined
         };
         if (sourceSubIndex >= 0) newSubs[sourceSubIndex] = sourceSubData; else newSubs.push(sourceSubData);
 
@@ -421,6 +463,7 @@ export const SubstitutionsPage = () => {
             replacementClassId: sourceLesson.classId,
             replacementSubjectId: sourceLesson.subjectId,
             replacementRoomId: effectiveRoomForTarget !== targetLesson.roomId ? effectiveRoomForTarget : undefined,
+            dayComment: dayComment || undefined
         };
         if (targetSubIndex >= 0) newSubs[targetSubIndex] = targetSubData; else newSubs.push(targetSubData);
 
@@ -432,7 +475,7 @@ export const SubstitutionsPage = () => {
         setShowSwapOptions(false);
         setSwapKeepRooms(false);
 
-    }, [currentSubParams, activeSchedule, substitutions, selectedDate, saveScheduleData, selectedRoomId, swapKeepRooms]);
+    }, [currentSubParams, activeSchedule, substitutions, selectedDate, saveScheduleData, selectedRoomId, swapKeepRooms, dayComment]);
     
     const removeSubstitution = useCallback(async (id: string) => { 
         const newSubs = substitutions.filter(s => !(s.scheduleItemId === id && s.date === selectedDate)); 
@@ -461,6 +504,9 @@ export const SubstitutionsPage = () => {
 
         if (sub.refusals) setRefusedTeacherIds(sub.refusals);
         else setRefusedTeacherIds([]);
+
+        setSubstitutionComment(sub.comment || '');
+        if (sub.dayComment) setDayComment(sub.dayComment);
 
         // Determine correct sub mode based on existing data
         if (sub.replacementTeacherId === 'cancelled') setSubMode('cancel');
@@ -871,6 +917,7 @@ export const SubstitutionsPage = () => {
 
         const isCancelled = firstSub?.replacementTeacherId === 'cancelled';
         const isConducted = firstSub?.replacementTeacherId === 'conducted';
+        const comment = firstSub?.comment;
         
         // Compact Mode Render
         if (isCompactMode) {
@@ -904,6 +951,11 @@ export const SubstitutionsPage = () => {
                                  </span>
                              )}
                         </div>
+                            {comment && (
+                                <div className="text-[10px] text-slate-500 italic mt-0.5 line-clamp-2">
+                                    {comment}
+                                </div>
+                            )}
                     </div>
                     
                     <div className="flex items-center gap-2">
@@ -995,6 +1047,12 @@ export const SubstitutionsPage = () => {
                                   {firstSub?.isMerger && <span className="text-[10px] text-purple-500 font-bold">ОБЪЕДИНЕНИЕ</span>}
                               </div>
                              }
+
+                             {comment && (
+                                <span className="text-[11px] text-slate-500 italic mt-1 max-w-xs text-right">
+                                    {comment}
+                                </span>
+                             )}
                              
                              {/* Telegram Send Button for Individual */}
                              {rep && rep.telegramChatId && !isCancelled && !isConducted && (
@@ -1074,6 +1132,19 @@ export const SubstitutionsPage = () => {
                             </button>
                         </div>
                     </div>
+                        {/* Day-level comment for all substitutions */}
+                        <div className="mt-4">
+                            <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1 block">
+                                Общий комментарий ко всем заменам (опционально)
+                            </label>
+                            <textarea
+                                value={dayComment}
+                                onChange={e => setDayComment(e.target.value)}
+                                className="w-full mt-1 p-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-sm text-slate-800 dark:text-slate-100 outline-none focus:ring-1 ring-indigo-500"
+                                rows={2}
+                                placeholder="Например: &quot;Замены связаны с педсоветом&quot; — будет показано в отчёте и PNG."
+                            />
+                        </div>
                 </div>
             </div>
 
@@ -1322,7 +1393,7 @@ export const SubstitutionsPage = () => {
                     {/* Fixed Footer for Options */}
                     {subMode === 'teacher' && (
                         <div className="p-6 pt-4 border-t border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-dark-800 flex flex-col gap-4 rounded-b-3xl">
-                             <div className="flex gap-4">
+                             <div className="flex flex-col md:flex-row gap-4">
                                 <div className="flex-1">
                                     <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Кабинет (Опционально)</label>
                                     <select value={selectedRoomId} onChange={e => setSelectedRoomId(e.target.value)} className="w-full border border-slate-200 p-3 rounded-xl text-sm bg-white dark:bg-slate-700 dark:text-white font-medium outline-none focus:ring-2 ring-indigo-500"><option value="">Авто / Без изменений</option>{rooms.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}</select>
@@ -1340,6 +1411,17 @@ export const SubstitutionsPage = () => {
                                         <option value="Другое">Другое</option>
                                     </select>
                                 </div>
+                             </div>
+
+                             <div className="flex flex-col gap-2">
+                                <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Комментарий к этой замене (Опционально)</label>
+                                <textarea
+                                    value={substitutionComment}
+                                    onChange={e => setSubstitutionComment(e.target.value)}
+                                    className="w-full border border-slate-200 p-2.5 rounded-xl text-sm bg-white dark:bg-slate-700 dark:text-white font-medium outline-none focus:ring-2 ring-indigo-500"
+                                    rows={2}
+                                    placeholder="Краткий комментарий, который будет виден в списке замен и на PNG."
+                                />
                              </div>
                              
                              {(activeReplacementId || (modalContext?.teacherId && selectedRoomId)) && (
