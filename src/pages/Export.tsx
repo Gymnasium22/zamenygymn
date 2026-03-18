@@ -10,10 +10,11 @@ import html2canvas from 'html2canvas';
 
 import { QRCodeSVG } from 'qrcode.react';
 import { Modal } from '../components/UI';
+import { SanitaryScheduleTab } from '../components/SanitaryScheduleTab';
 
 export const ExportPage = () => {
     const { subjects, teachers, classes, rooms, settings, bellSchedule, saveStaticData, dutyZones } = useStaticData();
-    const { schedule1, schedule2, substitutions, saveScheduleData, dutySchedule, nutritionRecords } = useScheduleData();
+    const { schedule1, schedule2, substitutions, saveScheduleData, dutySchedule, nutritionRecords, absenteeismRecords } = useScheduleData();
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const printRef1 = useRef<HTMLDivElement>(null);
@@ -35,6 +36,9 @@ export const ExportPage = () => {
     const [isMatrixPrintOpen, setIsMatrixPrintOpen] = useState(false);
     const [matrixGrade, setMatrixGrade] = useState<string>("");
 
+    type ExportTabId = 'data' | 'sanitary' | 'public';
+    const [activeExportTab, setActiveExportTab] = useState<ExportTabId>('data');
+
     const fullAppData: AppData = useMemo(() => ({
         subjects,
         teachers,
@@ -47,8 +51,9 @@ export const ExportPage = () => {
         substitutions,
         dutyZones,
         dutySchedule,
-        nutritionRecords
-    }), [subjects, teachers, classes, rooms, settings, bellSchedule, schedule1, schedule2, substitutions, dutyZones, dutySchedule, nutritionRecords]);
+        nutritionRecords,
+        absenteeismRecords
+    }), [subjects, teachers, classes, rooms, settings, bellSchedule, schedule1, schedule2, substitutions, dutyZones, dutySchedule, nutritionRecords, absenteeismRecords]);
 
     // Получаем расписание для экспорта (Excel, Матрица) на основе селектора
     const getScheduleForExport = () => exportSemester === 2 ? schedule2 : schedule1;
@@ -1375,150 +1380,207 @@ export const ExportPage = () => {
                 </div>
             </section>
 
-            <section className="bg-white dark:bg-dark-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
-                <div className="flex flex-col sm:flex-row justify-between items-center gap-6 mb-6">
-                    <div>
-                        <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                            <Icon name="Image" className="text-indigo-600 dark:text-indigo-400"/> Экспорт замен (PNG)
-                        </h2>
-                        <p className="text-slate-500 dark:text-slate-400 text-center">Общее расписание можно экспортировать через меню "Расписание" &rarr; "Печать" на самой странице расписания.</p>
-                    </div>
-                    <div className="flex gap-4 items-center">
-                        <input type="date" value={exportDate} onChange={e => setExportDate(e.target.value)} className="border border-slate-200 dark:border-slate-600 p-2 rounded-lg font-bold outline-none focus:border-indigo-500 bg-transparent dark:text-white"/>
-                        <button
-                            onClick={handleDownloadPngShift1}
-                            disabled={isGenerating || !subsForShift1}
-                            className="btn-primary btn-ripple flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:transform-none"
-                        >
-                            {isGenerating ? <><Icon name="Loader" size={20} className="animate-spin"/> Создание...</> : <><Icon name="Download" size={20}/> 1-я смена</>}
-                        </button>
-                        <button
-                            onClick={handleDownloadPngShift2}
-                            disabled={isGenerating || !subsForShift2}
-                            className="btn-primary btn-ripple flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:transform-none"
-                        >
-                            {isGenerating ? <><Icon name="Loader" size={20} className="animate-spin"/> Создание...</> : <><Icon name="Download" size={20}/> 2-я смена</>}
-                        </button>
-                    </div>
+            <section className="bg-white dark:bg-dark-800 p-3 sm:p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
+                <div className="flex flex-wrap gap-2">
+                    <button
+                        onClick={() => setActiveExportTab('data')}
+                        className={[
+                            "px-4 py-2 rounded-xl font-black text-sm transition border",
+                            activeExportTab === 'data'
+                                ? "bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-200 dark:shadow-none"
+                                : "bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600"
+                        ].join(' ')}
+                    >
+                        <span className="inline-flex items-center gap-2"><Icon name="FileSpreadsheet" size={18}/> Экспорт</span>
+                    </button>
+                    <button
+                        onClick={() => setActiveExportTab('sanitary')}
+                        className={[
+                            "px-4 py-2 rounded-xl font-black text-sm transition border",
+                            activeExportTab === 'sanitary'
+                                ? "bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-200 dark:shadow-none"
+                                : "bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600"
+                        ].join(' ')}
+                    >
+                        <span className="inline-flex items-center gap-2"><Icon name="Shield" size={18}/> Санстанция</span>
+                    </button>
+                    <button
+                        onClick={() => setActiveExportTab('public')}
+                        className={[
+                            "px-4 py-2 rounded-xl font-black text-sm transition border",
+                            activeExportTab === 'public'
+                                ? "bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-200 dark:shadow-none"
+                                : "bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600"
+                        ].join(' ')}
+                    >
+                        <span className="inline-flex items-center gap-2"><Icon name="QrCode" size={18}/> Публичное</span>
+                    </button>
                 </div>
-                <div className="overflow-auto bg-slate-100 dark:bg-slate-900 p-8 rounded-xl border border-slate-200 dark:border-slate-700 flex justify-start">
-                    {subsForDate.length === 0 ? (
-                        <div className="bg-white p-8 min-w-[800px] max-w-[1000px] shadow-xl text-slate-900">
-                            <ReportHeader />
-                            <div className="py-12 text-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50">
-                                <p className="text-slate-400 font-medium italic">Замен на этот день нет</p>
+            </section>
+
+            {activeExportTab === 'data' && (
+                <>
+                    <section className="bg-white dark:bg-dark-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
+                        <div className="flex flex-col sm:flex-row justify-between items-center gap-6 mb-6">
+                            <div>
+                                <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+                                    <Icon name="Image" className="text-indigo-600 dark:text-indigo-400"/> Экспорт замен (PNG)
+                                </h2>
+                                <p className="text-slate-500 dark:text-slate-400 text-center">Общее расписание можно экспортировать через меню "Расписание" &rarr; "Печать" на самой странице расписания.</p>
                             </div>
-                            <ReportFooter />
+                            <div className="flex gap-4 items-center">
+                                <input type="date" value={exportDate} onChange={e => setExportDate(e.target.value)} className="border border-slate-200 dark:border-slate-600 p-2 rounded-lg font-bold outline-none focus:border-indigo-500 bg-transparent dark:text-white"/>
+                                <button
+                                    onClick={handleDownloadPngShift1}
+                                    disabled={isGenerating || !subsForShift1}
+                                    className="btn-primary btn-ripple flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:transform-none"
+                                >
+                                    {isGenerating ? <><Icon name="Loader" size={20} className="animate-spin"/> Создание...</> : <><Icon name="Download" size={20}/> 1-я смена</>}
+                                </button>
+                                <button
+                                    onClick={handleDownloadPngShift2}
+                                    disabled={isGenerating || !subsForShift2}
+                                    className="btn-primary btn-ripple flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:transform-none"
+                                >
+                                    {isGenerating ? <><Icon name="Loader" size={20} className="animate-spin"/> Создание...</> : <><Icon name="Download" size={20}/> 2-я смена</>}
+                                </button>
+                            </div>
+                        </div>
+                        <div className="overflow-auto bg-slate-100 dark:bg-slate-900 p-8 rounded-xl border border-slate-200 dark:border-slate-700 flex justify-start">
+                            {subsForDate.length === 0 ? (
+                                <div className="bg-white p-8 min-w-[800px] max-w-[1000px] shadow-xl text-slate-900">
+                                    <ReportHeader />
+                                    <div className="py-12 text-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50">
+                                        <p className="text-slate-400 font-medium italic">Замен на этот день нет</p>
+                                    </div>
+                                    <ReportFooter />
+                                </div>
+                            ) : (
+                                <div className="flex flex-col lg:flex-row gap-8">
+                                    {subsForShift1 && (
+                                        <div ref={printRef1} className="bg-white p-8 min-w-[800px] max-w-[1000px] shadow-xl text-slate-900">
+                                            <ReportHeader />
+                                            {renderTableForShift(Shift.First)}
+                                            <ReportFooter />
+                                        </div>
+                                    )}
+                                    {subsForShift2 && (
+                                        <div ref={printRef2} className="bg-white p-8 min-w-[800px] max-w-[1000px] shadow-xl text-slate-900">
+                                            <ReportHeader />
+                                            {renderTableForShift(Shift.Second)}
+                                            <ReportFooter />
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </section>
+
+                    <section className="bg-white dark:bg-dark-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
+                        <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                            <Icon name="Printer" className="text-blue-600 dark:text-blue-400"/> Печать сетки
+                        </h2>
+                        <div className="flex flex-wrap gap-4 items-center">
+                            <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl p-1.5 pl-3">
+                                <span className="text-xs font-bold text-slate-500 dark:text-slate-400">Параллель:</span>
+                                <select
+                                    value={matrixGrade}
+                                    onChange={(e) => setMatrixGrade(e.target.value)}
+                                    className="bg-transparent text-sm font-bold text-slate-700 dark:text-slate-200 outline-none cursor-pointer"
+                                >
+                                    {availableGrades.map((g: string) => <option key={g} value={g}>{g}-е классы</option>)}
+                                </select>
+                            </div>
+                            <button onClick={() => setIsMatrixPrintOpen(true)} className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200 dark:shadow-none flex items-center gap-2">
+                                <Icon name="Printer" size={20}/> Открыть версию для печати
+                            </button>
+                            <button onClick={downloadGradeMatrixExcel} className="px-6 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition shadow-lg shadow-emerald-200 dark:shadow-none flex items-center gap-2">
+                                <Icon name="FileSpreadsheet" size={20}/> Скачать Excel
+                            </button>
+                        </div>
+                    </section>
+
+                    <section className="bg-white dark:bg-dark-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
+                        <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                            <Icon name="FileSpreadsheet" className="text-emerald-600 dark:text-emerald-400"/> Экспорт данных
+                        </h2>
+                        <div className="flex flex-wrap gap-4 items-center">
+                            <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl p-1.5 pl-3">
+                                <span className="text-xs font-bold text-slate-500 dark:text-slate-400">Полугодие:</span>
+                                <select
+                                    value={exportSemester}
+                                    onChange={(e) => setExportSemester(Number(e.target.value) as 1 | 2)}
+                                    className="bg-transparent text-sm font-bold text-slate-700 dark:text-slate-200 outline-none cursor-pointer"
+                                >
+                                    <option value={1}>1-е (Сен-Дек)</option>
+                                    <option value={2}>2-е (Янв-Май)</option>
+                                </select>
+                            </div>
+                            <button onClick={exportStyledExcel} className="px-6 py-3 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900 rounded-xl font-bold hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition flex items-center gap-2">
+                                <Icon name="FileSpreadsheet" size={20}/> Скачать Excel (XLS)
+                            </button>
+                            <button onClick={exportMatrixExcel} className="px-6 py-3 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border border-blue-100 dark:border-blue-900 rounded-xl font-bold hover:bg-blue-100 dark:hover:bg-blue-900/50 transition flex items-center gap-2">
+                                <Icon name="Table" size={20}/> Скачать Матрицу (XLS)
+                            </button>
+                            <button onClick={exportPosterMatrixExcel} className="px-6 py-3 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 border border-purple-100 dark:border-purple-900 rounded-xl font-bold hover:bg-purple-100 dark:hover:bg-purple-900/50 transition flex items-center gap-2">
+                                <Icon name="Table" size={20}/> Скачать Плакат (XLS)
+                            </button>
+                            <button onClick={copyForGoogleSheets} className="px-6 py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition shadow-lg shadow-green-200 dark:shadow-none flex items-center gap-2">
+                                <Icon name="Clipboard" size={20}/> Копировать для Google Sheets
+                            </button>
+                            <button onClick={exportMonthlySubstitutionsExcel} className="px-6 py-3 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 border border-purple-100 dark:border-purple-900 rounded-xl font-bold hover:bg-purple-100 dark:hover:bg-purple-900/50 transition flex items-center gap-2">
+                                <Icon name="List" size={20}/> Отчет по заменам (XLS)
+                            </button>
+                            <button onClick={exportRefusalsExcel} className="px-6 py-3 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 border border-red-100 dark:border-red-900 rounded-xl font-bold hover:bg-red-100 dark:hover:bg-red-900/50 transition flex items-center gap-2">
+                                <Icon name="UserX" size={20}/> Отчет об отказах (XLS)
+                            </button>
+                        </div>
+                    </section>
+                </>
+            )}
+
+            {activeExportTab === 'sanitary' && (
+                <SanitaryScheduleTab
+                    semester={exportSemester}
+                    onSemesterChange={setExportSemester}
+                    schedule1={schedule1}
+                    schedule2={schedule2}
+                    classes={classes}
+                    subjects={subjects}
+                    rooms={rooms}
+                    teachers={teachers}
+                />
+            )}
+
+            {activeExportTab === 'public' && (
+                <section className="bg-white dark:bg-dark-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
+                    <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                        <Icon name="QrCode" className="text-purple-600 dark:text-purple-400"/> Публичное расписание
+                    </h2>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+                        Опубликуйте актуальное расписание для учеников и родителей. Будет сгенерирована уникальная ссылка с QR-кодом.
+                    </p>
+                    {settings.publicScheduleId ? (
+                        <div className="flex flex-col md:flex-row items-center gap-4">
+                            <div className="flex-1">
+                                <p className="text-sm font-bold text-slate-600 dark:text-slate-300 mb-2">
+                                    Расписание опубликовано! ID: <span className="font-mono bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded">{settings.publicScheduleId}</span>
+                                </p>
+                                <button onClick={() => setIsPublishModalOpen(true)} className="px-4 py-2 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition flex items-center gap-2">
+                                    <Icon name="Share2" size={16}/> Показать QR-код и ссылку
+                                </button>
+                                <button onClick={clearPublicSchedule} className="ml-3 px-4 py-2 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 border border-red-100 dark:border-red-900 rounded-xl font-bold hover:bg-red-100 dark:hover:bg-red-900/50 transition flex items-center gap-2">
+                                    <Icon name="Trash2" size={16}/> Отменить публикацию
+                                </button>
+                            </div>
                         </div>
                     ) : (
-                        <div className="flex flex-col lg:flex-row gap-8">
-                            {subsForShift1 && (
-                                <div ref={printRef1} className="bg-white p-8 min-w-[800px] max-w-[1000px] shadow-xl text-slate-900">
-                                    <ReportHeader />
-                                    {renderTableForShift(Shift.First)}
-                                    <ReportFooter />
-                                </div>
-                            )}
-                            {subsForShift2 && (
-                                <div ref={printRef2} className="bg-white p-8 min-w-[800px] max-w-[1000px] shadow-xl text-slate-900">
-                                    <ReportHeader />
-                                    {renderTableForShift(Shift.Second)}
-                                    <ReportFooter />
-                                </div>
-                            )}
-                        </div>
+                        <button onClick={handlePublishSchedule} disabled={isGenerating} className="px-6 py-3 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition shadow-lg shadow-purple-200 dark:shadow-none flex items-center gap-2 disabled:opacity-50">
+                            <Icon name="Share2" size={20}/> Опубликовать расписание
+                        </button>
                     )}
-                </div>
-            </section>
-
-            <section className="bg-white dark:bg-dark-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
-                <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
-                    <Icon name="Printer" className="text-blue-600 dark:text-blue-400"/> Печать сетки
-                </h2>
-                <div className="flex flex-wrap gap-4 items-center">
-                    <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl p-1.5 pl-3">
-                        <span className="text-xs font-bold text-slate-500 dark:text-slate-400">Параллель:</span>
-                        <select
-                            value={matrixGrade}
-                            onChange={(e) => setMatrixGrade(e.target.value)}
-                            className="bg-transparent text-sm font-bold text-slate-700 dark:text-slate-200 outline-none cursor-pointer"
-                        >
-                            {availableGrades.map((g: string) => <option key={g} value={g}>{g}-е классы</option>)}
-                        </select>
-                    </div>
-                    <button onClick={() => setIsMatrixPrintOpen(true)} className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200 dark:shadow-none flex items-center gap-2">
-                        <Icon name="Printer" size={20}/> Открыть версию для печати
-                    </button>
-                    <button onClick={downloadGradeMatrixExcel} className="px-6 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition shadow-lg shadow-emerald-200 dark:shadow-none flex items-center gap-2">
-                        <Icon name="FileSpreadsheet" size={20}/> Скачать Excel
-                    </button>
-                </div>
-            </section>
-
-            <section className="bg-white dark:bg-dark-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
-                <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
-                    <Icon name="FileSpreadsheet" className="text-emerald-600 dark:text-emerald-400"/> Экспорт данных
-                </h2>
-                <div className="flex flex-wrap gap-4 items-center">
-                    <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl p-1.5 pl-3">
-                        <span className="text-xs font-bold text-slate-500 dark:text-slate-400">Полугодие:</span>
-                        <select
-                            value={exportSemester}
-                            onChange={(e) => setExportSemester(Number(e.target.value) as 1 | 2)}
-                            className="bg-transparent text-sm font-bold text-slate-700 dark:text-slate-200 outline-none cursor-pointer"
-                        >
-                            <option value={1}>1-е (Сен-Дек)</option>
-                            <option value={2}>2-е (Янв-Май)</option>
-                        </select>
-                    </div>
-                    <button onClick={exportStyledExcel} className="px-6 py-3 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900 rounded-xl font-bold hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition flex items-center gap-2">
-                        <Icon name="FileSpreadsheet" size={20}/> Скачать Excel (XLS)
-                    </button>
-                    <button onClick={exportMatrixExcel} className="px-6 py-3 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border border-blue-100 dark:border-blue-900 rounded-xl font-bold hover:bg-blue-100 dark:hover:bg-blue-900/50 transition flex items-center gap-2">
-                        <Icon name="Table" size={20}/> Скачать Матрицу (XLS)
-                    </button>
-                    <button onClick={exportPosterMatrixExcel} className="px-6 py-3 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 border border-purple-100 dark:border-purple-900 rounded-xl font-bold hover:bg-purple-100 dark:hover:bg-purple-900/50 transition flex items-center gap-2">
-                        <Icon name="Table" size={20}/> Скачать Плакат (XLS)
-                    </button>
-                    <button onClick={copyForGoogleSheets} className="px-6 py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition shadow-lg shadow-green-200 dark:shadow-none flex items-center gap-2">
-                        <Icon name="Clipboard" size={20}/> Копировать для Google Sheets
-                    </button>
-                    <button onClick={exportMonthlySubstitutionsExcel} className="px-6 py-3 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 border border-purple-100 dark:border-purple-900 rounded-xl font-bold hover:bg-purple-100 dark:hover:bg-purple-900/50 transition flex items-center gap-2">
-                        <Icon name="List" size={20}/> Отчет по заменам (XLS)
-                    </button>
-                    <button onClick={exportRefusalsExcel} className="px-6 py-3 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 border border-red-100 dark:border-red-900 rounded-xl font-bold hover:bg-red-100 dark:hover:bg-red-900/50 transition flex items-center gap-2">
-                        <Icon name="UserX" size={20}/> Отчет об отказах (XLS)
-                    </button>
-                </div>
-            </section>
-
-            <section className="bg-white dark:bg-dark-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
-                <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
-                    <Icon name="QrCode" className="text-purple-600 dark:text-purple-400"/> Публичное расписание
-                </h2>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-                    Опубликуйте актуальное расписание для учеников и родителей. Будет сгенерирована уникальная ссылка с QR-кодом.
-                </p>
-                {settings.publicScheduleId ? (
-                    <div className="flex flex-col md:flex-row items-center gap-4">
-                        <div className="flex-1">
-                            <p className="text-sm font-bold text-slate-600 dark:text-slate-300 mb-2">
-                                Расписание опубликовано! ID: <span className="font-mono bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded">{settings.publicScheduleId}</span>
-                            </p>
-                            <button onClick={() => setIsPublishModalOpen(true)} className="px-4 py-2 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition flex items-center gap-2">
-                                <Icon name="Share2" size={16}/> Показать QR-код и ссылку
-                            </button>
-                            <button onClick={clearPublicSchedule} className="ml-3 px-4 py-2 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 border border-red-100 dark:border-red-900 rounded-xl font-bold hover:bg-red-100 dark:hover:bg-red-900/50 transition flex items-center gap-2">
-                                <Icon name="Trash2" size={16}/> Отменить публикацию
-                            </button>
-                        </div>
-                    </div>
-                ) : (
-                    <button onClick={handlePublishSchedule} disabled={isGenerating} className="px-6 py-3 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition shadow-lg shadow-purple-200 dark:shadow-none flex items-center gap-2 disabled:opacity-50">
-                        <Icon name="Share2" size={20}/> Опубликовать расписание
-                    </button>
-                )}
-            </section>
+                </section>
+            )}
 
             <Modal isOpen={isPublishModalOpen} onClose={() => setIsPublishModalOpen(false)} title="Публичное расписание">
                 <div className="flex flex-col items-center justify-center p-4 text-center space-y-4">
