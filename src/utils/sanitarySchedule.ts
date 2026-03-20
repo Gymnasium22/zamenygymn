@@ -382,9 +382,9 @@ export function generateSanitarySchedule(params: {
     subjects,
     classes,
     periodsByShift,
-    maxIterations = 50000, // Увеличено с 25000
-    maxSwaps = 600, // Увеличено с 260
-    enforceTeacherConflicts = true,
+    maxIterations = 100000, // Увеличено по умолчанию
+    maxSwaps = 1500, // Увеличено по умолчанию
+    enforceTeacherConflicts = false, // Отключено по умолчанию для санстанции
   } = params;
 
   const subjectsById = new Map(subjects.map((s) => [s.id, s]));
@@ -411,7 +411,7 @@ export function generateSanitarySchedule(params: {
     from: { shift: string; day: string; period: number };
     to: { shift: string; day: string; period: number };
   }) => {
-    if (!enforceTeacherConflicts) return true;
+    if (!enforceTeacherConflicts) return true; // Всегда разрешаем, если учителя не учитываются
     const { occupancy, fromLessons, toLessons, from, to } = params;
     for (const it of fromLessons) {
       const key = teacherSlotKey(it.teacherId, to.shift, to.day, to.period);
@@ -432,7 +432,7 @@ export function generateSanitarySchedule(params: {
   }
 
   const analysisByClassId: Record<string, SanitaryAnalysis> = {};
-  let swapsApplied = 0;
+  let totalSwapsApplied = 0;
 
   for (const cls of classes) {
     const clsItems = byClassId.get(cls.id) || [];
@@ -472,6 +472,7 @@ export function generateSanitarySchedule(params: {
     const firstP = periods[0];
     const lastP = periods[periods.length - 1];
     const preferred = periods.filter((p) => p >= 2 && p <= 4);
+    const preferredDays = [DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Friday];
 
     const trySwap = (keyA: SlotKey, keyB: SlotKey): boolean => {
       const a = slotMap.get(keyA) || [];
@@ -495,7 +496,7 @@ export function generateSanitarySchedule(params: {
       const after = classPenalty({ classId: cls.id, className: cls.name, shift: cls.shift, periods, slotMap, subjectsById });
       if (after < before) { // Строгое неравенство для лучшего поиска
         currentPenalty = after;
-        swapsApplied++;
+        totalSwapsApplied++;
         return true;
       }
       swapSlots(slotMap, keyA, keyB);
@@ -508,8 +509,20 @@ export function generateSanitarySchedule(params: {
       return slot.some((it) => isHeavySubject(subjectsById.get(it.subjectId), undefined, grade));
     };
 
-    // Reduce heavy on first/last (keep <= 1 per week) - увеличено количество попыток
-    for (let pass = 0; pass < 15; pass++) {
+    const getNonHeavySlot = (day?: string, period?: number): SlotKey | null => {
+      const targetDays = day ? [day] : DAYS;
+      const targetPeriods = period ? [period] : preferred;
+      for (const d of targetDays) {
+        for (const p of targetPeriods) {
+          const key = `${cls.id}__${cls.shift}__${d}__${p}`;
+          if (!hasHeavyInSlot(key)) return key;
+        }
+      }
+      return null;
+    };
+
+    // Reduce heavy on first/last (keep <= 1 per week) - агрессивная фаза
+    for (let pass = 0; pass < 25; pass++) {
       const analysisTmp = analyzeClassSchedule({ classId: cls.id, className: cls.name, shift: cls.shift, periods, slotMap, subjectsById });
       if (analysisTmp.heavyFirstCount <= 1 && analysisTmp.heavyLastCount <= 1) break;
 
@@ -519,8 +532,7 @@ export function generateSanitarySchedule(params: {
 
         const maybeFix = (badKey: SlotKey) => {
           if (!hasHeavyInSlot(badKey)) return;
-          // Сначала пробуем preferred дни (Вт, Ср, Пт)
-          const preferredDays = [DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Friday];
+          // Сначала пробуем preferred дни (Вт, Ср, Пт) на preferred позициях (2-4)
           for (const d2 of preferredDays) {
             for (const p2 of preferred) {
               const goodKey = `${cls.id}__${cls.shift}__${d2}__${p2}`;
@@ -528,10 +540,11 @@ export function generateSanitarySchedule(params: {
               if (trySwap(badKey, goodKey)) return;
             }
           }
-          // Затем остальные дни
+          // Затем любые другие позиции
           for (const d2 of DAYS) {
-            for (const p2 of preferred) {
+            for (const p2 of periods) {
               const goodKey = `${cls.id}__${cls.shift}__${d2}__${p2}`;
+              if (goodKey === badKey) continue;
               if (hasHeavyInSlot(goodKey)) continue;
               if (trySwap(badKey, goodKey)) return;
             }
@@ -543,35 +556,44 @@ export function generateSanitarySchedule(params: {
       }
     }
 
-    // Break consecutive heavy - увеличено количество попыток
-    for (let pass = 0; pass < 20; pass++) {
+    // Break consecutive heavy - агрессивная фаза
+    for (let pass = 0; pass < 30; pass++) {
       const analysisTmp = analyzeClassSchedule({ classId: cls.id, className: cls.name, shift: cls.shift, periods, slotMap, subjectsById });
-      const consec = analysisTmp.violations.filter((x) => x.type === 'heavy_consecutive') as Array<{ type: 'heavy_consecutive'; classId: string; day: string; period: number }>;
+      const consec = analysisTmp.violations.filter((x) => x.type === 'heavy_consecutive');
       if (consec.length === 0) break;
-      for (const v of consec.slice(0, 8)) {
+      
+      for (const v of consec) {
         const badKey = `${cls.id}__${cls.shift}__${v.day}__${v.period}`;
-        // Пробуем переместить на preferred позиции
-        for (const p2 of preferred) {
-          const goodKey = `${cls.id}__${cls.shift}__${v.day}__${p2}`;
-          if (goodKey === badKey) continue;
-          if (hasHeavyInSlot(goodKey)) continue;
-          if (trySwap(badKey, goodKey)) break;
+        // Пробуем переместить на preferred позиции в preferred дни
+        for (const d2 of preferredDays) {
+          for (const p2 of preferred) {
+            const goodKey = `${cls.id}__${cls.shift}__${d2}__${p2}`;
+            if (goodKey === badKey) continue;
+            if (hasHeavyInSlot(goodKey)) continue;
+            if (trySwap(badKey, goodKey)) break;
+          }
+        }
+        // Если не получилось, пробуем любые другие позиции
+        for (const d2 of DAYS) {
+          for (const p2 of periods) {
+            const goodKey = `${cls.id}__${cls.shift}__${d2}__${p2}`;
+            if (goodKey === badKey) continue;
+            if (hasHeavyInSlot(goodKey)) continue;
+            if (trySwap(badKey, goodKey)) break;
+          }
         }
       }
     }
 
-    // --- Phase 2: Fix peak day violations ---
-    // Специальная фаза для исправления пикового дня
-    for (let pass = 0; pass < 10; pass++) {
+    // --- Phase 2: Fix peak day violations - агрессивная фаза ---
+    for (let pass = 0; pass < 20; pass++) {
       const analysisTmp = analyzeClassSchedule({ classId: cls.id, className: cls.name, shift: cls.shift, periods, slotMap, subjectsById });
       const peakViolation = analysisTmp.violations.find((x) => x.type === 'peak_day_not_on_recommended');
       if (!peakViolation) break;
 
       const peakDay = analysisTmp.peakDay;
-      const recommendedDays = [DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Friday];
       const nonRecommendedDays = [DayOfWeek.Monday, DayOfWeek.Thursday];
 
-      // Если пик в неправильный день, пробуем переместить часть нагрузки
       if (nonRecommendedDays.includes(peakDay as DayOfWeek)) {
         // Найти самый нагруженный слот в peakDay
         let maxLoadPeriod = periods[0];
@@ -587,11 +609,11 @@ export function generateSanitarySchedule(params: {
         }
 
         // Попробовать переместить в recommended day с меньшей нагрузкой
-        for (const recDay of recommendedDays) {
+        for (const recDay of preferredDays) {
           for (const period of preferred) {
             const fromKey = `${cls.id}__${cls.shift}__${peakDay}__${maxLoadPeriod}`;
             const toKey = `${cls.id}__${cls.shift}__${recDay}__${period}`;
-            if (!hasHeavyInSlot(fromKey)) continue;
+            if (fromKey === toKey) continue;
             if (hasHeavyInSlot(toKey)) continue;
             if (trySwap(fromKey, toKey)) break;
           }
@@ -599,22 +621,76 @@ export function generateSanitarySchedule(params: {
       }
     }
 
-    // --- Phase 3: stochastic search (annealing-lite) ---
-    // Stochastic hill-climb with limited swaps
-    const maxIters = Math.max(5000, maxIterations);
-    const tempStart = 100;
-    const tempEnd = 1.0;
+    // --- Phase 3: Balance day loads - новая фаза для баланса ---
+    for (let pass = 0; pass < 15; pass++) {
+      const analysisTmp = analyzeClassSchedule({ classId: cls.id, className: cls.name, shift: cls.shift, periods, slotMap, subjectsById });
+      const loads = DAYS.map((d) => analysisTmp.dayLoad[d] ?? 0);
+      const maxLoadDay = DAYS.reduce((a, b) => (loads[DAYS.indexOf(a)] > loads[DAYS.indexOf(b)] ? a : b));
+      const minLoadDay = DAYS.reduce((a, b) => (loads[DAYS.indexOf(a)] < loads[DAYS.indexOf(b)] ? a : b));
+      
+      if ((loads[DAYS.indexOf(maxLoadDay)] - loads[DAYS.indexOf(minLoadDay)]) < 5) break;
+
+      // Найти самый тяжёлый слот в самом нагруженном дне
+      let maxSlot: SlotKey | null = null;
+      let maxSlotLoad = 0;
+      for (const period of periods) {
+        const key = `${cls.id}__${cls.shift}__${maxLoadDay}__${period}`;
+        const slot = slotMap.get(key) || [];
+        const load = slot.reduce((sum, it) => sum + subjectDifficulty(subjectsById.get(it.subjectId), undefined), 0);
+        if (load > maxSlotLoad) {
+          maxSlotLoad = load;
+          maxSlot = key;
+        }
+      }
+
+      // Найти самый лёгкий слот в самом лёгком дне
+      let minSlot: SlotKey | null = null;
+      let minSlotLoad = 999;
+      for (const period of periods) {
+        const key = `${cls.id}__${cls.shift}__${minLoadDay}__${period}`;
+        const slot = slotMap.get(key) || [];
+        const load = slot.reduce((sum, it) => sum + subjectDifficulty(subjectsById.get(it.subjectId), undefined), 0);
+        if (load < minSlotLoad) {
+          minSlotLoad = load;
+          minSlot = key;
+        }
+      }
+
+      if (maxSlot && minSlot && maxSlotLoad > minSlotLoad + 3) {
+        trySwap(maxSlot, minSlot);
+      } else {
+        break;
+      }
+    }
+
+    // --- Phase 4: stochastic search (simulated annealing) ---
+    const maxIters = Math.max(10000, maxIterations);
+    let temp = 200;
+    const coolingRate = 0.9995;
     let swapsThisClass = 0;
 
     for (let iter = 0; iter < maxIters && swapsThisClass < maxSwaps; iter++) {
-      const idxA = Math.floor(Math.random() * allKeys.length);
+      // Умный выбор ячеек: предпочитаем ячейки с тяжёлыми предметами
+      let keyA: SlotKey;
+      let keyB: SlotKey;
+      
+      // С вероятностью 30% выбираем ячейку с тяжёлым предметом
+      if (Math.random() < 0.3) {
+        const heavyKeys = allKeys.filter((k) => hasHeavyInSlot(k));
+        if (heavyKeys.length > 0) {
+          keyA = heavyKeys[Math.floor(Math.random() * heavyKeys.length)];
+        } else {
+          keyA = allKeys[Math.floor(Math.random() * allKeys.length)];
+        }
+      } else {
+        keyA = allKeys[Math.floor(Math.random() * allKeys.length)];
+      }
+      
       let idxB = Math.floor(Math.random() * allKeys.length);
-      if (idxB === idxA) idxB = (idxB + 1) % allKeys.length;
-      const keyA = allKeys[idxA];
-      const keyB = allKeys[idxB];
+      keyB = allKeys[idxB];
 
       if (keyA === keyB) continue;
-      // skip no-op swaps (both empty)
+      
       const a = slotMap.get(keyA) || [];
       const b = slotMap.get(keyB) || [];
       if (a.length === 0 && b.length === 0) continue;
@@ -633,7 +709,6 @@ export function generateSanitarySchedule(params: {
         continue;
       }
 
-      // do swap
       swapSlots(slotMap, keyA, keyB);
       const newPenalty = classPenalty({
         classId: cls.id,
@@ -644,20 +719,21 @@ export function generateSanitarySchedule(params: {
         subjectsById,
       });
 
-      const t = tempStart + (tempEnd - tempStart) * (iter / maxIters);
       const delta = newPenalty - currentPenalty;
-      const accept = delta <= 0 || Math.random() < Math.exp(-delta / Math.max(0.001, t));
+      const accept = delta <= 0 || Math.random() < Math.exp(-delta / Math.max(0.001, temp));
+      
       if (accept) {
         currentPenalty = newPenalty;
-        swapsApplied++;
+        totalSwapsApplied++;
         swapsThisClass++;
       } else {
-        // revert
         swapSlots(slotMap, keyA, keyB);
       }
 
-      // early stop: good enough
-      if (currentPenalty < 50) break;
+      temp *= coolingRate;
+
+      // Ранняя остановка при отличном результате
+      if (currentPenalty < 10) break;
     }
 
     const finalAnalysis = analyzeClassSchedule({
@@ -674,7 +750,7 @@ export function generateSanitarySchedule(params: {
   }
 
   const schedule = Array.from(byClassId.values()).flat();
-  return { schedule, analysisByClassId, swapsApplied };
+  return { schedule, analysisByClassId, swapsApplied: totalSwapsApplied };
 }
 
 export function applySlotSwaps(params: {

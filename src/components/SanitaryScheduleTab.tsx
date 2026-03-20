@@ -100,7 +100,7 @@ export function SanitaryScheduleTab(props: {
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [lastOptimizedAt, setLastOptimizedAt] = useState<string>('');
   const [modeLabel, setModeLabel] = useState<'auto' | 'base'>('auto');
-  const allowTeacherConflicts = true;
+  const allowTeacherConflicts = true; // Учителя не учитываются для санстанции
 
   const periods = useMemo(() => {
     if (!selectedClass) return [];
@@ -139,10 +139,31 @@ export function SanitaryScheduleTab(props: {
     const rows = eligibleClasses.map((c) => {
       const a = sanitaryBase.analysisByClassId[c.id];
       const violations = a?.violations?.length ?? 0;
-      return { id: c.id, name: c.name, shift: c.shift, violations, peakDay: a?.peakDay, dayLoad: a?.dayLoad };
+      const heavyFirst = a?.heavyFirstCount ?? 0;
+      const heavyLast = a?.heavyLastCount ?? 0;
+      const peakDay = a?.peakDay;
+      const dayLoad = a?.dayLoad;
+      // Подсчёт типов нарушений
+      const violationTypes = {
+        heavyFirstOrLast: a?.violations.filter(v => v.type === 'heavy_first_or_last_more_than_once').length ?? 0,
+        consecutive: a?.violations.filter(v => v.type === 'heavy_consecutive').length ?? 0,
+        peakDay: a?.violations.filter(v => v.type === 'peak_day_not_on_recommended').length ?? 0,
+      };
+      return { 
+        id: c.id, 
+        name: c.name, 
+        shift: c.shift, 
+        violations, 
+        heavyFirst, 
+        heavyLast,
+        peakDay, 
+        dayLoad,
+        violationTypes 
+      };
     });
     const ok = rows.filter((r) => r.violations === 0).length;
-    return { rows, ok, total: rows.length };
+    const totalViolations = rows.reduce((sum, r) => sum + r.violations, 0);
+    return { rows, ok, total: rows.length, totalViolations };
   }, [eligibleClasses, sanitaryBase.analysisByClassId]);
 
   const sanitarySchedule = useMemo(() => {
@@ -432,9 +453,9 @@ export function SanitaryScheduleTab(props: {
       subjects,
       classes: eligibleClasses.map((c) => ({ id: c.id, name: c.name, shift: c.shift })),
       periodsByShift: SHIFT_PERIODS as any,
-      maxIterations: 35000,
-      maxSwaps: 420,
-      enforceTeacherConflicts: !allowTeacherConflicts,
+      maxIterations: 100000, // Увеличено для лучшей оптимизации
+      maxSwaps: 1500, // Увеличено для большей свободы перемещений
+      enforceTeacherConflicts: false, // Учителя не учитываются
     });
     setSanitaryBase(next);
     setLastOptimizedAt(new Date().toLocaleString('ru-RU'));
@@ -846,8 +867,15 @@ export function SanitaryScheduleTab(props: {
                 Режим: <span className="font-black">{modeLabel === 'auto' ? 'Автонастройка' : 'Как в действующем расписании'}</span>
               </div>
             </div>
-            <div className="px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wider bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200">
-              OK: {allClassesStats.ok} / {allClassesStats.total}
+            <div className="flex items-center gap-3">
+              <div className="px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wider bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400">
+                OK: {allClassesStats.ok} / {allClassesStats.total}
+              </div>
+              {allClassesStats.totalViolations > 0 && (
+                <div className="px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wider bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400">
+                  Нарушений: {allClassesStats.totalViolations}
+                </div>
+              )}
             </div>
           </div>
 
