@@ -23,26 +23,35 @@ export interface SanitaryResult {
   swapsApplied: number;
 }
 
-const DEFAULT_UNKNOWN_DIFFICULTY = 6; // ближе к “середине”, чтобы не занижать нагрузку
+const DEFAULT_UNKNOWN_DIFFICULTY = 6; // ближе к "середине", чтобы не занижать нагрузку
 
 // Важно: используем "вхождения", как в твоём примере, а не строгие совпадения.
+// Шкала трудности согласно требованиям санстанции
 const DIFFICULTY_BY_SUBJECT_NAME: Array<[RegExp, number]> = [
-  [/математ|алгебр|геометр/i, 12],
-  [/иностранн|английск|немецк|французск|испанск/i, 11],
-  [/(русск(ий|ого)?\s+язык|рус\.?\s*яз)|((белорусск(ий|ого)?\s+язык|бел\.?\s*яз))|национального\s+меньшинства/i, 10],
-  [/физик/i, 9],
-  [/хими/i, 9],
-  [/информатик/i, 8],
-  [/астроном/i, 8],
-  [/биолог/i, 8],
-  [/всемирн.*истор|история\s+беларуси|обществовед/i, 7],
-  [/литератур|русск\w*\s+лит|белорусск\w*\s+лит/i, 6],
-  [/географ/i, 6],
-  [/человек\s+и\s+мир/i, 5],
-  [/искусств|мхк/i, 4],
-  [/основы\s+безопасности|обж/i, 4],
-  [/черчен|труд|технолог|трудовое\s+обучение/i, 4],
-  [/физкультур|физическая\s+культура|допризывн|медицинск|здоровье/i, 3],
+  [/математ|алгебр|геометр/i, 12], // Математика
+  [/иностранн|английск|немецк|французск|испанск/i, 11], // Иностранный язык
+  [/русск(ий|ого)?\s+язык|рус\.?\s*яз/i, 10], // Русский язык
+  [/белорусск(ий|ого)?\s+язык|бел\.?\s*яз/i, 10], // Белорусский язык
+  [/национального\s+меньшинства/i, 10], // Язык национального меньшинства
+  [/физик/i, 9], // Физика
+  [/хими/i, 9], // Химия
+  [/информатик/i, 8], // Информатика
+  [/астроном/i, 8], // Астрономия
+  [/биолог/i, 8], // Биология
+  [/всемирн.*истор/i, 7], // Всемирная история
+  [/история\s+беларуси/i, 7], // История Беларуси
+  [/обществовед/i, 7], // Обществоведение
+  [/белорусск\w*\s+литератур/i, 6], // Белорусская литература
+  [/русск\w*\s+литератур/i, 6], // Русская литература
+  [/литература\s+национального\s+меньшинства/i, 6], // Литература национального меньшинства
+  [/географ/i, 6], // География
+  [/человек\s+и\s+мир/i, 5], // Человек и мир
+  [/искусств|отечественная\s+и\s+мировая\s+художественная\s+культура|мхк/i, 4], // Искусство (ОМХК)
+  [/основы\s+безопасности\s+жизнедеятельности|обж/i, 4], // ОБЖ
+  [/черчен/i, 4], // Черчение
+  [/труд|технолог|трудовое\s+обучение/i, 4], // Трудовое обучение
+  [/физкультур\s+и\s+здоров|физическая\s+культура\s+и\s+здоровье/i, 3], // Физическая культура и здоровье
+  [/допризывн|медицинск\s+подготов/i, 3], // Допризывная и медицинская подготовка
 ];
 
 const HEAVY_SUBJECT_NAME_PATTERNS: RegExp[] = [
@@ -239,14 +248,23 @@ function classPenalty(params: {
 }): number {
   const { classId, className, shift, periods, slotMap, subjectsById } = params;
   const grade = getGradeNumber(className);
-  const v = analyzeClassSchedule(params).violations;
+  const analysis = analyzeClassSchedule(params);
+  const v = analysis.violations;
 
-  // Base penalties from violations
+  // Base penalties from violations - увеличенные штрафы для критических нарушений
   let penalty = 0;
   for (const viol of v) {
-    if (viol.type === 'heavy_first_or_last_more_than_once') penalty += 2000 * (viol.count - 1);
-    if (viol.type === 'heavy_consecutive') penalty += 250;
-    if (viol.type === 'peak_day_not_on_recommended') penalty += 400;
+    if (viol.type === 'heavy_first_or_last_more_than_once') penalty += 5000 * viol.count; // Увеличено с 2000*(count-1)
+    if (viol.type === 'heavy_consecutive') penalty += 800; // Увеличено с 250
+    if (viol.type === 'peak_day_not_on_recommended') penalty += 1500; // Увеличено с 400
+  }
+
+  // Критическое нарушение: если пик не во Вт/Ср/Пт для V-XI классов
+  if (isVtoXI(grade)) {
+    const recommendedPeakDays = [DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Friday];
+    if (!recommendedPeakDays.includes(analysis.peakDay as DayOfWeek)) {
+      penalty += 2000;
+    }
   }
 
   // Soft: heavy should prefer 2-4, avoid first/last even if within weekly limit
@@ -259,28 +277,60 @@ function classPenalty(params: {
         const slot = slotMap.get(key) || [];
         const hasHeavy = slot.some((it) => isHeavySubject(subjectsById.get(it.subjectId), undefined, grade));
         if (!hasHeavy) continue;
-        if (period === first || period === last) penalty += 80;
-        if (period < 2 || period > 4) penalty += 25;
-        if (period >= 2 && period <= 4) penalty -= 5; // tiny bonus
+        // Сильный штраф за тяжёлый предмет на 1 или последнем уроке
+        if (period === first || period === last) penalty += 200;
+        // Штраф за тяжёлый предмет вне позиции 2-4
+        if (period < 2 || period > 4) penalty += 80;
+        // Бонус за тяжёлый предмет на позиции 2-4
+        if (period >= 2 && period <= 4) penalty -= 50;
       }
     }
   }
 
-  // Balance day loads (variance)
-  const analysis = analyzeClassSchedule(params);
+  // Balance day loads (variance) - более сильный штраф за дисбаланс
   const loads = DAYS.map((d) => analysis.dayLoad[d] ?? 0);
   const mean = loads.reduce((a, b) => a + b, 0) / Math.max(1, loads.length);
   const variance = loads.reduce((acc, x) => acc + (x - mean) * (x - mean), 0) / Math.max(1, loads.length);
-  penalty += variance * 0.8;
+  penalty += variance * 2.5;
 
-  // Stronger: ensure Tue/Wed/Fri are not lighter than Mon/Thu (V–XI)
+  // Сильнее:确保 Вт/Ср/Пт не легче Пн/Чт (V–XI)
   if (isVtoXI(grade)) {
     const high = [analysis.dayLoad[DayOfWeek.Tuesday] ?? 0, analysis.dayLoad[DayOfWeek.Wednesday] ?? 0, analysis.dayLoad[DayOfWeek.Friday] ?? 0];
     const low = [analysis.dayLoad[DayOfWeek.Monday] ?? 0, analysis.dayLoad[DayOfWeek.Thursday] ?? 0];
     const minHigh = Math.min(...high);
     const maxLow = Math.max(...low);
     if (maxLow > minHigh) {
-      penalty += (maxLow - minHigh) * 40 + 500;
+      penalty += (maxLow - minHigh) * 100 + 1500;
+    }
+    // Дополнительный штраф если Пн или Чт тяжелее любого из Вт/Ср/Пт
+    for (const lowDay of [DayOfWeek.Monday, DayOfWeek.Thursday]) {
+      for (const highDay of [DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Friday]) {
+        if ((analysis.dayLoad[lowDay] ?? 0) > (analysis.dayLoad[highDay] ?? 0)) {
+          penalty += 300;
+        }
+      }
+    }
+  }
+
+  // Дополнительный штраф за несколько consecutive heavy в один день
+  if (isVtoXI(grade)) {
+    for (const day of DAYS) {
+      let consecutiveHeavy = 0;
+      let maxConsecutive = 0;
+      for (const period of periods) {
+        const key = `${classId}__${shift}__${day}__${period}`;
+        const slot = slotMap.get(key) || [];
+        const hasHeavy = slot.some((it) => isHeavySubject(subjectsById.get(it.subjectId), undefined, grade));
+        if (hasHeavy) {
+          consecutiveHeavy++;
+          maxConsecutive = Math.max(maxConsecutive, consecutiveHeavy);
+        } else {
+          consecutiveHeavy = 0;
+        }
+      }
+      if (maxConsecutive >= 2) {
+        penalty += (maxConsecutive - 1) * 500;
+      }
     }
   }
 
@@ -325,14 +375,16 @@ export function generateSanitarySchedule(params: {
   periodsByShift: Record<string, number[]>;
   maxIterations?: number;
   maxSwaps?: number;
+  enforceTeacherConflicts?: boolean;
 }): SanitaryResult {
   const {
     baseSchedule,
     subjects,
     classes,
     periodsByShift,
-    maxIterations = 25000,
-    maxSwaps = 260,
+    maxIterations = 50000, // Увеличено с 25000
+    maxSwaps = 600, // Увеличено с 260
+    enforceTeacherConflicts = true,
   } = params;
 
   const subjectsById = new Map(subjects.map((s) => [s.id, s]));
@@ -359,8 +411,8 @@ export function generateSanitarySchedule(params: {
     from: { shift: string; day: string; period: number };
     to: { shift: string; day: string; period: number };
   }) => {
+    if (!enforceTeacherConflicts) return true;
     const { occupancy, fromLessons, toLessons, from, to } = params;
-    // After swap: fromLessons go to "to" and toLessons go to "from"
     for (const it of fromLessons) {
       const key = teacherSlotKey(it.teacherId, to.shift, to.day, to.period);
       if ((occupancy.get(key) || 0) > 0) return false;
@@ -398,7 +450,7 @@ export function generateSanitarySchedule(params: {
     }
 
     const slotMap = buildSlotMap(clsItems);
-    const teacherOccOtherClasses = buildTeacherOccupancy(resultItems, cls.id);
+    const teacherOccOtherClasses = enforceTeacherConflicts ? buildTeacherOccupancy(resultItems, cls.id) : new Map<TeacherSlotKey, number>();
 
     let currentPenalty = classPenalty({
       classId: cls.id,
@@ -441,7 +493,7 @@ export function generateSanitarySchedule(params: {
       const before = currentPenalty;
       swapSlots(slotMap, keyA, keyB);
       const after = classPenalty({ classId: cls.id, className: cls.name, shift: cls.shift, periods, slotMap, subjectsById });
-      if (after <= before) {
+      if (after < before) { // Строгое неравенство для лучшего поиска
         currentPenalty = after;
         swapsApplied++;
         return true;
@@ -456,8 +508,8 @@ export function generateSanitarySchedule(params: {
       return slot.some((it) => isHeavySubject(subjectsById.get(it.subjectId), undefined, grade));
     };
 
-    // Reduce heavy on first/last (keep <= 1 per week)
-    for (let pass = 0; pass < 8; pass++) {
+    // Reduce heavy on first/last (keep <= 1 per week) - увеличено количество попыток
+    for (let pass = 0; pass < 15; pass++) {
       const analysisTmp = analyzeClassSchedule({ classId: cls.id, className: cls.name, shift: cls.shift, periods, slotMap, subjectsById });
       if (analysisTmp.heavyFirstCount <= 1 && analysisTmp.heavyLastCount <= 1) break;
 
@@ -467,10 +519,20 @@ export function generateSanitarySchedule(params: {
 
         const maybeFix = (badKey: SlotKey) => {
           if (!hasHeavyInSlot(badKey)) return;
+          // Сначала пробуем preferred дни (Вт, Ср, Пт)
+          const preferredDays = [DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Friday];
+          for (const d2 of preferredDays) {
+            for (const p2 of preferred) {
+              const goodKey = `${cls.id}__${cls.shift}__${d2}__${p2}`;
+              if (hasHeavyInSlot(goodKey)) continue;
+              if (trySwap(badKey, goodKey)) return;
+            }
+          }
+          // Затем остальные дни
           for (const d2 of DAYS) {
             for (const p2 of preferred) {
               const goodKey = `${cls.id}__${cls.shift}__${d2}__${p2}`;
-              if (hasHeavyInSlot(goodKey)) continue; // swap heavy with non-heavy if possible
+              if (hasHeavyInSlot(goodKey)) continue;
               if (trySwap(badKey, goodKey)) return;
             }
           }
@@ -481,14 +543,14 @@ export function generateSanitarySchedule(params: {
       }
     }
 
-    // Break consecutive heavy
-    for (let pass = 0; pass < 10; pass++) {
+    // Break consecutive heavy - увеличено количество попыток
+    for (let pass = 0; pass < 20; pass++) {
       const analysisTmp = analyzeClassSchedule({ classId: cls.id, className: cls.name, shift: cls.shift, periods, slotMap, subjectsById });
       const consec = analysisTmp.violations.filter((x) => x.type === 'heavy_consecutive') as Array<{ type: 'heavy_consecutive'; classId: string; day: string; period: number }>;
       if (consec.length === 0) break;
-      for (const v of consec.slice(0, 6)) {
-        // v.period is the second of the consecutive pair, try swap it with a nearby non-heavy
+      for (const v of consec.slice(0, 8)) {
         const badKey = `${cls.id}__${cls.shift}__${v.day}__${v.period}`;
+        // Пробуем переместить на preferred позиции
         for (const p2 of preferred) {
           const goodKey = `${cls.id}__${cls.shift}__${v.day}__${p2}`;
           if (goodKey === badKey) continue;
@@ -498,11 +560,50 @@ export function generateSanitarySchedule(params: {
       }
     }
 
-    // --- Phase 2: stochastic search (annealing-lite) ---
+    // --- Phase 2: Fix peak day violations ---
+    // Специальная фаза для исправления пикового дня
+    for (let pass = 0; pass < 10; pass++) {
+      const analysisTmp = analyzeClassSchedule({ classId: cls.id, className: cls.name, shift: cls.shift, periods, slotMap, subjectsById });
+      const peakViolation = analysisTmp.violations.find((x) => x.type === 'peak_day_not_on_recommended');
+      if (!peakViolation) break;
+
+      const peakDay = analysisTmp.peakDay;
+      const recommendedDays = [DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Friday];
+      const nonRecommendedDays = [DayOfWeek.Monday, DayOfWeek.Thursday];
+
+      // Если пик в неправильный день, пробуем переместить часть нагрузки
+      if (nonRecommendedDays.includes(peakDay as DayOfWeek)) {
+        // Найти самый нагруженный слот в peakDay
+        let maxLoadPeriod = periods[0];
+        let maxLoad = 0;
+        for (const period of periods) {
+          const key = `${cls.id}__${cls.shift}__${peakDay}__${period}`;
+          const slot = slotMap.get(key) || [];
+          const load = slot.reduce((sum, it) => sum + subjectDifficulty(subjectsById.get(it.subjectId), undefined), 0);
+          if (load > maxLoad) {
+            maxLoad = load;
+            maxLoadPeriod = period;
+          }
+        }
+
+        // Попробовать переместить в recommended day с меньшей нагрузкой
+        for (const recDay of recommendedDays) {
+          for (const period of preferred) {
+            const fromKey = `${cls.id}__${cls.shift}__${peakDay}__${maxLoadPeriod}`;
+            const toKey = `${cls.id}__${cls.shift}__${recDay}__${period}`;
+            if (!hasHeavyInSlot(fromKey)) continue;
+            if (hasHeavyInSlot(toKey)) continue;
+            if (trySwap(fromKey, toKey)) break;
+          }
+        }
+      }
+    }
+
+    // --- Phase 3: stochastic search (annealing-lite) ---
     // Stochastic hill-climb with limited swaps
-    const maxIters = Math.max(1000, maxIterations);
-    const tempStart = 80;
-    const tempEnd = 1.5;
+    const maxIters = Math.max(5000, maxIterations);
+    const tempStart = 100;
+    const tempEnd = 1.0;
     let swapsThisClass = 0;
 
     for (let iter = 0; iter < maxIters && swapsThisClass < maxSwaps; iter++) {
@@ -556,7 +657,7 @@ export function generateSanitarySchedule(params: {
       }
 
       // early stop: good enough
-      if (currentPenalty < 150) break;
+      if (currentPenalty < 50) break;
     }
 
     const finalAnalysis = analyzeClassSchedule({

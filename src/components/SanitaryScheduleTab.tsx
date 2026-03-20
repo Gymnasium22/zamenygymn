@@ -100,6 +100,7 @@ export function SanitaryScheduleTab(props: {
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [lastOptimizedAt, setLastOptimizedAt] = useState<string>('');
   const [modeLabel, setModeLabel] = useState<'auto' | 'base'>('auto');
+  const allowTeacherConflicts = true;
 
   const periods = useMemo(() => {
     if (!selectedClass) return [];
@@ -249,153 +250,167 @@ export function SanitaryScheduleTab(props: {
   };
 
   const downloadAllClassesXls = () => {
-    const currentSchedule = sanitaryBase.schedule;
-    const dayColors: Record<string, { header: string; cell: string }> = {
-      [DayOfWeek.Monday]: { header: '#fecaca', cell: '#fee2e2' },
-      [DayOfWeek.Tuesday]: { header: '#fed7aa', cell: '#ffedd5' },
-      [DayOfWeek.Wednesday]: { header: '#fef08a', cell: '#fef9c3' },
-      [DayOfWeek.Thursday]: { header: '#bbf7d0', cell: '#dcfce7' },
-      [DayOfWeek.Friday]: { header: '#bfdbfe', cell: '#dbeafe' },
+    const currentSchedule = applySlotSwaps({ schedule: sanitaryBase.schedule, swaps: manualSwaps });
+
+    // Сортировка классов от младших к старшим с учётом буквы
+    const targetClasses = eligibleClasses.slice().sort((a, b) => {
+      const ka = classSortKey(a.name);
+      const kb = classSortKey(b.name);
+      if (ka.grade !== kb.grade) return ka.grade - kb.grade;
+      if (ka.letter !== kb.letter) return ka.letter.localeCompare(kb.letter, 'ru');
+      return ka.raw.localeCompare(kb.raw, 'ru');
+    });
+    const shifts = (Array.from(new Set(targetClasses.map((c) => c.shift))) as string[]).sort();
+
+    const dayStyles: Record<string, { label: string; cell: string }> = {
+      [DayOfWeek.Monday]: { label: '#fecaca', cell: '#fee2e2' },
+      [DayOfWeek.Tuesday]: { label: '#fed7aa', cell: '#ffedd5' },
+      [DayOfWeek.Wednesday]: { label: '#fef08a', cell: '#fef9c3' },
+      [DayOfWeek.Thursday]: { label: '#bbf7d0', cell: '#dcfce7' },
+      [DayOfWeek.Friday]: { label: '#bfdbfe', cell: '#dbeafe' },
+    };
+
+    // Функция для получения балла трудности предмета
+    const getSubjectDifficulty = (subjectId: string): number => {
+      const subj = subjects.find((s) => s.id === subjectId);
+      if (!subj) return 6;
+      if (typeof subj.difficulty === 'number' && subj.difficulty > 0) return subj.difficulty;
+      // Fallback к анализу по названию (как в sanitarySchedule.ts)
+      const name = subj.name.toLowerCase();
+      if (/математ|алгебр|геометр/i.test(name)) return 12;
+      if (/иностранн|английск|немецк|французск|испанск/i.test(name)) return 11;
+      if (/русск.*язык|рус[.]?яз|белорусск.*язык|бел[.]?яз/i.test(name)) return 10;
+      if (/физик/i.test(name)) return 9;
+      if (/хими/i.test(name)) return 9;
+      if (/информатик/i.test(name)) return 8;
+      if (/астроном/i.test(name)) return 8;
+      if (/биолог/i.test(name)) return 8;
+      if (/всемирн.*истор|история\s+беларуси|обществовед/i.test(name)) return 7;
+      if (/литератур/i.test(name)) return 6;
+      if (/географ/i.test(name)) return 6;
+      if (/человек\s+и\s+мир/i.test(name)) return 5;
+      if (/искусств|мхк/i.test(name)) return 4;
+      if (/основы\s+безопасности|обж/i.test(name)) return 4;
+      if (/черчен|труд|технолог/i.test(name)) return 4;
+      if (/физкультур|физическая\s+культура/i.test(name)) return 3;
+      return 6;
     };
 
     let html = `
       <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-      <head><meta charset="UTF-8"><style>
-        table { border-collapse: collapse; font-family: Arial, sans-serif; font-size: 16pt; margin-bottom: 40px; width: 100%; }
-        td, th { border: 2px solid #000; padding: 4px; vertical-align: middle; text-align: center; }
-        .header { font-weight: bold; }
-        .subject-cell { font-weight: bold; vertical-align: middle; background-color: #fff; font-size: 20pt; }
-        .teacher-cell { text-align: left; padding-left: 10px; font-size: 20pt; }
-        sub { font-size: 12pt; vertical-align: sub; }
-        .doc-table td { border: none !important; padding: 10px; vertical-align: top; font-size: 16pt; }
-        .doc-left { text-align: left; }
-        .doc-right { text-align: right; }
-      </style></head><body>
+      <head>
+        <meta charset="UTF-8">
+        <style>
+          table { border-collapse: collapse; font-family: Arial, sans-serif; width: 100%; }
+          td, th { border: 1px solid #000000; text-align: center; vertical-align: middle; padding: 4px; }
+          .shift-header { font-size: 16pt; font-weight: bold; background-color: #ffffff; text-align: center; border: 2px solid #000; }
+          .class-header { font-size: 12pt; font-weight: bold; background-color: #ffffff; text-align: center; border: 2px solid #000; }
+          .day-cell {
+            font-weight: bold;
+            text-transform: uppercase;
+            writing-mode: vertical-lr;
+            transform: rotate(180deg);
+            text-align: center;
+            vertical-align: middle;
+            border: 2px solid #000;
+            mso-rotate: 90;
+          }
+          .period-cell { font-weight: bold; border: 2px solid #000; }
+          .content-cell { font-weight: bold; border: 1px solid #000; height: 50px; }
+          .subject { font-weight: bold; }
+          .room { font-size: 8pt; font-weight: bold; }
+          .difficulty { font-size: 7pt; font-weight: bold; color: #666; }
+          .day-total { font-size: 9pt; font-weight: bold; background-color: #fef3c7; }
+        </style>
+      </head>
+      <body>
     `;
 
-    html += `
-      <table class="doc-table" style="width: 100%; border: none;">
-        <tr>
-          <td colspan="10" class="doc-left">СОГЛАСОВАНО</td>
-          <td colspan="17"></td>
-          <td colspan="10" class="doc-right">УТВЕРЖДАЮ</td>
-        </tr>
-        <tr>
-          <td colspan="10" class="doc-left">Председатель ПК ГУО "Гимназия №22 г.Минска"</td>
-          <td colspan="17"></td>
-          <td colspan="10" class="doc-right">Директор ГУО "Гимназия №22 г.Минска"</td>
-        </tr>
-        <tr>
-          <td colspan="10" class="doc-left">____________________ Ю.Г.Миханова</td>
-          <td colspan="17"></td>
-          <td colspan="10" class="doc-right">____________________ Н.В.Кисель</td>
-        </tr>
-        <tr>
-          <td colspan="10" class="doc-left">"__"_ __________ 2025г.</td>
-          <td colspan="17"></td>
-          <td colspan="10" class="doc-right">"__" __________ 2025г.</td>
-        </tr>
-      </table>
-      <br/>
-    `;
+    shifts.forEach((shift) => {
+      const shiftClasses = targetClasses.filter((c) => c.shift === shift);
+      const periods = SHIFT_PERIODS[shift as Shift];
+      if (shiftClasses.length === 0) return;
 
-    [Shift.First, Shift.Second].forEach((shift) => {
-      const periods = SHIFT_PERIODS[shift];
       html += `<table>`;
 
-      html += `<tr>
-        <th rowspan="3" class="header" style="border: 3px solid #000; width: 350px; background-color: #e9d5ff; font-size: 24pt;">Учебный предмет</th>
-        <th rowspan="3" class="header" style="border: 3px solid #000; width: 450px; background-color: #e9d5ff; font-size: 24pt;">ФИО</th>
-        <th colspan="${DAYS.length * periods.length}" class="header" style="border: 3px solid #000; font-size: 24pt; background-color: #f3f4f6;">День недели</th>
-      </tr>`;
-
       html += `<tr>`;
-      DAYS.forEach((day) => {
-        const bg = dayColors[day]?.header || '#f3f4f6';
-        html += `<th colspan="${periods.length}" class="header" style="border: 3px solid #000; background-color: ${bg}; font-size: 20pt;">${day}</th>`;
-      });
+      html += `<td style="border:none"></td>`;
+      html += `<td style="border:none"></td>`;
+      html += `<td style="border:none"></td>`;
+      html += `<td colspan="${shiftClasses.length}" class="shift-header">${shift}</td>`;
       html += `</tr>`;
 
       html += `<tr>`;
-      DAYS.forEach((day) => {
-        const bg = dayColors[day]?.header || '#f3f4f6';
-        html += `<th colspan="${periods.length}" class="header" style="border-bottom: 3px solid #000; background-color: ${bg}; font-size: 16pt;">Урок</th>`;
+      html += `<td style="border:none"></td>`;
+      html += `<td style="border:none"></td>`;
+      html += `<td style="border:none"></td>`;
+      shiftClasses.forEach((c) => {
+        html += `<td class="class-header">${c.name}</td>`;
       });
       html += `</tr>`;
 
-      const shiftGray = '#e5e7eb';
-      html += `<tr>
-        <th class="header" style="border: 3px solid #000; background-color: ${shiftGray}; font-size: 24pt;">${shift}</th>
-        <th class="header" style="border: 3px solid #000; background-color: ${shiftGray};"></th>
-      `;
       DAYS.forEach((day) => {
-        const bg = dayColors[day]?.header || '#f3f4f6';
-        periods.forEach((p) => {
-          html += `<th class="header" style="width: 20px; background-color: ${bg}; font-size: 16pt;">${p}</th>`;
-        });
-      });
-      html += `</tr>`;
+        const colors = dayStyles[day as string] || { label: '#e5e7eb', cell: '#f3f4f6' };
 
-      subjects.forEach((subject) => {
-        const filteredTeachers = teachers.filter((t) => t.subjectIds.includes(subject.id) && t.shifts.includes(shift));
-        if (filteredTeachers.length === 0) return;
-
-        filteredTeachers.forEach((teacher, tIndex) => {
+        periods.forEach((period, pIndex) => {
           html += `<tr>`;
-          if (tIndex === 0) {
-            html += `<td rowspan="${filteredTeachers.length}" class="subject-cell" style="border: 3px solid #000; background-color: #e9d5ff;">${subject.name}</td>`;
+          if (pIndex === 0) {
+            html += `<td rowspan="${periods.length}" class="day-cell" style="background-color: ${colors.label};">${day.toUpperCase()}</td>`;
           }
-          html += `<td class="teacher-cell" style="border-right: 3px solid #000; background-color: #e9d5ff;">${teacher.name}</td>`;
+          html += `<td class="period-cell" style="background-color: ${colors.label};">${period}</td>`;
+          html += `<td class="period-cell" style="background-color: ${colors.label}; font-size: 8pt;">Балл</td>`;
 
-          DAYS.forEach((day) => {
-            const cellBg = dayColors[day]?.cell || '#fff';
-            periods.forEach((p) => {
-              const item = currentSchedule.find(
-                (s) =>
-                  s.teacherId === teacher.id &&
-                  s.subjectId === subject.id &&
-                  s.day === day &&
-                  s.period === p &&
-                  s.shift === shift,
-              );
-              if (item) {
-                const cls = classes.find((c) => c.id === item.classId);
-                const r = rooms.find((rm) => rm.id === item.roomId);
-                const roomName = r ? r.name : item.roomId;
-                const room = roomName ? `<sub>${roomName}</sub>` : '';
-                const dir = item.direction ? ` <span style="font-size:14px">(${item.direction})</span>` : '';
-                html += `<td style="border: 1px solid #000; font-weight: bold; background-color: ${cellBg}; height: 60px;">${cls ? cls.name : ''}${dir}${room}</td>`;
-              } else {
-                html += `<td style="border: 1px solid #000; background-color: ${cellBg};"></td>`;
-              }
+          shiftClasses.forEach((cls) => {
+            const lessons = currentSchedule.filter(
+              (s) => s.classId === cls.id && s.day === day && s.shift === shift && s.period === period,
+            );
+
+            html += `<td class="content-cell" style="background-color: ${colors.cell};">`;
+            lessons.forEach((lesson, i) => {
+              if (i > 0) html += `<br style="mso-data-placement:same-cell;">`;
+              const sub = subjects.find((s) => s.id === lesson.subjectId);
+              const room = rooms.find((r) => r.id === lesson.roomId);
+              const roomName = room ? room.name : (lesson.roomId || '');
+              const difficulty = getSubjectDifficulty(lesson.subjectId);
+
+              html += `<span class="subject">${sub?.name || ''}</span>`;
+              if (roomName) html += ` <span class="room">${roomName}</span>`;
+              html += ` <span class="difficulty">(${difficulty})</span>`;
             });
+            html += `</td>`;
           });
+
           html += `</tr>`;
         });
-        html += `<tr><td colspan="${2 + DAYS.length * periods.length}" style="height: 4px; background-color: #000;"></td></tr>`;
+
+        // Row for day totals per class
+        html += `<tr>`;
+        html += `<td colspan="2" class="day-total" style="background-color: ${colors.label}; text-align: right; padding-right: 8px;">Сумма баллов за день:</td>`;
+        html += `<td class="day-total" style="background-color: ${colors.label};"></td>`;
+
+        shiftClasses.forEach((cls) => {
+          const dayLessons = currentSchedule.filter(
+            (s) => s.classId === cls.id && s.day === day && s.shift === shift,
+          );
+          const totalDifficulty = dayLessons.reduce((sum, lesson) => sum + getSubjectDifficulty(lesson.subjectId), 0);
+          html += `<td class="day-total" style="background-color: ${colors.cell}; font-weight: bold;">${totalDifficulty}</td>`;
+        });
+
+        html += `</tr>`;
+
+        html += `<tr><td colspan="${3 + shiftClasses.length}" style="height: 3px; background-color: #000000; border: none;"></td></tr>`;
       });
 
-      html += `</table><br/><br/>`;
+      html += `</table><br><br>`;
     });
 
-    html += `
-      <br/>
-      <table class="doc-table" style="width: 100%; border: none;">
-        <tr>
-          <td colspan="10" class="doc-left">Секретарь учебной части</td>
-          <td colspan="17"></td>
-          <td colspan="10" class="doc-right">Е.К.Шунто</td>
-        </tr>
-      </table>
-    `;
-
     html += `</body></html>`;
+
     const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    // Имя файла как у реального плаката
-    link.download = `Плакат_Матрица_${semester}пол.xls`;
+    link.download = `Сетка_Расписания_ВСЕ_${semester}пол.xls`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -419,6 +434,7 @@ export function SanitaryScheduleTab(props: {
       periodsByShift: SHIFT_PERIODS as any,
       maxIterations: 35000,
       maxSwaps: 420,
+      enforceTeacherConflicts: !allowTeacherConflicts,
     });
     setSanitaryBase(next);
     setLastOptimizedAt(new Date().toLocaleString('ru-RU'));
@@ -456,39 +472,42 @@ export function SanitaryScheduleTab(props: {
       setActivePick(null);
       return;
     }
-    // Teacher conflict validation (like in your sample)
-    const scheduleNow = applySlotSwaps({
-      schedule: sanitaryBase.schedule,
-      swaps: manualSwaps.filter((s) => s.classId === selectedClass.id && s.shift === selectedClass.shift),
-    });
-    const slotLessons = (s: Slot) =>
-      scheduleNow.filter(
-        (it) => it.classId === selectedClass.id && it.shift === selectedClass.shift && it.day === s.day && it.period === s.period,
-      );
-    const aLessons = slotLessons(activePick);
-    const bLessons = slotLessons(slot);
-    const aIds = new Set(aLessons.map((x) => x.id));
-    const bIds = new Set(bLessons.map((x) => x.id));
-    const ignore = new Set([...aIds, ...bIds]);
+    if (!allowTeacherConflicts) {
+      // Teacher conflict validation (like in your sample)
+      const scheduleNow = applySlotSwaps({
+        schedule: sanitaryBase.schedule,
+        swaps: manualSwaps.filter((s) => s.classId === selectedClass.id && s.shift === selectedClass.shift),
+      });
+      const slotLessons = (s: Slot) =>
+        scheduleNow.filter(
+          (it) =>
+            it.classId === selectedClass.id && it.shift === selectedClass.shift && it.day === s.day && it.period === s.period,
+        );
+      const aLessons = slotLessons(activePick);
+      const bLessons = slotLessons(slot);
+      const aIds = new Set(aLessons.map((x) => x.id));
+      const bIds = new Set(bLessons.map((x) => x.id));
+      const ignore = new Set([...aIds, ...bIds]);
 
-    const isTeacherFree = (teacherId: string, day: string, period: number) => {
-      return !scheduleNow.some(
-        (it) =>
-          !ignore.has(it.id) &&
-          it.teacherId === teacherId &&
-          it.shift === selectedClass.shift &&
-          it.day === day &&
-          it.period === period,
-      );
-    };
+      const isTeacherFree = (teacherId: string, day: string, period: number) => {
+        return !scheduleNow.some(
+          (it) =>
+            !ignore.has(it.id) &&
+            it.teacherId === teacherId &&
+            it.shift === selectedClass.shift &&
+            it.day === day &&
+            it.period === period,
+        );
+      };
 
-    const okA = aLessons.every((it) => isTeacherFree(it.teacherId, slot.day, slot.period));
-    const okB = bLessons.every((it) => isTeacherFree(it.teacherId, activePick.day, activePick.period));
+      const okA = aLessons.every((it) => isTeacherFree(it.teacherId, slot.day, slot.period));
+      const okB = bLessons.every((it) => isTeacherFree(it.teacherId, activePick.day, activePick.period));
 
-    if (!okA || !okB) {
-      setSwapError('Один из учителей занят в выбранное время. Обмен невозможен.');
-      setActivePick(null);
-      return;
+      if (!okA || !okB) {
+        setSwapError('Один из учителей занят в выбранное время. Обмен невозможен.');
+        setActivePick(null);
+        return;
+      }
     }
 
     setManualSwaps((prev) => [...prev, { classId: selectedClass.id, shift: selectedClass.shift, from: activePick, to: slot }]);
