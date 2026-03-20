@@ -148,6 +148,7 @@ export function SanitaryScheduleTab(props: {
         heavyFirstOrLast: a?.violations.filter(v => v.type === 'heavy_first_or_last_more_than_once').length ?? 0,
         consecutive: a?.violations.filter(v => v.type === 'heavy_consecutive').length ?? 0,
         peakDay: a?.violations.filter(v => v.type === 'peak_day_not_on_recommended').length ?? 0,
+        gapWindow: a?.violations.filter(v => v.type === 'gap_window').length ?? 0, // Форточки
       };
       return { 
         id: c.id, 
@@ -163,7 +164,8 @@ export function SanitaryScheduleTab(props: {
     });
     const ok = rows.filter((r) => r.violations === 0).length;
     const totalViolations = rows.reduce((sum, r) => sum + r.violations, 0);
-    return { rows, ok, total: rows.length, totalViolations };
+    const totalGaps = rows.reduce((sum, r) => sum + (r.violationTypes?.gapWindow || 0), 0);
+    return { rows, ok, total: rows.length, totalViolations, totalGaps };
   }, [eligibleClasses, sanitaryBase.analysisByClassId]);
 
   const sanitarySchedule = useMemo(() => {
@@ -867,13 +869,18 @@ export function SanitaryScheduleTab(props: {
                 Режим: <span className="font-black">{modeLabel === 'auto' ? 'Автонастройка' : 'Как в действующем расписании'}</span>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
               <div className="px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wider bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400">
                 OK: {allClassesStats.ok} / {allClassesStats.total}
               </div>
               {allClassesStats.totalViolations > 0 && (
                 <div className="px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wider bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400">
                   Нарушений: {allClassesStats.totalViolations}
+                </div>
+              )}
+              {allClassesStats.totalGaps > 0 && (
+                <div className="px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wider bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400">
+                  Форточек: {allClassesStats.totalGaps}
                 </div>
               )}
             </div>

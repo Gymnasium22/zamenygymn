@@ -6,7 +6,8 @@ export type SanitaryRuleViolation =
   | { type: 'heavy_first_or_last_more_than_once'; classId: string; position: 'first' | 'last'; count: number }
   | { type: 'heavy_consecutive'; classId: string; day: string; period: number }
   | { type: 'peak_day_not_on_recommended'; classId: string; peakDay: string; recommendedDays: string[] }
-  | { type: 'unknown_subject_difficulty'; classId: string; subjectName: string };
+  | { type: 'unknown_subject_difficulty'; classId: string; subjectName: string }
+  | { type: 'gap_window'; classId: string; day: string; period: number }; // Форточка
 
 export interface SanitaryAnalysis {
   classId: string;
@@ -235,6 +236,27 @@ function analyzeClassSchedule(params: {
     violations.push({ type: 'heavy_first_or_last_more_than_once', classId, position: 'last', count: heavyLastCount });
   }
 
+  // Проверка на форточки (окна между уроками)
+  for (const day of DAYS) {
+    for (let i = 1; i < periods.length - 1; i++) {
+      const period = periods[i];
+      const key = `${classId}__${shift}__${day}__${period}`;
+      const slot = slotMap.get(key) || [];
+      if (slot.length === 0) {
+        // Проверить, есть ли уроки до и после
+        const hasLessonsBefore = periods.slice(0, i).some(p => 
+          (slotMap.get(`${classId}__${shift}__${day}__${p}`) || []).length > 0
+        );
+        const hasLessonsAfter = periods.slice(i + 1).some(p => 
+          (slotMap.get(`${classId}__${shift}__${day}__${p}`) || []).length > 0
+        );
+        if (hasLessonsBefore && hasLessonsAfter) {
+          violations.push({ type: 'gap_window', classId, day, period });
+        }
+      }
+    }
+  }
+
   return { classId, dayLoad, peakDay, violations, heavyFirstCount, heavyLastCount };
 }
 
@@ -266,6 +288,29 @@ function classPenalty(params: {
       penalty += 2000;
     }
   }
+
+  // === НОВОЕ: Штраф за форточки (окна между уроками) ===
+  // Форточка - это когда есть уроки до и после пустого периода
+  for (const day of DAYS) {
+    const daySlots = periods.map(p => ({
+      period: p,
+      key: `${classId}__${shift}__${day}__${p}`,
+      hasLesson: (slotMap.get(`${classId}__${shift}__${day}__${p}`) || []).length > 0
+    }));
+    
+    // Ищем форточки: пустой период, у которого есть заполненные периоды до и после
+    for (let i = 1; i < daySlots.length - 1; i++) {
+      if (!daySlots[i].hasLesson) {
+        const hasLessonsBefore = daySlots.slice(0, i).some(s => s.hasLesson);
+        const hasLessonsAfter = daySlots.slice(i + 1).some(s => s.hasLesson);
+        if (hasLessonsBefore && hasLessonsAfter) {
+          // Это форточка! Добавляем большой штраф
+          penalty += 3000;
+        }
+      }
+    }
+  }
+  // === КОНЕЦ проверки на форточки ===
 
   // Soft: heavy should prefer 2-4, avoid first/last even if within weekly limit
   if (isVtoXI(grade)) {
@@ -555,6 +600,103 @@ export function generateSanitarySchedule(params: {
         if (analysisTmp.heavyLastCount > 1) maybeFix(lastKey);
       }
     }
+
+    // --- Phase 1.5: Eliminate gaps (форточки) - новая фаза ===
+    // Форточка - это пустой период между двумя заполненными
+    for (let pass = 0; pass < 20; pass++) {
+      let hasGap = false;
+      let gapDay: string | null = null;
+      let gapPeriod: number | null = null;
+      
+      // Найти первую форточку
+      for (const day of DAYS) {
+        for (let i = 1; i < periods.length - 1; i++) {
+          const period = periods[i];
+          const key = `${cls.id}__${cls.shift}__${day}__${period}`;
+          const slot = slotMap.get(key) || [];
+          if (slot.length === 0) {
+            // Проверить, есть ли уроки до и после
+            const hasLessonsBefore = periods.slice(0, i).some(p => 
+              (slotMap.get(`${cls.id}__${cls.shift}__${day}__${p}`) || []).length > 0
+            );
+            const hasLessonsAfter = periods.slice(i + 1).some(p => 
+              (slotMap.get(`${cls.id}__${cls.shift}__${day}__${p}`) || []).length > 0
+            );
+            if (hasLessonsBefore && hasLessonsAfter) {
+              hasGap = true;
+              gapDay = day;
+              gapPeriod = period;
+              break;
+            }
+          }
+        }
+        if (hasGap) break;
+      }
+      
+      if (!hasGap) break; // Форточек нет, выходим
+      
+      // Найти урок, который можно переместить в форточку
+      // Ищем урок в том же дне на последнем месте или в другом дне
+      let foundSource: SlotKey | null = null;
+      
+      // Сначала пробуем найти урок в том же дне (последний урок)
+      if (gapDay && gapPeriod) {
+        for (let i = periods.length - 1; i >= 0; i--) {
+          const p = periods[i];
+          if (p === gapPeriod) continue;
+          const key = `${cls.id}__${cls.shift}__${gapDay}__${p}`;
+          const slot = slotMap.get(key) || [];
+          if (slot.length > 0) {
+            // Проверить, не создаст ли перемещение новую форточку
+            const hasLessonsBefore = periods.slice(0, i).some(pp => 
+              (slotMap.get(`${cls.id}__${cls.shift}__${gapDay}__${pp}`) || []).length > 0
+            );
+            if (!hasLessonsBefore) {
+              // Перемещение не создаст новую форточку
+              foundSource = key;
+              break;
+            }
+          }
+        }
+      }
+      
+      // Если не нашли в том же дне, ищем в других днях
+      if (!foundSource && gapDay && gapPeriod) {
+        for (const day of DAYS) {
+          if (day === gapDay) continue;
+          for (const period of periods) {
+            const key = `${cls.id}__${cls.shift}__${day}__${period}`;
+            const slot = slotMap.get(key) || [];
+            if (slot.length > 0) {
+              // Проверить, не создаст ли перемещение форточку в исходном дне
+              const daySlots = periods.map(p => ({
+                p,
+                hasLesson: p === period ? false : (slotMap.get(`${cls.id}__${cls.shift}__${day}__${p}`) || []).length > 0
+              }));
+              const idx = daySlots.findIndex(s => s.p === period);
+              const hasLessonsBefore = daySlots.slice(0, idx).some(s => s.hasLesson);
+              const hasLessonsAfter = daySlots.slice(idx + 1).some(s => s.hasLesson);
+              if (!hasLessonsBefore || !hasLessonsAfter) {
+                // Перемещение создаст форточку в исходном дне, не подходит
+                continue;
+              }
+              foundSource = key;
+              break;
+            }
+          }
+          if (foundSource) break;
+        }
+      }
+      
+      // Пробуем переместить
+      if (foundSource && gapDay && gapPeriod) {
+        const gapKey = `${cls.id}__${cls.shift}__${gapDay}__${gapPeriod}`;
+        trySwap(foundSource, gapKey);
+      } else {
+        break; // Не нашли что переместить
+      }
+    }
+    // === КОНЕЦ фазы устранения форточек ===
 
     // Break consecutive heavy - агрессивная фаза
     for (let pass = 0; pass < 30; pass++) {
