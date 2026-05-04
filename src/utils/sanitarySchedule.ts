@@ -4,10 +4,14 @@ type SlotKey = string;
 
 export type SanitaryRuleViolation =
   | { type: 'heavy_first_or_last_more_than_once'; classId: string; position: 'first' | 'last'; count: number }
-  | { type: 'heavy_consecutive'; classId: string; day: string; period: number }
+  | { type: 'heavy_consecutive'; classId: string; day: string; period: number; count: number } // count: сколько тяжёлых подряд
   | { type: 'peak_day_not_on_recommended'; classId: string; peakDay: string; recommendedDays: string[] }
   | { type: 'unknown_subject_difficulty'; classId: string; subjectName: string }
-  | { type: 'gap_window'; classId: string; day: string; period: number }; // Форточка
+  | { type: 'gap_window'; classId: string; day: string; period: number } // Форточка
+  | { type: 'duplicate_subject_same_day'; classId: string; day: string; subjectName: string } // Два одинаковых предмета в день
+  | { type: 'pe_load_pattern'; classId: string; description: string } // Нарушение паттерна физкультуры
+  | { type: 'profile_class_subject_limit'; classId: string; subjectName: string; count: number } // Превышение лимита предметов в профильном классе
+  | { type: 'weekly_load_imbalance'; classId: string; expected: number; actual: number }; // Дисбаланс недельной нагрузки
 
 export interface SanitaryAnalysis {
   classId: string;
@@ -155,6 +159,7 @@ function analyzeClassSchedule(params: {
   const { classId, className, shift, periods, slotMap, subjectsById } = params;
   const grade = getGradeNumber(className);
   const recommendedPeakDays = [DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Friday];
+  const isProfileClass = grade === 10 || grade === 11;
 
   const dayLoad: Record<string, number> = Object.fromEntries(DAYS.map((d) => [d, 0]));
   const violations: SanitaryRuleViolation[] = [];
@@ -165,85 +170,134 @@ function analyzeClassSchedule(params: {
   let heavyFirstCount = 0;
   let heavyLastCount = 0;
 
+  // Предметы, которые не должны дублироваться в один день
+  const noDuplicateSubjects = ['русский язык', 'рус. язык', 'белорусский язык', 'бел. язык', 'белорусская литература', 'русская литература'];
+  
+  // Предметы с лимитом для профильных классов (не более 2 в неделю)
+  const profileSubjectLimit: { pattern: RegExp; limit: number }[] = [
+    { pattern: /математ|алгебр|геометр/i, limit: 2 },
+    { pattern: /физик/i, limit: 2 },
+    { pattern: /хими/i, limit: 2 },
+    { pattern: /биолог/i, limit: 2 },
+    { pattern: /иностранн|английск/i, limit: 2 },
+  ];
+
+  // Подсчёт предметов по дням и за неделю
+  const subjectCountByDay: Record<string, Record<string, number>> = {};
+  const subjectCountWeek: Record<string, number> = {};
+  const peLessons: Array<{ day: string; period: number; name: string }> = [];
+
   for (const day of DAYS) {
+    subjectCountByDay[day] = {};
+    
     for (const period of periods) {
       const key = `${classId}__${shift}__${day}__${period}`;
       const slot = slotMap.get(key) || [];
       for (const it of slot) {
         const subj = subjectsById.get(it.subjectId);
+        const subjName = subj?.name || '';
         const diff = subjectDifficulty(subj, undefined);
         dayLoad[day] += diff;
 
+        // Подсчёт предметов
+        subjectCountByDay[day][subjName] = (subjectCountByDay[day][subjName] || 0) + 1;
+        subjectCountWeek[subjName] = (subjectCountWeek[subjName] || 0) + 1;
+
+        // Проверка на тяжёлые предметы на первом/последнем месте
         const heavy = isHeavySubject(subj, undefined, grade);
         if (heavy && period === firstPeriod) heavyFirstCount++;
         if (heavy && period === lastPeriod) heavyLastCount++;
+
+        // Сбор уроков физкультуры
+        if (/физкультур|физическая\s+культура/i.test(subjName)) {
+          peLessons.push({ day, period, name: subjName });
+        }
       }
     }
   }
 
-  // Consecutive heavy check (any heavy in adjacent slots)
+  // === 1. Проверка: не более 2 тяжёлых предметов подряд ===
   for (const day of DAYS) {
-    for (let i = 0; i < periods.length - 1; i++) {
-      const pA = periods[i];
-      const pB = periods[i + 1];
-      const keyA = `${classId}__${shift}__${day}__${pA}`;
-      const keyB = `${classId}__${shift}__${day}__${pB}`;
-      const slotA = slotMap.get(keyA) || [];
-      const slotB = slotMap.get(keyB) || [];
-      const hasHeavyA = slotA.some((it) => isHeavySubject(subjectsById.get(it.subjectId), undefined, grade));
-      const hasHeavyB = slotB.some((it) => isHeavySubject(subjectsById.get(it.subjectId), undefined, grade));
-      if (hasHeavyA && hasHeavyB) {
-        violations.push({ type: 'heavy_consecutive', classId, day, period: pB });
+    let consecutiveHeavy = 0;
+    let maxConsecutive = 0;
+    let consecutiveStartPeriod = 0;
+    
+    for (const period of periods) {
+      const key = `${classId}__${shift}__${day}__${period}`;
+      const slot = slotMap.get(key) || [];
+      const hasHeavy = slot.some((it) => isHeavySubject(subjectsById.get(it.subjectId), undefined, grade));
+      
+      if (hasHeavy) {
+        if (consecutiveHeavy === 0) consecutiveStartPeriod = period;
+        consecutiveHeavy++;
+        maxConsecutive = Math.max(maxConsecutive, consecutiveHeavy);
+      } else {
+        consecutiveHeavy = 0;
+      }
+    }
+    
+    if (maxConsecutive > 2) {
+      violations.push({ type: 'heavy_consecutive', classId, day, period: consecutiveStartPeriod + 2, count: maxConsecutive });
+    }
+  }
+
+  // === 2. Проверка: дублирование предметов в один день ===
+  for (const day of DAYS) {
+    for (const [subjName, count] of Object.entries(subjectCountByDay[day])) {
+      const normalizedSubj = subjName.toLowerCase();
+      if (noDuplicateSubjects.some(s => normalizedSubj.includes(s)) && count > 1) {
+        violations.push({ type: 'duplicate_subject_same_day', classId, day, subjectName: subjName });
       }
     }
   }
 
-  // Peak day
-  let peakDay = DAYS[0];
-  for (const d of DAYS) {
-    if ((dayLoad[d] ?? 0) > (dayLoad[peakDay] ?? 0)) peakDay = d;
-  }
-  if (!recommendedPeakDays.includes(peakDay as DayOfWeek) && isVtoXI(grade)) {
-    violations.push({
-      type: 'peak_day_not_on_recommended',
-      classId,
-      peakDay,
-      recommendedDays: recommendedPeakDays,
-    });
-  }
-
-  // “Пн/Чт не должны быть тяжелее Вт/Ср/Пт” (сильнее соответствует требованию)
-  if (isVtoXI(grade)) {
-    const highLoadDays = [dayLoad[DayOfWeek.Tuesday] ?? 0, dayLoad[DayOfWeek.Wednesday] ?? 0, dayLoad[DayOfWeek.Friday] ?? 0];
-    const lowLoadDays = [dayLoad[DayOfWeek.Monday] ?? 0, dayLoad[DayOfWeek.Thursday] ?? 0];
-    const minHigh = Math.min(...highLoadDays);
-    const maxLow = Math.max(...lowLoadDays);
-    if (maxLow > minHigh) {
-      violations.push({
-        type: 'peak_day_not_on_recommended',
-        classId,
-        peakDay,
-        recommendedDays: recommendedPeakDays,
-      });
+  // === 3. Проверка: лимит предметов в профильных классах ===
+  if (isProfileClass) {
+    for (const [subjName, count] of Object.entries(subjectCountWeek)) {
+      for (const { pattern, limit } of profileSubjectLimit) {
+        if (pattern.test(subjName) && count > limit) {
+          violations.push({ type: 'profile_class_subject_limit', classId, subjectName: subjName, count });
+        }
+      }
     }
   }
 
-  // Heavy on first/last more than once
-  if (heavyFirstCount > 1 && isVtoXI(grade)) {
-    violations.push({ type: 'heavy_first_or_last_more_than_once', classId, position: 'first', count: heavyFirstCount });
-  }
-  if (heavyLastCount > 1 && isVtoXI(grade)) {
-    violations.push({ type: 'heavy_first_or_last_more_than_once', classId, position: 'last', count: heavyLastCount });
+  // === 4. Проверка: паттерн физкультуры (между двумя физкультурами должна быть ещё одна) ===
+  if (peLessons.length >= 2) {
+    // Сортируем уроки физкультуры по дням и периодам
+    const peByDay: Record<string, number[]> = {};
+    peLessons.forEach(pe => {
+      if (!peByDay[pe.day]) peByDay[pe.day] = [];
+      peByDay[pe.day].push(pe.period);
+    });
+    
+    // Если в один день 2 урока физкультуры без третьего между ними
+    for (const [day, periods] of Object.entries(peByDay)) {
+      if (periods.length === 2) {
+        const [p1, p2] = periods.sort((a, b) => a - b);
+        // Проверить, есть ли физкультура между ними
+        const hasPeBetween = Array.from({ length: p2 - p1 - 1 }, (_, i) => p1 + 1 + i)
+          .some(p => {
+            const key = `${classId}__${shift}__${day}__${p}`;
+            const slot = slotMap.get(key) || [];
+            return slot.some(it => /физкультур/i.test(subjectsById.get(it.subjectId)?.name || ''));
+          });
+        
+        if (!hasPeBetween && p2 - p1 <= 3) {
+          // Нет физкультуры между ними и они близко
+          violations.push({ type: 'pe_load_pattern', classId, description: `В ${day} два урока физкультуры (${p1} и ${p2}) без промежуточного` });
+        }
+      }
+    }
   }
 
-  // Проверка на форточки (окна между уроками)
+  // === 5. Проверка на форточки (окна между уроками) ===
   for (const day of DAYS) {
     for (let i = 1; i < periods.length - 1; i++) {
       const period = periods[i];
       const key = `${classId}__${shift}__${day}__${period}`;
       const slot = slotMap.get(key) || [];
       if (slot.length === 0) {
-        // Проверить, есть ли уроки до и после
         const hasLessonsBefore = periods.slice(0, i).some(p => 
           (slotMap.get(`${classId}__${shift}__${day}__${p}`) || []).length > 0
         );
@@ -255,6 +309,60 @@ function analyzeClassSchedule(params: {
         }
       }
     }
+  }
+
+  // === 6. Peak day ===
+  let peakDay = DAYS[0];
+  for (const d of DAYS) {
+    if ((dayLoad[d] ?? 0) > (dayLoad[peakDay] ?? 0)) peakDay = d;
+  }
+  
+  // Проверка: пик должен быть во Вт/Ср/Пт
+  if (!recommendedPeakDays.includes(peakDay as DayOfWeek) && isVtoXI(grade)) {
+    violations.push({
+      type: 'peak_day_not_on_recommended',
+      classId,
+      peakDay,
+      recommendedDays: recommendedPeakDays,
+    });
+  }
+
+  // === 7. Проверка: паттерн нагрузки (рост к среде, спад в чт, подъём в пт) ===
+  if (isVtoXI(grade)) {
+    const wedLoad = dayLoad[DayOfWeek.Wednesday] ?? 0;
+    const thuLoad = dayLoad[DayOfWeek.Thursday] ?? 0;
+    const friLoad = dayLoad[DayOfWeek.Friday] ?? 0;
+    const monLoad = dayLoad[DayOfWeek.Monday] ?? 0;
+    const tueLoad = dayLoad[DayOfWeek.Tuesday] ?? 0;
+    
+    // Среда должна быть одним из самых высоких
+    const maxLoad = Math.max(monLoad, tueLoad, wedLoad, thuLoad, friLoad);
+    if (wedLoad < maxLoad * 0.85) { // Среда меньше 85% от максимума
+      violations.push({
+        type: 'peak_day_not_on_recommended',
+        classId,
+        peakDay,
+        recommendedDays: recommendedPeakDays,
+      });
+    }
+    
+    // Четверг должен быть легче среды
+    if (thuLoad > wedLoad && wedLoad > 0) {
+      violations.push({
+        type: 'peak_day_not_on_recommended',
+        classId,
+        peakDay,
+        recommendedDays: recommendedPeakDays,
+      });
+    }
+  }
+
+  // === 8. Heavy on first/last more than once ===
+  if (heavyFirstCount > 1 && isVtoXI(grade)) {
+    violations.push({ type: 'heavy_first_or_last_more_than_once', classId, position: 'first', count: heavyFirstCount });
+  }
+  if (heavyLastCount > 1 && isVtoXI(grade)) {
+    violations.push({ type: 'heavy_first_or_last_more_than_once', classId, position: 'last', count: heavyLastCount });
   }
 
   return { classId, dayLoad, peakDay, violations, heavyFirstCount, heavyLastCount };
@@ -272,13 +380,18 @@ function classPenalty(params: {
   const grade = getGradeNumber(className);
   const analysis = analyzeClassSchedule(params);
   const v = analysis.violations;
+  const isProfileClass = grade === 10 || grade === 11;
 
   // Base penalties from violations - увеличенные штрафы для критических нарушений
   let penalty = 0;
   for (const viol of v) {
-    if (viol.type === 'heavy_first_or_last_more_than_once') penalty += 5000 * viol.count; // Увеличено с 2000*(count-1)
-    if (viol.type === 'heavy_consecutive') penalty += 800; // Увеличено с 250
-    if (viol.type === 'peak_day_not_on_recommended') penalty += 1500; // Увеличено с 400
+    if (viol.type === 'heavy_first_or_last_more_than_once') penalty += 5000 * viol.count;
+    if (viol.type === 'heavy_consecutive') penalty += 1500 * viol.count; // Увеличено за >2 тяжёлых подряд
+    if (viol.type === 'peak_day_not_on_recommended') penalty += 1500;
+    if (viol.type === 'gap_window') penalty += 3000; // Форточки
+    if (viol.type === 'duplicate_subject_same_day') penalty += 2000; // Дубли предметов
+    if (viol.type === 'profile_class_subject_limit') penalty += 3000 * (viol.count - 2); // Превышение лимита
+    if (viol.type === 'pe_load_pattern') penalty += 1500; // Паттерн физкультуры
   }
 
   // Критическое нарушение: если пик не во Вт/Ср/Пт для V-XI классов
@@ -287,10 +400,23 @@ function classPenalty(params: {
     if (!recommendedPeakDays.includes(analysis.peakDay as DayOfWeek)) {
       penalty += 2000;
     }
+    
+    // Паттерн: рост к среде, спад в чт, подъём в пт
+    const wedLoad = analysis.dayLoad[DayOfWeek.Wednesday] ?? 0;
+    const thuLoad = analysis.dayLoad[DayOfWeek.Thursday] ?? 0;
+    const friLoad = analysis.dayLoad[DayOfWeek.Friday] ?? 0;
+    
+    if (thuLoad > wedLoad && wedLoad > 0) {
+      penalty += (thuLoad - wedLoad) * 500 + 1000; // Четверг тяжелее среды
+    }
+    
+    // Пятница должна быть достаточно нагружена
+    if (friLoad < wedLoad * 0.7 && wedLoad > 0) {
+      penalty += (wedLoad - friLoad) * 300;
+    }
   }
 
   // === НОВОЕ: Штраф за форточки (окна между уроками) ===
-  // Форточка - это когда есть уроки до и после пустого периода
   for (const day of DAYS) {
     const daySlots = periods.map(p => ({
       period: p,
@@ -298,19 +424,37 @@ function classPenalty(params: {
       hasLesson: (slotMap.get(`${classId}__${shift}__${day}__${p}`) || []).length > 0
     }));
     
-    // Ищем форточки: пустой период, у которого есть заполненные периоды до и после
     for (let i = 1; i < daySlots.length - 1; i++) {
       if (!daySlots[i].hasLesson) {
         const hasLessonsBefore = daySlots.slice(0, i).some(s => s.hasLesson);
         const hasLessonsAfter = daySlots.slice(i + 1).some(s => s.hasLesson);
         if (hasLessonsBefore && hasLessonsAfter) {
-          // Это форточка! Добавляем большой штраф
           penalty += 3000;
         }
       }
     }
   }
-  // === КОНЕЦ проверки на форточки ===
+
+  // === НОВОЕ: Штраф за дублирование предметов в один день ===
+  for (const day of DAYS) {
+    const subjectCount: Record<string, number> = {};
+    for (const period of periods) {
+      const key = `${classId}__${shift}__${day}__${period}`;
+      const slot = slotMap.get(key) || [];
+      for (const it of slot) {
+        const subj = subjectsById.get(it.subjectId);
+        const subjName = subj?.name.toLowerCase() || '';
+        subjectCount[subjName] = (subjectCount[subjName] || 0) + 1;
+      }
+    }
+    
+    const noDuplicateSubjects = ['русский язык', 'рус. язык', 'белорусский язык', 'бел. язык', 'белорусская литература', 'русская литература'];
+    for (const [subjName, count] of Object.entries(subjectCount)) {
+      if (noDuplicateSubjects.some(s => subjName.includes(s)) && count > 1) {
+        penalty += 2000 * (count - 1);
+      }
+    }
+  }
 
   // Soft: heavy should prefer 2-4, avoid first/last even if within weekly limit
   if (isVtoXI(grade)) {
@@ -322,11 +466,8 @@ function classPenalty(params: {
         const slot = slotMap.get(key) || [];
         const hasHeavy = slot.some((it) => isHeavySubject(subjectsById.get(it.subjectId), undefined, grade));
         if (!hasHeavy) continue;
-        // Сильный штраф за тяжёлый предмет на 1 или последнем уроке
         if (period === first || period === last) penalty += 200;
-        // Штраф за тяжёлый предмет вне позиции 2-4
         if (period < 2 || period > 4) penalty += 80;
-        // Бонус за тяжёлый предмет на позиции 2-4
         if (period >= 2 && period <= 4) penalty -= 50;
       }
     }
@@ -347,7 +488,6 @@ function classPenalty(params: {
     if (maxLow > minHigh) {
       penalty += (maxLow - minHigh) * 100 + 1500;
     }
-    // Дополнительный штраф если Пн или Чт тяжелее любого из Вт/Ср/Пт
     for (const lowDay of [DayOfWeek.Monday, DayOfWeek.Thursday]) {
       for (const highDay of [DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Friday]) {
         if ((analysis.dayLoad[lowDay] ?? 0) > (analysis.dayLoad[highDay] ?? 0)) {
@@ -373,8 +513,8 @@ function classPenalty(params: {
           consecutiveHeavy = 0;
         }
       }
-      if (maxConsecutive >= 2) {
-        penalty += (maxConsecutive - 1) * 500;
+      if (maxConsecutive > 2) {
+        penalty += (maxConsecutive - 2) * 2000; // Увеличенный штраф за >2 тяжёлых подряд
       }
     }
   }

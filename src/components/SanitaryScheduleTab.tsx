@@ -298,7 +298,6 @@ export function SanitaryScheduleTab(props: {
       const subj = subjects.find((s) => s.id === subjectId);
       if (!subj) return 6;
       if (typeof subj.difficulty === 'number' && subj.difficulty > 0) return subj.difficulty;
-      // Fallback к анализу по названию (как в sanitarySchedule.ts)
       const name = subj.name.toLowerCase();
       if (/математ|алгебр|геометр/i.test(name)) return 12;
       if (/иностранн|английск|немецк|французск|испанск/i.test(name)) return 11;
@@ -317,6 +316,32 @@ export function SanitaryScheduleTab(props: {
       if (/черчен|труд|технолог/i.test(name)) return 4;
       if (/физкультур|физическая\s+культура/i.test(name)) return 3;
       return 6;
+    };
+
+    // Цвета для предметов разной трудности
+    const getDifficultyColor = (difficulty: number): string => {
+      if (difficulty >= 11) return '#fecaca'; // Очень высокая (11-12) - красный
+      if (difficulty >= 9) return '#fed7aa';  // Высокая (9-10) - оранжевый
+      if (difficulty >= 7) return '#fef08a';  // Средняя (7-8) - жёлтый
+      if (difficulty >= 5) return '#fef3c7';  // Ниже средней (5-6) - светло-жёлтый
+      return '#ffffff'; // Низкая (3-4) - белый
+    };
+
+    // Проверка на предмет физкультуры
+    const isPELesson = (subjectName: string): boolean => {
+      return /физкультур|физическая\s+культура/i.test(subjectName);
+    };
+
+    // Пометка "(игровой)" для физкультуры
+    const getLessonDisplayName = (subjectName: string, direction?: string): string => {
+      if (isPELesson(subjectName)) {
+        // Если это уже с направлением (например, "легкая атлетика"), добавляем "(игровой)"
+        if (direction && direction.toLowerCase().includes('игров') || subjectName.toLowerCase().includes('игров')) {
+          return `${subjectName} (игровой)`;
+        }
+        return subjectName;
+      }
+      return subjectName;
     };
 
     let html = `
@@ -344,9 +369,23 @@ export function SanitaryScheduleTab(props: {
           .room { font-size: 8pt; font-weight: bold; }
           .difficulty { font-size: 7pt; font-weight: bold; color: #666; }
           .day-total { font-size: 9pt; font-weight: bold; background-color: #fef3c7; }
+          .week-total { font-size: 10pt; font-weight: bold; background-color: #fde68a; border: 2px solid #000; }
+          .legend { font-size: 8pt; }
         </style>
       </head>
       <body>
+    `;
+
+    // Легенда цветов
+    html += `
+      <table style="width: 100%; margin-bottom: 10px; border: none;">
+        <tr>
+          <td style="border: none; padding: 4px;"><span class="legend">🔴 <b>11-12 баллов</b> (макс. трудность): математика, ин.яз</span></td>
+          <td style="border: none; padding: 4px;"><span class="legend">🟠 <b>9-10 баллов</b>: физика, химия, рус/бел яз</span></td>
+          <td style="border: none; padding: 4px;"><span class="legend">🟡 <b>7-8 баллов</b>: информатика, биология, история</span></td>
+          <td style="border: none; padding: 4px;"><span class="legend">⚪ <b>3-6 баллов</b>: остальные предметы</span></td>
+        </tr>
+      </table>
     `;
 
     shifts.forEach((shift) => {
@@ -395,8 +434,10 @@ export function SanitaryScheduleTab(props: {
               const room = rooms.find((r) => r.id === lesson.roomId);
               const roomName = room ? room.name : (lesson.roomId || '');
               const difficulty = getSubjectDifficulty(lesson.subjectId);
+              const bgColor = getDifficultyColor(difficulty);
+              const displayName = getLessonDisplayName(sub?.name || '', lesson.direction);
 
-              html += `<span class="subject">${sub?.name || ''}</span>`;
+              html += `<span class="subject" style="background-color: ${bgColor}; padding: 2px;">${displayName}</span>`;
               if (roomName) html += ` <span class="room">${roomName}</span>`;
               html += ` <span class="difficulty">(${difficulty})</span>`;
             });
@@ -423,6 +464,18 @@ export function SanitaryScheduleTab(props: {
 
         html += `<tr><td colspan="${3 + shiftClasses.length}" style="height: 3px; background-color: #000000; border: none;"></td></tr>`;
       });
+
+      // Итоговая строка: сумма баллов за неделю по каждому классу
+      html += `<tr>`;
+      html += `<td colspan="3" class="week-total" style="text-align: right; padding-right: 8px;">ВСЕГО БАЛЛОВ ЗА НЕДЕЛЮ:</td>`;
+      shiftClasses.forEach((cls) => {
+        const weekLessons = currentSchedule.filter(
+          (s) => s.classId === cls.id && s.shift === shift,
+        );
+        const weekTotal = weekLessons.reduce((sum, lesson) => sum + getSubjectDifficulty(lesson.subjectId), 0);
+        html += `<td class="week-total">${weekTotal}</td>`;
+      });
+      html += `</tr>`;
 
       html += `</table><br><br>`;
     });
