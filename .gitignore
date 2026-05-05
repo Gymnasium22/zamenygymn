@@ -27,3 +27,4 @@ dist-ssr
 .env.local
 
 repomix-output.xml
+repomix-output*.xml
