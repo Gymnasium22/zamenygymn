@@ -4,9 +4,22 @@ import { useLocation } from 'react-router-dom';
 import { useStaticData, useScheduleData } from '../context/DataContext'; 
 import { Icon } from '../components/Icons';
 import { Modal, useToast } from '../components/UI';
-import { DAYS, Shift, ScheduleItem, ClassEntity, Substitution } from '../types';
+import { DAYS, ScheduleItem, ClassEntity, Substitution } from '../types';
 import { formatDateISO, getScheduleForDate, generateId } from '../utils/helpers';
 import useMedia from 'use-media';
+
+// Subcomponents
+import { TeacherCard } from '../components/Substitutions/TeacherCard';
+import { LessonCard } from '../components/Substitutions/LessonCard';
+import { TeacherFilter } from '../components/Substitutions/TeacherFilter';
+import { 
+    AbsenceModal, 
+    BatchActionModal, 
+    ManualSearchModal, 
+    TelegramChoiceModal, 
+    QuickViewScheduleModal 
+} from '../components/Substitutions/Modals';
+import { AssignmentModal } from '../components/Substitutions/AssignmentModal';
 
 export const SubstitutionsPage = () => {
     const { subjects, teachers, classes, rooms, settings, saveStaticData } = useStaticData(); 
@@ -603,8 +616,8 @@ export const SubstitutionsPage = () => {
         }
     };
 
-    const handleTelegramClick = (teacherId: string, lessonId: string, roomName: string, className: string, subjectName: string, period: number, roomChanged: boolean) => {
-        setTelegramTarget({ teacherId, lessonId, roomName, className, subjectName, period, roomChanged });
+    const handleTelegramClick = (params: any) => {
+        setTelegramTarget(params);
         setTelegramChoiceOpen(true);
     };
 
@@ -891,196 +904,7 @@ export const SubstitutionsPage = () => {
         }
     };
 
-    const renderLessonCard = (l: ScheduleItem, isResolved: boolean) => {
-        const subs = substitutions.filter(s => s.scheduleItemId === l.id && s.date === selectedDate);
-        const hasSubs = subs.length > 0;
-        const firstSub = hasSubs ? subs[0] : null;
-        
-        const rep = firstSub && !['conducted','cancelled'].includes(firstSub.replacementTeacherId) ? teachers.find(t => t.id === firstSub.replacementTeacherId) : null;
-        const orig = teachers.find(t => t.id === l.teacherId);
-        const subj = subjects.find(s => s.id === l.subjectId); 
-        const cls = classes.find(c => c.id === l.classId);
-        
-        // Logic for showing room changes
-        const originalRoomName = rooms.find(r => r.id === l.roomId)?.name || l.roomId || '—';
-        const replacementRoomId = firstSub?.replacementRoomId;
-        const replacementRoomName = replacementRoomId ? (rooms.find(r => r.id === replacementRoomId)?.name || replacementRoomId) : null;
-        const isRoomChanged = replacementRoomId && replacementRoomId !== l.roomId;
 
-        const isCancelled = firstSub?.replacementTeacherId === 'cancelled';
-        const isConducted = firstSub?.replacementTeacherId === 'conducted';
-        const comment = firstSub?.comment;
-        
-        // Compact Mode Render
-        if (isCompactMode) {
-            return (
-                <div 
-                    key={l.id} 
-                    onDragOver={(e) => handleDragOver(e, l.id)}
-                    onDragLeave={handleDragLeave}
-                    onDrop={(e) => handleDrop(e, l)}
-                    className={`relative flex items-center gap-3 p-2 rounded-lg border transition-all 
-                        ${dragOverLessonId === l.id ? 'ring-2 ring-indigo-500 bg-indigo-50 border-indigo-500 z-10' : 'bg-white dark:bg-dark-800 border-slate-100 dark:border-slate-700'} 
-                        ${draggedTeacherId && !isResolved && dragOverLessonId !== l.id ? 'border-dashed border-indigo-300' : ''} overflow-hidden`}
-                >
-                    {/* Visual Overlay for Drop Zone */}
-                    {draggedTeacherId && !isResolved && dragOverLessonId !== l.id && (
-                        <div className="absolute inset-0 bg-indigo-50/10 pointer-events-none" />
-                    )}
-                    
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm ${isResolved ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>{l.period}</div>
-                    <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                            <span className="font-bold text-slate-800 dark:text-slate-200 text-sm truncate">{cls?.name}</span>
-                            <span className="text-xs text-slate-400 truncate">{subj?.name}</span>
-                        </div>
-                        <div className="flex items-center gap-2 text-xs">
-                             <span className={`font-medium ${isResolved ? 'text-slate-400 line-through' : 'text-red-500'}`}>{orig?.name}</span>
-                             {isResolved && <Icon name="ArrowRight" size={10} className="text-slate-300"/>}
-                             {isResolved && (
-                                 <span className={`font-bold ${isCancelled ? 'text-red-600' : isConducted ? 'text-blue-600' : 'text-emerald-600'}`}>
-                                     {isCancelled ? 'СНЯТ' : isConducted ? 'ПРОВЕДЕН' : rep?.name}
-                                 </span>
-                             )}
-                        </div>
-                            {comment && (
-                                <div className="text-[10px] text-slate-500 italic mt-0.5 line-clamp-2">
-                                    {comment}
-                                </div>
-                            )}
-                    </div>
-                    
-                    <div className="flex items-center gap-2">
-                         {/* Room Info */}
-                         {isRoomChanged ? (
-                             <div className="flex items-center gap-1 text-[10px] bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100">
-                                 <span className="line-through text-slate-400">{originalRoomName}</span>
-                                 <Icon name="ArrowRight" size={8} className="text-indigo-400"/>
-                                 <span className="font-bold text-indigo-700">{replacementRoomName}</span>
-                             </div>
-                         ) : (
-                             <div className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded font-bold text-slate-500">{originalRoomName}</div>
-                         )}
-
-                         {!isResolved ? (
-                            <button onClick={() => { setCurrentSubParams({ scheduleItemId: l.id, subjectId: l.subjectId, period: l.period, shift: l.shift, classId: l.classId, teacherId: l.teacherId, roomId: l.roomId, day: l.day }); setIsModalOpen(true); }} className="p-1.5 bg-indigo-100 text-indigo-600 rounded-lg hover:bg-indigo-200">
-                                <Icon name="Edit" size={14}/>
-                            </button>
-                         ) : (
-                            <div className="flex gap-1">
-                                {firstSub && (
-                                    <button onClick={() => handleEditSubstitution(l, firstSub)} className="p-1.5 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-slate-100">
-                                        <Icon name="Edit" size={14}/>
-                                    </button>
-                                )}
-                                <button onClick={() => removeSubstitution(l.id)} className="p-1.5 text-slate-300 hover:text-red-500 rounded-lg hover:bg-red-50">
-                                    <Icon name="X" size={14}/>
-                                </button>
-                            </div>
-                         )}
-                    </div>
-                </div>
-            );
-        }
-
-        return (
-            <div 
-                key={l.id} 
-                onDragOver={(e) => handleDragOver(e, l.id)}
-                onDragLeave={handleDragLeave}
-                onDrop={(e) => handleDrop(e, l)}
-                className={`relative p-5 rounded-2xl border transition-all overflow-hidden
-                    ${dragOverLessonId === l.id ? 'ring-2 ring-indigo-500 bg-indigo-50 border-indigo-500 z-10 scale-[1.02] shadow-md' : 'bg-white dark:bg-dark-800 border-slate-100 dark:border-slate-700 shadow-sm'} 
-                    ${draggedTeacherId && !isResolved && dragOverLessonId !== l.id ? 'border-dashed border-indigo-300' : ''}`}
-            >
-                {/* Visual Overlay for Drop Zone */}
-                {draggedTeacherId && !isResolved && dragOverLessonId !== l.id && (
-                    <div className="absolute inset-0 bg-indigo-50/10 pointer-events-none z-10" />
-                )}
-                
-                <div className="flex justify-between items-start mb-3">
-                    <div className="flex items-center gap-4">
-                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-xl ${isResolved ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>{l.period}</div>
-                        <div>
-                            <div className="font-bold text-slate-800 dark:text-slate-200 text-lg">{cls?.name}</div>
-                            <div className="text-sm text-slate-500">{subj?.name}</div>
-                        </div>
-                    </div>
-                    <div className="text-right">
-                         <div className="text-xs font-bold text-slate-400 uppercase">{l.shift === Shift.First ? '1 смена' : '2 смена'}</div>
-                         <div className="mt-1">
-                            {isRoomChanged ? (
-                                <div className="flex items-center justify-end gap-1.5 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-1 rounded border border-indigo-100 dark:border-indigo-800">
-                                    <span className="text-xs font-mono font-bold text-slate-400 line-through decoration-red-400">{originalRoomName}</span>
-                                    <Icon name="ArrowRight" size={10} className="text-indigo-400"/>
-                                    <span className="text-xs font-mono font-black text-indigo-700 dark:text-indigo-300">{replacementRoomName}</span>
-                                </div>
-                            ) : (
-                                <div className="text-xs font-mono bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded inline-block font-bold">{originalRoomName}</div>
-                            )}
-                         </div>
-                    </div>
-                </div>
-
-                <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
-                     <div className={`text-base font-medium ${isResolved ? 'text-slate-400 line-through' : 'text-red-500'}`}>
-                        {orig?.name}
-                     </div>
-                     {!isResolved ? (
-                        <button onClick={() => { setCurrentSubParams({ scheduleItemId: l.id, subjectId: l.subjectId, period: l.period, shift: l.shift, classId: l.classId, teacherId: l.teacherId, roomId: l.roomId, day: l.day }); setIsModalOpen(true); }} className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition">
-                            Заменить
-                        </button>
-                     ) : (
-                        <div className="flex items-center gap-3 justify-end">
-                             {isCancelled ? <span className="text-red-600 font-black text-sm uppercase">УРОК СНЯТ</span> :
-                              isConducted ? <span className="text-blue-600 font-bold text-sm">ПРОВЕДЕН</span> :
-                              <div className="flex flex-col items-end">
-                                  <span className="text-emerald-600 font-bold text-base">{rep?.name || 'Замена'}</span>
-                                  {firstSub?.isMerger && <span className="text-[10px] text-purple-500 font-bold">ОБЪЕДИНЕНИЕ</span>}
-                              </div>
-                             }
-
-                             {comment && (
-                                <span className="text-[11px] text-slate-500 italic mt-1 max-w-xs text-right">
-                                    {comment}
-                                </span>
-                             )}
-                             
-                             {/* Telegram Send Button for Individual */}
-                             {rep && rep.telegramChatId && !isCancelled && !isConducted && (
-                                <button 
-                                    onClick={() => {
-                                        const roomInfo = isRoomChanged ? `${originalRoomName} -> ${replacementRoomName}` : originalRoomName;
-                                        handleTelegramClick(
-                                            rep.id, 
-                                            l.id, 
-                                            roomInfo, 
-                                            cls?.name || '?', 
-                                            subj?.name || '?', 
-                                            l.period, 
-                                            !!isRoomChanged
-                                        );
-                                    }}
-                                    className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
-                                    title="Отправить учителю в Telegram"
-                                >
-                                    <Icon name="Send" size={16} />
-                                </button>
-                             )}
-
-                             {firstSub && (
-                                <button onClick={() => handleEditSubstitution(l, firstSub)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition-colors" title="Редактировать замену">
-                                    <Icon name="Edit" size={18} />
-                                </button>
-                             )}
-
-                             <button onClick={() => removeSubstitution(l.id)} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><Icon name="X" size={18}/></button>
-                        </div>
-                     )}
-                </div>
-            </div>
-        );
-    };
 
     return (
         <div className="h-full flex flex-col gap-6">
@@ -1164,49 +988,29 @@ export const SubstitutionsPage = () => {
                      <div className="bg-white dark:bg-dark-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex-1 overflow-hidden flex flex-col h-[600px] md:h-auto">
                         <h3 className="font-bold text-slate-800 dark:text-slate-100 mb-4 flex items-center gap-2"><Icon name="UserX" size={18} className="text-red-500"/> Отсутствующие</h3>
                         
-                        <div className="mb-3 space-y-2">
-                            <div className="flex bg-slate-100 dark:bg-slate-700 p-1 rounded-lg">
-                                <button onClick={() => setTeacherShiftFilter('all')} className={`flex-1 py-2 text-xs font-bold rounded-md ${teacherShiftFilter === 'all' ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>Все</button>
-                                <button onClick={() => setTeacherShiftFilter(Shift.First)} className={`flex-1 py-2 text-xs font-bold rounded-md ${teacherShiftFilter === Shift.First ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>1 см</button>
-                                <button onClick={() => setTeacherShiftFilter(Shift.Second)} className={`flex-1 py-2 text-xs font-bold rounded-md ${teacherShiftFilter === Shift.Second ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>2 см</button>
-                            </div>
-                            {/* Subject Filter */}
-                            <select value={teacherSubjectFilter} onChange={e => setTeacherSubjectFilter(e.target.value)} className="w-full p-2 bg-slate-50 dark:bg-slate-700 border border-slate-100 dark:border-slate-600 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 outline-none">
-                                <option value="">Все предметы</option>
-                                {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                            </select>
-                            <div className="relative">
-                                <Icon name="Search" className="absolute left-3 top-3 text-slate-400" size={16}/>
-                                <input placeholder="Найти учителя..." value={teacherSearch} onChange={e => setTeacherSearch(e.target.value)} className="w-full pl-9 pr-3 py-2.5 bg-slate-50 dark:bg-slate-700 border border-slate-100 dark:border-slate-600 rounded-xl text-sm outline-none focus:ring-1 ring-indigo-500 dark:text-white"/>
-                            </div>
-                        </div>
+                        <TeacherFilter 
+                            shiftFilter={teacherShiftFilter}
+                            onShiftChange={setTeacherShiftFilter}
+                            subjectFilter={teacherSubjectFilter}
+                            onSubjectChange={setTeacherSubjectFilter}
+                            subjects={subjects}
+                            searchQuery={teacherSearch}
+                            onSearchChange={setTeacherSearch}
+                        />
 
                         <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 space-y-2">
-                            {filteredTeachersList.map(t => {
-                                const isAbsent = t.unavailableDates.includes(selectedDate); 
-                                const reason = t.absenceReasons ? t.absenceReasons[selectedDate] : '';
-                                return (
-                                <div 
-                                    key={t.id} 
-                                    draggable={true}
-                                    onDragStart={(e) => handleDragStart(e, t.id)}
-                                    className={`flex flex-col p-4 rounded-xl border transition-all ${isAbsent ? 'bg-red-50 dark:bg-red-900/20 border-red-100 dark:border-red-900 opacity-90' : 'bg-slate-50 dark:bg-slate-700/50 border-slate-100 dark:border-slate-600 cursor-grab active:cursor-grabbing hover:border-indigo-300'}`}
-                                >
-                                    <div className="flex items-center justify-between mb-1">
-                                        <span className={`text-base font-bold ${isAbsent ? 'text-red-700 dark:text-red-400' : 'text-slate-700 dark:text-slate-300'}`}>{t.name}</span>
-                                        <div className="flex gap-1">
-                                            {isAbsent && <button onClick={() => openAbsenceModal(t.id)} className="p-1.5 bg-white text-slate-500 rounded-lg hover:text-indigo-600 shadow-sm" title="Изменить причину"><Icon name="Edit" size={14}/></button>}
-                                            <button onClick={() => isAbsent ? removeAbsence(t.id) : openAbsenceModal(t.id)} className={`text-xs px-2.5 py-1.5 rounded-lg font-bold transition-colors ${isAbsent ? 'bg-white dark:bg-dark-800 text-red-600 dark:text-red-400 shadow-sm' : 'text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600'}`}>
-                                                {isAbsent ? 'Вернуть' : 'Нет'}
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <div className="flex justify-between items-end">
-                                        <div className="flex gap-1">{t.shifts.map(s => <span key={s} className="text-[10px] bg-white dark:bg-slate-600 px-1.5 py-0.5 rounded border border-slate-100 dark:border-slate-500 text-slate-500 font-medium">{s === Shift.First ? '1' : '2'}</span>)}</div>
-                                        {isAbsent && reason && <div className="text-xs text-red-500 dark:text-red-400 italic font-medium">{reason}</div>}
-                                    </div>
-                                </div>)
-                            })}
+                            {filteredTeachersList.map(t => (
+                                <TeacherCard 
+                                    key={t.id}
+                                    teacher={t}
+                                    isAbsent={t.unavailableDates.includes(selectedDate)}
+                                    absenceReason={t.absenceReasons ? t.absenceReasons[selectedDate] : ''}
+                                    selectedDate={selectedDate}
+                                    onOpenAbsenceModal={openAbsenceModal}
+                                    onRemoveAbsence={removeAbsence}
+                                    onDragStart={handleDragStart}
+                                />
+                            ))}
                         </div>
                     </div>
                 </div>
@@ -1234,7 +1038,29 @@ export const SubstitutionsPage = () => {
                     </div>
                     
                     <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3">
-                        {(activeTab === 'pending' ? pendingLessons : resolvedLessons).map(l => renderLessonCard(l, activeTab === 'resolved'))}
+                        {(activeTab === 'pending' ? pendingLessons : resolvedLessons).map(l => (
+                            <LessonCard 
+                                key={l.id}
+                                lesson={l}
+                                isResolved={activeTab === 'resolved'}
+                                substitutions={substitutions}
+                                selectedDate={selectedDate}
+                                teachers={teachers}
+                                subjects={subjects}
+                                classes={classes}
+                                rooms={rooms}
+                                isCompactMode={isCompactMode}
+                                draggedTeacherId={draggedTeacherId}
+                                dragOverLessonId={dragOverLessonId}
+                                onDragOver={handleDragOver}
+                                onDragLeave={handleDragLeave}
+                                onDrop={handleDrop}
+                                onEdit={handleEditSubstitution}
+                                onAssign={(params) => { setCurrentSubParams(params); setIsModalOpen(true); }}
+                                onRemove={removeSubstitution}
+                                onTelegramClick={handleTelegramClick}
+                            />
+                        ))}
                         {(activeTab === 'pending' ? pendingLessons : resolvedLessons).length === 0 && (
                             <div className="h-full flex flex-col items-center justify-center text-slate-400">
                                 <Icon name={activeTab === 'pending' ? 'CheckCircle' : 'List'} size={64} className="mb-4 text-slate-200 dark:text-slate-700"/>
@@ -1245,292 +1071,80 @@ export const SubstitutionsPage = () => {
                 </div>
             </div>
             
-            {/* SUBSTITUTION MODAL */}
-            <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Управление заменой" maxWidth="max-w-2xl">
-                {/* Flex container to handle scrolling */}
-                <div className="flex flex-col h-[90vh] md:h-[850px] -m-6">
-                    {/* Fixed Header */}
-                    <div className="p-6 pb-2 border-b border-slate-100 dark:border-slate-700 bg-white dark:bg-dark-800 z-10">
-                        {modalContext && (
-                            <div className="bg-slate-50 dark:bg-slate-700/50 p-4 rounded-xl mb-4 text-sm border border-slate-100 dark:border-slate-600 flex justify-between items-center">
-                                <div>
-                                    <div className="font-bold text-slate-800 dark:text-slate-200 text-xl">{modalContext.className}</div>
-                                    <div className="text-slate-500 dark:text-slate-400 font-medium">{modalContext.period} урок • {modalContext.subjectName}</div>
-                                </div>
-                                <div className="text-right">
-                                     <div className="text-slate-400 text-xs uppercase font-bold">Учитель</div>
-                                     <div className={`text-base ${modalContext.isTeacherAbsent ? 'line-through decoration-red-400 text-red-400' : 'font-bold dark:text-white'}`}>{modalContext.teacherName}</div>
-                                </div>
-                            </div>
-                        )}
-                        
-                        {/* Action Tabs */}
-                        <div className="flex gap-2 border-b border-slate-100 dark:border-slate-700">
-                            <button onClick={() => setSubMode('teacher')} className={`pb-3 px-4 text-sm font-bold border-b-2 transition-all ${subMode === 'teacher' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>Замена учителем</button>
-                            <button onClick={() => setSubMode('cancel')} className={`pb-3 px-4 text-sm font-bold border-b-2 transition-all ${subMode === 'cancel' ? 'border-red-600 text-red-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>Отмена урока</button>
-                            <button onClick={() => setSubMode('advanced')} className={`pb-3 px-4 text-sm font-bold border-b-2 transition-all ${subMode === 'advanced' ? 'border-amber-600 text-amber-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}>Спец. действия</button>
-                        </div>
-                    </div>
+            <AssignmentModal 
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                modalContext={modalContext}
+                subMode={subMode}
+                setSubMode={setSubMode}
+                candidates={candidates}
+                candidateSearch={candidateSearch}
+                setCandidateSearch={setCandidateSearch}
+                onViewSchedule={setViewScheduleTeacherId}
+                onAssign={assignSubstitution}
+                onToggleRefusal={toggleRefusal}
+                refusedTeacherIds={refusedTeacherIds}
+                handleCandidateClick={handleCandidateClick}
+                mergeCandidates={mergeCandidates}
+                onBatchClassMerge={handleBatchClassMerge}
+                otherLessonsForTeacher={otherLessonsForTeacher}
+                onSwapLessons={swapLessons}
+                selectedRoomId={selectedRoomId}
+                setSelectedRoomId={setSelectedRoomId}
+                rooms={rooms}
+                lessonAbsenceReason={lessonAbsenceReason}
+                setLessonAbsenceReason={setLessonAbsenceReason}
+                substitutionComment={substitutionComment}
+                setSubstitutionComment={setSubstitutionComment}
+                activeReplacementId={activeReplacementId}
+                classes={classes}
+            />
 
-                    {/* Scrollable Content */}
-                    <div className="flex-1 overflow-y-auto custom-scrollbar p-6 bg-white dark:bg-dark-800">
-                        {subMode === 'teacher' && (
-                            <div className="space-y-6">
-                                {/* Smart Recommendations */}
-                                {candidates.recommended.length > 0 && (
-                                    <div>
-                                        <h4 className="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-2 flex items-center gap-1"><Icon name="Star" size={14}/> Рекомендуемые</h4>
-                                        <div className="space-y-2">
-                                            {candidates.recommended.map(({ teacher, isSpecialist }) => (
-                                                <div key={teacher.id} className="flex items-center justify-between p-3 bg-emerald-50/50 border border-emerald-100 rounded-xl hover:bg-emerald-100/50 transition-colors">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-10 h-10 rounded-full bg-emerald-200 text-emerald-700 flex items-center justify-center text-sm font-bold">{teacher.name[0]}</div>
-                                                        <div>
-                                                            <div className="font-bold text-slate-800 text-base">{teacher.name}</div>
-                                                            <div className="text-xs text-emerald-600 font-bold uppercase">{isSpecialist ? 'Профиль' : 'Есть окно'}</div>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <button onClick={() => setViewScheduleTeacherId(teacher.id)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-white rounded-lg" title="Посмотреть расписание"><Icon name="Eye" size={16}/></button>
-                                                        <button onClick={() => assignSubstitution(teacher.id)} className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-bold hover:bg-emerald-700">Выбрать</button>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Все учителя</label>
-                                    <div className="relative mb-2">
-                                        <Icon name="Search" className="absolute left-3 top-3 text-slate-400" size={16}/>
-                                        <input placeholder="Найти учителя..." value={candidateSearch} onChange={e => setCandidateSearch(e.target.value)} className="w-full pl-10 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500"/>
-                                    </div>
-                                    <div className="space-y-1">
-                                        {candidates.others.map(({ teacher, isBusy, busyReason, isAbsent, subsCount }) => {
-                                            const isRefused = refusedTeacherIds.includes(teacher.id);
-                                            return (
-                                                <div key={teacher.id} className={`flex items-center justify-between p-3 rounded-lg text-sm ${isAbsent ? 'opacity-70 bg-red-50/50' : 'hover:bg-slate-50'}`}>
-                                                    <div className="flex items-center gap-3">
-                                                        <div className={`w-2 h-2 rounded-full ${isBusy ? 'bg-orange-400' : isAbsent ? 'bg-red-400' : 'bg-slate-300'}`}></div>
-                                                        <div className="flex flex-col">
-                                                            <span className="font-bold text-base text-slate-700">{teacher.name}</span>
-                                                            {isBusy && busyReason && (
-                                                                <span className="text-[10px] text-orange-500 font-bold">{busyReason.details}</span>
-                                                            )}
-                                                            {isRefused && <span className="text-[10px] bg-slate-200 px-1.5 py-0.5 rounded font-bold text-slate-500 w-fit">Отказ</span>}
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex gap-2">
-                                                        <button onClick={() => setViewScheduleTeacherId(teacher.id)} className="p-1.5 text-slate-300 hover:text-indigo-600 hover:bg-slate-100 rounded" title="Посмотреть расписание"><Icon name="Eye" size={16}/></button>
-                                                        <button onClick={(e) => toggleRefusal(teacher.id, e)} className="p-1.5 text-slate-300 hover:text-slate-500 hover:bg-slate-100 rounded"><Icon name="X" size={16}/></button>
-                                                        <button 
-                                                            onClick={() => handleCandidateClick(teacher.id, isBusy, isAbsent)} 
-                                                            className={`px-3 py-1.5 rounded-lg text-xs font-bold ${isBusy ? 'text-orange-600 bg-orange-50' : isAbsent ? 'text-red-600 bg-red-100 hover:bg-red-200' : 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100'}`}
-                                                            title={isAbsent ? "Назначить несмотря на отсутствие" : "Назначить замену"}
-                                                        >
-                                                            {isBusy ? 'Объед?' : isAbsent ? 'Выбрать' : 'Выбрать'}
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            )
-                                        })}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {subMode === 'cancel' && (
-                            <div className="text-center py-12 flex flex-col items-center justify-center h-full">
-                                <div className="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mb-6"><Icon name="X" size={40}/></div>
-                                <h3 className="font-black text-2xl mb-2 text-slate-800">Снять урок?</h3>
-                                <p className="text-slate-500 text-base mb-8 max-w-sm">Урок будет отмечен как отмененный в расписании и отобразится красным цветом.</p>
-                                <button onClick={() => assignSubstitution('cancelled')} className="px-8 py-4 bg-red-600 text-white rounded-xl font-bold text-lg hover:bg-red-700 shadow-lg shadow-red-200 hover:shadow-xl transition-all">Подтвердить отмену</button>
-                            </div>
-                        )}
-
-                        {subMode === 'advanced' && (
-                            <div className="space-y-6 pt-4">
-                                <button onClick={() => assignSubstitution('conducted')} className="w-full p-4 rounded-xl bg-blue-50 text-blue-700 font-bold text-base hover:bg-blue-100 flex items-center justify-center gap-3 border border-blue-100 transition-all hover:shadow-md"><Icon name="CheckCircle" size={20}/> Урок проведен (без замены)</button>
-                                
-                                <div className="bg-amber-50 p-5 rounded-2xl border border-amber-100">
-                                    <h4 className="font-bold text-amber-800 text-base mb-2 flex items-center gap-2"><Icon name="Users" size={18}/> Объединение</h4>
-                                    <p className="text-sm text-amber-700 mb-4">Присоединить этот класс к другому уроку.</p>
-                                    <div className="space-y-2">
-                                        {mergeCandidates.length === 0 ? <div className="text-sm text-amber-500 italic text-center py-4">Нет подходящих классов</div> : mergeCandidates.map(c => (
-                                            <button key={c.classEntity.id} onClick={() => handleBatchClassMerge(c.classEntity.id)} className="w-full p-3 bg-white rounded-xl border border-amber-200 text-left text-sm hover:border-amber-400 hover:shadow-sm transition-all">
-                                                <span className="font-bold text-base">{c.classEntity.name}</span> <span className="text-slate-400 mx-2">|</span> <span className="font-medium">{c.subjects.join(', ')}</span>
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {otherLessonsForTeacher.length > 0 && (
-                                    <div className="bg-purple-50 p-5 rounded-2xl border border-purple-100">
-                                        <h4 className="font-bold text-purple-800 text-base mb-2 flex items-center gap-2"><Icon name="RotateCw" size={18}/> Обмен</h4>
-                                        <p className="text-sm text-purple-700 mb-4">Поменять местами с другим уроком этого учителя.</p>
-                                        <div className="space-y-2">
-                                            {otherLessonsForTeacher.map(l => (
-                                                <button key={l.id} onClick={() => swapLessons(l.id)} className="w-full p-3 bg-white rounded-xl border border-purple-200 text-left text-sm hover:border-purple-400 hover:shadow-sm transition-all">
-                                                    <span className="font-bold text-base">{l.period} урок</span>: <span className="font-medium">{classes.find(c=>c.id===l.classId)?.name}</span>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Fixed Footer for Options */}
-                    {subMode === 'teacher' && (
-                        <div className="p-6 pt-4 border-t border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-dark-800 flex flex-col gap-4 rounded-b-3xl">
-                             <div className="flex flex-col md:flex-row gap-4">
-                                <div className="flex-1">
-                                    <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Кабинет (Опционально)</label>
-                                    <select value={selectedRoomId} onChange={e => setSelectedRoomId(e.target.value)} className="w-full border border-slate-200 p-3 rounded-xl text-sm bg-white dark:bg-slate-700 dark:text-white font-medium outline-none focus:ring-2 ring-indigo-500"><option value="">Авто / Без изменений</option>{rooms.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}</select>
-                                </div>
-                                <div className="flex-1">
-                                    <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Причина (Опционально)</label>
-                                    <select value={lessonAbsenceReason} onChange={e => setLessonAbsenceReason(e.target.value)} className="w-full border border-slate-200 p-3 rounded-xl text-sm bg-white dark:bg-slate-700 dark:text-white font-medium outline-none focus:ring-2 ring-indigo-500">
-                                        <option value="">Не указана</option>
-                                        <option value="Болезнь">Болезнь</option>
-                                        <option value="Курсы">Курсы</option>
-                                        <option value="Отгул">Отгул</option>
-                                        <option value="Семейные обстоятельства">Семейные обстоятельства</option>
-                                        <option value="Командировка">Командировка</option>
-                                        <option value="Без записи">Без записи</option>
-                                        <option value="Другое">Другое</option>
-                                    </select>
-                                </div>
-                             </div>
-
-                             <div className="flex flex-col gap-2">
-                                <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Комментарий к этой замене (Опционально)</label>
-                                <textarea
-                                    value={substitutionComment}
-                                    onChange={e => setSubstitutionComment(e.target.value)}
-                                    className="w-full border border-slate-200 p-2.5 rounded-xl text-sm bg-white dark:bg-slate-700 dark:text-white font-medium outline-none focus:ring-2 ring-indigo-500"
-                                    rows={2}
-                                    placeholder="Краткий комментарий, который будет виден в списке замен и на PNG."
-                                />
-                             </div>
-                             
-                             {(activeReplacementId || (modalContext?.teacherId && selectedRoomId)) && (
-                                <button 
-                                    onClick={() => assignSubstitution(activeReplacementId || modalContext?.teacherId || '')} 
-                                    className="w-full py-3 bg-indigo-600 text-white rounded-xl text-base font-bold hover:bg-indigo-700 transition shadow-lg shadow-indigo-200"
-                                >
-                                    Сохранить изменения
-                                </button>
-                             )}
-                        </div>
-                    )}
-                </div>
-            </Modal>
-
-            {/* ABSENCE MODAL */}
-            <Modal isOpen={absenceModalOpen} onClose={() => setAbsenceModalOpen(false)} title="Причина отсутствия">
-                <div className="space-y-4">
-                    <select value={absenceReason} onChange={e => setAbsenceReason(e.target.value)} className="w-full border p-3 rounded-xl outline-none font-bold text-slate-700 dark:text-white dark:bg-slate-700 dark:border-slate-600">
-                        <option>Болезнь</option>
-                        <option>Курсы</option>
-                        <option>Отгул</option>
-                        <option>Семейные обстоятельства</option>
-                        <option>Командировка</option>
-                        <option>Без записи</option>
-                        <option>Другое</option>
-                    </select>
-                    <div className="flex flex-col gap-2">
-                         <button onClick={confirmAbsence} className="w-full px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition">
-                             Только отметить отсутствие
-                         </button>
-                         <button onClick={openBatchActionModal} className="w-full px-6 py-3 bg-purple-50 text-purple-700 border border-purple-100 rounded-xl font-bold hover:bg-purple-100 transition flex items-center justify-center gap-2">
-                             <Icon name="Layers" size={18}/> Пакетная обработка уроков
-                         </button>
-                    </div>
-                </div>
-            </Modal>
+            <AbsenceModal 
+                isOpen={absenceModalOpen}
+                onClose={() => setAbsenceModalOpen(false)}
+                reason={absenceReason}
+                onReasonChange={setAbsenceReason}
+                onConfirm={confirmAbsence}
+                onOpenBatch={openBatchActionModal}
+            />
             
-            {/* BATCH ACTION MODAL */}
-            <Modal isOpen={batchActionModalOpen} onClose={() => setBatchActionModalOpen(false)} title="Пакетная обработка">
-                <div className="space-y-6">
-                    <p className="text-slate-600 dark:text-slate-300">
-                        Выберите действие для <strong>всех уроков</strong> выбранного учителя на {new Date(selectedDate).toLocaleDateString('ru-RU')}.
-                    </p>
-                    
-                    <div className="grid grid-cols-1 gap-3">
-                        <button 
-                            onClick={() => setBatchActionType('cancel')}
-                            className={`p-4 rounded-xl border text-left transition-all ${batchActionType === 'cancel' ? 'bg-red-50 border-red-200 ring-2 ring-red-500' : 'bg-white border-slate-200 hover:border-red-300'}`}
-                        >
-                            <div className="font-bold text-red-600 mb-1 flex items-center gap-2"><Icon name="X" size={18}/> Снять все уроки</div>
-                            <div className="text-xs text-slate-500">Все уроки будут отмечены как отмененные.</div>
-                        </button>
-                        
-                        <button 
-                            onClick={() => setBatchActionType('replace')}
-                            className={`p-4 rounded-xl border text-left transition-all ${batchActionType === 'replace' ? 'bg-indigo-50 border-indigo-200 ring-2 ring-indigo-500' : 'bg-white border-slate-200 hover:border-indigo-300'}`}
-                        >
-                            <div className="font-bold text-indigo-600 mb-1 flex items-center gap-2"><Icon name="UserCheck" size={18}/> Назначить одного учителя</div>
-                            <div className="text-xs text-slate-500">Все уроки проведет один выбранный учитель.</div>
-                        </button>
-                    </div>
-
-                    {batchActionType === 'replace' && (
-                        <div className="animate-fadeIn">
-                            <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Выберите заменяющего учителя</label>
-                            <select 
-                                value={batchReplacementId} 
-                                onChange={e => setBatchReplacementId(e.target.value)} 
-                                className="w-full p-3 border border-slate-200 rounded-xl bg-white dark:bg-slate-700 dark:border-slate-600 dark:text-white outline-none focus:ring-2 ring-indigo-500"
-                            >
-                                <option value="">-- Выберите учителя --</option>
-                                {teachers.filter(t => t.id !== selectedTeacherId && !t.unavailableDates.includes(selectedDate)).map(t => (
-                                    <option key={t.id} value={t.id}>{t.name}</option>
-                                ))}
-                            </select>
-                        </div>
-                    )}
-                    
-                    <div className="pt-4 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-3">
-                        <button onClick={() => setBatchActionModalOpen(false)} className="px-4 py-2 text-slate-500 font-bold hover:bg-slate-100 rounded-lg">Отмена</button>
-                        <button 
-                            onClick={confirmBatchAction} 
-                            disabled={!batchActionType || (batchActionType === 'replace' && !batchReplacementId)}
-                            className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            Применить
-                        </button>
-                    </div>
-                </div>
-            </Modal>
+            <BatchActionModal 
+                isOpen={batchActionModalOpen}
+                onClose={() => setBatchActionModalOpen(false)}
+                selectedDate={selectedDate}
+                batchActionType={batchActionType}
+                onTypeChange={setBatchActionType}
+                batchReplacementId={batchReplacementId}
+                onReplacementChange={setBatchReplacementId}
+                teachers={teachers}
+                selectedTeacherId={selectedTeacherId}
+                onConfirm={confirmBatchAction}
+            />
             
-            {/* MANUAL SEARCH MODAL */}
-            <Modal isOpen={manualSearchModalOpen} onClose={() => setManualSearchModalOpen(false)} title="Ручной поиск урока">
-                <div className="mb-4">
-                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">Введите имя учителя или название класса.</p>
-                    <div className="relative">
-                        <Icon name="Search" className="absolute left-3 top-2.5 text-slate-400" size={14}/>
-                        <input autoFocus placeholder="Например: 6А или Иванова..." value={manualLessonSearch} onChange={e => setManualLessonSearch(e.target.value)} className="w-full pl-8 pr-3 py-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl text-sm outline-none focus:border-indigo-500 dark:text-white"/>
-                    </div>
-                </div>
-                <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar">
-                    {manualSearchResults.map((item) => (
-                        <button key={item.id} onClick={() => { setManualSearchModalOpen(false); setCurrentSubParams({ scheduleItemId: item.id, subjectId: item.subjectId, period: item.period, shift: item.shift, classId: item.classId, teacherId: item.teacherId, roomId: item.roomId, day: item.day }); setIsModalOpen(true); }} className="w-full p-3 rounded-xl border border-slate-100 dark:border-slate-700 hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors text-left group">
-                            <div className="flex justify-between items-center mb-1">
-                                <span className="font-bold text-slate-800 dark:text-slate-200">{item.entityName} <span className="font-normal text-slate-500">({item.subInfo})</span></span>
-                                <span className="text-xs font-bold bg-slate-100 dark:bg-slate-600 px-2 py-0.5 rounded">{item.period} урок</span>
-                            </div>
-                            <div className="text-xs text-slate-500 dark:text-slate-400 flex gap-2">
-                                <span>{item.subjectName}</span>
-                                {item.roomId && <span className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 px-1 rounded">Каб. {rooms.find(r=>r.id===item.roomId)?.name || item.roomId}</span>}
-                            </div>
-                        </button>
-                    ))}
-                    {manualLessonSearch.length > 1 && manualSearchResults.length === 0 && <div className="text-center text-slate-400 text-xs py-4">Уроки не найдены на выбранную дату ({selectedDate})</div>}
-                </div>
-            </Modal>
+            <ManualSearchModal 
+                isOpen={manualSearchModalOpen}
+                onClose={() => setManualSearchModalOpen(false)}
+                searchValue={manualLessonSearch}
+                onSearchChange={setManualLessonSearch}
+                results={manualSearchResults}
+                rooms={rooms}
+                selectedDate={selectedDate}
+                onSelect={(item) => { 
+                    setManualSearchModalOpen(false); 
+                    setCurrentSubParams({ 
+                        scheduleItemId: item.id, 
+                        subjectId: item.subjectId, 
+                        period: item.period, 
+                        shift: item.shift, 
+                        classId: item.classId, 
+                        teacherId: item.teacherId, 
+                        roomId: item.roomId, 
+                        day: item.day 
+                    }); 
+                    setIsModalOpen(true); 
+                }}
+            />
 
             {/* HISTORY MODAL (Improved) */}
             <Modal isOpen={isHistoryModalOpen} onClose={() => setIsHistoryModalOpen(false)} title="История замен" maxWidth="max-w-5xl">
@@ -1626,64 +1240,20 @@ export const SubstitutionsPage = () => {
                  </div>
             </Modal>
             
-            {/* TELEGRAM CHOICE MODAL */}
-            <Modal isOpen={telegramChoiceOpen} onClose={() => setTelegramChoiceOpen(false)} title="Отправка уведомления">
-                <div className="space-y-6">
-                    <p className="text-base text-slate-600 dark:text-slate-300">
-                        Вы хотите отправить учителю информацию только об этой замене или сводку всех его замен на сегодня?
-                    </p>
-                    <div className="flex flex-col gap-3">
-                        <button 
-                            onClick={() => confirmSendTelegram('single')}
-                            className="w-full p-4 bg-white border border-slate-200 dark:bg-slate-700 dark:border-slate-600 rounded-xl flex items-center gap-4 hover:shadow-md transition-all group"
-                        >
-                            <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                                <Icon name="Bell" size={20} />
-                            </div>
-                            <div className="text-left">
-                                <div className="font-bold text-slate-800 dark:text-white">Только этот урок</div>
-                                <div className="text-xs text-slate-500 dark:text-slate-400">Уведомление о конкретной замене</div>
-                            </div>
-                        </button>
-
-                        <button 
-                            onClick={() => confirmSendTelegram('all')}
-                            className="w-full p-4 bg-white border border-slate-200 dark:bg-slate-700 dark:border-slate-600 rounded-xl flex items-center gap-4 hover:shadow-md transition-all group"
-                        >
-                            <div className="w-10 h-10 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center group-hover:bg-purple-600 group-hover:text-white transition-colors">
-                                <Icon name="List" size={20} />
-                            </div>
-                            <div className="text-left">
-                                <div className="font-bold text-slate-800 dark:text-white">Все замены (Сводка)</div>
-                                <div className="text-xs text-slate-500 dark:text-slate-400">Полный список замен учителя на сегодня</div>
-                            </div>
-                        </button>
-                    </div>
-                </div>
-            </Modal>
-            {/* QUICK VIEW SCHEDULE MODAL */}
-            <Modal isOpen={!!viewScheduleTeacherId} onClose={() => setViewScheduleTeacherId(null)} title="Расписание учителя" maxWidth="max-w-md">
-                 <div className="space-y-3">
-                     {viewScheduleTeacherId && (() => {
-                         const schedule = activeSchedule.filter(s => s.teacherId === viewScheduleTeacherId && s.day === selectedDayOfWeek).sort((a,b) => a.period - b.period);
-                         if (schedule.length === 0) return <div className="text-center text-slate-400 py-8">Уроков нет</div>;
-                         return schedule.map(s => {
-                             const c = classes.find(x => x.id === s.classId)?.name;
-                             const subj = subjects.find(x => x.id === s.subjectId)?.name;
-                             const r = rooms.find(x => x.id === s.roomId)?.name || s.roomId;
-                             return (
-                                 <div key={s.id} className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-700 rounded-xl">
-                                     <div className="w-8 h-8 rounded-lg bg-white dark:bg-slate-600 flex items-center justify-center font-bold text-slate-500">{s.period}</div>
-                                     <div>
-                                         <div className="font-bold text-slate-800 dark:text-white">{c}</div>
-                                         <div className="text-xs text-slate-500 dark:text-slate-400">{subj}, каб. {r}</div>
-                                     </div>
-                                 </div>
-                             )
-                         })
-                     })()}
-                 </div>
-            </Modal>
+            <TelegramChoiceModal 
+                isOpen={telegramChoiceOpen}
+                onClose={() => setTelegramChoiceOpen(false)}
+                onConfirm={confirmSendTelegram}
+            />
+            <QuickViewScheduleModal 
+                teacherId={viewScheduleTeacherId}
+                onClose={() => setViewScheduleTeacherId(null)}
+                activeSchedule={activeSchedule}
+                selectedDayOfWeek={selectedDayOfWeek}
+                classes={classes}
+                subjects={subjects}
+                rooms={rooms}
+            />
         </div>
     );
 };
