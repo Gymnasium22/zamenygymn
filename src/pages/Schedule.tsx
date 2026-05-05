@@ -1,6 +1,5 @@
-
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { useStaticData, useScheduleData } from '../context/DataContext'; 
+import { useStaticData, useScheduleData } from '../context/DataContext';
 import { Icon } from '../components/Icons';
 import { Modal, SearchableSelect, ContextMenu, useToast } from '../components/UI';
 import { Shift, DayOfWeek, DAYS, SHIFT_PERIODS, ScheduleItem } from '../types';
@@ -30,7 +29,7 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
     const { subjects, teachers, classes, rooms } = useStaticData();
     const { schedule1, schedule2, saveSemesterSchedule, canUndo, canRedo, undo, redo } = useScheduleData();
     const { addToast } = useToast();
-    
+
     // Выбираем нужный массив данных в зависимости от пропса semester
     const schedule = semester === 2 ? schedule2 : schedule1;
 
@@ -38,21 +37,27 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
     const saveCurrentSchedule = async (newScheduleData: ScheduleItem[]) => {
         await saveSemesterSchedule(semester, newScheduleData);
     };
-    
+
     const [selectedShift, setSelectedShift] = useState(Shift.First);
     const [selectedDay, setSelectedDay] = useState<DayOfWeek>(DayOfWeek.Monday);
     const [isEditorOpen, setIsEditorOpen] = useState(false);
     const [tempItem, setTempItem] = useState<Partial<ScheduleItem>>({});
-    const [viewMode, setViewMode] = useState<'class'|'teacher'|'subject'|'week'>('class');
+    const [viewMode, setViewMode] = useState<'class' | 'teacher' | 'subject' | 'week'>('class');
     const [filterId, setFilterId] = useState('');
     const [filterRoom, setFilterRoom] = useState('');
     const [filterDirection, setFilterDirection] = useState('');
     const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
-    const [contextMenu, setContextMenu] = useState<ContextMenuState>({ visible: false, x: 0, y: 0, item: null, cell: null });
+    const [contextMenu, setContextMenu] = useState<ContextMenuState>({
+        visible: false,
+        x: 0,
+        y: 0,
+        item: null,
+        cell: null
+    });
     const [clipboard, setClipboard] = useState<ScheduleItem | null>(null);
-    
+
     const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
-    
+
     // Interactive Conflicts State
     const [conflictModalOpen, setConflictModalOpen] = useState(false);
     const [activeConflictDetails, setActiveConflictDetails] = useState<{
@@ -61,14 +66,14 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
     } | null>(null);
 
     const [draggedItem, setDraggedItem] = useState<ScheduleItem | null>(null);
-    const [dragOverCell, setDragOverCell] = useState<string|null>(null);
+    const [dragOverCell, setDragOverCell] = useState<string | null>(null);
 
     const isMobile = useMedia({ maxWidth: 767 });
-    const [mobileListView, setMobileListView] = useState(true); 
+    const [mobileListView, setMobileListView] = useState(true);
 
     const [isMassOperationsModalOpen, setIsMassOperationsModalOpen] = useState(false);
     const [massOpConfirm, setMassOpConfirm] = useState({ isOpen: false, type: '', day: '', classId: '' });
-    
+
     // State for Mass Ops Modal Selections
     const [massOpSelectedDay, setMassOpSelectedDay] = useState<string>(DayOfWeek.Monday);
     const [massOpSelectedClass, setMassOpSelectedClass] = useState<string>('');
@@ -81,7 +86,7 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
         const id = searchParams.get('id');
         const day = searchParams.get('day');
         const shift = searchParams.get('shift');
-        
+
         if (view && ['class', 'teacher', 'subject', 'week'].includes(view)) {
             setViewMode(view as any);
             if (id) setFilterId(id);
@@ -99,10 +104,14 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
     const currentPeriods = SHIFT_PERIODS[selectedShift];
 
     const rows = useMemo(() => {
-        if (viewMode === 'week') return SHIFT_PERIODS[selectedShift].map(p => ({ id: p.toString(), name: `${p} урок` }));
-        if (viewMode === 'class') return filterId ? classes.filter(c => c.id === filterId && c.shift === selectedShift) : classes.filter(c => c.shift === selectedShift);
-        if (viewMode === 'teacher') return filterId ? teachers.filter(t => t.id === filterId) : teachers;
-        if (viewMode === 'subject') return filterId ? subjects.filter(s => s.id === filterId) : subjects;
+        if (viewMode === 'week')
+            return SHIFT_PERIODS[selectedShift].map((p) => ({ id: p.toString(), name: `${p} урок` }));
+        if (viewMode === 'class')
+            return filterId
+                ? classes.filter((c) => c.id === filterId && c.shift === selectedShift)
+                : classes.filter((c) => c.shift === selectedShift);
+        if (viewMode === 'teacher') return filterId ? teachers.filter((t) => t.id === filterId) : teachers;
+        if (viewMode === 'subject') return filterId ? subjects.filter((s) => s.id === filterId) : subjects;
         return [];
     }, [viewMode, filterId, classes, teachers, subjects, selectedShift]);
 
@@ -123,58 +132,85 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
         }
     }, [scheduleItemsCache]);
 
-    const getScheduleItems = useCallback((rowId: string, colKey: string | number): ScheduleItem[] => {
-        const cacheKey = `${viewMode}-${rowId}-${colKey}-${selectedShift}-${selectedDay}-${filterId}-${filterRoom}-${filterDirection}`;
+    const getScheduleItems = useCallback(
+        (rowId: string, colKey: string | number): ScheduleItem[] => {
+            const cacheKey = `${viewMode}-${rowId}-${colKey}-${selectedShift}-${selectedDay}-${filterId}-${filterRoom}-${filterDirection}`;
 
-        if (scheduleItemsCache.has(cacheKey)) {
-            return scheduleItemsCache.get(cacheKey)!;
-        }
+            if (scheduleItemsCache.has(cacheKey)) {
+                return scheduleItemsCache.get(cacheKey)!;
+            }
 
-        let items: ScheduleItem[] = [];
-        if (viewMode === 'week') {
-             const period = parseInt(rowId);
-             if (isNaN(period)) return [];
-             const day = String(colKey);
-             items = schedule.filter(s => s.shift === selectedShift && s.period === period && s.day === day);
-             if (filterId) items = items.filter(s => s.classId === filterId);
-        } else {
-            const period = typeof colKey === 'string' ? parseInt(colKey) : colKey;
-            if (isNaN(period)) return [];
-            if (viewMode === 'class') items = schedule.filter(s => s.classId === rowId && s.period === period && s.day === selectedDay && s.shift === selectedShift);
-            if (viewMode === 'teacher') items = schedule.filter(s => s.teacherId === rowId && s.period === period && s.day === selectedDay && s.shift === selectedShift);
-            if (viewMode === 'subject') items = schedule.filter(s => s.subjectId === rowId && s.period === period && s.day === selectedDay && s.shift === selectedShift);
-        }
+            let items: ScheduleItem[] = [];
+            if (viewMode === 'week') {
+                const period = parseInt(rowId);
+                if (isNaN(period)) return [];
+                const day = String(colKey);
+                items = schedule.filter((s) => s.shift === selectedShift && s.period === period && s.day === day);
+                if (filterId) items = items.filter((s) => s.classId === filterId);
+            } else {
+                const period = typeof colKey === 'string' ? parseInt(colKey) : colKey;
+                if (isNaN(period)) return [];
+                if (viewMode === 'class')
+                    items = schedule.filter(
+                        (s) =>
+                            s.classId === rowId &&
+                            s.period === period &&
+                            s.day === selectedDay &&
+                            s.shift === selectedShift
+                    );
+                if (viewMode === 'teacher')
+                    items = schedule.filter(
+                        (s) =>
+                            s.teacherId === rowId &&
+                            s.period === period &&
+                            s.day === selectedDay &&
+                            s.shift === selectedShift
+                    );
+                if (viewMode === 'subject')
+                    items = schedule.filter(
+                        (s) =>
+                            s.subjectId === rowId &&
+                            s.period === period &&
+                            s.day === selectedDay &&
+                            s.shift === selectedShift
+                    );
+            }
 
-        if (filterRoom) {
-            items = items.filter(s => {
-                if (!s.roomId) return false;
-                const room = rooms.find(r => r.id === s.roomId);
-                const roomName = room ? room.name : s.roomId;
-                return (roomName || '').toLowerCase().includes(filterRoom.toLowerCase());
-            });
-        }
-        if (filterDirection) items = items.filter(s => s.direction?.toLowerCase().includes(filterDirection.toLowerCase()));
+            if (filterRoom) {
+                items = items.filter((s) => {
+                    if (!s.roomId) return false;
+                    const room = rooms.find((r) => r.id === s.roomId);
+                    const roomName = room ? room.name : s.roomId;
+                    return (roomName || '').toLowerCase().includes(filterRoom.toLowerCase());
+                });
+            }
+            if (filterDirection)
+                items = items.filter((s) => s.direction?.toLowerCase().includes(filterDirection.toLowerCase()));
 
-        scheduleItemsCache.set(cacheKey, items);
-        return items;
-    }, [viewMode, schedule, selectedShift, selectedDay, filterId, filterRoom, filterDirection, rooms]);
+            scheduleItemsCache.set(cacheKey, items);
+            return items;
+        },
+        [viewMode, schedule, selectedShift, selectedDay, filterId, filterRoom, filterDirection, rooms]
+    );
 
     const checkConflicts = (item: ScheduleItem): string[] => {
         const conflicts: string[] = [];
-        const others = schedule.filter(s => s.id !== item.id && s.day === item.day && s.period === item.period && s.shift === item.shift);
-        
-        const teacherBusy = others.find(s => s.teacherId === item.teacherId);
+        const others = schedule.filter(
+            (s) => s.id !== item.id && s.day === item.day && s.period === item.period && s.shift === item.shift
+        );
+
+        const teacherBusy = others.find((s) => s.teacherId === item.teacherId);
         if (teacherBusy) conflicts.push('teacher');
 
-        const classBusy = others.find(s => {
+        const classBusy = others.find((s) => {
             if (s.classId !== item.classId) return false;
             if (s.direction && item.direction && s.direction !== item.direction) return false;
-            return true; 
+            return true;
         });
         if (classBusy) conflicts.push('class');
 
         if (item.roomId) {
-            const roomBusy = others.find(s => s.roomId === item.roomId);
+            const roomBusy = others.find((s) => s.roomId === item.roomId);
             if (roomBusy) conflicts.push('room');
         }
 
@@ -183,13 +219,15 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
 
     const getDetailedConflicts = (item: ScheduleItem) => {
         const detailed: Array<{ type: string; description: string }> = [];
-        const others = schedule.filter(s => s.id !== item.id && s.day === item.day && s.period === item.period && s.shift === item.shift);
+        const others = schedule.filter(
+            (s) => s.id !== item.id && s.day === item.day && s.period === item.period && s.shift === item.shift
+        );
 
         // Teacher Conflict
-        const teacherBusy = others.filter(s => s.teacherId === item.teacherId);
-        teacherBusy.forEach(t => {
-            const cls = classes.find(c => c.id === t.classId)?.name;
-            const rm = rooms.find(r => r.id === t.roomId)?.name || t.roomId;
+        const teacherBusy = others.filter((s) => s.teacherId === item.teacherId);
+        teacherBusy.forEach((t) => {
+            const cls = classes.find((c) => c.id === t.classId)?.name;
+            const rm = rooms.find((r) => r.id === t.roomId)?.name || t.roomId;
             detailed.push({
                 type: 'Учитель',
                 description: `Ведет урок у ${cls} в каб. ${rm || '?'}`
@@ -197,32 +235,32 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
         });
 
         // Class Conflict
-        const classBusy = others.filter(s => {
+        const classBusy = others.filter((s) => {
             if (s.classId !== item.classId) return false;
             if (s.direction && item.direction && s.direction !== item.direction) return false;
             return true;
         });
-        classBusy.forEach(c => {
-             const subj = subjects.find(s => s.id === c.subjectId)?.name;
-             detailed.push({
-                 type: 'Класс',
-                 description: `Уже имеет урок "${subj}"`
-             });
+        classBusy.forEach((c) => {
+            const subj = subjects.find((s) => s.id === c.subjectId)?.name;
+            detailed.push({
+                type: 'Класс',
+                description: `Уже имеет урок "${subj}"`
+            });
         });
 
         // Room Conflict
         if (item.roomId) {
-            const roomBusy = others.filter(s => s.roomId === item.roomId);
-            roomBusy.forEach(r => {
-                const teacher = teachers.find(t => t.id === r.teacherId)?.name;
-                const cls = classes.find(c => c.id === r.classId)?.name;
+            const roomBusy = others.filter((s) => s.roomId === item.roomId);
+            roomBusy.forEach((r) => {
+                const teacher = teachers.find((t) => t.id === r.teacherId)?.name;
+                const cls = classes.find((c) => c.id === r.classId)?.name;
                 detailed.push({
                     type: 'Кабинет',
                     description: `Занят: ${cls}, ${teacher}`
                 });
             });
         }
-        
+
         return detailed;
     };
 
@@ -235,9 +273,9 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
 
     const validateRoom = (classId: string, subjectId: string, roomId: string) => {
         const warnings: string[] = [];
-        const cls = classes.find(c => c.id === classId);
-        const subj = subjects.find(s => s.id === subjectId);
-        const room = rooms.find(r => r.id === roomId);
+        const cls = classes.find((c) => c.id === classId);
+        const subj = subjects.find((s) => s.id === subjectId);
+        const room = rooms.find((r) => r.id === roomId);
 
         if (!room) return warnings;
 
@@ -245,7 +283,12 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
             warnings.push(`⚠️ Мало мест! В классе ${cls.studentsCount} уч., а в кабинете только ${room.capacity}.`);
         }
 
-        if (subj && subj.requiredRoomType && subj.requiredRoomType !== 'Обычный' && room.type !== subj.requiredRoomType) {
+        if (
+            subj &&
+            subj.requiredRoomType &&
+            subj.requiredRoomType !== 'Обычный' &&
+            room.type !== subj.requiredRoomType
+        ) {
             warnings.push(`🚫 Не тот тип! Предмет требует "${subj.requiredRoomType}", а кабинет "${room.type}".`);
         }
 
@@ -259,28 +302,28 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
         }
         const warns = validateRoom(item.classId, item.subjectId, item.roomId);
         setValidationWarnings(warns);
-    }
+    };
 
-    const handleEditItem = (item: ScheduleItem) => { 
-        if(readOnly) return; 
-        setTempItem(item); 
+    const handleEditItem = (item: ScheduleItem) => {
+        if (readOnly) return;
+        setTempItem(item);
         updateValidation(item);
-        setIsEditorOpen(true); 
+        setIsEditorOpen(true);
     };
     const handleAddItem = (rowId: string, period: number, day: DayOfWeek = selectedDay) => {
-        if(readOnly) return;
+        if (readOnly) return;
         const base: Partial<ScheduleItem> = { period, day, shift: selectedShift, id: generateId() };
         if (viewMode === 'class') base.classId = rowId;
         if (viewMode === 'teacher') base.teacherId = rowId;
         if (viewMode === 'subject') base.subjectId = rowId;
-        if (viewMode === 'week') { 
-            base.period = parseInt(rowId); 
+        if (viewMode === 'week') {
+            base.period = parseInt(rowId);
             base.day = day;
-            if(filterId && classes.find(c => c.id === filterId)) base.classId = filterId; 
+            if (filterId && classes.find((c) => c.id === filterId)) base.classId = filterId;
         }
-        setTempItem(base); 
+        setTempItem(base);
         setValidationWarnings([]);
-        setIsEditorOpen(true); 
+        setIsEditorOpen(true);
     };
     const handleSaveItem = async () => {
         if (!tempItem.subjectId || !tempItem.teacherId || !tempItem.classId) return;
@@ -298,17 +341,17 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
         }
 
         // Проверяем существование связанных данных
-        const teacher = teachers.find(t => t.id === tempItem.teacherId);
+        const teacher = teachers.find((t) => t.id === tempItem.teacherId);
         if (!teacher) validationErrors.push('Выбранный учитель не найден');
 
-        const subject = subjects.find(s => s.id === tempItem.subjectId);
+        const subject = subjects.find((s) => s.id === tempItem.subjectId);
         if (!subject) validationErrors.push('Выбранный предмет не найден');
 
-        const classItem = classes.find(c => c.id === tempItem.classId);
+        const classItem = classes.find((c) => c.id === tempItem.classId);
         if (!classItem) validationErrors.push('Выбранный класс не найден');
 
         if (tempItem.roomId) {
-            const room = rooms.find(r => r.id === tempItem.roomId);
+            const room = rooms.find((r) => r.id === tempItem.roomId);
             if (!room) validationErrors.push('Выбранный кабинет не найден');
         }
 
@@ -325,36 +368,43 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
                 class: 'Класс',
                 room: 'Кабинет'
             };
-            const conflictMessages = conflicts.map(type => conflictNames[type as keyof typeof conflictNames]).join(', ');
+            const conflictMessages = conflicts
+                .map((type) => conflictNames[type as keyof typeof conflictNames])
+                .join(', ');
 
-            if (!confirm(`⚠️ Обнаружены конфликты: ${conflictMessages} уже заняты в это время.\n\nВсе равно сохранить урок?`)) {
+            if (
+                !confirm(
+                    `⚠️ Обнаружены конфликты: ${conflictMessages} уже заняты в это время.\n\nВсе равно сохранить урок?`
+                )
+            ) {
                 return;
             }
         }
 
-        let newSchedule = [...schedule];
-        const idx = newSchedule.findIndex(s => s.id === tempItem.id);
-        if (idx >= 0) newSchedule[idx] = tempItem as ScheduleItem; else newSchedule.push(tempItem as ScheduleItem);
+        const newSchedule = [...schedule];
+        const idx = newSchedule.findIndex((s) => s.id === tempItem.id);
+        if (idx >= 0) newSchedule[idx] = tempItem as ScheduleItem;
+        else newSchedule.push(tempItem as ScheduleItem);
         await saveCurrentSchedule(newSchedule);
         setIsEditorOpen(false);
     };
     const handleDeleteItem = async (id?: string) => {
-        const newSchedule = schedule.filter(s => s.id !== (id || tempItem.id));
+        const newSchedule = schedule.filter((s) => s.id !== (id || tempItem.id));
         await saveCurrentSchedule(newSchedule);
         setIsEditorOpen(false);
     };
 
     const handleContextMenu = (e: React.MouseEvent, item: ScheduleItem | null, cellInfo: CellInfo | null) => {
-        if(readOnly) return;
+        if (readOnly) return;
         e.preventDefault();
-        e.stopPropagation(); 
+        e.stopPropagation();
         setContextMenu({ visible: true, x: e.clientX, y: e.clientY, item, cell: cellInfo });
     };
 
     const handleDragStart = (e: React.DragEvent, item: ScheduleItem) => {
-        if(readOnly) return;
+        if (readOnly) return;
         setDraggedItem(item);
-        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.effectAllowed = 'move';
         const el = e.currentTarget as HTMLElement;
         setTimeout(() => el.classList.add('dragging'), 0);
     };
@@ -368,8 +418,8 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
 
     const handleDragOver = (e: React.DragEvent, cellInfo: CellInfo) => {
         e.preventDefault();
-        if(readOnly) return;
-        setDragOverCell(`${cellInfo.rowId}-${cellInfo.colKey}`); 
+        if (readOnly) return;
+        setDragOverCell(`${cellInfo.rowId}-${cellInfo.colKey}`);
     };
 
     const handleDrop = async (e: React.DragEvent, cellInfo: CellInfo) => {
@@ -390,11 +440,11 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
         }
 
         // Check for conflicts before saving
-        const potentialSchedule = schedule.map(s => s.id === newItem.id ? newItem : s);
+        const potentialSchedule = schedule.map((s) => (s.id === newItem.id ? newItem : s));
         const conflicts = findScheduleConflicts(potentialSchedule, newItem);
 
         if (conflicts.length > 0) {
-            const conflictMessages = conflicts.map(conflict => {
+            const conflictMessages = conflicts.map((conflict) => {
                 switch (conflict.type) {
                     case 'teacher':
                         return `Учитель ${conflict.entityName} уже занят в это время`;
@@ -407,33 +457,38 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
                 }
             });
 
-            addToast({ type: 'danger', title: 'Ошибка', message: `Невозможно переместить урок:\n${conflictMessages.join('\n')}` });
+            addToast({
+                type: 'danger',
+                title: 'Ошибка',
+                message: `Невозможно переместить урок:\n${conflictMessages.join('\n')}`
+            });
             setDraggedItem(null);
             setDragOverCell(null);
             return;
         }
 
-        let newSchedule = potentialSchedule;
+        const newSchedule = potentialSchedule;
         await saveCurrentSchedule(newSchedule);
         setDraggedItem(null);
         setDragOverCell(null);
     };
 
     const findScheduleConflicts = (scheduleItems: ScheduleItem[], newItem: ScheduleItem) => {
-        const conflicts: Array<{ type: 'teacher' | 'room' | 'class', entityName: string }> = [];
+        const conflicts: Array<{ type: 'teacher' | 'room' | 'class'; entityName: string }> = [];
 
         // Check for conflicts at the same time slot (day, period, shift)
-        const conflictingItems = scheduleItems.filter(item =>
-            item.id !== newItem.id && // Don't conflict with itself
-            item.day === newItem.day &&
-            item.period === newItem.period &&
-            item.shift === newItem.shift
+        const conflictingItems = scheduleItems.filter(
+            (item) =>
+                item.id !== newItem.id && // Don't conflict with itself
+                item.day === newItem.day &&
+                item.period === newItem.period &&
+                item.shift === newItem.shift
         );
 
         // Check teacher conflicts
-        const teacherConflict = conflictingItems.find(item => item.teacherId === newItem.teacherId);
+        const teacherConflict = conflictingItems.find((item) => item.teacherId === newItem.teacherId);
         if (teacherConflict) {
-            const teacher = teachers.find(t => t.id === newItem.teacherId);
+            const teacher = teachers.find((t) => t.id === newItem.teacherId);
             conflicts.push({
                 type: 'teacher',
                 entityName: teacher?.name || newItem.teacherId
@@ -442,9 +497,9 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
 
         // Check room conflicts (only if both items have room assignments)
         if (newItem.roomId) {
-            const roomConflict = conflictingItems.find(item => item.roomId === newItem.roomId);
+            const roomConflict = conflictingItems.find((item) => item.roomId === newItem.roomId);
             if (roomConflict) {
-                const room = rooms.find(r => r.id === newItem.roomId);
+                const room = rooms.find((r) => r.id === newItem.roomId);
                 conflicts.push({
                     type: 'room',
                     entityName: room?.name || newItem.roomId
@@ -453,9 +508,9 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
         }
 
         // Check class conflicts
-        const classConflict = conflictingItems.find(item => item.classId === newItem.classId);
+        const classConflict = conflictingItems.find((item) => item.classId === newItem.classId);
         if (classConflict) {
-            const cls = classes.find(c => c.id === newItem.classId);
+            const cls = classes.find((c) => c.id === newItem.classId);
             conflicts.push({
                 type: 'class',
                 entityName: cls?.name || newItem.classId
@@ -469,84 +524,107 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
     if (contextMenu.item) {
         contextActions.push(
             { label: 'Копировать', icon: 'Copy', onClick: () => setClipboard(contextMenu.item) },
-            { label: 'Удалить', icon: 'Trash2', color: 'text-red-600', onClick: () => handleDeleteItem(contextMenu.item!.id) }
+            {
+                label: 'Удалить',
+                icon: 'Trash2',
+                color: 'text-red-600',
+                onClick: () => handleDeleteItem(contextMenu.item!.id)
+            }
         );
     } else if (contextMenu.cell) {
         // Capture cell in a const to guarantee strict null check safety within closures
         const cell = contextMenu.cell;
         if (clipboard) {
-            contextActions.push({ label: 'Вставить', icon: 'Clipboard', onClick: async () => {
-                 const newItem = { ...clipboard, id: generateId(), day: selectedDay, shift: selectedShift, period: cell.colKey } as ScheduleItem; 
-                 if(viewMode === 'week') { newItem.day = cell.colKey as string; newItem.period = parseInt(cell.rowId); }
-                 if(viewMode === 'class') newItem.classId = cell.rowId;
-                 else if (viewMode === 'teacher') newItem.teacherId = cell.rowId;
-                 else if (viewMode === 'subject') newItem.subjectId = cell.rowId;
-                 
-                 let newSchedule = [...schedule, newItem];
-                 await saveCurrentSchedule(newSchedule);
-                 setClipboard(null);
-            }});
+            contextActions.push({
+                label: 'Вставить',
+                icon: 'Clipboard',
+                onClick: async () => {
+                    const newItem = {
+                        ...clipboard,
+                        id: generateId(),
+                        day: selectedDay,
+                        shift: selectedShift,
+                        period: cell.colKey
+                    } as ScheduleItem;
+                    if (viewMode === 'week') {
+                        newItem.day = cell.colKey as string;
+                        newItem.period = parseInt(cell.rowId);
+                    }
+                    if (viewMode === 'class') newItem.classId = cell.rowId;
+                    else if (viewMode === 'teacher') newItem.teacherId = cell.rowId;
+                    else if (viewMode === 'subject') newItem.subjectId = cell.rowId;
+
+                    const newSchedule = [...schedule, newItem];
+                    await saveCurrentSchedule(newSchedule);
+                    setClipboard(null);
+                }
+            });
         }
-        contextActions.push({ 
-            label: 'Добавить урок', 
-            icon: 'Plus', 
-            onClick: () => handleAddItem(
-                cell.rowId || '', 
-                typeof cell.colKey === 'number' ? cell.colKey : parseInt(cell.rowId || '0'), 
-                viewMode === 'week' ? cell.colKey as DayOfWeek : selectedDay
-            ) 
+        contextActions.push({
+            label: 'Добавить урок',
+            icon: 'Plus',
+            onClick: () =>
+                handleAddItem(
+                    cell.rowId || '',
+                    typeof cell.colKey === 'number' ? cell.colKey : parseInt(cell.rowId || '0'),
+                    viewMode === 'week' ? (cell.colKey as DayOfWeek) : selectedDay
+                )
         });
     }
 
-    const recommendedTeachers = tempItem.subjectId ? teachers.filter(t => t.subjectIds && t.subjectIds.includes(tempItem.subjectId!)) : [];
-    const otherTeachers = tempItem.subjectId ? teachers.filter(t => !t.subjectIds || !t.subjectIds.includes(tempItem.subjectId!)) : teachers;
+    const recommendedTeachers = tempItem.subjectId
+        ? teachers.filter((t) => t.subjectIds && t.subjectIds.includes(tempItem.subjectId!))
+        : [];
+    const otherTeachers = tempItem.subjectId
+        ? teachers.filter((t) => !t.subjectIds || !t.subjectIds.includes(tempItem.subjectId!))
+        : teachers;
 
     const printTitle = useMemo(() => {
         const semesterSuffix = semester === 2 ? ' (2-е полугодие)' : '';
         if (filterId) {
             if (viewMode === 'teacher') {
-                const teacher = teachers.find(t=>t.id===filterId);
+                const teacher = teachers.find((t) => t.id === filterId);
                 return teacher ? teacher.name + semesterSuffix : 'Учитель' + semesterSuffix;
             }
             if (viewMode === 'class') {
-                const classItem = classes.find(c=>c.id===filterId);
+                const classItem = classes.find((c) => c.id === filterId);
                 return classItem ? classItem.name + semesterSuffix : 'Класс' + semesterSuffix;
             }
             if (viewMode === 'subject') {
-                const subject = subjects.find(s=>s.id===filterId);
+                const subject = subjects.find((s) => s.id === filterId);
                 return subject ? subject.name + semesterSuffix : 'Предмет' + semesterSuffix;
             }
             if (viewMode === 'week') {
-                const classItem = classes.find(c=>c.id===filterId);
+                const classItem = classes.find((c) => c.id === filterId);
                 return classItem ? classItem.name + semesterSuffix : 'Неделя' + semesterSuffix;
             }
         }
         return `Расписание на ${selectedDay}` + semesterSuffix;
     }, [filterId, viewMode, teachers, classes, subjects, selectedDay, semester]);
-    
+
     // --- PRINT LOGIC START ---
     const isWeeklyPrint = !!filterId;
 
     const printCols = useMemo(() => {
-        if (isWeeklyPrint) return DAYS; 
-        return currentPeriods; 
+        if (isWeeklyPrint) return DAYS;
+        return currentPeriods;
     }, [isWeeklyPrint, currentPeriods]);
 
     const printRows = useMemo(() => {
-        if (isWeeklyPrint) return SHIFT_PERIODS[selectedShift].map(p => ({ id: p.toString(), name: `${p} урок` })); 
-        return getRows(); 
+        if (isWeeklyPrint) return SHIFT_PERIODS[selectedShift].map((p) => ({ id: p.toString(), name: `${p} урок` }));
+        return getRows();
     }, [isWeeklyPrint, selectedShift, getRows]);
 
     const getPrintItems = (rowId: string, colKey: string | number): ScheduleItem[] => {
         if (isWeeklyPrint) {
             const period = parseInt(rowId);
             const day = colKey as string;
-            let items = schedule.filter(s => s.shift === selectedShift && s.period === period && s.day === day);
-            
-            if (viewMode === 'class' || viewMode === 'week') items = items.filter(s => s.classId === filterId);
-            else if (viewMode === 'teacher') items = items.filter(s => s.teacherId === filterId);
-            else if (viewMode === 'subject') items = items.filter(s => s.subjectId === filterId);
-            
+            let items = schedule.filter((s) => s.shift === selectedShift && s.period === period && s.day === day);
+
+            if (viewMode === 'class' || viewMode === 'week') items = items.filter((s) => s.classId === filterId);
+            else if (viewMode === 'teacher') items = items.filter((s) => s.teacherId === filterId);
+            else if (viewMode === 'subject') items = items.filter((s) => s.subjectId === filterId);
+
             return items;
         } else {
             return getScheduleItems(rowId, colKey);
@@ -565,66 +643,103 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
         if (massOpConfirm.type === 'clearAll') {
             newSchedule = [];
         } else if (massOpConfirm.type === 'clearDay' && massOpConfirm.day) {
-            newSchedule = newSchedule.filter(item => item.day !== massOpConfirm.day);
+            newSchedule = newSchedule.filter((item) => item.day !== massOpConfirm.day);
         } else if (massOpConfirm.type === 'clearClass' && massOpConfirm.classId) {
-            newSchedule = newSchedule.filter(item => item.classId !== massOpConfirm.classId);
+            newSchedule = newSchedule.filter((item) => item.classId !== massOpConfirm.classId);
         }
         await saveCurrentSchedule(newSchedule);
         setMassOpConfirm({ isOpen: false, type: '', day: '', classId: '' });
-        setIsMassOperationsModalOpen(false); 
+        setIsMassOperationsModalOpen(false);
     };
 
     const renderScheduleItemsContent = (items: ScheduleItem[], colKey: string | number, rowId: string) => {
-        if (readOnly && items.length === 0) return null; 
+        if (readOnly && items.length === 0) return null;
 
         return (
             <div className="h-full flex flex-col gap-1">
                 {items.map((item) => {
-                    const subj = subjects.find(s => s.id === item.subjectId);
-                    const teacher = teachers.find(t => t.id === item.teacherId);
-                    const cls = classes.find(c => c.id === item.classId);
+                    const subj = subjects.find((s) => s.id === item.subjectId);
+                    const teacher = teachers.find((t) => t.id === item.teacherId);
+                    const cls = classes.find((c) => c.id === item.classId);
                     const conflicts = checkConflicts(item);
-                    const room = rooms.find(r => r.id === item.roomId);
+                    const room = rooms.find((r) => r.id === item.roomId);
                     const roomName = room ? room.name : item.roomId;
 
                     return (
-                        <div 
-                            key={item.id} 
+                        <div
+                            key={item.id}
                             draggable={!readOnly}
                             onDragStart={!readOnly ? (e) => handleDragStart(e, item) : undefined}
                             onDragEnd={!readOnly ? handleDragEnd : undefined}
-                            onClick={!readOnly ? () => handleEditItem(item) : undefined} 
-                            onContextMenu={!readOnly ? (e) => handleContextMenu(e, item, null) : undefined} 
-                            className={`rounded-lg p-2 text-xs shadow-sm ${!readOnly ? 'hover:shadow-md cursor-grab active:cursor-grabbing' : ''} border flex flex-col gap-0.5 flex-1 relative group transition-transform ${conflicts.length > 0 ? 'border-red-300 bg-red-50 dark:bg-red-900/20 ring-1 ring-red-200' : 'border-slate-100 dark:border-slate-600'}`} 
+                            onClick={!readOnly ? () => handleEditItem(item) : undefined}
+                            onContextMenu={!readOnly ? (e) => handleContextMenu(e, item, null) : undefined}
+                            className={`rounded-lg p-2 text-xs shadow-sm ${!readOnly ? 'hover:shadow-md cursor-grab active:cursor-grabbing' : ''} border flex flex-col gap-0.5 flex-1 relative group transition-transform ${conflicts.length > 0 ? 'border-red-300 bg-red-50 dark:bg-red-900/20 ring-1 ring-red-200' : 'border-slate-100 dark:border-slate-600'}`}
                             style={conflicts.length === 0 && subj?.color ? { backgroundColor: `${subj.color}40` } : {}}
                         >
                             <div className="flex justify-between items-center gap-1">
-                                <span className="font-bold text-slate-800 dark:text-slate-200 line-clamp-1">{viewMode === 'subject' || viewMode === 'week' ? cls?.name : subj?.name}</span>
-                                {item.direction && <span className="text-[9px] px-1 rounded bg-white/80 dark:bg-black/30 font-bold text-slate-600 dark:text-slate-300">{item.direction}</span>}
+                                <span className="font-bold text-slate-800 dark:text-slate-200 line-clamp-1">
+                                    {viewMode === 'subject' || viewMode === 'week' ? cls?.name : subj?.name}
+                                </span>
+                                {item.direction && (
+                                    <span className="text-[9px] px-1 rounded bg-white/80 dark:bg-black/30 font-bold text-slate-600 dark:text-slate-300">
+                                        {item.direction}
+                                    </span>
+                                )}
                             </div>
-                            {viewMode === 'week' && <div className="font-bold text-slate-800 dark:text-slate-200 line-clamp-1">{subj?.name}</div>}
+                            {viewMode === 'week' && (
+                                <div className="font-bold text-slate-800 dark:text-slate-200 line-clamp-1">
+                                    {subj?.name}
+                                </div>
+                            )}
                             <div className="flex justify-between items-center mt-auto">
-                                <div className="text-slate-600 dark:text-slate-400 text-[10px] flex items-center gap-1 leading-tight overflow-hidden" title={teacher?.name}>
-                                    <Icon name={viewMode === 'teacher' ? 'GraduationCap' : 'User'} size={10} className="shrink-0" /> 
+                                <div
+                                    className="text-slate-600 dark:text-slate-400 text-[10px] flex items-center gap-1 leading-tight overflow-hidden"
+                                    title={teacher?.name}
+                                >
+                                    <Icon
+                                        name={viewMode === 'teacher' ? 'GraduationCap' : 'User'}
+                                        size={10}
+                                        className="shrink-0"
+                                    />
                                     <span className="truncate">
                                         {viewMode === 'teacher' ? cls?.name : teacher?.name}
                                     </span>
                                 </div>
-                                {roomName && <div className="text-[9px] font-mono text-slate-400 bg-white/50 dark:bg-black/20 rounded px-1 flex items-center gap-0.5 shrink-0" title={room ? `Вмест: ${room.capacity}, Тип: ${room.type}` : ''}>{roomName}</div>}
+                                {roomName && (
+                                    <div
+                                        className="text-[9px] font-mono text-slate-400 bg-white/50 dark:bg-black/20 rounded px-1 flex items-center gap-0.5 shrink-0"
+                                        title={room ? `Вмест: ${room.capacity}, Тип: ${room.type}` : ''}
+                                    >
+                                        {roomName}
+                                    </div>
+                                )}
                             </div>
                             {conflicts.length > 0 && (
-                                <button 
+                                <button
                                     onClick={(e) => handleConflictClick(e, item)}
-                                    className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-bold shadow-sm hover:bg-red-600 hover:scale-110 transition-all z-10" 
+                                    className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-bold shadow-sm hover:bg-red-600 hover:scale-110 transition-all z-10"
                                     title="Нажмите для деталей конфликта"
                                 >
                                     !
                                 </button>
                             )}
                         </div>
-                    )
+                    );
                 })}
-                {!readOnly && items.length < 3 && <button onClick={() => handleAddItem(rowId, typeof colKey === 'number' ? colKey : parseInt(rowId), viewMode === 'week' ? colKey as DayOfWeek : selectedDay)} className="w-full rounded-lg border-2 border-dashed border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-300 dark:text-slate-600 hover:border-indigo-300 hover:text-indigo-400 transition-colors mt-auto h-6"><Icon name="Plus" size={16} /></button>}
+                {!readOnly && items.length < 3 && (
+                    <button
+                        onClick={() =>
+                            handleAddItem(
+                                rowId,
+                                typeof colKey === 'number' ? colKey : parseInt(rowId),
+                                viewMode === 'week' ? (colKey as DayOfWeek) : selectedDay
+                            )
+                        }
+                        className="w-full rounded-lg border-2 border-dashed border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-300 dark:text-slate-600 hover:border-indigo-300 hover:text-indigo-400 transition-colors mt-auto h-6"
+                    >
+                        <Icon name="Plus" size={16} />
+                    </button>
+                )}
             </div>
         );
     };
@@ -638,13 +753,16 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
             );
         }
 
-        const lessonsForDay = schedule.filter(s => 
-            s.day === selectedDay && 
-            s.shift === selectedShift && 
-            (viewMode === 'class' && s.classId === filterId ||
-             viewMode === 'teacher' && s.teacherId === filterId ||
-             viewMode === 'subject' && s.subjectId === filterId)
-        ).sort((a,b) => a.period - b.period);
+        const lessonsForDay = schedule
+            .filter(
+                (s) =>
+                    s.day === selectedDay &&
+                    s.shift === selectedShift &&
+                    ((viewMode === 'class' && s.classId === filterId) ||
+                        (viewMode === 'teacher' && s.teacherId === filterId) ||
+                        (viewMode === 'subject' && s.subjectId === filterId))
+            )
+            .sort((a, b) => a.period - b.period);
 
         if (lessonsForDay.length === 0) {
             return (
@@ -656,24 +774,26 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
 
         return (
             <div className="p-4 space-y-4">
-                {lessonsForDay.map(item => {
-                    const subj = subjects.find(s => s.id === item.subjectId);
-                    const teacher = teachers.find(t => t.id === item.teacherId);
-                    const cls = classes.find(c => c.id === item.classId);
-                    const room = rooms.find(r => r.id === item.roomId);
+                {lessonsForDay.map((item) => {
+                    const subj = subjects.find((s) => s.id === item.subjectId);
+                    const teacher = teachers.find((t) => t.id === item.teacherId);
+                    const cls = classes.find((c) => c.id === item.classId);
+                    const room = rooms.find((r) => r.id === item.roomId);
                     const roomName = room ? room.name : item.roomId;
                     const conflicts = checkConflicts(item);
 
                     return (
-                        <div 
-                            key={item.id} 
-                            onClick={!readOnly ? () => handleEditItem(item) : undefined} 
+                        <div
+                            key={item.id}
+                            onClick={!readOnly ? () => handleEditItem(item) : undefined}
                             className={`rounded-xl p-4 shadow-sm border ${conflicts.length > 0 ? 'border-red-300 bg-red-50 dark:bg-red-900/20 ring-1 ring-red-200' : 'border-slate-100 dark:border-slate-600 bg-white dark:bg-dark-800'} transition-colors ${!readOnly ? 'cursor-pointer' : ''}`}
                         >
                             <div className="flex items-center justify-between mb-2">
-                                <span className="text-sm font-bold text-slate-800 dark:text-slate-100">{item.period} урок</span>
+                                <span className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                                    {item.period} урок
+                                </span>
                                 {conflicts.length > 0 && (
-                                    <button 
+                                    <button
                                         onClick={(e) => handleConflictClick(e, item)}
                                         className="bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold shadow-sm"
                                     >
@@ -681,16 +801,23 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
                                     </button>
                                 )}
                             </div>
-                            <div className="text-lg font-black text-indigo-600 dark:text-indigo-400 mb-1">{subj?.name} {item.direction && `(${item.direction})`}</div>
-                            <div className="text-sm text-slate-700 dark:text-slate-300">{cls?.name} • {teacher?.name}</div>
-                            {roomName && <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">Кабинет: {roomName}</div>}
+                            <div className="text-lg font-black text-indigo-600 dark:text-indigo-400 mb-1">
+                                {subj?.name} {item.direction && `(${item.direction})`}
+                            </div>
+                            <div className="text-sm text-slate-700 dark:text-slate-300">
+                                {cls?.name} • {teacher?.name}
+                            </div>
+                            {roomName && (
+                                <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                    Кабинет: {roomName}
+                                </div>
+                            )}
                         </div>
                     );
                 })}
             </div>
         );
     };
-
 
     return (
         <div className="h-full flex flex-col">
@@ -699,68 +826,195 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
                     {semester === 1 ? 'Расписание (1-е полугодие)' : 'Расписание (2-е полугодие)'}
                 </h2>
             </div>
-            
-            {contextMenu.visible && <ContextMenu x={contextMenu.x} y={contextMenu.y} onClose={()=>setContextMenu({...contextMenu, visible:false})} actions={contextActions} />}
+
+            {contextMenu.visible && (
+                <ContextMenu
+                    x={contextMenu.x}
+                    y={contextMenu.y}
+                    onClose={() => setContextMenu({ ...contextMenu, visible: false })}
+                    actions={contextActions}
+                />
+            )}
             <div className="bg-white dark:bg-dark-800 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 mb-6 flex flex-col xl:flex-row gap-4 items-start xl:items-center justify-between no-print">
-                 <div className="flex gap-4 items-center flex-wrap">
+                <div className="flex gap-4 items-center flex-wrap">
                     <div className="flex bg-slate-100 dark:bg-slate-700 p-1 rounded-xl">
-                        <button onClick={() => setSelectedShift(Shift.First)} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${selectedShift === Shift.First ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>1 смена</button>
-                        <button onClick={() => setSelectedShift(Shift.Second)} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${selectedShift === Shift.Second ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>2 смена</button>
+                        <button
+                            onClick={() => setSelectedShift(Shift.First)}
+                            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${selectedShift === Shift.First ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}
+                        >
+                            1 смена
+                        </button>
+                        <button
+                            onClick={() => setSelectedShift(Shift.Second)}
+                            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${selectedShift === Shift.Second ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}
+                        >
+                            2 смена
+                        </button>
                     </div>
                     {viewMode !== 'week' && (
                         <div className="flex overflow-x-auto pb-1 gap-1 max-w-[40vw] hide-scrollbar">
-                            {DAYS.map(day => <button key={day} onClick={() => setSelectedDay(day)} className={`whitespace-nowrap px-4 py-2 rounded-xl text-sm font-bold transition-all ${selectedDay === day ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>{day}</button>)}
+                            {DAYS.map((day) => (
+                                <button
+                                    key={day}
+                                    onClick={() => setSelectedDay(day)}
+                                    className={`whitespace-nowrap px-4 py-2 rounded-xl text-sm font-bold transition-all ${selectedDay === day ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
+                                >
+                                    {day}
+                                </button>
+                            ))}
                         </div>
                     )}
-                     {!readOnly && (
+                    {!readOnly && (
                         <div className="flex bg-slate-100 dark:bg-slate-700 p-1 rounded-xl">
-                            <button onClick={undo} disabled={!canUndo} className="p-2 text-slate-500 disabled:opacity-30 hover:bg-white dark:hover:bg-slate-600 rounded-lg transition"><Icon name="RotateCcw" size={18}/></button>
-                            <button onClick={redo} disabled={!canRedo} className="p-2 text-slate-500 disabled:opacity-30 hover:bg-white dark:hover:bg-slate-600 rounded-lg transition"><Icon name="RotateCw" size={18}/></button>
+                            <button
+                                onClick={undo}
+                                disabled={!canUndo}
+                                className="p-2 text-slate-500 disabled:opacity-30 hover:bg-white dark:hover:bg-slate-600 rounded-lg transition"
+                            >
+                                <Icon name="RotateCcw" size={18} />
+                            </button>
+                            <button
+                                onClick={redo}
+                                disabled={!canRedo}
+                                className="p-2 text-slate-500 disabled:opacity-30 hover:bg-white dark:hover:bg-slate-600 rounded-lg transition"
+                            >
+                                <Icon name="RotateCw" size={18} />
+                            </button>
                         </div>
                     )}
                 </div>
                 <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
-                     <div className="flex bg-slate-100 dark:bg-slate-700 p-1 rounded-lg">
-                         <button onClick={()=>{setViewMode('class'); setFilterId('')}} className={`p-2 rounded-md ${viewMode==='class'?'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white':'text-slate-400'}`} title="По классам"><Icon name="GraduationCap" size={18}/></button>
-                         <button onClick={()=>{setViewMode('teacher'); setFilterId('')}} className={`p-2 rounded-md ${viewMode==='teacher'?'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white':'text-slate-400'}`} title="По учителям"><Icon name="Users" size={18}/></button>
-                         <button onClick={()=>{setViewMode('subject'); setFilterId('')}} className={`p-2 rounded-md ${viewMode==='subject'?'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white':'text-slate-400'}`} title="По предметам"><Icon name="BookOpen" size={18}/></button>
-                         <button onClick={()=>{setViewMode('week'); setFilterId(classes[0]?.id || '')}} className={`p-2 rounded-md ${viewMode==='week'?'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white':'text-slate-400'}`} title="Неделя"><Icon name="Calendar" size={18}/></button>
-                     </div>
-                     
-                     <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg p-1.5 pl-3 flex-1">
+                    <div className="flex bg-slate-100 dark:bg-slate-700 p-1 rounded-lg">
+                        <button
+                            onClick={() => {
+                                setViewMode('class');
+                                setFilterId('');
+                            }}
+                            className={`p-2 rounded-md ${viewMode === 'class' ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-400'}`}
+                            title="По классам"
+                        >
+                            <Icon name="GraduationCap" size={18} />
+                        </button>
+                        <button
+                            onClick={() => {
+                                setViewMode('teacher');
+                                setFilterId('');
+                            }}
+                            className={`p-2 rounded-md ${viewMode === 'teacher' ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-400'}`}
+                            title="По учителям"
+                        >
+                            <Icon name="Users" size={18} />
+                        </button>
+                        <button
+                            onClick={() => {
+                                setViewMode('subject');
+                                setFilterId('');
+                            }}
+                            className={`p-2 rounded-md ${viewMode === 'subject' ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-400'}`}
+                            title="По предметам"
+                        >
+                            <Icon name="BookOpen" size={18} />
+                        </button>
+                        <button
+                            onClick={() => {
+                                setViewMode('week');
+                                setFilterId(classes[0]?.id || '');
+                            }}
+                            className={`p-2 rounded-md ${viewMode === 'week' ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-400'}`}
+                            title="Неделя"
+                        >
+                            <Icon name="Calendar" size={18} />
+                        </button>
+                    </div>
+
+                    <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg p-1.5 pl-3 flex-1">
                         <Icon name="Filter" size={16} className="text-slate-400" />
-                        <select value={filterId} onChange={(e) => setFilterId(e.target.value)} className="bg-transparent text-sm font-bold text-slate-700 dark:text-slate-200 outline-none w-full xl:w-32">
-                            <option value="">Все {viewMode === 'class' ? 'классы' : viewMode === 'teacher' ? 'учителя' : viewMode === 'week' ? 'классы (неделя)' : 'предметы'}</option>
-                            {(viewMode === 'class' || viewMode === 'week') && classes.filter(c=>c.shift===selectedShift).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                            {viewMode === 'teacher' && teachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                            {viewMode === 'subject' && subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                        <select
+                            value={filterId}
+                            onChange={(e) => setFilterId(e.target.value)}
+                            className="bg-transparent text-sm font-bold text-slate-700 dark:text-slate-200 outline-none w-full xl:w-32"
+                        >
+                            <option value="">
+                                Все{' '}
+                                {viewMode === 'class'
+                                    ? 'классы'
+                                    : viewMode === 'teacher'
+                                      ? 'учителя'
+                                      : viewMode === 'week'
+                                        ? 'классы (неделя)'
+                                        : 'предметы'}
+                            </option>
+                            {(viewMode === 'class' || viewMode === 'week') &&
+                                classes
+                                    .filter((c) => c.shift === selectedShift)
+                                    .map((c) => (
+                                        <option key={c.id} value={c.id}>
+                                            {c.name}
+                                        </option>
+                                    ))}
+                            {viewMode === 'teacher' &&
+                                teachers.map((t) => (
+                                    <option key={t.id} value={t.id}>
+                                        {t.name}
+                                    </option>
+                                ))}
+                            {viewMode === 'subject' &&
+                                subjects.map((s) => (
+                                    <option key={s.id} value={s.id}>
+                                        {s.name}
+                                    </option>
+                                ))}
                         </select>
                     </div>
-                    <input placeholder="Каб..." value={filterRoom} onChange={e=>setFilterRoom(e.target.value)} className="w-20 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg p-2 text-xs font-bold" />
-                    <input placeholder="Проф..." value={filterDirection} onChange={e=>setFilterDirection(e.target.value)} className="w-20 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg p-2 text-xs font-bold" />
+                    <input
+                        placeholder="Каб..."
+                        value={filterRoom}
+                        onChange={(e) => setFilterRoom(e.target.value)}
+                        className="w-20 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg p-2 text-xs font-bold"
+                    />
+                    <input
+                        placeholder="Проф..."
+                        value={filterDirection}
+                        onChange={(e) => setFilterDirection(e.target.value)}
+                        className="w-20 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg p-2 text-xs font-bold"
+                    />
 
                     {!readOnly && (
-                        <button onClick={() => setIsMassOperationsModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-bold shadow-lg shadow-red-200 dark:shadow-none transition-all">
-                            <Icon name="List" size={16}/> Масс. опер.
+                        <button
+                            onClick={() => setIsMassOperationsModalOpen(true)}
+                            className="flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-bold shadow-lg shadow-red-200 dark:shadow-none transition-all"
+                        >
+                            <Icon name="List" size={16} /> Масс. опер.
                         </button>
                     )}
 
                     {(filterId || viewMode === 'week') && (
-                        <button onClick={() => setIsPrintModalOpen(true)} className="btn-primary btn-ripple text-sm flex items-center gap-2">
-                            <Icon name="Printer" size={16}/>
+                        <button
+                            onClick={() => setIsPrintModalOpen(true)}
+                            className="btn-primary btn-ripple text-sm flex items-center gap-2"
+                        >
+                            <Icon name="Printer" size={16} />
                         </button>
                     )}
                 </div>
             </div>
-            
+
             {isMobile && !readOnly && filterId && (
                 <div className="flex justify-center mb-4 no-print">
                     <div className="flex bg-slate-100 dark:bg-slate-700 p-1 rounded-xl">
-                        <button onClick={() => setMobileListView(false)} className={`flex-1 py-1 px-3 text-xs font-bold rounded-md ${!mobileListView ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`} title="Табличный вид">
-                            <Icon name="Columns" size={16}/>
+                        <button
+                            onClick={() => setMobileListView(false)}
+                            className={`flex-1 py-1 px-3 text-xs font-bold rounded-md ${!mobileListView ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}
+                            title="Табличный вид"
+                        >
+                            <Icon name="Columns" size={16} />
                         </button>
-                        <button onClick={() => setMobileListView(true)} className={`flex-1 py-1 px-3 text-xs font-bold rounded-md ${mobileListView ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`} title="Списочный вид">
-                            <Icon name="Rows" size={16}/>
+                        <button
+                            onClick={() => setMobileListView(true)}
+                            className={`flex-1 py-1 px-3 text-xs font-bold rounded-md ${mobileListView ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}
+                            title="Списочный вид"
+                        >
+                            <Icon name="Rows" size={16} />
                         </button>
                     </div>
                 </div>
@@ -768,45 +1022,80 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
 
             <div className="flex-1 bg-white dark:bg-dark-800 rounded-2xl shadow-xl shadow-slate-200/50 dark:shadow-none border border-slate-100 dark:border-slate-700 overflow-hidden flex flex-col transition-colors duration-300 no-print">
                 <div className="overflow-auto flex-1 custom-scrollbar">
-                    {isMobile && mobileListView && !readOnly && filterId ? renderMobileListView() : (
+                    {isMobile && mobileListView && !readOnly && filterId ? (
+                        renderMobileListView()
+                    ) : (
                         <table className="w-full border-collapse min-w-[1000px]">
                             <thead className="bg-slate-50 dark:bg-slate-700 sticky top-0 z-20">
                                 <tr>
                                     <th className="p-4 border-b border-r border-slate-100 dark:border-slate-600 text-left text-xs font-extrabold text-slate-400 uppercase w-40 sticky left-0 bg-slate-50 dark:bg-slate-700 z-30">
-                                        {viewMode === 'week' ? 'Урок' : viewMode === 'class' ? 'Класс' : viewMode === 'teacher' ? 'Учитель' : 'Предмет'}
+                                        {viewMode === 'week'
+                                            ? 'Урок'
+                                            : viewMode === 'class'
+                                              ? 'Класс'
+                                              : viewMode === 'teacher'
+                                                ? 'Учитель'
+                                                : 'Предмет'}
                                     </th>
-                                    {cols.map(col => <th key={col} className="p-4 border-b border-slate-100 dark:border-slate-600 text-center text-xs font-extrabold text-slate-400 uppercase min-w-[160px]">{viewMode === 'week' ? col : `${col} урок`}</th>)}
+                                    {cols.map((col) => (
+                                        <th
+                                            key={col}
+                                            className="p-4 border-b border-slate-100 dark:border-slate-600 text-center text-xs font-extrabold text-slate-400 uppercase min-w-[160px]"
+                                        >
+                                            {viewMode === 'week' ? col : `${col} урок`}
+                                        </th>
+                                    ))}
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50 dark:divide-slate-700">
-                                {rows.length > 0 ? rows.map(row => (
-                                    <tr key={row.id}>
-                                        <td className="p-4 border-r border-slate-100 dark:border-slate-600 font-black text-lg text-slate-700 dark:text-slate-200 sticky left-0 bg-white dark:bg-dark-800 z-10 text-left">{row.name}</td>
-                        {cols.map(colKey => {
-                            const items = getScheduleItems(row.id, colKey);
-                            const cellId = `${row.id}-${colKey}`;
-                            const cellInfo: CellInfo = { rowId: row.id, colKey };
-                            return (
-                                <td 
-                                    key={colKey} 
-                                    className={`p-2 border-r border-slate-50 dark:border-slate-700 h-28 align-top transition-colors ${dragOverCell === cellId ? 'drag-over' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}
-                                    onContextMenu={!readOnly ? (e) => handleContextMenu(e, null, cellInfo) : undefined}
-                                    onDragOver={!readOnly ? (e) => handleDragOver(e, cellInfo) : undefined}
-                                    onDrop={!readOnly ? (e) => handleDrop(e, cellInfo) : undefined}
-                                >
-                                    {renderScheduleItemsContent(items, colKey, row.id)}
-                                </td>
-                            );
-                        })}
+                                {rows.length > 0 ? (
+                                    rows.map((row) => (
+                                        <tr key={row.id}>
+                                            <td className="p-4 border-r border-slate-100 dark:border-slate-600 font-black text-lg text-slate-700 dark:text-slate-200 sticky left-0 bg-white dark:bg-dark-800 z-10 text-left">
+                                                {row.name}
+                                            </td>
+                                            {cols.map((colKey) => {
+                                                const items = getScheduleItems(row.id, colKey);
+                                                const cellId = `${row.id}-${colKey}`;
+                                                const cellInfo: CellInfo = { rowId: row.id, colKey };
+                                                return (
+                                                    <td
+                                                        key={colKey}
+                                                        className={`p-2 border-r border-slate-50 dark:border-slate-700 h-28 align-top transition-colors ${dragOverCell === cellId ? 'drag-over' : 'hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}
+                                                        onContextMenu={
+                                                            !readOnly
+                                                                ? (e) => handleContextMenu(e, null, cellInfo)
+                                                                : undefined
+                                                        }
+                                                        onDragOver={
+                                                            !readOnly ? (e) => handleDragOver(e, cellInfo) : undefined
+                                                        }
+                                                        onDrop={!readOnly ? (e) => handleDrop(e, cellInfo) : undefined}
+                                                    >
+                                                        {renderScheduleItemsContent(items, colKey, row.id)}
+                                                    </td>
+                                                );
+                                            })}
+                                        </tr>
+                                    ))
+                                ) : (
+                                    <tr>
+                                        <td colSpan={8} className="p-8 text-center text-slate-400 dark:text-slate-500">
+                                            Нет данных для отображения
+                                        </td>
                                     </tr>
-                                )) : <tr><td colSpan={8} className="p-8 text-center text-slate-400 dark:text-slate-500">Нет данных для отображения</td></tr>}
+                                )}
                             </tbody>
                         </table>
                     )}
                 </div>
             </div>
 
-            <Modal isOpen={isEditorOpen} onClose={() => setIsEditorOpen(false)} title={tempItem.id ? 'Редактирование урока' : 'Добавить урок'}>
+            <Modal
+                isOpen={isEditorOpen}
+                onClose={() => setIsEditorOpen(false)}
+                title={tempItem.id ? 'Редактирование урока' : 'Добавить урок'}
+            >
                 <div className="space-y-4">
                     {/* Top Info Bar */}
                     <div className="bg-slate-50 dark:bg-slate-700/50 p-3 rounded-xl flex items-center gap-4 text-sm font-bold text-slate-600 dark:text-slate-300">
@@ -817,63 +1106,124 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
 
                     {validationWarnings.length > 0 && (
                         <div className="bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 p-3 rounded-lg text-sm border border-orange-100 dark:border-orange-900">
-                            {validationWarnings.map((w) => <div key={w} className="flex items-center gap-2"><Icon name="AlertTriangle" size={14}/>{w}</div>)}
+                            {validationWarnings.map((w) => (
+                                <div key={w} className="flex items-center gap-2">
+                                    <Icon name="AlertTriangle" size={14} />
+                                    {w}
+                                </div>
+                            ))}
                         </div>
                     )}
-                    
+
                     <div>
-                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">КЛАСС</label>
-                        <SearchableSelect 
-                            options={classes.filter(c => c.shift === selectedShift).map(c => ({ value: c.id, label: c.name }))} 
-                            value={tempItem.classId || null} 
-                            onChange={(val) => { setTempItem({...tempItem, classId: val as string}); updateValidation({...tempItem, classId: val as string}); }} 
-                            placeholder="Выберите класс" 
+                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">
+                            КЛАСС
+                        </label>
+                        <SearchableSelect
+                            options={classes
+                                .filter((c) => c.shift === selectedShift)
+                                .map((c) => ({ value: c.id, label: c.name }))}
+                            value={tempItem.classId || null}
+                            onChange={(val) => {
+                                setTempItem({ ...tempItem, classId: val as string });
+                                updateValidation({ ...tempItem, classId: val as string });
+                            }}
+                            placeholder="Выберите класс"
                         />
                     </div>
 
                     <div>
-                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">ПРЕДМЕТ</label>
-                        <SearchableSelect 
-                            options={subjects.map(s => ({ value: s.id, label: s.name }))} 
-                            value={tempItem.subjectId || null} 
-                            onChange={(val) => { setTempItem({...tempItem, subjectId: val as string}); updateValidation({...tempItem, subjectId: val as string}); }} 
-                            placeholder="Выберите предмет" 
-                        />
-                    </div>
-                    
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">УЧИТЕЛЬ</label>
-                        <SearchableSelect 
-                            options={[{ label: 'Рекомендуемые', options: recommendedTeachers.map(t => ({ value: t.id, label: t.name })) }, { label: 'Остальные', options: otherTeachers.map(t => ({ value: t.id, label: t.name })) }]} 
-                            value={tempItem.teacherId || null} 
-                            onChange={(val) => setTempItem({...tempItem, teacherId: val as string})} 
-                            placeholder="Выберите учителя" 
-                            groupBy 
+                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">
+                            ПРЕДМЕТ
+                        </label>
+                        <SearchableSelect
+                            options={subjects.map((s) => ({ value: s.id, label: s.name }))}
+                            value={tempItem.subjectId || null}
+                            onChange={(val) => {
+                                setTempItem({ ...tempItem, subjectId: val as string });
+                                updateValidation({ ...tempItem, subjectId: val as string });
+                            }}
+                            placeholder="Выберите предмет"
                         />
                     </div>
 
                     <div>
-                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">ГРУППА / НАПРАВЛЕНИЕ</label>
-                        <input className="w-full border border-slate-200 dark:border-slate-600 p-3 rounded-xl text-sm outline-none bg-white dark:bg-slate-700 dark:text-white focus:border-indigo-500" placeholder="Например: 1 гр. или Профиль" value={tempItem.direction || ''} onChange={e => setTempItem({...tempItem, direction: e.target.value})} />
+                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">
+                            УЧИТЕЛЬ
+                        </label>
+                        <SearchableSelect
+                            options={[
+                                {
+                                    label: 'Рекомендуемые',
+                                    options: recommendedTeachers.map((t) => ({ value: t.id, label: t.name }))
+                                },
+                                {
+                                    label: 'Остальные',
+                                    options: otherTeachers.map((t) => ({ value: t.id, label: t.name }))
+                                }
+                            ]}
+                            value={tempItem.teacherId || null}
+                            onChange={(val) => setTempItem({ ...tempItem, teacherId: val as string })}
+                            placeholder="Выберите учителя"
+                            groupBy
+                        />
                     </div>
 
                     <div>
-                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">КАБИНЕТ</label>
-                        <select className="w-full border border-slate-200 dark:border-slate-600 p-3 rounded-xl text-sm outline-none bg-white dark:bg-slate-700 dark:text-white focus:border-indigo-500" value={tempItem.roomId || ''} onChange={e => { setTempItem({...tempItem, roomId: e.target.value}); updateValidation({...tempItem, roomId: e.target.value}); }}>
+                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">
+                            ГРУППА / НАПРАВЛЕНИЕ
+                        </label>
+                        <input
+                            className="w-full border border-slate-200 dark:border-slate-600 p-3 rounded-xl text-sm outline-none bg-white dark:bg-slate-700 dark:text-white focus:border-indigo-500"
+                            placeholder="Например: 1 гр. или Профиль"
+                            value={tempItem.direction || ''}
+                            onChange={(e) => setTempItem({ ...tempItem, direction: e.target.value })}
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">
+                            КАБИНЕТ
+                        </label>
+                        <select
+                            className="w-full border border-slate-200 dark:border-slate-600 p-3 rounded-xl text-sm outline-none bg-white dark:bg-slate-700 dark:text-white focus:border-indigo-500"
+                            value={tempItem.roomId || ''}
+                            onChange={(e) => {
+                                setTempItem({ ...tempItem, roomId: e.target.value });
+                                updateValidation({ ...tempItem, roomId: e.target.value });
+                            }}
+                        >
                             <option value="">Без кабинета</option>
-                            {rooms.map(r => <option key={r.id} value={r.id}>{r.name} ({r.capacity} мест)</option>)}
+                            {rooms.map((r) => (
+                                <option key={r.id} value={r.id}>
+                                    {r.name} ({r.capacity} мест)
+                                </option>
+                            ))}
                         </select>
                     </div>
 
                     <div className="flex justify-end gap-2 mt-6">
-                        {tempItem.id && <button onClick={() => handleDeleteItem()} className="px-4 py-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg font-bold text-sm">Удалить</button>}
-                        <button onClick={handleSaveItem} className="btn-primary btn-ripple">Сохранить</button>
+                        {tempItem.id && (
+                            <button
+                                onClick={() => handleDeleteItem()}
+                                className="px-4 py-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg font-bold text-sm"
+                            >
+                                Удалить
+                            </button>
+                        )}
+                        <button onClick={handleSaveItem} className="btn-primary btn-ripple">
+                            Сохранить
+                        </button>
                     </div>
                 </div>
             </Modal>
-            
+
             {/* Mass Operations Modal */}
-            <Modal isOpen={isMassOperationsModalOpen} onClose={() => setIsMassOperationsModalOpen(false)} title="Массовые операции с расписанием">
+            <Modal
+                isOpen={isMassOperationsModalOpen}
+                onClose={() => setIsMassOperationsModalOpen(false)}
+                title="Массовые операции с расписанием"
+            >
                 <div className="space-y-6">
                     <p className="text-sm text-slate-500 dark:text-slate-400">
                         Внимание: Эти операции необратимы без использования функции "Отменить" сразу после действия.
@@ -881,44 +1231,70 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
 
                     <div>
                         <h4 className="font-bold text-slate-800 dark:text-white mb-1">Очистить всё расписание</h4>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Удаляет все уроки из расписания (все дни, все смены, все классы).</p>
-                        <button onClick={() => handleMassClear('clearAll')} className="px-4 py-2 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition text-sm">
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+                            Удаляет все уроки из расписания (все дни, все смены, все классы).
+                        </p>
+                        <button
+                            onClick={() => handleMassClear('clearAll')}
+                            className="px-4 py-2 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition text-sm"
+                        >
                             Очистить полностью
                         </button>
                     </div>
 
                     <div>
                         <h4 className="font-bold text-slate-800 dark:text-white mb-1">Очистить расписание на день</h4>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Удаляет все уроки для выбранного дня недели.</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+                            Удаляет все уроки для выбранного дня недели.
+                        </p>
                         <div className="flex gap-2">
-                            <select 
-                                value={massOpSelectedDay} 
-                                onChange={(e) => setMassOpSelectedDay(e.target.value)} 
+                            <select
+                                value={massOpSelectedDay}
+                                onChange={(e) => setMassOpSelectedDay(e.target.value)}
                                 className="border border-slate-200 dark:border-slate-600 rounded-xl p-2 text-sm bg-white dark:bg-slate-700 dark:text-white outline-none w-full"
                             >
-                                {DAYS.map(day => <option key={day} value={day}>{day}</option>)}
+                                {DAYS.map((day) => (
+                                    <option key={day} value={day}>
+                                        {day}
+                                    </option>
+                                ))}
                             </select>
                         </div>
-                        <button onClick={() => handleMassClear('clearDay', massOpSelectedDay)} className="mt-2 px-4 py-2 bg-amber-600 text-white rounded-xl font-bold hover:bg-amber-700 transition text-sm w-full sm:w-auto">
+                        <button
+                            onClick={() => handleMassClear('clearDay', massOpSelectedDay)}
+                            className="mt-2 px-4 py-2 bg-amber-600 text-white rounded-xl font-bold hover:bg-amber-700 transition text-sm w-full sm:w-auto"
+                        >
                             Очистить {massOpSelectedDay}
                         </button>
                     </div>
 
                     <div>
-                        <h4 className="font-bold text-slate-800 dark:text-white mb-1">Очистить расписание для класса</h4>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Удаляет все уроки для выбранного класса.</p>
+                        <h4 className="font-bold text-slate-800 dark:text-white mb-1">
+                            Очистить расписание для класса
+                        </h4>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+                            Удаляет все уроки для выбранного класса.
+                        </p>
                         <div className="flex gap-2">
-                            <select 
-                                value={massOpSelectedClass} 
-                                onChange={(e) => setMassOpSelectedClass(e.target.value)} 
+                            <select
+                                value={massOpSelectedClass}
+                                onChange={(e) => setMassOpSelectedClass(e.target.value)}
                                 className="border border-slate-200 dark:border-slate-600 rounded-xl p-2 text-sm bg-white dark:bg-slate-700 dark:text-white outline-none w-full"
                             >
-                                <option value="" disabled>Выберите класс</option>
-                                {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                <option value="" disabled>
+                                    Выберите класс
+                                </option>
+                                {classes.map((c) => (
+                                    <option key={c.id} value={c.id}>
+                                        {c.name}
+                                    </option>
+                                ))}
                             </select>
                         </div>
-                        <button 
-                            onClick={() => { if(massOpSelectedClass) handleMassClear('clearClass', undefined, massOpSelectedClass); }} 
+                        <button
+                            onClick={() => {
+                                if (massOpSelectedClass) handleMassClear('clearClass', undefined, massOpSelectedClass);
+                            }}
                             disabled={!massOpSelectedClass}
                             className="mt-2 px-4 py-2 bg-teal-600 text-white rounded-xl font-bold hover:bg-teal-700 transition text-sm w-full sm:w-auto disabled:opacity-50 disabled:cursor-not-allowed"
                         >
@@ -928,14 +1304,27 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
                 </div>
             </Modal>
 
-            <Modal isOpen={massOpConfirm.isOpen} onClose={() => setMassOpConfirm({ ...massOpConfirm, isOpen: false })} title="Подтверждение">
-                <p className="mb-6 text-slate-600 dark:text-slate-300">Вы уверены? Это действие нельзя будет отменить через историю изменений.</p>
+            <Modal
+                isOpen={massOpConfirm.isOpen}
+                onClose={() => setMassOpConfirm({ ...massOpConfirm, isOpen: false })}
+                title="Подтверждение"
+            >
+                <p className="mb-6 text-slate-600 dark:text-slate-300">
+                    Вы уверены? Это действие нельзя будет отменить через историю изменений.
+                </p>
                 <div className="flex justify-end gap-3">
-                    <button onClick={() => setMassOpConfirm({ ...massOpConfirm, isOpen: false })} className="px-4 py-2 bg-slate-100 dark:bg-slate-700 rounded-lg font-bold text-slate-600 dark:text-slate-300">Отмена</button>
-                    <button onClick={confirmMassClear} className="px-4 py-2 bg-red-600 text-white rounded-lg font-bold">Подтвердить</button>
+                    <button
+                        onClick={() => setMassOpConfirm({ ...massOpConfirm, isOpen: false })}
+                        className="px-4 py-2 bg-slate-100 dark:bg-slate-700 rounded-lg font-bold text-slate-600 dark:text-slate-300"
+                    >
+                        Отмена
+                    </button>
+                    <button onClick={confirmMassClear} className="px-4 py-2 bg-red-600 text-white rounded-lg font-bold">
+                        Подтвердить
+                    </button>
                 </div>
             </Modal>
-            
+
             {/* Conflict Details Modal */}
             <Modal isOpen={conflictModalOpen} onClose={() => setConflictModalOpen(false)} title="Детали конфликта">
                 <div className="space-y-4">
@@ -945,11 +1334,18 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
                     <div className="space-y-3">
                         {activeConflictDetails && activeConflictDetails.conflicts.length > 0 ? (
                             activeConflictDetails.conflicts.map((conflict, idx) => (
-                                <div key={idx} className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-3 flex items-start gap-3">
+                                <div
+                                    key={idx}
+                                    className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-3 flex items-start gap-3"
+                                >
                                     <Icon name="AlertTriangle" className="text-red-500 shrink-0 mt-0.5" size={18} />
                                     <div>
-                                        <h4 className="font-bold text-red-700 dark:text-red-300 text-sm mb-1">{conflict.type}</h4>
-                                        <p className="text-xs text-red-600 dark:text-red-400 font-medium">{conflict.description}</p>
+                                        <h4 className="font-bold text-red-700 dark:text-red-300 text-sm mb-1">
+                                            {conflict.type}
+                                        </h4>
+                                        <p className="text-xs text-red-600 dark:text-red-400 font-medium">
+                                            {conflict.description}
+                                        </p>
                                     </div>
                                 </div>
                             ))
@@ -958,7 +1354,10 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
                         )}
                     </div>
                     <div className="flex justify-end">
-                        <button onClick={() => setConflictModalOpen(false)} className="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg font-bold hover:bg-slate-300 transition text-sm">
+                        <button
+                            onClick={() => setConflictModalOpen(false)}
+                            className="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg font-bold hover:bg-slate-300 transition text-sm"
+                        >
                             Закрыть
                         </button>
                     </div>
@@ -969,73 +1368,115 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
             {isPrintModalOpen && (
                 <div className="fixed inset-0 z-[100] bg-white flex flex-col">
                     <div className="p-4 border-b flex justify-between items-center bg-slate-50 no-print">
-                         <h2 className="font-bold text-lg text-slate-800">Печать расписания</h2>
-                         <div className="flex gap-2">
-                             <button onClick={() => window.print()} className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold flex items-center gap-2 hover:bg-indigo-700"><Icon name="Printer" size={16}/> Печать</button>
-                             <button onClick={() => setIsPrintModalOpen(false)} className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg font-bold hover:bg-slate-300">Закрыть</button>
-                         </div>
+                        <h2 className="font-bold text-lg text-slate-800">Печать расписания</h2>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => window.print()}
+                                className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold flex items-center gap-2 hover:bg-indigo-700"
+                            >
+                                <Icon name="Printer" size={16} /> Печать
+                            </button>
+                            <button
+                                onClick={() => setIsPrintModalOpen(false)}
+                                className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg font-bold hover:bg-slate-300"
+                            >
+                                Закрыть
+                            </button>
+                        </div>
                     </div>
                     <div className="flex-1 overflow-auto p-8 custom-scrollbar">
-                         <div className="max-w-[1100px] mx-auto">
-                             <div className="text-center mb-6">
-                                 <h1 className="text-2xl font-black text-slate-800 uppercase">{printTitle}</h1>
-                                 <p className="text-slate-500 font-bold">{new Date().toLocaleDateString('ru-RU', {day:'numeric', month:'long', year:'numeric'})}</p>
-                             </div>
-                             
-                             <table className="w-full border-collapse border border-slate-300 text-xs">
-                                 <thead>
-                                     <tr>
-                                         <th className="border border-slate-300 p-2 bg-slate-100 w-24 font-bold text-slate-700">
-                                            {isWeeklyPrint ? 'Урок' : (viewMode === 'week' ? 'Урок' : viewMode === 'class' ? 'Класс' : viewMode === 'teacher' ? 'Учитель' : 'Предмет')}
-                                         </th>
-                                         {printCols.map(c => <th key={c} className="border border-slate-300 p-2 bg-slate-100 text-center font-bold text-slate-700">{isWeeklyPrint ? c : (viewMode === 'week' ? c : `${c} урок`)}</th>)}
-                                     </tr>
-                                 </thead>
-                                 <tbody>
-                                     {printRows.map(row => (
-                                         <tr key={row.id}>
-                                             <td className="border border-slate-300 p-2 font-bold bg-slate-50 text-slate-800">{row.name}</td>
-                                             {printCols.map(colKey => {
-                                                 const items = getPrintItems(row.id, colKey);
-                                                 return (
-                                                     <td key={colKey} className="border border-slate-300 p-1 align-top h-20 bg-white">
-                                                         {items.map(item => {
-                                                             const subj = subjects.find(s => s.id === item.subjectId);
-                                                             const teach = teachers.find(t => t.id === item.teacherId);
-                                                             const cls = classes.find(c => c.id === item.classId);
-                                                             const room = rooms.find(r => r.id === item.roomId);
-                                                             const roomName = room ? room.name : item.roomId;
-                                                             
-                                                             const isTeacherView = viewMode === 'teacher';
-                                                             const isWeeklyTeacher = isWeeklyPrint && isTeacherView;
-                                                             const isSubjectOrWeek = viewMode === 'subject' || viewMode === 'week';
+                        <div className="max-w-[1100px] mx-auto">
+                            <div className="text-center mb-6">
+                                <h1 className="text-2xl font-black text-slate-800 uppercase">{printTitle}</h1>
+                                <p className="text-slate-500 font-bold">
+                                    {new Date().toLocaleDateString('ru-RU', {
+                                        day: 'numeric',
+                                        month: 'long',
+                                        year: 'numeric'
+                                    })}
+                                </p>
+                            </div>
 
-                                                             const mainText = (isSubjectOrWeek || isWeeklyTeacher) ? cls?.name : subj?.name;
-                                                             const subText = isTeacherView ? cls?.name : teach?.name;
+                            <table className="w-full border-collapse border border-slate-300 text-xs">
+                                <thead>
+                                    <tr>
+                                        <th className="border border-slate-300 p-2 bg-slate-100 w-24 font-bold text-slate-700">
+                                            {isWeeklyPrint
+                                                ? 'Урок'
+                                                : viewMode === 'week'
+                                                  ? 'Урок'
+                                                  : viewMode === 'class'
+                                                    ? 'Класс'
+                                                    : viewMode === 'teacher'
+                                                      ? 'Учитель'
+                                                      : 'Предмет'}
+                                        </th>
+                                        {printCols.map((c) => (
+                                            <th
+                                                key={c}
+                                                className="border border-slate-300 p-2 bg-slate-100 text-center font-bold text-slate-700"
+                                            >
+                                                {isWeeklyPrint ? c : viewMode === 'week' ? c : `${c} урок`}
+                                            </th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {printRows.map((row) => (
+                                        <tr key={row.id}>
+                                            <td className="border border-slate-300 p-2 font-bold bg-slate-50 text-slate-800">
+                                                {row.name}
+                                            </td>
+                                            {printCols.map((colKey) => {
+                                                const items = getPrintItems(row.id, colKey);
+                                                return (
+                                                    <td
+                                                        key={colKey}
+                                                        className="border border-slate-300 p-1 align-top h-20 bg-white"
+                                                    >
+                                                        {items.map((item) => {
+                                                            const subj = subjects.find((s) => s.id === item.subjectId);
+                                                            const teach = teachers.find((t) => t.id === item.teacherId);
+                                                            const cls = classes.find((c) => c.id === item.classId);
+                                                            const room = rooms.find((r) => r.id === item.roomId);
+                                                            const roomName = room ? room.name : item.roomId;
 
-                                                             return (
-                                                                 <div key={item.id} className="mb-1">
-                                                                     <div className="font-bold text-slate-900 text-[11px] leading-tight">
+                                                            const isTeacherView = viewMode === 'teacher';
+                                                            const isWeeklyTeacher = isWeeklyPrint && isTeacherView;
+                                                            const isSubjectOrWeek =
+                                                                viewMode === 'subject' || viewMode === 'week';
+
+                                                            const mainText =
+                                                                isSubjectOrWeek || isWeeklyTeacher
+                                                                    ? cls?.name
+                                                                    : subj?.name;
+                                                            const subText = isTeacherView ? cls?.name : teach?.name;
+
+                                                            return (
+                                                                <div key={item.id} className="mb-1">
+                                                                    <div className="font-bold text-slate-900 text-[11px] leading-tight">
                                                                         {mainText}
                                                                         {item.direction && ` (${item.direction})`}
-                                                                     </div>
-                                                                     <div className="text-[9px] text-slate-600 flex justify-between items-center mt-0.5">
-                                                                         <span>
-                                                                             {subText}
-                                                                         </span>
-                                                                         {roomName && <span className="border px-1 rounded bg-slate-50 border-slate-200">{roomName}</span>}
-                                                                     </div>
-                                                                 </div>
-                                                             );
-                                                         })}
-                                                     </td>
-                                                 );
-                                             })}
-                                         </tr>
-                                     ))}
-                                 </tbody>
-                             </table>
-                         </div>
+                                                                    </div>
+                                                                    <div className="text-[9px] text-slate-600 flex justify-between items-center mt-0.5">
+                                                                        <span>{subText}</span>
+                                                                        {roomName && (
+                                                                            <span className="border px-1 rounded bg-slate-50 border-slate-200">
+                                                                                {roomName}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </td>
+                                                );
+                                            })}
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             )}

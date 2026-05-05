@@ -1,103 +1,102 @@
-
 export enum Shift {
-  First = '1 смена',
-  Second = '2 смена'
+    First = '1 смена',
+    Second = '2 смена'
 }
 
 export enum DayOfWeek {
-  Monday = 'Пн',
-  Tuesday = 'Вт',
-  Wednesday = 'Ср',
-  Thursday = 'Чт',
-  Friday = 'Пт'
+    Monday = 'Пн',
+    Tuesday = 'Вт',
+    Wednesday = 'Ср',
+    Thursday = 'Чт',
+    Friday = 'Пт'
 }
 
 export interface Subject {
-  id: string;
-  name: string;
-  color: string;
-  difficulty: number;
-  requiredRoomType: string;
-  order?: number;
+    id: string;
+    name: string;
+    color: string;
+    difficulty: number;
+    requiredRoomType: string;
+    order?: number;
 }
 
 export interface Teacher {
-  id: string;
-  name: string;
-  subjectIds: string[];
-  unavailableDates: string[]; // ISO Date strings
-  absenceReasons?: Record<string, string>;
-  shifts: string[]; // Shift values
-  birthDate?: string;
-  telegramChatId?: string;
-  order?: number;
+    id: string;
+    name: string;
+    subjectIds: string[];
+    unavailableDates: string[]; // ISO Date strings
+    absenceReasons?: Record<string, string>;
+    shifts: string[]; // Shift values
+    birthDate?: string;
+    telegramChatId?: string;
+    order?: number;
 }
 
 export interface ClassEntity {
-  id: string;
-  name: string;
-  shift: string; // Shift enum
-  studentsCount: number;
-  order?: number;
-  excludeFromReports?: boolean; // New field to hide class from conflict checks
+    id: string;
+    name: string;
+    shift: string; // Shift enum
+    studentsCount: number;
+    order?: number;
+    excludeFromReports?: boolean; // New field to hide class from conflict checks
 }
 
 export interface Room {
-  id: string;
-  name: string;
-  capacity: number;
-  type: string;
-  order?: number;
+    id: string;
+    name: string;
+    capacity: number;
+    type: string;
+    order?: number;
 }
 
 export interface ScheduleItem {
-  id: string;
-  classId: string;
-  subjectId: string;
-  teacherId: string;
-  roomId?: string;
-  day: string; // DayOfWeek
-  period: number;
-  shift: string; // Shift
-  direction?: string; // Group or profile
+    id: string;
+    classId: string;
+    subjectId: string;
+    teacherId: string;
+    roomId?: string;
+    day: string; // DayOfWeek
+    period: number;
+    shift: string; // Shift
+    direction?: string; // Group or profile
 }
 
 export interface Substitution {
-  id: string;
-  date: string; // ISO Date
-  scheduleItemId: string;
-  originalTeacherId: string;
-  replacementTeacherId: string; // 'conducted', 'cancelled', or teacherId. If purely room change, can be originalTeacherId
-  replacementRoomId?: string; // New field for room substitution
-  lessonAbsenceReason?: string; // NEW: Reason for lesson-specific absence
-  isMerger?: boolean; // NEW: Flag for merged classes
-  refusals?: string[]; // IDs of teachers who refused
-  replacementClassId?: string; // NEW: For swapping lessons (target class)
-  replacementSubjectId?: string; // NEW: For swapping lessons (target subject)
-  isRead?: boolean; // NEW: Status of acknowledgement by the teacher
-  comment?: string; // NEW: Per-substitution comment
-  dayComment?: string; // NEW: Common comment for all substitutions on this date
+    id: string;
+    date: string; // ISO Date
+    scheduleItemId: string;
+    originalTeacherId: string;
+    replacementTeacherId: string; // 'conducted', 'cancelled', or teacherId. If purely room change, can be originalTeacherId
+    replacementRoomId?: string; // New field for room substitution
+    lessonAbsenceReason?: string; // NEW: Reason for lesson-specific absence
+    isMerger?: boolean; // NEW: Flag for merged classes
+    refusals?: string[]; // IDs of teachers who refused
+    replacementClassId?: string; // NEW: For swapping lessons (target class)
+    replacementSubjectId?: string; // NEW: For swapping lessons (target subject)
+    isRead?: boolean; // NEW: Status of acknowledgement by the teacher
+    comment?: string; // NEW: Per-substitution comment
+    dayComment?: string; // NEW: Common comment for all substitutions on this date
 }
 
 export interface SubstitutionParams {
-  scheduleItemId: string;
-  subjectId: string;
-  period: number;
-  shift: string;
-  classId: string;
-  teacherId: string;
-  roomId?: string;
-  day: string;
-  isEditing?: boolean;
+    scheduleItemId: string;
+    subjectId: string;
+    period: number;
+    shift: string;
+    classId: string;
+    teacherId: string;
+    roomId?: string;
+    day: string;
+    isEditing?: boolean;
 }
 
 export interface Bell {
-  shift: string;
-  period: number;
-  start: string;
-  end: string;
-  day: string; // 'default' or DayOfWeek
-  cancelled?: boolean; // New field
+    shift: string;
+    period: number;
+    start: string;
+    end: string;
+    day: string; // 'default' or DayOfWeek
+    cancelled?: boolean; // New field
 }
 
 export interface BellPreset {
@@ -119,29 +118,29 @@ export interface AdminAnnouncement {
 }
 
 export interface Settings {
-  telegramToken: string;
-  publicScheduleId?: string | null; // ID for publicly published schedule
-  feedbackChatId?: string;
-  bellPresets?: BellPreset[];
-  semesterConfig?: {
-    firstSemesterMonths: number[]; // Массив месяцев для 1 семестра (0-11)
-    secondSemesterMonths: number[]; // Массив месяцев для 2 семестра (0-11)
-  };
-  telegramTemplates?: TelegramTemplates;
-  adminAnnouncement?: AdminAnnouncement;
-  substitutionDayComments?: Record<string, string>; // ISO date -> common comment for substitutions on that day
-  weatherApiKey?: string; // OpenWeatherMap API Key
-  weatherCity?: string; // "Minsk,BY"
-  schoolName?: string;        // "ГУО «Гимназия №22 г.Минска»"
-  directorName?: string;      // "Н.В.Кисель"
-  unionChairName?: string;    // "Ю.Г.Миханова"
-  secretaryName?: string;     // "Е.К.Шунто"
-  currentYear?: number;       // 2026
+    telegramToken: string;
+    publicScheduleId?: string | null; // ID for publicly published schedule
+    feedbackChatId?: string;
+    bellPresets?: BellPreset[];
+    semesterConfig?: {
+        firstSemesterMonths: number[]; // Массив месяцев для 1 семестра (0-11)
+        secondSemesterMonths: number[]; // Массив месяцев для 2 семестра (0-11)
+    };
+    telegramTemplates?: TelegramTemplates;
+    adminAnnouncement?: AdminAnnouncement;
+    substitutionDayComments?: Record<string, string>; // ISO date -> common comment for substitutions on that day
+    weatherApiKey?: string; // OpenWeatherMap API Key
+    weatherCity?: string; // "Minsk,BY"
+    schoolName?: string; // "ГУО «Гимназия №22 г.Минска»"
+    directorName?: string; // "Н.В.Кисель"
+    unionChairName?: string; // "Ю.Г.Миханова"
+    secretaryName?: string; // "Е.К.Шунто"
+    currentYear?: number; // 2026
 }
 
 export interface PrivateSettings {
-  telegramToken?: string;
-  weatherApiKey?: string;
+    telegramToken?: string;
+    weatherApiKey?: string;
 }
 
 // --- NEW DUTY TYPES ---
@@ -203,41 +202,50 @@ export interface AbsenteeismRecord {
 
 // Interfaces for split contexts
 export interface StaticAppData {
-  subjects: Subject[];
-  teachers: Teacher[];
-  classes: ClassEntity[];
-  rooms: Room[];
-  bellSchedule: Bell[];
-  settings: Settings;
-  privateSettings: PrivateSettings; // New
-  dutyZones: DutyZone[]; // New
+    subjects: Subject[];
+    teachers: Teacher[];
+    classes: ClassEntity[];
+    rooms: Room[];
+    bellSchedule: Bell[];
+    settings: Settings;
+    privateSettings: PrivateSettings; // New
+    dutyZones: DutyZone[]; // New
 }
 
 export interface ScheduleAndSubstitutionData extends ScheduleAndSubstitutionDataFields {
-  saveSemesterSchedule: (semester: 1 | 2, newData: ScheduleItem[]) => Promise<void>;
-  saveScheduleData: (newData: Partial<ScheduleAndSubstitutionDataFields>, addToHistory?: boolean) => Promise<void>; 
+    saveSemesterSchedule: (semester: 1 | 2, newData: ScheduleItem[]) => Promise<void>;
+    saveScheduleData: (newData: Partial<ScheduleAndSubstitutionDataFields>, addToHistory?: boolean) => Promise<void>;
 }
 
 export interface ScheduleAndSubstitutionDataFields {
-  schedule: ScheduleItem[]; // АВТОМАТИЧЕСКИ ВЫБРАННОЕ ТЕКУЩЕЕ РАСПИСАНИЕ (зависит от месяца)
-  schedule1: ScheduleItem[]; // Явное 1 полугодие
-  schedule2: ScheduleItem[]; // Явное 2 полугодие
-  substitutions: Substitution[];
-  dutySchedule: DutyRecord[]; 
-  nutritionRecords: NutritionRecord[]; 
-  absenteeismRecords: AbsenteeismRecord[];
+    schedule: ScheduleItem[]; // АВТОМАТИЧЕСКИ ВЫБРАННОЕ ТЕКУЩЕЕ РАСПИСАНИЕ (зависит от месяца)
+    schedule1: ScheduleItem[]; // Явное 1 полугодие
+    schedule2: ScheduleItem[]; // Явное 2 полугодие
+    substitutions: Substitution[];
+    dutySchedule: DutyRecord[];
+    nutritionRecords: NutritionRecord[];
+    absenteeismRecords: AbsenteeismRecord[];
 }
 
 export interface AppData extends StaticAppData {
-  schedule: ScheduleItem[]; // 1 полугодие
-  schedule2: ScheduleItem[]; // 2 полугодие
-  substitutions: Substitution[];
-  dutySchedule: DutyRecord[]; // New
-  nutritionRecords: NutritionRecord[]; // New
-  absenteeismRecords: AbsenteeismRecord[]; // New
-  privateSettings: PrivateSettings; // New
+    schedule: ScheduleItem[]; // 1 полугодие
+    schedule2: ScheduleItem[]; // 2 полугодие
+    substitutions: Substitution[];
+    dutySchedule: DutyRecord[]; // New
+    nutritionRecords: NutritionRecord[]; // New
+    absenteeismRecords: AbsenteeismRecord[]; // New
+    privateSettings: PrivateSettings; // New
 }
 
 export const DAYS = [DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday];
 export const SHIFT_PERIODS = { [Shift.First]: [1, 2, 3, 4, 5, 6, 7], [Shift.Second]: [0, 1, 2, 3, 4, 5, 6] };
-export const ROOM_TYPES = ['Обычный', 'Спортзал', 'Химия/Биология', 'Физика', 'Информатика', 'Музыка', 'Технология', 'Актовый зал'];
+export const ROOM_TYPES = [
+    'Обычный',
+    'Спортзал',
+    'Химия/Биология',
+    'Физика',
+    'Информатика',
+    'Музыка',
+    'Технология',
+    'Актовый зал'
+];

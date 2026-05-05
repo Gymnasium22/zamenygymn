@@ -1,17 +1,7 @@
-
 import { AppData } from '../types';
 import { INITIAL_DATA } from '../constants';
 import { firestoreDB, auth } from './firebase';
-import { 
-    collection, 
-    doc, 
-    setDoc, 
-    writeBatch, 
-    onSnapshot, 
-    getDocs, 
-    query,
-    deleteDoc
-} from "firebase/firestore";
+import { collection, doc, setDoc, writeBatch, onSnapshot, getDocs, query, deleteDoc } from 'firebase/firestore';
 
 // Конфигурация коллекций
 const COLLECTIONS = {
@@ -50,7 +40,7 @@ const sanitizeForFirestore = (data: any): any => {
 
     if (typeof data === 'object') {
         if (Array.isArray(data)) {
-            return data.map(item => sanitizeForFirestore(item)).filter(item => item !== undefined);
+            return data.map((item) => sanitizeForFirestore(item)).filter((item) => item !== undefined);
         }
 
         const sanitized: any = {};
@@ -89,18 +79,21 @@ const deepEqual = (a: any, b: any): boolean => {
 };
 
 // Wrapper to safely execute getDocs even if it fails
-async function awaitHZ<T>(fn: () => Promise<T>, options: { throwOnError?: boolean } = {}): Promise<T | { docs: any[] }> {
+async function awaitHZ<T>(
+    fn: () => Promise<T>,
+    options: { throwOnError?: boolean } = {}
+): Promise<T | { docs: any[] }> {
     try {
         return await fn();
-    } catch(e) {
-        console.error("Firestore read error (likely quota):", e);
+    } catch (e) {
+        console.error('Firestore read error (likely quota):', e);
         if (options.throwOnError) {
             throw e; // Re-throw for UI error handling
         }
         // Return empty snapshot structure to prevent crash in loop
         return { docs: [] };
     }
-};
+}
 
 export const dbService = {
     // Helper for direct deletion (bypassing syncCollection cache dependency)
@@ -118,7 +111,7 @@ export const dbService = {
             throw error;
         }
     },
-    
+
     clearCache: () => {
         collectionCache.clear();
     },
@@ -136,14 +129,14 @@ export const dbService = {
 
         // Создаем Map из новых элементов
         const newItemsMap = new Map<string, any>();
-        items.forEach(item => {
+        items.forEach((item) => {
             if (item && item.id) {
                 newItemsMap.set(item.id, sanitizeForFirestore(item));
             }
         });
 
         // Вычисляем операции только на основе кеша
-        const operations: { type: 'create' | 'update' | 'delete', item?: any, id: string }[] = [];
+        const operations: { type: 'create' | 'update' | 'delete'; item?: any; id: string }[] = [];
 
         // Удаление элементов, которые есть в кеше, но нет в новых данных
         cachedItems.forEach((_, id) => {
@@ -207,7 +200,7 @@ export const dbService = {
 
         try {
             const q = query(collection(firestoreDB, collectionName));
-            const querySnapshot = await awaitHZ(async() => await getDocs(q), { throwOnError: true });
+            const querySnapshot = await awaitHZ(async () => await getDocs(q), { throwOnError: true });
 
             const cachedItems = new Map<string, any>();
             querySnapshot.docs.forEach((doc: any) => {
@@ -238,90 +231,119 @@ export const dbService = {
         if (data.substitutions) promises.push(dbService.syncCollection(COLLECTIONS.SUBSTITUTIONS, data.substitutions));
         if (data.dutyZones) promises.push(dbService.syncCollection(COLLECTIONS.DUTY_ZONES, data.dutyZones));
         if (data.dutySchedule) promises.push(dbService.syncCollection(COLLECTIONS.DUTY_SCHEDULE, data.dutySchedule));
-        if (data.nutritionRecords) promises.push(dbService.syncCollection(COLLECTIONS.NUTRITION, data.nutritionRecords));
-        if (data.absenteeismRecords) promises.push(dbService.syncCollection(COLLECTIONS.ABSENTEEISM, data.absenteeismRecords));
+        if (data.nutritionRecords)
+            promises.push(dbService.syncCollection(COLLECTIONS.NUTRITION, data.nutritionRecords));
+        if (data.absenteeismRecords)
+            promises.push(dbService.syncCollection(COLLECTIONS.ABSENTEEISM, data.absenteeismRecords));
 
         if (data.settings) {
-            promises.push(setDoc(doc(firestoreDB, COLLECTIONS.CONFIG, 'settings'), sanitizeForFirestore(data.settings), { merge: true }));
+            promises.push(
+                setDoc(doc(firestoreDB, COLLECTIONS.CONFIG, 'settings'), sanitizeForFirestore(data.settings), {
+                    merge: true
+                })
+            );
         }
         if (data.privateSettings && user.email === 'admin@gymnasium22.com') {
-            promises.push(setDoc(doc(firestoreDB, COLLECTIONS.CONFIG, 'secrets'), sanitizeForFirestore(data.privateSettings), { merge: true }));
+            promises.push(
+                setDoc(doc(firestoreDB, COLLECTIONS.CONFIG, 'secrets'), sanitizeForFirestore(data.privateSettings), {
+                    merge: true
+                })
+            );
         }
         if (data.bellSchedule) {
-            promises.push(setDoc(doc(firestoreDB, COLLECTIONS.CONFIG, 'bells'), sanitizeForFirestore({ items: data.bellSchedule })));
+            promises.push(
+                setDoc(
+                    doc(firestoreDB, COLLECTIONS.CONFIG, 'bells'),
+                    sanitizeForFirestore({ items: data.bellSchedule })
+                )
+            );
         }
 
         await Promise.all(promises);
     },
 
-    subscribe: (
-        onNext: (data: Partial<AppData>) => void,
-        onError: (error: Error) => void
-    ) => {
+    subscribe: (onNext: (data: Partial<AppData>) => void, onError: (error: Error) => void) => {
         if (!firestoreDB) {
             return () => {};
         }
 
-        let localData: Partial<AppData> = {};
+        const localData: Partial<AppData> = {};
         let isInitialLoad = true;
         const collectionsToLoad = [
-            'teachers', 'subjects', 'classes', 'rooms', 
-            'schedule', 'schedule2', 'substitutions', 
-            'dutyZones', 'dutySchedule', 'nutritionRecords', 
-            'absenteeismRecords', 'settings', 'bellSchedule', 'privateSettings'
+            'teachers',
+            'subjects',
+            'classes',
+            'rooms',
+            'schedule',
+            'schedule2',
+            'substitutions',
+            'dutyZones',
+            'dutySchedule',
+            'nutritionRecords',
+            'absenteeismRecords',
+            'settings',
+            'bellSchedule',
+            'privateSettings'
         ];
         const loadedCollections = new Set<string>();
 
         let updateTimeout: any;
         const triggerUpdate = (collectionKey?: string) => {
             if (collectionKey) loadedCollections.add(collectionKey);
-            
+
             clearTimeout(updateTimeout);
-            updateTimeout = setTimeout(async () => {
-                // Wait for all collections to load initially before the first update
-                if (isInitialLoad && loadedCollections.size < collectionsToLoad.length) {
-                    return;
-                }
+            updateTimeout = setTimeout(
+                async () => {
+                    // Wait for all collections to load initially before the first update
+                    if (isInitialLoad && loadedCollections.size < collectionsToLoad.length) {
+                        return;
+                    }
 
-                const data = { ...localData };
+                    const data = { ...localData };
 
-                if (isInitialLoad) {
-                    isInitialLoad = false;
-                }
+                    if (isInitialLoad) {
+                        isInitialLoad = false;
+                    }
 
-                onNext(data);
-            }, isInitialLoad ? 200 : 50);
+                    onNext(data);
+                },
+                isInitialLoad ? 200 : 50
+            );
         };
 
         const unsubs: (() => void)[] = [];
 
         const subColl = (colName: string, key: keyof AppData) => {
             const q = query(collection(firestoreDB, colName));
-            return onSnapshot(q, (snapshot) => {
-                const items = snapshot.docs.map(d => d.data());
-                
-                // IMPORTANT: Populate the internal cache with data from Firestore
-                // This ensures that when syncCollection runs (e.g. on delete),
-                // it knows what currently exists in the DB to calculate deletions correctly.
-                const cachedItems = new Map<string, any>();
-                items.forEach((item: any) => {
-                    if (item && item.id) {
-                        cachedItems.set(item.id, item);
-                    }
-                });
-                collectionCache.set(colName, cachedItems);
-                
-                // Sort items based on 'order' property client-side
-                items.sort((a: any, b: any) => {
-                    const orderA = typeof a.order === 'number' ? a.order : 999999;
-                    const orderB = typeof b.order === 'number' ? b.order : 999999;
-                    return orderA - orderB;
-                });
-                (localData as any)[key] = items;
-                triggerUpdate(key as string);
-            }, (err) => {
-                console.warn(`Error reading ${colName}:`, err);
-            });
+            return onSnapshot(
+                q,
+                (snapshot) => {
+                    const items = snapshot.docs.map((d) => d.data());
+
+                    // IMPORTANT: Populate the internal cache with data from Firestore
+                    // This ensures that when syncCollection runs (e.g. on delete),
+                    // it knows what currently exists in the DB to calculate deletions correctly.
+                    const cachedItems = new Map<string, any>();
+                    items.forEach((item: any) => {
+                        if (item && item.id) {
+                            cachedItems.set(item.id, item);
+                        }
+                    });
+                    collectionCache.set(colName, cachedItems);
+
+                    // Sort items based on 'order' property client-side
+                    items.sort((a: any, b: any) => {
+                        const orderA = typeof a.order === 'number' ? a.order : 999999;
+                        const orderB = typeof b.order === 'number' ? b.order : 999999;
+                        return orderA - orderB;
+                    });
+                    (localData as any)[key] = items;
+                    triggerUpdate(key as string);
+                },
+                (err) => {
+                    console.warn(`Error reading ${colName}:`, err);
+                }
+            );
         };
 
         unsubs.push(subColl(COLLECTIONS.TEACHERS, 'teachers'));
@@ -337,52 +359,70 @@ export const dbService = {
         unsubs.push(subColl(COLLECTIONS.ABSENTEEISM, 'absenteeismRecords'));
 
         // Listen to settings
-        unsubs.push(onSnapshot(doc(firestoreDB, COLLECTIONS.CONFIG, 'settings'), (snapshot) => {
-            if (snapshot.exists()) {
-                localData.settings = { ...INITIAL_DATA.settings, ...snapshot.data() };
-            } else {
-                localData.settings = INITIAL_DATA.settings;
-            }
-            loadedCollections.add('settings');
-            triggerUpdate();
-        }, (err) => {
-            console.warn("Error reading settings:", err);
-            loadedCollections.add('settings'); // Mark as loaded even if failed
-            triggerUpdate();
-        }));
+        unsubs.push(
+            onSnapshot(
+                doc(firestoreDB, COLLECTIONS.CONFIG, 'settings'),
+                (snapshot) => {
+                    if (snapshot.exists()) {
+                        localData.settings = { ...INITIAL_DATA.settings, ...snapshot.data() };
+                    } else {
+                        localData.settings = INITIAL_DATA.settings;
+                    }
+                    loadedCollections.add('settings');
+                    triggerUpdate();
+                },
+                (err) => {
+                    console.warn('Error reading settings:', err);
+                    loadedCollections.add('settings'); // Mark as loaded even if failed
+                    triggerUpdate();
+                }
+            )
+        );
 
         // Listen to bells
-        unsubs.push(onSnapshot(doc(firestoreDB, COLLECTIONS.CONFIG, 'bells'), (snapshot) => {
-            if (snapshot.exists()) {
-                const data = snapshot.data();
-                localData.bellSchedule = data.items || INITIAL_DATA.bellSchedule;
-            } else {
-                localData.bellSchedule = INITIAL_DATA.bellSchedule;
-            }
-            loadedCollections.add('bellSchedule');
-            triggerUpdate();
-        }, (err) => {
-            console.warn("Error reading bells:", err);
-            loadedCollections.add('bellSchedule');
-            triggerUpdate();
-        }));
+        unsubs.push(
+            onSnapshot(
+                doc(firestoreDB, COLLECTIONS.CONFIG, 'bells'),
+                (snapshot) => {
+                    if (snapshot.exists()) {
+                        const data = snapshot.data();
+                        localData.bellSchedule = data.items || INITIAL_DATA.bellSchedule;
+                    } else {
+                        localData.bellSchedule = INITIAL_DATA.bellSchedule;
+                    }
+                    loadedCollections.add('bellSchedule');
+                    triggerUpdate();
+                },
+                (err) => {
+                    console.warn('Error reading bells:', err);
+                    loadedCollections.add('bellSchedule');
+                    triggerUpdate();
+                }
+            )
+        );
 
         // Listen to secrets (ONLY if admin)
         const user = auth?.currentUser;
         if (user && user.email === 'admin@gymnasium22.com') {
-            unsubs.push(onSnapshot(doc(firestoreDB, COLLECTIONS.CONFIG, 'secrets'), (snapshot) => {
-                if (snapshot.exists()) {
-                    localData.privateSettings = snapshot.data();
-                } else {
-                    localData.privateSettings = INITIAL_DATA.privateSettings;
-                }
-                loadedCollections.add('privateSettings');
-                triggerUpdate();
-            }, (err) => {
-                console.warn("Error reading secrets:", err);
-                loadedCollections.add('privateSettings');
-                triggerUpdate();
-            }));
+            unsubs.push(
+                onSnapshot(
+                    doc(firestoreDB, COLLECTIONS.CONFIG, 'secrets'),
+                    (snapshot) => {
+                        if (snapshot.exists()) {
+                            localData.privateSettings = snapshot.data();
+                        } else {
+                            localData.privateSettings = INITIAL_DATA.privateSettings;
+                        }
+                        loadedCollections.add('privateSettings');
+                        triggerUpdate();
+                    },
+                    (err) => {
+                        console.warn('Error reading secrets:', err);
+                        loadedCollections.add('privateSettings');
+                        triggerUpdate();
+                    }
+                )
+            );
         } else {
             // Not an admin or not logged in, mark as "loaded" with empty defaults
             localData.privateSettings = INITIAL_DATA.privateSettings;
@@ -391,7 +431,7 @@ export const dbService = {
         }
 
         return () => {
-            unsubs.forEach(unsub => unsub());
+            unsubs.forEach((unsub) => unsub());
             clearTimeout(updateTimeout);
         };
     },
@@ -414,14 +454,14 @@ export const dbService = {
     },
 
     setPublicData: async (id: string, data: AppData) => {
-        if (!firestoreDB) throw new Error("Database not initialized");
+        if (!firestoreDB) throw new Error('Database not initialized');
         const user = auth?.currentUser;
-        if (!user || user.email !== "admin@gymnasium22.com") throw new Error("Нет прав.");
+        if (!user || user.email !== 'admin@gymnasium22.com') throw new Error('Нет прав.');
 
         // Helper to pick only specific fields from an object (White-listing)
         const pick = (obj: any, fields: string[]) => {
             const result: any = {};
-            fields.forEach(f => {
+            fields.forEach((f) => {
                 if (obj && obj[f] !== undefined) result[f] = obj[f];
             });
             return result;
@@ -429,17 +469,47 @@ export const dbService = {
 
         // Explicitly define public-safe versions of data structures using White-listing
         const publicDataSubset = {
-            subjects: data.subjects.map(s => pick(s, ['id', 'name', 'color', 'difficulty', 'requiredRoomType', 'order'])),
-            teachers: data.teachers.map(t => pick(t, ['id', 'name', 'subjectIds', 'shifts', 'order'])),
-            classes: data.classes.map(c => pick(c, ['id', 'name', 'shift', 'studentsCount', 'order'])),
-            rooms: data.rooms.map(r => pick(r, ['id', 'name', 'capacity', 'type', 'order'])),
-            schedule: data.schedule.map(s => pick(s, ['id', 'classId', 'subjectId', 'teacherId', 'roomId', 'day', 'period', 'shift', 'direction'])),
-            schedule2: data.schedule2.map(s => pick(s, ['id', 'classId', 'subjectId', 'teacherId', 'roomId', 'day', 'period', 'shift', 'direction'])),
-            substitutions: data.substitutions.map(s => pick(s, ['id', 'date', 'scheduleItemId', 'originalTeacherId', 'replacementTeacherId', 'replacementRoomId', 'isMerger', 'replacementClassId', 'replacementSubjectId', 'comment', 'dayComment'])),
-            bellSchedule: data.bellSchedule.map(b => pick(b, ['shift', 'period', 'start', 'end', 'day', 'cancelled'])),
-            settings: pick(data.settings, ['publicScheduleId', 'bellPresets', 'semesterConfig', 'schoolName', 'currentYear']),
-            dutyZones: data.dutyZones.map(dz => pick(dz, ['id', 'name', 'description', 'includedRooms', 'order', 'floor'])),
-            dutySchedule: data.dutySchedule.map(ds => pick(ds, ['id', 'day', 'shift', 'zoneId', 'teacherId']))
+            subjects: data.subjects.map((s) =>
+                pick(s, ['id', 'name', 'color', 'difficulty', 'requiredRoomType', 'order'])
+            ),
+            teachers: data.teachers.map((t) => pick(t, ['id', 'name', 'subjectIds', 'shifts', 'order'])),
+            classes: data.classes.map((c) => pick(c, ['id', 'name', 'shift', 'studentsCount', 'order'])),
+            rooms: data.rooms.map((r) => pick(r, ['id', 'name', 'capacity', 'type', 'order'])),
+            schedule: data.schedule.map((s) =>
+                pick(s, ['id', 'classId', 'subjectId', 'teacherId', 'roomId', 'day', 'period', 'shift', 'direction'])
+            ),
+            schedule2: data.schedule2.map((s) =>
+                pick(s, ['id', 'classId', 'subjectId', 'teacherId', 'roomId', 'day', 'period', 'shift', 'direction'])
+            ),
+            substitutions: data.substitutions.map((s) =>
+                pick(s, [
+                    'id',
+                    'date',
+                    'scheduleItemId',
+                    'originalTeacherId',
+                    'replacementTeacherId',
+                    'replacementRoomId',
+                    'isMerger',
+                    'replacementClassId',
+                    'replacementSubjectId',
+                    'comment',
+                    'dayComment'
+                ])
+            ),
+            bellSchedule: data.bellSchedule.map((b) =>
+                pick(b, ['shift', 'period', 'start', 'end', 'day', 'cancelled'])
+            ),
+            settings: pick(data.settings, [
+                'publicScheduleId',
+                'bellPresets',
+                'semesterConfig',
+                'schoolName',
+                'currentYear'
+            ]),
+            dutyZones: data.dutyZones.map((dz) =>
+                pick(dz, ['id', 'name', 'description', 'includedRooms', 'order', 'floor'])
+            ),
+            dutySchedule: data.dutySchedule.map((ds) => pick(ds, ['id', 'day', 'shift', 'zoneId', 'teacherId']))
         };
 
         const cleanData = sanitizeForFirestore(publicDataSubset);
@@ -449,7 +519,9 @@ export const dbService = {
     getPublicData: async (id: string): Promise<AppData | null> => {
         if (!firestoreDB) return null;
         try {
-            const d = await import("firebase/firestore").then(m => m.getDoc(doc(firestoreDB, COLLECTIONS.PUBLIC, id)));
+            const d = await import('firebase/firestore').then((m) =>
+                m.getDoc(doc(firestoreDB, COLLECTIONS.PUBLIC, id))
+            );
             if (d.exists()) return d.data() as AppData;
             return null;
         } catch (error) {

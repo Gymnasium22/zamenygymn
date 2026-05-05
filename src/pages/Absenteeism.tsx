@@ -7,7 +7,6 @@ import { Modal, useToast } from '../components/UI';
 import { AbsenteeismRecord, StudentAbsence } from '../types';
 import { formatDateISO, generateId } from '../utils/helpers';
 
-
 export const AbsenteeismPage = () => {
     const { classes } = useStaticData();
     const { absenteeismRecords, saveScheduleData } = useScheduleData();
@@ -34,7 +33,7 @@ export const AbsenteeismPage = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingRecord, setEditingRecord] = useState<AbsenteeismRecord | null>(null);
     const [selectedClassId, setSelectedClassId] = useState<string>('');
-    
+
     // New absence entry state
     const [absences, setAbsences] = useState<StudentAbsence[]>([]);
     const [newStudentName, setNewStudentName] = useState('');
@@ -45,13 +44,13 @@ export const AbsenteeismPage = () => {
 
     // Get records for selected date
     const recordsForDate = useMemo(() => {
-        return absenteeismRecords.filter(r => r.date === selectedDate);
+        return absenteeismRecords.filter((r) => r.date === selectedDate);
     }, [absenteeismRecords, selectedDate]);
 
     // Get records for selected month
     const recordsForMonth = useMemo(() => {
         const [year, month] = selectedMonth.split('-').map(Number);
-        return absenteeismRecords.filter(r => {
+        return absenteeismRecords.filter((r) => {
             const recordDate = new Date(r.date);
             return recordDate.getFullYear() === year && recordDate.getMonth() + 1 === month;
         });
@@ -59,10 +58,10 @@ export const AbsenteeismPage = () => {
 
     // Get classes that have NOT submitted info for the selected date
     const pendingClasses = useMemo(() => {
-        const submittedClassIds = recordsForDate.map(r => r.classId);
+        const submittedClassIds = recordsForDate.map((r) => r.classId);
         // Сначала фильтруем, потом сортируем по order, затем по имени для надежности
         return classes
-            .filter(c => !submittedClassIds.includes(c.id))
+            .filter((c) => !submittedClassIds.includes(c.id))
             .sort((a, b) => {
                 const orderA = typeof a.order === 'number' ? a.order : 999999;
                 const orderB = typeof b.order === 'number' ? b.order : 999999;
@@ -74,8 +73,8 @@ export const AbsenteeismPage = () => {
     // Get classes that HAVE submitted info for the selected date
     const submittedRecords = useMemo(() => {
         return recordsForDate.sort((a, b) => {
-            const classA = classes.find(c => c.id === a.classId);
-            const classB = classes.find(c => c.id === b.classId);
+            const classA = classes.find((c) => c.id === a.classId);
+            const classB = classes.find((c) => c.id === b.classId);
             const orderA = typeof classA?.order === 'number' ? classA.order : 999999;
             const orderB = typeof classB?.order === 'number' ? classB.order : 999999;
             if (orderA !== orderB) return orderA - orderB;
@@ -83,39 +82,43 @@ export const AbsenteeismPage = () => {
         });
     }, [recordsForDate, classes]);
 
-
     // Helpers
     const getClassName = (classId: string) => {
-        return classes.find(c => c.id === classId)?.name || classId;
+        return classes.find((c) => c.id === classId)?.name || classId;
     };
-
 
     const getReasonLabel = (reason: StudentAbsence['reason'], other?: string) => {
         switch (reason) {
-            case 'statement': return 'Заявление';
-            case 'illness': return 'Болезнь';
-            case 'abroad': return 'За пределами РБ';
-            case 'disrespectful': return 'Неуважительная';
-            case 'other': return other || 'Другое';
-            default: return reason;
+            case 'statement':
+                return 'Заявление';
+            case 'illness':
+                return 'Болезнь';
+            case 'abroad':
+                return 'За пределами РБ';
+            case 'disrespectful':
+                return 'Неуважительная';
+            case 'other':
+                return other || 'Другое';
+            default:
+                return reason;
         }
     };
 
     // Calculate monthly statistics
     const monthlyStats = useMemo(() => {
-        const stats: Record<string, { total: number, reasons: Record<string, number> }> = {};
-        
+        const stats: Record<string, { total: number; reasons: Record<string, number> }> = {};
+
         // Initialize all classes
-        classes.forEach(c => {
+        classes.forEach((c) => {
             stats[c.id] = { total: 0, reasons: {} };
         });
 
-        recordsForMonth.forEach(record => {
+        recordsForMonth.forEach((record) => {
             if (!stats[record.classId]) {
                 stats[record.classId] = { total: 0, reasons: {} };
             }
-            
-            record.absences.forEach(abs => {
+
+            record.absences.forEach((abs) => {
                 stats[record.classId].total++;
                 const reasonKey = abs.reason === 'other' ? 'Другое' : getReasonLabel(abs.reason);
                 stats[record.classId].reasons[reasonKey] = (stats[record.classId].reasons[reasonKey] || 0) + 1;
@@ -128,8 +131,8 @@ export const AbsenteeismPage = () => {
                 ...data
             }))
             .sort((a, b) => {
-                const classA = classes.find(c => c.id === a.classId);
-                const classB = classes.find(c => c.id === b.classId);
+                const classA = classes.find((c) => c.id === a.classId);
+                const classB = classes.find((c) => c.id === b.classId);
                 const orderA = typeof classA?.order === 'number' ? classA.order : 999999;
                 const orderB = typeof classB?.order === 'number' ? classB.order : 999999;
                 if (orderA !== orderB) return orderA - orderB;
@@ -139,19 +142,19 @@ export const AbsenteeismPage = () => {
 
     // Calculate daily statistics for print
     const dailyStats = useMemo(() => {
-        const stats: Record<string, { total: number, reasons: Record<string, number> }> = {};
-        
+        const stats: Record<string, { total: number; reasons: Record<string, number> }> = {};
+
         // Initialize all classes
-        classes.forEach(c => {
+        classes.forEach((c) => {
             stats[c.id] = { total: 0, reasons: {} };
         });
 
-        recordsForDate.forEach(record => {
+        recordsForDate.forEach((record) => {
             if (!stats[record.classId]) {
                 stats[record.classId] = { total: 0, reasons: {} };
             }
-            
-            record.absences.forEach(abs => {
+
+            record.absences.forEach((abs) => {
                 stats[record.classId].total++;
                 const reasonKey = abs.reason === 'other' ? 'Другое' : getReasonLabel(abs.reason);
                 stats[record.classId].reasons[reasonKey] = (stats[record.classId].reasons[reasonKey] || 0) + 1;
@@ -164,8 +167,8 @@ export const AbsenteeismPage = () => {
                 ...data
             }))
             .sort((a, b) => {
-                const classA = classes.find(c => c.id === a.classId);
-                const classB = classes.find(c => c.id === b.classId);
+                const classA = classes.find((c) => c.id === a.classId);
+                const classB = classes.find((c) => c.id === b.classId);
                 const orderA = typeof classA?.order === 'number' ? classA.order : 999999;
                 const orderB = typeof classB?.order === 'number' ? classB.order : 999999;
                 if (orderA !== orderB) return orderA - orderB;
@@ -213,11 +216,14 @@ export const AbsenteeismPage = () => {
             return;
         }
 
-        setAbsences([...absences, {
-            studentName: newStudentName.trim(),
-            reason: newAbsenceReason,
-            otherReason: newAbsenceReason === 'other' ? newOtherReason.trim() : undefined
-        }]);
+        setAbsences([
+            ...absences,
+            {
+                studentName: newStudentName.trim(),
+                reason: newAbsenceReason,
+                otherReason: newAbsenceReason === 'other' ? newOtherReason.trim() : undefined
+            }
+        ]);
 
         setNewStudentName('');
         setNewAbsenceReason('illness');
@@ -248,21 +254,21 @@ export const AbsenteeismPage = () => {
         };
 
         const updatedRecords = editingRecord
-            ? absenteeismRecords.map(r => r.id === record.id ? record : r)
+            ? absenteeismRecords.map((r) => (r.id === record.id ? record : r))
             : [...absenteeismRecords, record];
 
         await saveScheduleData({ absenteeismRecords: updatedRecords });
-        
+
         addToast({ type: 'success', title: editingRecord ? 'Запись обновлена' : 'Запись сохранена' });
         closeModal();
     }, [selectedClassId, absences, editingRecord, absenteeismRecords, saveScheduleData, selectedDate, user, addToast]);
 
     const deleteRecord = async () => {
         if (!editingRecord) return;
-        
+
         if (window.confirm('Вы уверены, что хотите удалить запись? Класс вернется в список "Не заполнено".')) {
-            const updatedRecords = absenteeismRecords.filter(r => r.id !== editingRecord.id);
-            
+            const updatedRecords = absenteeismRecords.filter((r) => r.id !== editingRecord.id);
+
             // Update local state and sync via standard method (just like Substitutions)
             // This will trigger dbService.save -> syncCollection which handles both cache and Firestore
             await saveScheduleData({ absenteeismRecords: updatedRecords });
@@ -274,7 +280,7 @@ export const AbsenteeismPage = () => {
 
     const exportToPDF = () => {
         if (!printRef.current) return;
-        
+
         // Show print dialog
         const printWindow = window.open('', '_blank');
         if (!printWindow) {
@@ -359,7 +365,7 @@ export const AbsenteeismPage = () => {
                             Месяц
                         </button>
                     </div>
-                    
+
                     {viewMode === 'day' ? (
                         <input
                             type="date"
@@ -395,7 +401,7 @@ export const AbsenteeismPage = () => {
                             Не заполнено ({pendingClasses.length})
                         </h2>
                         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-2 gap-3">
-                            {pendingClasses.map(cls => (
+                            {pendingClasses.map((cls) => (
                                 <button
                                     key={cls.id}
                                     onClick={() => openModal(cls.id)}
@@ -421,18 +427,18 @@ export const AbsenteeismPage = () => {
                             <Icon name="CheckCircle" className="text-green-500" size={20} />
                             Заполнено ({submittedRecords.length})
                         </h2>
-                        
+
                         <div className="bg-white dark:bg-dark-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
                             <div className="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-dark-700/30 flex justify-between items-center">
                                 <h3 className="font-medium text-slate-700 dark:text-slate-200">
                                     Сводка пропусков за {new Date(selectedDate).toLocaleDateString('ru-RU')}
                                 </h3>
                             </div>
-                            
+
                             <div className="divide-y divide-slate-100 dark:divide-slate-700">
-                                {submittedRecords.map(record => (
-                                    <div 
-                                        key={record.id} 
+                                {submittedRecords.map((record) => (
+                                    <div
+                                        key={record.id}
                                         onClick={() => openModal(undefined, record)}
                                         className="p-4 hover:bg-slate-50 dark:hover:bg-dark-700/50 transition-colors cursor-pointer group"
                                     >
@@ -443,17 +449,20 @@ export const AbsenteeismPage = () => {
                                                 </div>
                                                 <div>
                                                     <div className="font-medium text-slate-800 dark:text-white">
-                                                        {record.absences.length > 0 
-                                                            ? `Отсутствует: ${record.absences.length} чел.` 
+                                                        {record.absences.length > 0
+                                                            ? `Отсутствует: ${record.absences.length} чел.`
                                                             : 'Все присутствуют'}
                                                     </div>
                                                 </div>
                                             </div>
-                                            
+
                                             {record.absences.length > 0 && (
                                                 <div className="flex flex-wrap gap-2">
                                                     {record.absences.slice(0, 3).map((abs, idx) => (
-                                                        <span key={idx} className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-900/30">
+                                                        <span
+                                                            key={idx}
+                                                            className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-900/30"
+                                                        >
                                                             {abs.studentName}
                                                         </span>
                                                     ))}
@@ -467,11 +476,9 @@ export const AbsenteeismPage = () => {
                                         </div>
                                     </div>
                                 ))}
-                                
+
                                 {submittedRecords.length === 0 && (
-                                    <div className="p-8 text-center text-slate-400">
-                                        Нет данных за выбранную дату
-                                    </div>
+                                    <div className="p-8 text-center text-slate-400">Нет данных за выбранную дату</div>
                                 )}
                             </div>
                         </div>
@@ -481,32 +488,44 @@ export const AbsenteeismPage = () => {
                 <div className="bg-white dark:bg-dark-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
                     <div className="p-6 border-b border-slate-200 dark:border-slate-700">
                         <h2 className="text-lg font-semibold text-slate-800 dark:text-white">
-                            Статистика за {new Date(selectedMonth).toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}
+                            Статистика за{' '}
+                            {new Date(selectedMonth).toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}
                         </h2>
                         <p className="text-slate-500 mt-1">Сводная таблица по всем классам</p>
                     </div>
-                    
+
                     <div className="overflow-x-auto">
                         <table className="w-full">
                             <thead>
                                 <tr className="bg-slate-50 dark:bg-dark-700/50 text-left">
-                                    <th className="px-6 py-4 text-sm font-semibold text-slate-600 dark:text-slate-300">Класс</th>
-                                    <th className="px-6 py-4 text-sm font-semibold text-slate-600 dark:text-slate-300">Всего пропусков</th>
-                                    <th className="px-6 py-4 text-sm font-semibold text-slate-600 dark:text-slate-300">По причинам</th>
+                                    <th className="px-6 py-4 text-sm font-semibold text-slate-600 dark:text-slate-300">
+                                        Класс
+                                    </th>
+                                    <th className="px-6 py-4 text-sm font-semibold text-slate-600 dark:text-slate-300">
+                                        Всего пропусков
+                                    </th>
+                                    <th className="px-6 py-4 text-sm font-semibold text-slate-600 dark:text-slate-300">
+                                        По причинам
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                                {monthlyStats.map(stat => (
-                                    <tr key={stat.classId} className="hover:bg-slate-50 dark:hover:bg-dark-700/50 transition-colors">
+                                {monthlyStats.map((stat) => (
+                                    <tr
+                                        key={stat.classId}
+                                        className="hover:bg-slate-50 dark:hover:bg-dark-700/50 transition-colors"
+                                    >
                                         <td className="px-6 py-4 font-medium text-slate-800 dark:text-white">
                                             {getClassName(stat.classId)}
                                         </td>
                                         <td className="px-6 py-4 text-slate-600 dark:text-slate-300">
-                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                                stat.total > 0 
-                                                    ? 'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-400'
-                                                    : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-                                            }`}>
+                                            <span
+                                                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                                    stat.total > 0
+                                                        ? 'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-400'
+                                                        : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                                                }`}
+                                            >
                                                 {stat.total}
                                             </span>
                                         </td>
@@ -514,7 +533,10 @@ export const AbsenteeismPage = () => {
                                             {stat.total > 0 ? (
                                                 <div className="flex flex-wrap gap-2">
                                                     {Object.entries(stat.reasons).map(([reason, count]) => (
-                                                        <span key={reason} className="inline-flex items-center gap-1 bg-slate-100 dark:bg-dark-700 px-2 py-1 rounded text-xs">
+                                                        <span
+                                                            key={reason}
+                                                            className="inline-flex items-center gap-1 bg-slate-100 dark:bg-dark-700 px-2 py-1 rounded text-xs"
+                                                        >
                                                             <span>{reason}:</span>
                                                             <span className="font-semibold">{count}</span>
                                                         </span>
@@ -540,15 +562,13 @@ export const AbsenteeismPage = () => {
             )}
 
             {/* Modal */}
-            <Modal
-                isOpen={isModalOpen}
-                onClose={closeModal}
-                title={`Пропуски: ${getClassName(selectedClassId)}`}
-            >
+            <Modal isOpen={isModalOpen} onClose={closeModal} title={`Пропуски: ${getClassName(selectedClassId)}`}>
                 <div className="space-y-6">
                     <div className="space-y-4">
                         <div className="flex flex-col gap-2">
-                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Добавить отсутствующего</label>
+                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                                Добавить отсутствующего
+                            </label>
                             <div className="flex gap-2">
                                 <input
                                     type="text"
@@ -587,7 +607,9 @@ export const AbsenteeismPage = () => {
                         </div>
 
                         <div className="border-t border-slate-100 dark:border-slate-700 pt-4">
-                            <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">Список отсутствующих ({absences.length})</h3>
+                            <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
+                                Список отсутствующих ({absences.length})
+                            </h3>
                             {absences.length === 0 ? (
                                 <div className="text-center py-4 text-slate-400 bg-slate-50 dark:bg-dark-800/50 rounded-lg">
                                     Нет отсутствующих
@@ -595,9 +617,14 @@ export const AbsenteeismPage = () => {
                             ) : (
                                 <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
                                     {absences.map((abs, idx) => (
-                                        <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-dark-700/50 rounded-lg border border-slate-100 dark:border-slate-700">
+                                        <div
+                                            key={idx}
+                                            className="flex items-center justify-between p-3 bg-slate-50 dark:bg-dark-700/50 rounded-lg border border-slate-100 dark:border-slate-700"
+                                        >
                                             <div>
-                                                <div className="font-medium text-slate-800 dark:text-white">{abs.studentName}</div>
+                                                <div className="font-medium text-slate-800 dark:text-white">
+                                                    {abs.studentName}
+                                                </div>
                                                 <div className="text-xs text-slate-500">
                                                     {getReasonLabel(abs.reason, abs.otherReason)}
                                                 </div>
@@ -647,12 +674,11 @@ export const AbsenteeismPage = () => {
             <div ref={printRef} className="hidden print:block">
                 <div className="p-8">
                     <h1 className="text-2xl font-black mb-4 text-center">
-                        {viewMode === 'day' 
+                        {viewMode === 'day'
                             ? `Отчёт по пропускам за ${new Date(selectedDate).toLocaleDateString('ru-RU')}`
-                            : `Отчёт по пропускам за ${new Date(selectedMonth).toLocaleString('ru-RU', { month: 'long', year: 'numeric' })}`
-                        }
+                            : `Отчёт по пропускам за ${new Date(selectedMonth).toLocaleString('ru-RU', { month: 'long', year: 'numeric' })}`}
                     </h1>
-                    
+
                     <table className="w-full border-collapse">
                         <thead>
                             <tr className="bg-slate-100">
@@ -666,15 +692,27 @@ export const AbsenteeismPage = () => {
                             </tr>
                         </thead>
                         <tbody>
-                            {(viewMode === 'day' ? dailyStats : monthlyStats).map(stat => (
+                            {(viewMode === 'day' ? dailyStats : monthlyStats).map((stat) => (
                                 <tr key={stat.classId}>
                                     <td className="border border-slate-300 px-4 py-2">{getClassName(stat.classId)}</td>
-                                    <td className="border border-slate-300 px-4 py-2 text-center font-bold">{stat.total}</td>
-                                    <td className="border border-slate-300 px-4 py-2 text-center">{stat.reasons['Болезнь'] || 0}</td>
-                                    <td className="border border-slate-300 px-4 py-2 text-center">{stat.reasons['Заявление'] || 0}</td>
-                                    <td className="border border-slate-300 px-4 py-2 text-center">{stat.reasons['Неуважительная'] || 0}</td>
-                                    <td className="border border-slate-300 px-4 py-2 text-center">{stat.reasons['За пределами РБ'] || 0}</td>
-                                    <td className="border border-slate-300 px-4 py-2 text-center">{stat.reasons['Другое'] || 0}</td>
+                                    <td className="border border-slate-300 px-4 py-2 text-center font-bold">
+                                        {stat.total}
+                                    </td>
+                                    <td className="border border-slate-300 px-4 py-2 text-center">
+                                        {stat.reasons['Болезнь'] || 0}
+                                    </td>
+                                    <td className="border border-slate-300 px-4 py-2 text-center">
+                                        {stat.reasons['Заявление'] || 0}
+                                    </td>
+                                    <td className="border border-slate-300 px-4 py-2 text-center">
+                                        {stat.reasons['Неуважительная'] || 0}
+                                    </td>
+                                    <td className="border border-slate-300 px-4 py-2 text-center">
+                                        {stat.reasons['За пределами РБ'] || 0}
+                                    </td>
+                                    <td className="border border-slate-300 px-4 py-2 text-center">
+                                        {stat.reasons['Другое'] || 0}
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>

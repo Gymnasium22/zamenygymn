@@ -1,4 +1,3 @@
-
 import { useState, useMemo } from 'react';
 import { useStaticData, useScheduleData } from '../context/DataContext';
 import { Icon } from '../components/Icons';
@@ -22,14 +21,14 @@ export const ReportsPage = () => {
     const { subjects, teachers, classes } = useStaticData();
     // Получаем оба расписания
     const { schedule1, schedule2, substitutions } = useScheduleData();
-    
+
     const [reportTab, setReportTab] = useState('load');
     const [selectedClassId, setSelectedClassId] = useState(classes[0]?.id || '');
-    
+
     // Состояние для выбора полугодия (по умолчанию текущее)
     const [selectedSemester, setSelectedSemester] = useState<1 | 2>(() => {
         const month = new Date().getMonth();
-        return (month >= 0 && month <= 4) ? 2 : 1;
+        return month >= 0 && month <= 4 ? 2 : 1;
     });
 
     // Report Builder State
@@ -39,37 +38,39 @@ export const ReportsPage = () => {
     const activeSchedule = useMemo(() => {
         return selectedSemester === 2 ? schedule2 : schedule1;
     }, [selectedSemester, schedule1, schedule2]);
-    
-    const tariffData = useMemo<TariffRow[]>(() => { 
-        const weeks = 4; 
-        return teachers.map(t => { 
-            // Используем activeSchedule вместо schedule
-            const weeklyLessons = activeSchedule.filter(s => s.teacherId === t.id); 
-            const weeklyHours = weeklyLessons.length; 
-            const monthlyPlan = weeklyHours * weeks; 
-            const subsTaken = substitutions.filter(s => s.replacementTeacherId === t.id).length; 
-            const subsMissed = substitutions.filter(s => s.originalTeacherId === t.id).length; 
-            const actualHours = monthlyPlan + subsTaken - subsMissed; 
-            const subjectBreakdown: Record<string, number> = {}; 
-            weeklyLessons.forEach(s => { 
-                const subj = subjects.find(sub => sub.id === s.subjectId); 
-                if(subj) subjectBreakdown[subj.name] = (subjectBreakdown[subj.name] || 0) + 1; 
-            }); 
-            
-            const subjectsList = Object.keys(subjectBreakdown).join(', ');
 
-            return { 
-                id: t.id, 
-                name: t.name, 
-                weeklyHours, 
-                monthlyPlan,
-                subsTaken, 
-                subsMissed, 
-                actualHours, 
-                subjectBreakdown,
-                subjectsList 
-            }; 
-        }).sort((a,b) => b.actualHours - a.actualHours); 
+    const tariffData = useMemo<TariffRow[]>(() => {
+        const weeks = 4;
+        return teachers
+            .map((t) => {
+                // Используем activeSchedule вместо schedule
+                const weeklyLessons = activeSchedule.filter((s) => s.teacherId === t.id);
+                const weeklyHours = weeklyLessons.length;
+                const monthlyPlan = weeklyHours * weeks;
+                const subsTaken = substitutions.filter((s) => s.replacementTeacherId === t.id).length;
+                const subsMissed = substitutions.filter((s) => s.originalTeacherId === t.id).length;
+                const actualHours = monthlyPlan + subsTaken - subsMissed;
+                const subjectBreakdown: Record<string, number> = {};
+                weeklyLessons.forEach((s) => {
+                    const subj = subjects.find((sub) => sub.id === s.subjectId);
+                    if (subj) subjectBreakdown[subj.name] = (subjectBreakdown[subj.name] || 0) + 1;
+                });
+
+                const subjectsList = Object.keys(subjectBreakdown).join(', ');
+
+                return {
+                    id: t.id,
+                    name: t.name,
+                    weeklyHours,
+                    monthlyPlan,
+                    subsTaken,
+                    subsMissed,
+                    actualHours,
+                    subjectBreakdown,
+                    subjectsList
+                };
+            })
+            .sort((a, b) => b.actualHours - a.actualHours);
     }, [teachers, activeSchedule, substitutions, subjects]);
 
     const reportColumns = [
@@ -82,53 +83,72 @@ export const ReportsPage = () => {
         { key: 'subjectsList', label: 'Предметы' }
     ];
 
-    const sanPinData = useMemo(() => { 
-        if(!selectedClassId) return []; 
-        return DAYS.map(day => { 
+    const sanPinData = useMemo(() => {
+        if (!selectedClassId) return [];
+        return DAYS.map((day) => {
             // Используем activeSchedule вместо schedule
-            const lessons = activeSchedule.filter(s => s.classId === selectedClassId && s.day === day); 
-            const score = lessons.reduce((acc, curr) => { 
-                const subj = subjects.find(s => s.id === curr.subjectId); 
-                return acc + (subj?.difficulty || 5); 
-            }, 0); 
-            return { label: day, value: score }; 
-        }); 
+            const lessons = activeSchedule.filter((s) => s.classId === selectedClassId && s.day === day);
+            const score = lessons.reduce((acc, curr) => {
+                const subj = subjects.find((s) => s.id === curr.subjectId);
+                return acc + (subj?.difficulty || 5);
+            }, 0);
+            return { label: day, value: score };
+        });
     }, [activeSchedule, subjects, selectedClassId]);
 
-    const ratings = useMemo(() => { 
-        const heroes = teachers.map(t => ({ 
-            name: t.name, 
-            count: substitutions.filter(s => s.replacementTeacherId === t.id).length 
-        })).sort((a,b) => b.count - a.count).slice(0, 5); 
-        
-        const absentees = teachers.map(t => ({ 
-            name: t.name, 
-            count: t.unavailableDates.length 
-        })).sort((a,b) => b.count - a.count).slice(0, 5); 
-        
-        return { heroes, absentees }; 
+    const ratings = useMemo(() => {
+        const heroes = teachers
+            .map((t) => ({
+                name: t.name,
+                count: substitutions.filter((s) => s.replacementTeacherId === t.id).length
+            }))
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 5);
+
+        const absentees = teachers
+            .map((t) => ({
+                name: t.name,
+                count: t.unavailableDates.length
+            }))
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 5);
+
+        return { heroes, absentees };
     }, [teachers, substitutions]);
 
     const toggleColumn = (key: string) => {
-        setSelectedColumns(prev => 
-            prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
-        );
+        setSelectedColumns((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
     };
 
-    const downloadReport = () => { 
-        let content = ""; 
-        if (reportTab === 'load') { 
-            content = "Teacher,Planned Weekly,Subs Taken,Absences (Lessons),Est. Monthly Actual,Details\n" + tariffData.map(r => `"${r.name}",${r.weeklyHours},${r.subsTaken},${r.subsMissed},${r.actualHours},"${Object.entries(r.subjectBreakdown).map(([k,v]) => k+': '+v).join(', ')}"`).join('\n'); 
-        } else if (reportTab === 'sanpin') { 
-            content = "Day,Score\n" + sanPinData.map(r => `${r.label},${r.value}`).join('\n'); 
+    const downloadReport = () => {
+        let content = '';
+        if (reportTab === 'load') {
+            content =
+                'Teacher,Planned Weekly,Subs Taken,Absences (Lessons),Est. Monthly Actual,Details\n' +
+                tariffData
+                    .map(
+                        (r) =>
+                            `"${r.name}",${r.weeklyHours},${r.subsTaken},${r.subsMissed},${r.actualHours},"${Object.entries(
+                                r.subjectBreakdown
+                            )
+                                .map(([k, v]) => k + ': ' + v)
+                                .join(', ')}"`
+                    )
+                    .join('\n');
+        } else if (reportTab === 'sanpin') {
+            content = 'Day,Score\n' + sanPinData.map((r) => `${r.label},${r.value}`).join('\n');
         } else if (reportTab === 'builder') {
-            const header = selectedColumns.map(key => reportColumns.find(c => c.key === key)?.label).join(',');
-            const rows = tariffData.map(r => {
-                return selectedColumns.map(key => {
-                    const val = r[key as keyof typeof r];
-                    return typeof val === 'string' && val.includes(',') ? `"${val}"` : val;
-                }).join(',');
-            }).join('\n');
+            const header = selectedColumns.map((key) => reportColumns.find((c) => c.key === key)?.label).join(',');
+            const rows = tariffData
+                .map((r) => {
+                    return selectedColumns
+                        .map((key) => {
+                            const val = r[key as keyof typeof r];
+                            return typeof val === 'string' && val.includes(',') ? `"${val}"` : val;
+                        })
+                        .join(',');
+                })
+                .join('\n');
             content = header + '\n' + rows;
         }
 
@@ -142,7 +162,7 @@ export const ReportsPage = () => {
                     <h1 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
                         <Icon name="BarChart2" className="text-indigo-600 dark:text-indigo-400" /> Аналитика
                     </h1>
-                    
+
                     <div className="flex gap-4 items-center">
                         <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl p-1.5 pl-3">
                             <span className="text-xs font-bold text-slate-500 dark:text-slate-400">Полугодие:</span>
@@ -156,16 +176,39 @@ export const ReportsPage = () => {
                             </select>
                         </div>
 
-                        <button onClick={downloadReport} className="px-4 py-2 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors hover:bg-emerald-100 dark:hover:bg-emerald-900/50">
-                            <Icon name="FileSpreadsheet" size={16}/> Скачать CSV
+                        <button
+                            onClick={downloadReport}
+                            className="px-4 py-2 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-lg text-sm font-bold flex items-center gap-2 transition-colors hover:bg-emerald-100 dark:hover:bg-emerald-900/50"
+                        >
+                            <Icon name="FileSpreadsheet" size={16} /> Скачать CSV
                         </button>
                     </div>
                 </div>
                 <div className="flex gap-2 bg-slate-100 dark:bg-slate-700 p-1 rounded-xl w-fit overflow-x-auto max-w-full">
-                    <button onClick={() => setReportTab('load')} className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all ${reportTab === 'load' ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>Тарификация</button>
-                    <button onClick={() => setReportTab('sanpin')} className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all ${reportTab === 'sanpin' ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>СанПиН</button>
-                    <button onClick={() => setReportTab('rating')} className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all ${reportTab === 'rating' ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>Рейтинг</button>
-                    <button onClick={() => setReportTab('builder')} className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all ${reportTab === 'builder' ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>Конструктор</button>
+                    <button
+                        onClick={() => setReportTab('load')}
+                        className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all ${reportTab === 'load' ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}
+                    >
+                        Тарификация
+                    </button>
+                    <button
+                        onClick={() => setReportTab('sanpin')}
+                        className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all ${reportTab === 'sanpin' ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}
+                    >
+                        СанПиН
+                    </button>
+                    <button
+                        onClick={() => setReportTab('rating')}
+                        className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all ${reportTab === 'rating' ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}
+                    >
+                        Рейтинг
+                    </button>
+                    <button
+                        onClick={() => setReportTab('builder')}
+                        className={`px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap transition-all ${reportTab === 'builder' ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}
+                    >
+                        Конструктор
+                    </button>
                 </div>
             </div>
 
@@ -174,26 +217,47 @@ export const ReportsPage = () => {
                     <table className="w-full text-left border-collapse">
                         <thead className="bg-slate-50 dark:bg-slate-700 border-b border-slate-200 dark:border-slate-600">
                             <tr>
-                                <th className="p-4 font-bold text-slate-500 dark:text-slate-400 text-xs uppercase">Учитель</th>
-                                <th className="p-4 font-bold text-slate-500 dark:text-slate-400 text-xs uppercase text-right">План (Нед)</th>
-                                <th className="p-4 font-bold text-slate-500 dark:text-slate-400 text-xs uppercase text-right text-emerald-600">+ Замены</th>
-                                <th className="p-4 font-bold text-slate-500 dark:text-slate-400 text-xs uppercase text-right text-red-500">- Пропуски</th>
-                                <th className="p-4 font-bold text-slate-500 dark:text-slate-400 text-xs uppercase text-right">Итого (Мес)</th>
-                                <th className="p-4 font-bold text-slate-500 dark:text-slate-400 text-xs uppercase w-1/3">Детализация</th>
+                                <th className="p-4 font-bold text-slate-500 dark:text-slate-400 text-xs uppercase">
+                                    Учитель
+                                </th>
+                                <th className="p-4 font-bold text-slate-500 dark:text-slate-400 text-xs uppercase text-right">
+                                    План (Нед)
+                                </th>
+                                <th className="p-4 font-bold text-slate-500 dark:text-slate-400 text-xs uppercase text-right text-emerald-600">
+                                    + Замены
+                                </th>
+                                <th className="p-4 font-bold text-slate-500 dark:text-slate-400 text-xs uppercase text-right text-red-500">
+                                    - Пропуски
+                                </th>
+                                <th className="p-4 font-bold text-slate-500 dark:text-slate-400 text-xs uppercase text-right">
+                                    Итого (Мес)
+                                </th>
+                                <th className="p-4 font-bold text-slate-500 dark:text-slate-400 text-xs uppercase w-1/3">
+                                    Детализация
+                                </th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                            {tariffData.map(row => (
+                            {tariffData.map((row) => (
                                 <tr key={row.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
                                     <td className="p-4 font-bold text-slate-800 dark:text-slate-200">{row.name}</td>
                                     <td className="p-4 text-right font-mono">{row.weeklyHours}</td>
-                                    <td className="p-4 text-right font-mono text-emerald-600 font-bold">+{row.subsTaken}</td>
-                                    <td className="p-4 text-right font-mono text-red-500 font-bold">-{row.subsMissed}</td>
+                                    <td className="p-4 text-right font-mono text-emerald-600 font-bold">
+                                        +{row.subsTaken}
+                                    </td>
+                                    <td className="p-4 text-right font-mono text-red-500 font-bold">
+                                        -{row.subsMissed}
+                                    </td>
                                     <td className="p-4 text-right font-mono font-black text-lg">{row.actualHours}</td>
                                     <td className="p-4 text-xs text-slate-500 dark:text-slate-400">
                                         <div className="flex flex-wrap gap-1">
-                                            {Object.entries(row.subjectBreakdown).map(([s,c]) => (
-                                                <span key={s} className="bg-slate-100 dark:bg-slate-600 px-1.5 py-0.5 rounded">{s}: {c}</span>
+                                            {Object.entries(row.subjectBreakdown).map(([s, c]) => (
+                                                <span
+                                                    key={s}
+                                                    className="bg-slate-100 dark:bg-slate-600 px-1.5 py-0.5 rounded"
+                                                >
+                                                    {s}: {c}
+                                                </span>
                                             ))}
                                         </div>
                                     </td>
@@ -203,39 +267,71 @@ export const ReportsPage = () => {
                     </table>
                 </div>
             )}
-            
+
             {reportTab === 'sanpin' && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div className="lg:col-span-2 bg-white dark:bg-dark-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
                         <div className="flex justify-between items-center mb-6">
                             <h3 className="font-bold text-lg dark:text-white">График сложности</h3>
-                            <select value={selectedClassId} onChange={e => setSelectedClassId(e.target.value)} className="border dark:border-slate-600 p-2 rounded-lg bg-transparent dark:text-white outline-none">
-                                {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                            <select
+                                value={selectedClassId}
+                                onChange={(e) => setSelectedClassId(e.target.value)}
+                                className="border dark:border-slate-600 p-2 rounded-lg bg-transparent dark:text-white outline-none"
+                            >
+                                {classes.map((c) => (
+                                    <option key={c.id} value={c.id}>
+                                        {c.name}
+                                    </option>
+                                ))}
                             </select>
                         </div>
-                        <BarChart items={sanPinData} max={60} barClassName="bg-indigo-500"/>
-                        <div className="mt-4 text-xs text-slate-500 dark:text-slate-400">* Баллы рассчитываются на основе шкалы трудности предметов (Математика=11, и т.д.). Рекомендуемый пик нагрузки: Среда/Четверг.</div>
+                        <BarChart items={sanPinData} max={60} barClassName="bg-indigo-500" />
+                        <div className="mt-4 text-xs text-slate-500 dark:text-slate-400">
+                            * Баллы рассчитываются на основе шкалы трудности предметов (Математика=11, и т.д.).
+                            Рекомендуемый пик нагрузки: Среда/Четверг.
+                        </div>
                     </div>
                     <div className="bg-indigo-50 dark:bg-indigo-900/20 p-6 rounded-2xl border border-indigo-100 dark:border-indigo-900">
                         <h3 className="font-bold text-indigo-900 dark:text-indigo-300 mb-4">Нормы СанПиН</h3>
                         <ul className="space-y-3 text-sm text-indigo-800 dark:text-indigo-400">
-                            <li className="flex gap-2"><div className="w-1.5 h-1.5 mt-1.5 bg-indigo-500 rounded-full"></div>Равномерное распределение нагрузки</li>
-                            <li className="flex gap-2"><div className="w-1.5 h-1.5 mt-1.5 bg-indigo-500 rounded-full"></div>Один сложный предмет в день</li>
-                            <li className="flex gap-2"><div className="w-1.5 h-1.5 mt-1.5 bg-indigo-500 rounded-full"></div>Контрольные работы в Вт/Ср</li>
+                            <li className="flex gap-2">
+                                <div className="w-1.5 h-1.5 mt-1.5 bg-indigo-500 rounded-full"></div>Равномерное
+                                распределение нагрузки
+                            </li>
+                            <li className="flex gap-2">
+                                <div className="w-1.5 h-1.5 mt-1.5 bg-indigo-500 rounded-full"></div>Один сложный
+                                предмет в день
+                            </li>
+                            <li className="flex gap-2">
+                                <div className="w-1.5 h-1.5 mt-1.5 bg-indigo-500 rounded-full"></div>Контрольные работы
+                                в Вт/Ср
+                            </li>
                         </ul>
                     </div>
                 </div>
             )}
-            
+
             {reportTab === 'rating' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="bg-white dark:bg-dark-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
-                        <h3 className="font-bold text-lg text-emerald-600 mb-4 flex items-center gap-2"><Icon name="TrendingUp" size={20}/> Герои замен (Топ 5)</h3>
-                        <BarChart items={ratings.heroes.map(h => ({ label: h.name, value: h.count }))} max={Math.max(...ratings.heroes.map(h=>h.count), 1)} barClassName="bg-emerald-500"/>
+                        <h3 className="font-bold text-lg text-emerald-600 mb-4 flex items-center gap-2">
+                            <Icon name="TrendingUp" size={20} /> Герои замен (Топ 5)
+                        </h3>
+                        <BarChart
+                            items={ratings.heroes.map((h) => ({ label: h.name, value: h.count }))}
+                            max={Math.max(...ratings.heroes.map((h) => h.count), 1)}
+                            barClassName="bg-emerald-500"
+                        />
                     </div>
                     <div className="bg-white dark:bg-dark-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
-                        <h3 className="font-bold text-lg text-red-500 mb-4 flex items-center gap-2"><Icon name="Activity" size={20}/> Пропуски (Топ 5)</h3>
-                        <BarChart items={ratings.absentees.map(h => ({ label: h.name, value: h.count }))} max={Math.max(...ratings.absentees.map(h=>h.count), 1)} barClassName="bg-red-500"/>
+                        <h3 className="font-bold text-lg text-red-500 mb-4 flex items-center gap-2">
+                            <Icon name="Activity" size={20} /> Пропуски (Топ 5)
+                        </h3>
+                        <BarChart
+                            items={ratings.absentees.map((h) => ({ label: h.name, value: h.count }))}
+                            max={Math.max(...ratings.absentees.map((h) => h.count), 1)}
+                            barClassName="bg-red-500"
+                        />
                     </div>
                 </div>
             )}
@@ -245,7 +341,7 @@ export const ReportsPage = () => {
                     <div className="mb-6">
                         <h3 className="font-bold text-lg text-slate-800 dark:text-white mb-2">Настройка колонок</h3>
                         <div className="flex flex-wrap gap-2">
-                            {reportColumns.map(col => (
+                            {reportColumns.map((col) => (
                                 <button
                                     key={col.key}
                                     onClick={() => toggleColumn(col.key)}
@@ -261,20 +357,26 @@ export const ReportsPage = () => {
                         <table className="w-full text-left border-collapse">
                             <thead className="bg-slate-50 dark:bg-slate-700">
                                 <tr>
-                                    {selectedColumns.map(colKey => (
-                                        <th key={colKey} className="p-3 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase border-b border-slate-200 dark:border-slate-600">
-                                            {reportColumns.find(c => c.key === colKey)?.label}
+                                    {selectedColumns.map((colKey) => (
+                                        <th
+                                            key={colKey}
+                                            className="p-3 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase border-b border-slate-200 dark:border-slate-600"
+                                        >
+                                            {reportColumns.find((c) => c.key === colKey)?.label}
                                         </th>
                                     ))}
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                                {tariffData.map(row => (
+                                {tariffData.map((row) => (
                                     <tr key={row.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
-                                        {selectedColumns.map(colKey => {
+                                        {selectedColumns.map((colKey) => {
                                             const cellValue = row[colKey as keyof typeof row];
                                             return (
-                                                <td key={`${row.id}-${colKey}`} className="p-3 text-sm text-slate-700 dark:text-slate-300">
+                                                <td
+                                                    key={`${row.id}-${colKey}`}
+                                                    className="p-3 text-sm text-slate-700 dark:text-slate-300"
+                                                >
                                                     {typeof cellValue === 'object' ? '' : cellValue}
                                                 </td>
                                             );

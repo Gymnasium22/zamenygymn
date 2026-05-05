@@ -1,7 +1,6 @@
-
-import { initializeApp, getApps, getApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
-import { getAuth } from "firebase/auth";
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { getFirestore } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
 
 // Environment variables from .env file
 const apiKey = import.meta.env.VITE_FIREBASE_API_KEY;
@@ -12,28 +11,30 @@ const messagingSenderId = import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID;
 const appId = import.meta.env.VITE_FIREBASE_APP_ID;
 
 const firebaseConfig = {
-  apiKey,
-  authDomain,
-  projectId,
-  storageBucket,
-  messagingSenderId,
-  appId
+    apiKey,
+    authDomain,
+    projectId,
+    storageBucket,
+    messagingSenderId,
+    appId
 };
 
 let app;
 if (!getApps().length) {
-  app = initializeApp(firebaseConfig);
+    app = initializeApp(firebaseConfig);
 } else {
-  app = getApp();
+    app = getApp();
 }
 
 const firestoreDB = getFirestore(app);
 const auth = getAuth(app);
 
 if (!firebaseConfig.apiKey) {
-  console.error("CRITICAL ERROR: Firebase API Key is missing. Ensure your .env file exists and VITE_ variables are set.");
+    console.error(
+        'CRITICAL ERROR: Firebase API Key is missing. Ensure your .env file exists and VITE_ variables are set.'
+    );
 } else {
-  console.log("Firebase initialized successfully (Modular SDK)");
+    console.log('Firebase initialized successfully (Modular SDK)');
 }
 
 export { firestoreDB, auth };

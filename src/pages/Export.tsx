@@ -1,9 +1,19 @@
-
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { useStaticData, useScheduleData } from '../context/DataContext';
 import { Icon } from '../components/Icons';
-import { dbService } from '../services/db'; 
-import { DAYS, DayOfWeek, Shift, SHIFT_PERIODS, AppData, Substitution, ScheduleItem, ClassEntity, Subject, Teacher } from '../types';
+import { dbService } from '../services/db';
+import {
+    DAYS,
+    DayOfWeek,
+    Shift,
+    SHIFT_PERIODS,
+    AppData,
+    Substitution,
+    ScheduleItem,
+    ClassEntity,
+    Subject,
+    Teacher
+} from '../types';
 import { INITIAL_DATA } from '../constants';
 import { formatDateISO, generateId, getActiveSemester } from '../utils/helpers';
 import html2canvas from 'html2canvas';
@@ -15,7 +25,15 @@ import { SanitaryScheduleTab } from '../components/SanitaryScheduleTab';
 
 export const ExportPage = () => {
     const { subjects, teachers, classes, rooms, settings, bellSchedule, saveStaticData, dutyZones } = useStaticData();
-    const { schedule1, schedule2, substitutions, saveScheduleData, dutySchedule, nutritionRecords, absenteeismRecords } = useScheduleData();
+    const {
+        schedule1,
+        schedule2,
+        substitutions,
+        saveScheduleData,
+        dutySchedule,
+        nutritionRecords,
+        absenteeismRecords
+    } = useScheduleData();
     const { addToast } = useToast();
 
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -23,7 +41,7 @@ export const ExportPage = () => {
     const printRef2 = useRef<HTMLDivElement>(null);
 
     const [exportDate, setExportDate] = useState(formatDateISO());
-    
+
     // Выбор полугодия для ручного экспорта (по умолчанию текущее)
     const [exportSemester, setExportSemester] = useState<1 | 2>(() => {
         return getActiveSemester(new Date(), settings);
@@ -36,44 +54,61 @@ export const ExportPage = () => {
 
     // Matrix Print State
     const [isMatrixPrintOpen, setIsMatrixPrintOpen] = useState(false);
-    const [matrixGrade, setMatrixGrade] = useState<string>("");
+    const [matrixGrade, setMatrixGrade] = useState<string>('');
 
     type ExportTabId = 'data' | 'sanitary' | 'public';
     const [activeExportTab, setActiveExportTab] = useState<ExportTabId>('data');
 
-    const fullAppData: AppData = useMemo(() => ({
-        subjects,
-        teachers,
-        classes,
-        rooms,
-        settings,
-        bellSchedule,
-        schedule: schedule1,
-        schedule2,
-        substitutions,
-        dutyZones,
-        dutySchedule,
-        nutritionRecords,
-        absenteeismRecords
-    }), [subjects, teachers, classes, rooms, settings, bellSchedule, schedule1, schedule2, substitutions, dutyZones, dutySchedule, nutritionRecords, absenteeismRecords]);
+    const fullAppData: AppData = useMemo(
+        () => ({
+            subjects,
+            teachers,
+            classes,
+            rooms,
+            settings,
+            bellSchedule,
+            schedule: schedule1,
+            schedule2,
+            substitutions,
+            dutyZones,
+            dutySchedule,
+            nutritionRecords,
+            absenteeismRecords
+        }),
+        [
+            subjects,
+            teachers,
+            classes,
+            rooms,
+            settings,
+            bellSchedule,
+            schedule1,
+            schedule2,
+            substitutions,
+            dutyZones,
+            dutySchedule,
+            nutritionRecords,
+            absenteeismRecords
+        ]
+    );
 
     // Получаем расписание для экспорта (Excel, Матрица) на основе селектора
-    const getScheduleForExport = () => exportSemester === 2 ? schedule2 : schedule1;
+    const getScheduleForExport = () => (exportSemester === 2 ? schedule2 : schedule1);
 
     // Получаем расписание для PNG (Замены) на основе выбранной даты
     const getScheduleForDate = (date: string) => {
         const month = new Date(date).getMonth();
-        return (month >= 0 && month <= 4) ? schedule2 : schedule1;
+        return month >= 0 && month <= 4 ? schedule2 : schedule1;
     };
 
     // Extract available grades (parallels)
     const availableGrades = useMemo<string[]>(() => {
         const grades = new Set<string>();
-        classes.forEach(c => {
+        classes.forEach((c) => {
             const match = c.name.match(/^(\d+)/);
             if (match) grades.add(match[1]);
         });
-        return Array.from(grades).sort((a,b) => parseInt(a)-parseInt(b));
+        return Array.from(grades).sort((a, b) => parseInt(a) - parseInt(b));
     }, [classes]);
 
     useEffect(() => {
@@ -82,15 +117,15 @@ export const ExportPage = () => {
         }
     }, [availableGrades]);
 
-    const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => { 
-        const file = e.target.files?.[0]; 
-        if (!file) return; 
-        const reader = new FileReader(); 
-        reader.onload = async (ev: ProgressEvent<FileReader>) => { 
-            try { 
-                const json = JSON.parse(ev.target?.result as string); 
-                if (json.teachers && (json.schedule || json.schedule2)) { 
-                    if(window.confirm("Это перезапишет текущую базу данных. Продолжить?")) { 
+    const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = async (ev: ProgressEvent<FileReader>) => {
+            try {
+                const json = JSON.parse(ev.target?.result as string);
+                if (json.teachers && (json.schedule || json.schedule2)) {
+                    if (window.confirm('Это перезапишет текущую базу данных. Продолжить?')) {
                         const mergedData = {
                             ...INITIAL_DATA,
                             ...json,
@@ -105,39 +140,43 @@ export const ExportPage = () => {
                         };
                         await saveStaticData(mergedData as any);
                         await saveScheduleData(mergedData as any);
-                        addToast({ type: 'success', title: 'Успешно', message: "База успешно восстановлена!" }); 
-                    } 
-                } else addToast({ type: 'danger', title: 'Ошибка', message: "Неверный формат файла." }); 
-            } catch (err) { addToast({ type: 'danger', title: 'Ошибка', message: "Ошибка чтения файла." }); } 
-        }; 
-        reader.readAsText(file); 
+                        addToast({ type: 'success', title: 'Успешно', message: 'База успешно восстановлена!' });
+                    }
+                } else addToast({ type: 'danger', title: 'Ошибка', message: 'Неверный формат файла.' });
+            } catch (err) {
+                addToast({ type: 'danger', title: 'Ошибка', message: 'Ошибка чтения файла.' });
+            }
+        };
+        reader.readAsText(file);
     };
-    
+
     const exportStyledExcel = () => {
         const currentSchedule = getScheduleForExport();
-        
+
         let content = `<table>`;
 
-        DAYS.forEach(day => {
+        DAYS.forEach((day) => {
             content += `<tr><td colspan="8" style="background-color:#4f46e5; color:white; font-size:16px; font-weight:bold; text-align:center;">${day}</td></tr>`;
-            [Shift.First, Shift.Second].forEach(shift => {
-                const filteredClasses = classes.filter(c => c.shift === shift);
+            [Shift.First, Shift.Second].forEach((shift) => {
+                const filteredClasses = classes.filter((c) => c.shift === shift);
                 if (filteredClasses.length === 0) return;
-                
+
                 content += `<tr><td colspan="8" style="background-color:#e0e7ff; font-weight:bold;">${shift}</td></tr>`;
                 content += `<tr><th class="header">Класс</th>`;
-                SHIFT_PERIODS[shift].forEach(p => content += `<th class="header">${p} урок</th>`);
+                SHIFT_PERIODS[shift].forEach((p) => (content += `<th class="header">${p} урок</th>`));
                 content += `</tr>`;
 
-                filteredClasses.forEach(c => {
+                filteredClasses.forEach((c) => {
                     content += `<tr><td class="class-cell">${c.name}</td>`;
-                    SHIFT_PERIODS[shift].forEach(p => {
-                        const items = currentSchedule.filter(s => s.classId === c.id && s.day === day && s.shift === shift && s.period === p);
+                    SHIFT_PERIODS[shift].forEach((p) => {
+                        const items = currentSchedule.filter(
+                            (s) => s.classId === c.id && s.day === day && s.shift === shift && s.period === p
+                        );
                         content += `<td style="height: 60px;">`;
-                        items.forEach(item => {
-                            const sub = subjects.find(s => s.id === item.subjectId);
-                            const teach = teachers.find(t => t.id === item.teacherId);
-                            const room = rooms.find(r => r.id === item.roomId);
+                        items.forEach((item) => {
+                            const sub = subjects.find((s) => s.id === item.subjectId);
+                            const teach = teachers.find((t) => t.id === item.teacherId);
+                            const room = rooms.find((r) => r.id === item.roomId);
                             const roomName = room ? room.name : item.roomId;
                             content += `<div style="background-color: ${sub?.color || '#fff'}; padding: 2px; margin-bottom: 2px; border: 1px solid #eee;">
                                 <div class="subject">${sub?.name || ''} ${item.direction || ''}</div>
@@ -150,7 +189,7 @@ export const ExportPage = () => {
                 });
             });
         });
-        
+
         content += `</table>`;
 
         const styles = `
@@ -167,12 +206,12 @@ export const ExportPage = () => {
         const currentSchedule = getScheduleForExport();
 
         // Цвета для дней недели (Header - потемнее, Cell - посветлее)
-        const dayColors: Record<string, { header: string, cell: string }> = {
-            [DayOfWeek.Monday]:    { header: '#fecaca', cell: '#fee2e2' }, // Red
-            [DayOfWeek.Tuesday]:   { header: '#fed7aa', cell: '#ffedd5' }, // Orange
+        const dayColors: Record<string, { header: string; cell: string }> = {
+            [DayOfWeek.Monday]: { header: '#fecaca', cell: '#fee2e2' }, // Red
+            [DayOfWeek.Tuesday]: { header: '#fed7aa', cell: '#ffedd5' }, // Orange
             [DayOfWeek.Wednesday]: { header: '#fef08a', cell: '#fef9c3' }, // Yellow
-            [DayOfWeek.Thursday]:  { header: '#bbf7d0', cell: '#dcfce7' }, // Green
-            [DayOfWeek.Friday]:    { header: '#bfdbfe', cell: '#dbeafe' }, // Blue
+            [DayOfWeek.Thursday]: { header: '#bbf7d0', cell: '#dcfce7' }, // Green
+            [DayOfWeek.Friday]: { header: '#bfdbfe', cell: '#dbeafe' } // Blue
         };
 
         let content = '';
@@ -204,9 +243,9 @@ export const ExportPage = () => {
             <br/>
         `;
 
-        [Shift.First, Shift.Second].forEach(shift => {
+        [Shift.First, Shift.Second].forEach((shift) => {
             const periods = SHIFT_PERIODS[shift];
-            
+
             content += `<table>`;
             content += `<tr>
                 <th rowspan="3" class="header" style="border: 2px solid #000; width: 150px; background-color: #e9d5ff;">Учебный предмет</th>
@@ -215,7 +254,7 @@ export const ExportPage = () => {
             </tr>`;
 
             content += `<tr>`;
-            DAYS.forEach(day => {
+            DAYS.forEach((day) => {
                 const bg = dayColors[day]?.header || '#f3f4f6';
                 content += `<th colspan="${periods.length}" class="header" style="border: 2px solid #000; background-color: ${bg};">${day}</th>`;
             });
@@ -224,11 +263,14 @@ export const ExportPage = () => {
             content += `<tr>`;
             DAYS.forEach((day) => {
                 const bg = dayColors[day]?.header || '#f3f4f6';
-                periods.forEach(p => content += `<th class="header" style="border-bottom: 2px solid #000; background-color: ${bg};">Урок</th>`);
+                periods.forEach(
+                    (p) =>
+                        (content += `<th class="header" style="border-bottom: 2px solid #000; background-color: ${bg};">Урок</th>`)
+                );
             });
             content += `</tr>`;
-            
-            const shiftGray = '#e5e7eb'; 
+
+            const shiftGray = '#e5e7eb';
 
             content += `<tr>
                 <th class="header" style="border: 2px solid #000; background-color: ${shiftGray};">${shift}</th>
@@ -236,12 +278,16 @@ export const ExportPage = () => {
             `;
             DAYS.forEach((day) => {
                 const bg = dayColors[day]?.header || '#f3f4f6';
-                periods.forEach(p => content += `<th class="header" style="width: 40px; background-color: ${bg};">${p}</th>`);
+                periods.forEach(
+                    (p) => (content += `<th class="header" style="width: 40px; background-color: ${bg};">${p}</th>`)
+                );
             });
             content += `</tr>`;
 
-            subjects.forEach(subject => {
-                const filteredTeachers = teachers.filter(t => t.subjectIds.includes(subject.id) && t.shifts.includes(shift));
+            subjects.forEach((subject) => {
+                const filteredTeachers = teachers.filter(
+                    (t) => t.subjectIds.includes(subject.id) && t.shifts.includes(shift)
+                );
                 if (filteredTeachers.length === 0) return;
 
                 filteredTeachers.forEach((teacher, tIndex) => {
@@ -251,23 +297,26 @@ export const ExportPage = () => {
                     }
                     content += `<td class="teacher-cell" style="border-right: 2px solid #000; background-color: #e9d5ff;">${teacher.name}</td>`;
 
-                    DAYS.forEach(day => {
+                    DAYS.forEach((day) => {
                         const cellBg = dayColors[day]?.cell || '#fff';
-                        periods.forEach(p => {
-                            const item = currentSchedule.find(s => 
-                                s.teacherId === teacher.id && 
-                                s.subjectId === subject.id && 
-                                s.day === day && 
-                                s.period === p &&
-                                s.shift === shift
+                        periods.forEach((p) => {
+                            const item = currentSchedule.find(
+                                (s) =>
+                                    s.teacherId === teacher.id &&
+                                    s.subjectId === subject.id &&
+                                    s.day === day &&
+                                    s.period === p &&
+                                    s.shift === shift
                             );
 
                             if (item) {
-                                const cls = classes.find(c => c.id === item.classId);
-                                const r = rooms.find(rm => rm.id === item.roomId);
+                                const cls = classes.find((c) => c.id === item.classId);
+                                const r = rooms.find((rm) => rm.id === item.roomId);
                                 const roomName = r ? r.name : item.roomId;
                                 const room = roomName ? `<sub>${roomName}</sub>` : '';
-                                const dir = item.direction ? ` <span style="font-size:10px">(${item.direction})</span>` : '';
+                                const dir = item.direction
+                                    ? ` <span style="font-size:10px">(${item.direction})</span>`
+                                    : '';
                                 // Убрали индивидуальный цвет предмета, используем цвет дня
                                 const bgColor = cellBg;
                                 content += `<td style="border: 1px solid #000; font-weight: bold; background-color: ${bgColor};">${cls ? cls.name : ''}${dir}${room}</td>`;
@@ -314,12 +363,12 @@ export const ExportPage = () => {
         const currentSchedule = getScheduleForExport();
 
         // Цвета для дней недели (как в обычной матрице)
-        const dayColors: Record<string, { header: string, cell: string }> = {
-            [DayOfWeek.Monday]:    { header: '#fecaca', cell: '#fee2e2' }, // Red
-            [DayOfWeek.Tuesday]:   { header: '#fed7aa', cell: '#ffedd5' }, // Orange
+        const dayColors: Record<string, { header: string; cell: string }> = {
+            [DayOfWeek.Monday]: { header: '#fecaca', cell: '#fee2e2' }, // Red
+            [DayOfWeek.Tuesday]: { header: '#fed7aa', cell: '#ffedd5' }, // Orange
             [DayOfWeek.Wednesday]: { header: '#fef08a', cell: '#fef9c3' }, // Yellow
-            [DayOfWeek.Thursday]:  { header: '#bbf7d0', cell: '#dcfce7' }, // Green
-            [DayOfWeek.Friday]:    { header: '#bfdbfe', cell: '#dbeafe' }, // Blue
+            [DayOfWeek.Thursday]: { header: '#bbf7d0', cell: '#dcfce7' }, // Green
+            [DayOfWeek.Friday]: { header: '#bfdbfe', cell: '#dbeafe' } // Blue
         };
 
         // Увеличенные шрифты и размеры для плаката
@@ -352,11 +401,11 @@ export const ExportPage = () => {
             <br/>
         `;
 
-        [Shift.First, Shift.Second].forEach(shift => {
+        [Shift.First, Shift.Second].forEach((shift) => {
             const periods = SHIFT_PERIODS[shift];
-            
+
             content += `<table>`;
-            
+
             // --- ROW 1: Main Headers ---
             content += `<tr>
                 <th rowspan="3" class="header" style="border: 3px solid #000; width: 350px; background-color: #e9d5ff; font-size: 24pt;">Учебный предмет</th>
@@ -366,7 +415,7 @@ export const ExportPage = () => {
 
             // --- ROW 2: Day Names ---
             content += `<tr>`;
-            DAYS.forEach(day => {
+            DAYS.forEach((day) => {
                 const bg = dayColors[day]?.header || '#f3f4f6';
                 content += `<th colspan="${periods.length}" class="header" style="border: 3px solid #000; background-color: ${bg}; font-size: 20pt;">${day}</th>`;
             });
@@ -380,22 +429,27 @@ export const ExportPage = () => {
                 content += `<th colspan="${periods.length}" class="header" style="border-bottom: 3px solid #000; background-color: ${bg}; font-size: 16pt;">Урок</th>`;
             });
             content += `</tr>`;
-            
+
             // --- ROW 4: Shift Name + Period Numbers ---
-            const shiftGray = '#e5e7eb'; 
+            const shiftGray = '#e5e7eb';
             content += `<tr>
                 <th class="header" style="border: 3px solid #000; background-color: ${shiftGray}; font-size: 24pt;">${shift}</th>
                 <th class="header" style="border: 3px solid #000; background-color: ${shiftGray};"></th>
             `;
             DAYS.forEach((day) => {
                 const bg = dayColors[day]?.header || '#f3f4f6';
-                periods.forEach(p => content += `<th class="header" style="width: 20px; background-color: ${bg}; font-size: 16pt;">${p}</th>`);
+                periods.forEach(
+                    (p) =>
+                        (content += `<th class="header" style="width: 20px; background-color: ${bg}; font-size: 16pt;">${p}</th>`)
+                );
             });
             content += `</tr>`;
 
             // --- DATA ROWS ---
-            subjects.forEach(subject => {
-                const filteredTeachers = teachers.filter(t => t.subjectIds.includes(subject.id) && t.shifts.includes(shift));
+            subjects.forEach((subject) => {
+                const filteredTeachers = teachers.filter(
+                    (t) => t.subjectIds.includes(subject.id) && t.shifts.includes(shift)
+                );
                 if (filteredTeachers.length === 0) return;
 
                 filteredTeachers.forEach((teacher, tIndex) => {
@@ -405,24 +459,27 @@ export const ExportPage = () => {
                     }
                     content += `<td class="teacher-cell" style="border-right: 3px solid #000; background-color: #e9d5ff;">${teacher.name}</td>`;
 
-                    DAYS.forEach(day => {
+                    DAYS.forEach((day) => {
                         const cellBg = dayColors[day]?.cell || '#fff';
-                        periods.forEach(p => {
-                            const item = currentSchedule.find(s => 
-                                s.teacherId === teacher.id && 
-                                s.subjectId === subject.id && 
-                                s.day === day && 
-                                s.period === p &&
-                                s.shift === shift
+                        periods.forEach((p) => {
+                            const item = currentSchedule.find(
+                                (s) =>
+                                    s.teacherId === teacher.id &&
+                                    s.subjectId === subject.id &&
+                                    s.day === day &&
+                                    s.period === p &&
+                                    s.shift === shift
                             );
 
                             if (item) {
-                                const cls = classes.find(c => c.id === item.classId);
-                                const r = rooms.find(rm => rm.id === item.roomId);
+                                const cls = classes.find((c) => c.id === item.classId);
+                                const r = rooms.find((rm) => rm.id === item.roomId);
                                 const roomName = r ? r.name : item.roomId;
                                 const room = roomName ? `<sub>${roomName}</sub>` : '';
-                                const dir = item.direction ? ` <span style="font-size:14px">(${item.direction})</span>` : '';
-                                
+                                const dir = item.direction
+                                    ? ` <span style="font-size:14px">(${item.direction})</span>`
+                                    : '';
+
                                 content += `<td style="border: 1px solid #000; font-weight: bold; background-color: ${cellBg}; height: 60px;">${cls ? cls.name : ''}${dir}${room}</td>`;
                             } else {
                                 content += `<td style="border: 1px solid #000; background-color: ${cellBg};"></td>`;
@@ -464,27 +521,29 @@ export const ExportPage = () => {
 
     const downloadGradeMatrixExcel = () => {
         const currentSchedule = getScheduleForExport();
-        const targetClasses = classes.filter(c => c.name.startsWith(matrixGrade)).sort((a,b) => a.name.localeCompare(b.name));
-        const shifts = (Array.from(new Set(targetClasses.map(c => c.shift))) as string[]).sort();
+        const targetClasses = classes
+            .filter((c) => c.name.startsWith(matrixGrade))
+            .sort((a, b) => a.name.localeCompare(b.name));
+        const shifts = (Array.from(new Set(targetClasses.map((c) => c.shift))) as string[]).sort();
 
         // Colors matching the visual style in MatrixPrintContent
-        const dayStyles: Record<string, { label: string, cell: string }> = {
-            [DayOfWeek.Monday]:    { label: '#fecaca', cell: '#fee2e2' }, // Red 200/100
-            [DayOfWeek.Tuesday]:   { label: '#fed7aa', cell: '#ffedd5' }, // Orange 200/100
+        const dayStyles: Record<string, { label: string; cell: string }> = {
+            [DayOfWeek.Monday]: { label: '#fecaca', cell: '#fee2e2' }, // Red 200/100
+            [DayOfWeek.Tuesday]: { label: '#fed7aa', cell: '#ffedd5' }, // Orange 200/100
             [DayOfWeek.Wednesday]: { label: '#fef08a', cell: '#fef9c3' }, // Yellow 200/100
-            [DayOfWeek.Thursday]:  { label: '#bbf7d0', cell: '#dcfce7' }, // Green 200/100
-            [DayOfWeek.Friday]:    { label: '#bfdbfe', cell: '#dbeafe' }, // Blue 200/100
+            [DayOfWeek.Thursday]: { label: '#bbf7d0', cell: '#dcfce7' }, // Green 200/100
+            [DayOfWeek.Friday]: { label: '#bfdbfe', cell: '#dbeafe' } // Blue 200/100
         };
 
         let content = '';
 
         shifts.forEach((shift) => {
-            const shiftClasses = targetClasses.filter(c => c.shift === shift);
+            const shiftClasses = targetClasses.filter((c) => c.shift === shift);
             const periods = SHIFT_PERIODS[shift as Shift];
             if (shiftClasses.length === 0) return;
 
             content += `<table>`;
-            
+
             // Row 1: "1 СМЕНА" merged
             content += `<tr>`;
             content += `<td style="border:none"></td>`;
@@ -496,7 +555,7 @@ export const ExportPage = () => {
             content += `<tr>`;
             content += `<td style="border:none"></td>`;
             content += `<td style="border:none"></td>`;
-            shiftClasses.forEach(c => {
+            shiftClasses.forEach((c) => {
                 content += `<td class="class-header">${c.name}</td>`;
             });
             content += `</tr>`;
@@ -504,7 +563,7 @@ export const ExportPage = () => {
             // Data Rows
             DAYS.forEach((day) => {
                 const colors = dayStyles[day as string] || { label: '#e5e7eb', cell: '#f3f4f6' };
-                
+
                 periods.forEach((period, pIndex) => {
                     content += `<tr>`;
 
@@ -517,32 +576,29 @@ export const ExportPage = () => {
                     content += `<td class="period-cell" style="background-color: ${colors.label};">${period}</td>`;
 
                     // Class Columns
-                    shiftClasses.forEach(cls => {
-                        const lessons = currentSchedule.filter(s => 
-                            s.classId === cls.id && 
-                            s.day === day && 
-                            s.shift === shift && 
-                            s.period === period
+                    shiftClasses.forEach((cls) => {
+                        const lessons = currentSchedule.filter(
+                            (s) => s.classId === cls.id && s.day === day && s.shift === shift && s.period === period
                         );
-                        
+
                         content += `<td class="content-cell" style="background-color: ${colors.cell};">`;
-                        
+
                         lessons.forEach((lesson, i) => {
                             if (i > 0) content += `<br style="mso-data-placement:same-cell;">`;
-                            const sub = subjects.find(s => s.id === lesson.subjectId);
-                            const room = rooms.find(r => r.id === lesson.roomId);
-                            const roomName = room ? room.name : (lesson.roomId || '');
-                            
+                            const sub = subjects.find((s) => s.id === lesson.subjectId);
+                            const room = rooms.find((r) => r.id === lesson.roomId);
+                            const roomName = room ? room.name : lesson.roomId || '';
+
                             content += `<span class="subject">${sub?.name || ''}</span>`;
                             if (roomName) content += ` <span class="room">${roomName}</span>`;
                         });
-                        
+
                         content += `</td>`;
                     });
 
                     content += `</tr>`;
                 });
-                
+
                 // Add a black separator row to mimic the thick border in the image
                 content += `<tr><td colspan="${2 + shiftClasses.length}" style="height: 3px; background-color: #000000; border: none;"></td></tr>`;
             });
@@ -578,13 +634,15 @@ export const ExportPage = () => {
         const targetYear = targetDate.getUTCFullYear();
 
         // Фильтруем замены за выбранный месяц
-        const monthlySubs = substitutions.filter(s => {
-            const sDate = new Date(s.date);
-            return sDate.getUTCMonth() === targetMonth && sDate.getUTCFullYear() === targetYear;
-        }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        const monthlySubs = substitutions
+            .filter((s) => {
+                const sDate = new Date(s.date);
+                return sDate.getUTCMonth() === targetMonth && sDate.getUTCFullYear() === targetYear;
+            })
+            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
         if (monthlySubs.length === 0) {
-            addToast({ type: 'warning', title: 'Внимание', message: "Нет данных о заменах за выбранный месяц." });
+            addToast({ type: 'warning', title: 'Внимание', message: 'Нет данных о заменах за выбранный месяц.' });
             return;
         }
 
@@ -599,7 +657,7 @@ export const ExportPage = () => {
 
         // Group by scheduleItemId to handle merges
         const groupedSubs = new Map<string, Substitution[]>();
-        monthlySubs.forEach(sub => {
+        monthlySubs.forEach((sub) => {
             // Group by item AND date to separate same lesson on different days
             const key = `${sub.scheduleItemId}_${sub.date}`;
             const existing = groupedSubs.get(key) || [];
@@ -610,21 +668,29 @@ export const ExportPage = () => {
         const mainSubs: SubstitutionDetail[] = [];
         const noRecordSubs: SubstitutionDetail[] = [];
 
-        groupedSubs.forEach(subsGroup => {
+        groupedSubs.forEach((subsGroup) => {
             const firstSub = subsGroup[0];
             // Ищем урок в обоих расписаниях
-            const scheduleItem = schedule1.find(s => s.id === firstSub.scheduleItemId) || schedule2.find(s => s.id === firstSub.scheduleItemId);
+            const scheduleItem =
+                schedule1.find((s) => s.id === firstSub.scheduleItemId) ||
+                schedule2.find((s) => s.id === firstSub.scheduleItemId);
             if (!scheduleItem) return;
 
-            const cls = classes.find(c => c.id === scheduleItem.classId);
-            const subj = subjects.find(s => s.id === scheduleItem.subjectId);
-            const origTeacher = teachers.find(t => t.id === firstSub.originalTeacherId);
+            const cls = classes.find((c) => c.id === scheduleItem.classId);
+            const subj = subjects.find((s) => s.id === scheduleItem.subjectId);
+            const origTeacher = teachers.find((t) => t.id === firstSub.originalTeacherId);
 
             let reason = firstSub.lessonAbsenceReason || origTeacher?.absenceReasons?.[firstSub.date] || '';
-            
+
             // Logic overrides for display
-            if (firstSub.replacementTeacherId === firstSub.originalTeacherId && firstSub.replacementRoomId && !firstSub.replacementClassId) reason = 'Смена кабинета';
-            if (firstSub.replacementClassId && firstSub.replacementSubjectId && !firstSub.isMerger) reason = 'Обмен уроками';
+            if (
+                firstSub.replacementTeacherId === firstSub.originalTeacherId &&
+                firstSub.replacementRoomId &&
+                !firstSub.replacementClassId
+            )
+                reason = 'Смена кабинета';
+            if (firstSub.replacementClassId && firstSub.replacementSubjectId && !firstSub.isMerger)
+                reason = 'Обмен уроками';
 
             const detail: SubstitutionDetail = { subs: subsGroup, scheduleItem, cls, subj, origTeacher, reason };
 
@@ -638,45 +704,48 @@ export const ExportPage = () => {
         let content = `<h3>Отчет по заменам за ${targetDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}</h3>`;
 
         const renderRowsLocal = (items: SubstitutionDetail[]) => {
-            return items.map(item => {
-                const { subs, scheduleItem, cls, subj, origTeacher, reason } = item;
-                const firstSub = subs[0];
-                const dateStr = new Date(firstSub.date).toLocaleDateString('ru-RU');
-                
-                let repTeacherName = '';
-                
-                if (firstSub.replacementTeacherId === 'conducted') repTeacherName = 'Урок проведен';
-                else if (firstSub.replacementTeacherId === 'cancelled') repTeacherName = 'Урок снят';
-                else {
-                    const names = subs.map(s => {
-                        const t = teachers.find(x => x.id === s.replacementTeacherId);
-                        return t ? t.name : 'Неизвестно';
-                    }).join(', ');
-                    
-                    repTeacherName = names;
-                    
-                    if (firstSub.isMerger) {
-                        let suffix = ' (Объединение)';
-                        if (firstSub.replacementClassId) {
-                             const swappedClass = classes.find(c => c.id === firstSub.replacementClassId);
-                             if (swappedClass) suffix = ` (Объединение с ${swappedClass.name})`;
+            return items
+                .map((item) => {
+                    const { subs, scheduleItem, cls, subj, origTeacher, reason } = item;
+                    const firstSub = subs[0];
+                    const dateStr = new Date(firstSub.date).toLocaleDateString('ru-RU');
+
+                    let repTeacherName = '';
+
+                    if (firstSub.replacementTeacherId === 'conducted') repTeacherName = 'Урок проведен';
+                    else if (firstSub.replacementTeacherId === 'cancelled') repTeacherName = 'Урок снят';
+                    else {
+                        const names = subs
+                            .map((s) => {
+                                const t = teachers.find((x) => x.id === s.replacementTeacherId);
+                                return t ? t.name : 'Неизвестно';
+                            })
+                            .join(', ');
+
+                        repTeacherName = names;
+
+                        if (firstSub.isMerger) {
+                            let suffix = ' (Объединение)';
+                            if (firstSub.replacementClassId) {
+                                const swappedClass = classes.find((c) => c.id === firstSub.replacementClassId);
+                                if (swappedClass) suffix = ` (Объединение с ${swappedClass.name})`;
+                            }
+                            repTeacherName += suffix;
+                        } else if (firstSub.replacementClassId && firstSub.replacementSubjectId) {
+                            const swappedClass = classes.find((c) => c.id === firstSub.replacementClassId);
+                            const swappedSubj = subjects.find((s) => s.id === firstSub.replacementSubjectId);
+                            repTeacherName += ` (Урок ${swappedClass?.name || '?'} ${swappedSubj?.name || '?'})`;
                         }
-                        repTeacherName += suffix;
-                    } else if (firstSub.replacementClassId && firstSub.replacementSubjectId) {
-                        const swappedClass = classes.find(c => c.id === firstSub.replacementClassId);
-                        const swappedSubj = subjects.find(s => s.id === firstSub.replacementSubjectId);
-                        repTeacherName += ` (Урок ${swappedClass?.name || '?'} ${swappedSubj?.name || '?'})`;
                     }
-                }
 
-                const originalRoomId = scheduleItem.roomId;
-                const replacementRoomId = firstSub.replacementRoomId;
-                const actualRoomId = replacementRoomId || originalRoomId;
-                const roomObj = rooms.find(r => r.id === actualRoomId);
-                const roomName = roomObj ? roomObj.name : (actualRoomId || '-');
-                const roomDisplay = replacementRoomId ? `${roomName} (Замена каб.)` : roomName;
+                    const originalRoomId = scheduleItem.roomId;
+                    const replacementRoomId = firstSub.replacementRoomId;
+                    const actualRoomId = replacementRoomId || originalRoomId;
+                    const roomObj = rooms.find((r) => r.id === actualRoomId);
+                    const roomName = roomObj ? roomObj.name : actualRoomId || '-';
+                    const roomDisplay = replacementRoomId ? `${roomName} (Замена каб.)` : roomName;
 
-                return `
+                    return `
                     <tr>
                         <td>${dateStr}</td>
                         <td>${scheduleItem.period}</td>
@@ -689,7 +758,8 @@ export const ExportPage = () => {
                         <td>${reason}</td>
                     </tr>
                 `;
-            }).join('');
+                })
+                .join('');
         };
 
         const renderTableLocal = (items: SubstitutionDetail[], isWarning = false) => `
@@ -728,27 +798,39 @@ export const ExportPage = () => {
         }
 
         // --- NEW SUMMARY TABLE ---
-        const teacherStats = new Map<string, { name: string, total: number, withoutRecord: number, merger: number, other: number, illness: number }>();
+        const teacherStats = new Map<
+            string,
+            { name: string; total: number; withoutRecord: number; merger: number; other: number; illness: number }
+        >();
 
-        monthlySubs.forEach(sub => {
-            if (sub.replacementTeacherId === 'conducted' || 
-                sub.replacementTeacherId === 'cancelled' || 
-                sub.replacementTeacherId === sub.originalTeacherId) {
+        monthlySubs.forEach((sub) => {
+            if (
+                sub.replacementTeacherId === 'conducted' ||
+                sub.replacementTeacherId === 'cancelled' ||
+                sub.replacementTeacherId === sub.originalTeacherId
+            ) {
                 return;
             }
 
-            const teacher = teachers.find(t => t.id === sub.replacementTeacherId);
+            const teacher = teachers.find((t) => t.id === sub.replacementTeacherId);
             if (!teacher) return;
 
-            const stats = teacherStats.get(teacher.id) || { name: teacher.name, total: 0, withoutRecord: 0, merger: 0, other: 0, illness: 0 };
-            
-            const origTeacher = teachers.find(t => t.id === sub.originalTeacherId);
+            const stats = teacherStats.get(teacher.id) || {
+                name: teacher.name,
+                total: 0,
+                withoutRecord: 0,
+                merger: 0,
+                other: 0,
+                illness: 0
+            };
+
+            const origTeacher = teachers.find((t) => t.id === sub.originalTeacherId);
             let reason = sub.lessonAbsenceReason || origTeacher?.absenceReasons?.[sub.date] || '';
-            
+
             if (sub.replacementClassId && sub.replacementSubjectId && !sub.isMerger) reason = 'Обмен уроками';
 
             stats.total++;
-            
+
             // Priority: Merger > Illness > Without Record > Other
             if (sub.isMerger) {
                 stats.merger++;
@@ -766,9 +848,9 @@ export const ExportPage = () => {
         const statsArray = Array.from(teacherStats.values()).sort((a, b) => a.name.localeCompare(b.name));
 
         if (statsArray.length > 0) {
-             content += `<br/><br/>`;
-             content += `<h3>Сводная ведомость заменяющих учителей</h3>`;
-             content += `
+            content += `<br/><br/>`;
+            content += `<h3>Сводная ведомость заменяющих учителей</h3>`;
+            content += `
              <table style="border-collapse: collapse; width: 60%;">
              <thead>
                  <tr class="header">
@@ -782,8 +864,8 @@ export const ExportPage = () => {
              </thead>
              <tbody>
              `;
-             statsArray.forEach(stat => {
-                 content += `
+            statsArray.forEach((stat) => {
+                content += `
                      <tr>
                          <td style="border: 1px solid #999; padding: 4px;">${stat.name}</td>
                          <td style="text-align: center; border: 1px solid #999; padding: 4px;">${stat.total}</td>
@@ -793,8 +875,8 @@ export const ExportPage = () => {
                          <td style="text-align: center; border: 1px solid #999; padding: 4px;">${stat.other}</td>
                      </tr>
                  `;
-             });
-             content += `</tbody></table>`;
+            });
+            content += `</tbody></table>`;
         }
 
         const styles = `
@@ -804,7 +886,11 @@ export const ExportPage = () => {
             .date-row { background-color: #f3f4f6; font-weight: bold; }
         `;
 
-        exportService.saveAsExcel(content, `Отчет_Замены_${targetDate.getMonth()+1}_${targetDate.getFullYear()}.xls`, styles);
+        exportService.saveAsExcel(
+            content,
+            `Отчет_Замены_${targetDate.getMonth() + 1}_${targetDate.getFullYear()}.xls`,
+            styles
+        );
     };
 
     const exportRefusalsExcel = () => {
@@ -812,15 +898,17 @@ export const ExportPage = () => {
         const targetMonth = targetDate.getUTCMonth();
         const targetYear = targetDate.getUTCFullYear();
 
-        const refusalsData = substitutions.filter(s => {
-            const sDate = new Date(s.date);
-            const inMonth = sDate.getUTCMonth() === targetMonth && sDate.getUTCFullYear() === targetYear;
-            const hasRefusals = s.refusals && s.refusals.length > 0;
-            return inMonth && hasRefusals;
-        }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        const refusalsData = substitutions
+            .filter((s) => {
+                const sDate = new Date(s.date);
+                const inMonth = sDate.getUTCMonth() === targetMonth && sDate.getUTCFullYear() === targetYear;
+                const hasRefusals = s.refusals && s.refusals.length > 0;
+                return inMonth && hasRefusals;
+            })
+            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
         if (refusalsData.length === 0) {
-            addToast({ type: 'warning', title: 'Внимание', message: "Нет данных об отказах за выбранный месяц." });
+            addToast({ type: 'warning', title: 'Внимание', message: 'Нет данных об отказах за выбранный месяц.' });
             return;
         }
 
@@ -842,27 +930,31 @@ export const ExportPage = () => {
             <tbody>
         `;
 
-        refusalsData.forEach(sub => {
-            const scheduleItem = schedule1.find(s => s.id === sub.scheduleItemId) || schedule2.find(s => s.id === sub.scheduleItemId);
+        refusalsData.forEach((sub) => {
+            const scheduleItem =
+                schedule1.find((s) => s.id === sub.scheduleItemId) ||
+                schedule2.find((s) => s.id === sub.scheduleItemId);
             if (!scheduleItem) return;
 
             const dateStr = new Date(sub.date).toLocaleDateString('ru-RU');
-            const cls = classes.find(c => c.id === scheduleItem.classId);
-            const subj = subjects.find(s => s.id === scheduleItem.subjectId);
-            const origTeacher = teachers.find(t => t.id === sub.originalTeacherId);
-            
+            const cls = classes.find((c) => c.id === scheduleItem.classId);
+            const subj = subjects.find((s) => s.id === scheduleItem.subjectId);
+            const origTeacher = teachers.find((t) => t.id === sub.originalTeacherId);
+
             let repTeacherName = '';
             if (sub.replacementTeacherId === 'conducted') repTeacherName = 'Урок проведен';
             else if (sub.replacementTeacherId === 'cancelled') repTeacherName = 'Урок снят';
             else {
-                const t = teachers.find(x => x.id === sub.replacementTeacherId);
+                const t = teachers.find((x) => x.id === sub.replacementTeacherId);
                 repTeacherName = t ? t.name : 'Неизвестно';
             }
 
-            const refusedNames = (sub.refusals || []).map(id => {
-                const t = teachers.find(x => x.id === id);
-                return t ? t.name : 'Неизвестно';
-            }).join(', ');
+            const refusedNames = (sub.refusals || [])
+                .map((id) => {
+                    const t = teachers.find((x) => x.id === id);
+                    return t ? t.name : 'Неизвестно';
+                })
+                .join(', ');
 
             html += `
                 <tr>
@@ -879,37 +971,43 @@ export const ExportPage = () => {
         });
 
         html += `</tbody></table>`;
-        
-        const fileName = `Отчет_Отказы_${targetDate.getMonth()+1}_${targetDate.getFullYear()}`;
+
+        const fileName = `Отчет_Отказы_${targetDate.getMonth() + 1}_${targetDate.getFullYear()}`;
         exportService.saveAsExcel(html, fileName);
     };
 
     const copyForGoogleSheets = async () => {
         const currentSchedule = getScheduleForExport();
-        let tsv = "День\tСмена\tКласс\tУрок\tПредмет\tУчитель\tКабинет\tГруппа\n";
-        DAYS.forEach(day => {
-            [Shift.First, Shift.Second].forEach(shift => {
-                const filteredClasses = classes.filter(c => c.shift === shift);
-                filteredClasses.forEach(cls => {
-                    SHIFT_PERIODS[shift].forEach(period => {
-                        const items = currentSchedule.filter(s => s.classId === cls.id && s.day === day && s.shift === shift && s.period === period);
-                        items.forEach(item => {
-                            const sub = subjects.find(s => s.id === item.subjectId);
-                            const teach = teachers.find(t => t.id === item.teacherId);
-                            const r = rooms.find(rm => rm.id === item.roomId);
-                            const roomName = r ? r.name : (item.roomId || '');
+        let tsv = 'День\tСмена\tКласс\tУрок\tПредмет\tУчитель\tКабинет\tГруппа\n';
+        DAYS.forEach((day) => {
+            [Shift.First, Shift.Second].forEach((shift) => {
+                const filteredClasses = classes.filter((c) => c.shift === shift);
+                filteredClasses.forEach((cls) => {
+                    SHIFT_PERIODS[shift].forEach((period) => {
+                        const items = currentSchedule.filter(
+                            (s) => s.classId === cls.id && s.day === day && s.shift === shift && s.period === period
+                        );
+                        items.forEach((item) => {
+                            const sub = subjects.find((s) => s.id === item.subjectId);
+                            const teach = teachers.find((t) => t.id === item.teacherId);
+                            const r = rooms.find((rm) => rm.id === item.roomId);
+                            const roomName = r ? r.name : item.roomId || '';
                             tsv += `${day}\t${shift}\t${cls.name}\t${period}\t${sub?.name || ''}\t${teach?.name || ''}\t${roomName}\t${item.direction || ''}\n`;
                         });
                     });
                 });
             });
         });
-        
+
         const success = await exportService.copyToClipboard(tsv);
         if (success) {
-            addToast({ type: 'info', title: 'Скопировано', message: "Данные скопированы! Откройте Google Sheets и нажмите Ctrl+V (Cmd+V)." });
+            addToast({
+                type: 'info',
+                title: 'Скопировано',
+                message: 'Данные скопированы! Откройте Google Sheets и нажмите Ctrl+V (Cmd+V).'
+            });
         } else {
-            addToast({ type: 'danger', title: 'Ошибка', message: "Не удалось скопировать данные в буфер обмена." });
+            addToast({ type: 'danger', title: 'Ошибка', message: 'Не удалось скопировать данные в буфер обмена.' });
         }
     };
 
@@ -921,7 +1019,11 @@ export const ExportPage = () => {
                 return;
             }
 
-            const canvas1 = await html2canvas(printRef1.current, { scale: 2, backgroundColor: '#ffffff', logging: false });
+            const canvas1 = await html2canvas(printRef1.current, {
+                scale: 2,
+                backgroundColor: '#ffffff',
+                logging: false
+            });
             const link = document.createElement('a');
             link.href = canvas1.toDataURL('image/png');
             link.download = `Замены_${exportDate}_1смена.png`;
@@ -930,7 +1032,7 @@ export const ExportPage = () => {
             document.body.removeChild(link);
         } catch (e) {
             console.error(e);
-            addToast({ type: 'danger', title: 'Ошибка', message: "Ошибка при создании изображения" });
+            addToast({ type: 'danger', title: 'Ошибка', message: 'Ошибка при создании изображения' });
         } finally {
             setIsGenerating(false);
         }
@@ -944,7 +1046,11 @@ export const ExportPage = () => {
                 return;
             }
 
-            const canvas2 = await html2canvas(printRef2.current, { scale: 2, backgroundColor: '#ffffff', logging: false });
+            const canvas2 = await html2canvas(printRef2.current, {
+                scale: 2,
+                backgroundColor: '#ffffff',
+                logging: false
+            });
             const link = document.createElement('a');
             link.href = canvas2.toDataURL('image/png');
             link.download = `Замены_${exportDate}_2смена.png`;
@@ -953,105 +1059,146 @@ export const ExportPage = () => {
             document.body.removeChild(link);
         } catch (e) {
             console.error(e);
-            addToast({ type: 'danger', title: 'Ошибка', message: "Ошибка при создании изображения" });
+            addToast({ type: 'danger', title: 'Ошибка', message: 'Ошибка при создании изображения' });
         } finally {
             setIsGenerating(false);
         }
     };
 
-    const subsForDate = useMemo(() => substitutions.filter(s => s.date === exportDate), [substitutions, exportDate]);
-    
+    const subsForDate = useMemo(() => substitutions.filter((s) => s.date === exportDate), [substitutions, exportDate]);
+
     const dayComment = useMemo(() => {
         const fromSettings = settings.substitutionDayComments?.[exportDate];
         if (fromSettings) return fromSettings;
-        const fromSubs = subsForDate.find(s => s.dayComment)?.dayComment;
+        const fromSubs = subsForDate.find((s) => s.dayComment)?.dayComment;
         return fromSubs || '';
     }, [settings.substitutionDayComments, exportDate, subsForDate]);
-    
+
     const subsForShift1 = useMemo(() => {
         const currentSchedule = getScheduleForDate(exportDate);
-        return subsForDate.filter(sub => {
-            const s = currentSchedule.find(x => x.id === sub.scheduleItemId);
-            return s && s.shift === Shift.First;
-        }).filter(sub => sub.replacementTeacherId !== 'conducted').length > 0;
+        return (
+            subsForDate
+                .filter((sub) => {
+                    const s = currentSchedule.find((x) => x.id === sub.scheduleItemId);
+                    return s && s.shift === Shift.First;
+                })
+                .filter((sub) => sub.replacementTeacherId !== 'conducted').length > 0
+        );
     }, [subsForDate, getScheduleForDate, exportDate]);
 
     const subsForShift2 = useMemo(() => {
         const currentSchedule = getScheduleForDate(exportDate);
-        return subsForDate.filter(sub => {
-            const s = currentSchedule.find(x => x.id === sub.scheduleItemId);
-            return s && s.shift === Shift.Second;
-        }).filter(sub => sub.replacementTeacherId !== 'conducted').length > 0;
+        return (
+            subsForDate
+                .filter((sub) => {
+                    const s = currentSchedule.find((x) => x.id === sub.scheduleItemId);
+                    return s && s.shift === Shift.Second;
+                })
+                .filter((sub) => sub.replacementTeacherId !== 'conducted').length > 0
+        );
     }, [subsForDate, getScheduleForDate, exportDate]);
-
 
     const renderTableForShift = (shift: string) => {
         const currentSchedule = getScheduleForDate(exportDate);
 
         // Group subs by scheduleItemId to handle merges
-        const shiftSubs = subsForDate.filter(sub => {
-            const s = currentSchedule.find(x => x.id === sub.scheduleItemId);
-            return s && s.shift === shift;
-        }).filter(sub => sub.replacementTeacherId !== 'conducted');
-        
+        const shiftSubs = subsForDate
+            .filter((sub) => {
+                const s = currentSchedule.find((x) => x.id === sub.scheduleItemId);
+                return s && s.shift === shift;
+            })
+            .filter((sub) => sub.replacementTeacherId !== 'conducted');
+
         if (shiftSubs.length === 0) return null;
 
-        const uniqueLessonIds = Array.from(new Set(shiftSubs.map(s => s.scheduleItemId)))
-            .sort((idA, idB) => {
-                const itemA = currentSchedule.find(x => x.id === idA);
-                const itemB = currentSchedule.find(x => x.id === idB);
-                return (itemA?.period ?? 0) - (itemB?.period ?? 0);
-            });
+        const uniqueLessonIds = Array.from(new Set(shiftSubs.map((s) => s.scheduleItemId))).sort((idA, idB) => {
+            const itemA = currentSchedule.find((x) => x.id === idA);
+            const itemB = currentSchedule.find((x) => x.id === idB);
+            return (itemA?.period ?? 0) - (itemB?.period ?? 0);
+        });
 
         return (
             <div>
-                <div className="text-xl font-bold bg-slate-100 text-slate-700 p-2 mb-2 uppercase tracking-wide border-l-4 border-indigo-500">{shift}</div>
+                <div className="text-xl font-bold bg-slate-100 text-slate-700 p-2 mb-2 uppercase tracking-wide border-l-4 border-indigo-500">
+                    {shift}
+                </div>
                 <table className="w-full text-left border-collapse">
                     <thead>
                         <tr className="border-b border-slate-200">
-                            <th className="py-3 px-2 font-black text-slate-400 text-xs uppercase tracking-wider w-16 text-center">Урок</th>
-                            <th className="py-3 px-2 font-black text-slate-400 text-xs uppercase tracking-wider w-24">Класс</th>
-                            <th className="py-3 px-2 font-black text-slate-400 text-xs uppercase tracking-wider">Предмет</th>
-                            <th className="py-3 px-2 font-black text-slate-400 text-xs uppercase tracking-wider w-1/4">Отсутствует</th>
-                            <th className="py-3 px-2 font-black text-slate-400 text-xs uppercase tracking-wider w-1/4">Заменяет</th>
-                            <th className="py-3 px-2 font-black text-slate-400 text-xs uppercase tracking-wider w-20 text-right">Каб.</th>
+                            <th className="py-3 px-2 font-black text-slate-400 text-xs uppercase tracking-wider w-16 text-center">
+                                Урок
+                            </th>
+                            <th className="py-3 px-2 font-black text-slate-400 text-xs uppercase tracking-wider w-24">
+                                Класс
+                            </th>
+                            <th className="py-3 px-2 font-black text-slate-400 text-xs uppercase tracking-wider">
+                                Предмет
+                            </th>
+                            <th className="py-3 px-2 font-black text-slate-400 text-xs uppercase tracking-wider w-1/4">
+                                Отсутствует
+                            </th>
+                            <th className="py-3 px-2 font-black text-slate-400 text-xs uppercase tracking-wider w-1/4">
+                                Заменяет
+                            </th>
+                            <th className="py-3 px-2 font-black text-slate-400 text-xs uppercase tracking-wider w-20 text-right">
+                                Каб.
+                            </th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                        {uniqueLessonIds.map(lessonId => { 
-                            const lessonSubs = shiftSubs.filter(s => s.scheduleItemId === lessonId);
+                        {uniqueLessonIds.map((lessonId) => {
+                            const lessonSubs = shiftSubs.filter((s) => s.scheduleItemId === lessonId);
                             const sub = lessonSubs[0];
-                            const s = currentSchedule.find(x => x.id === lessonId); 
+                            const s = currentSchedule.find((x) => x.id === lessonId);
                             if (!s) return null;
-                            const cls = classes.find(c => c.id === s.classId); 
-                            const subj = subjects.find(x => x.id === s.subjectId); 
-                            const t1 = teachers.find(t => t.id === sub.originalTeacherId); 
-                            
+                            const cls = classes.find((c) => c.id === s.classId);
+                            const subj = subjects.find((x) => x.id === s.subjectId);
+                            const t1 = teachers.find((t) => t.id === sub.originalTeacherId);
+
                             const newRoomId = sub.replacementRoomId;
-                            const oldRoomObj = s.roomId ? rooms.find(r => r.id === s.roomId) : null;
-                            const oldRoomName = oldRoomObj ? oldRoomObj.name : (s.roomId || '—');
-                            const newRoomObj = newRoomId ? rooms.find(r => r.id === newRoomId) : null;
-                            const newRoomName = newRoomObj ? newRoomObj.name : (newRoomId || '—');
-                            
+                            const oldRoomObj = s.roomId ? rooms.find((r) => r.id === s.roomId) : null;
+                            const oldRoomName = oldRoomObj ? oldRoomObj.name : s.roomId || '—';
+                            const newRoomObj = newRoomId ? rooms.find((r) => r.id === newRoomId) : null;
+                            const newRoomName = newRoomObj ? newRoomObj.name : newRoomId || '—';
+
                             const isCancelled = sub.replacementTeacherId === 'cancelled';
-                            
+
                             const dayReason = t1?.absenceReasons?.[exportDate];
                             const lessonReason = sub.lessonAbsenceReason;
-                            const displayReason = (lessonReason === 'Без записи') ? lessonReason : ((dayReason === 'Без записи') ? dayReason : '');
-                            
-                            const swappedClass = sub.replacementClassId ? classes.find(c => c.id === sub.replacementClassId) : null;
-                            const swappedSubj = sub.replacementSubjectId ? subjects.find(s => s.id === sub.replacementSubjectId) : null;
+                            const displayReason =
+                                lessonReason === 'Без записи'
+                                    ? lessonReason
+                                    : dayReason === 'Без записи'
+                                      ? dayReason
+                                      : '';
 
-                            const isRoomChangeOnly = sub.replacementTeacherId === sub.originalTeacherId && newRoomId && !swappedClass;
+                            const swappedClass = sub.replacementClassId
+                                ? classes.find((c) => c.id === sub.replacementClassId)
+                                : null;
+                            const swappedSubj = sub.replacementSubjectId
+                                ? subjects.find((s) => s.id === sub.replacementSubjectId)
+                                : null;
+
+                            const isRoomChangeOnly =
+                                sub.replacementTeacherId === sub.originalTeacherId && newRoomId && !swappedClass;
                             const isSwap = swappedClass && swappedSubj && !sub.isMerger;
                             const isTeacherPresent = sub.replacementTeacherId === sub.originalTeacherId;
                             const rowComment = sub.comment;
 
                             return (
                                 <tr key={String(lessonId)}>
-                                    <td className="py-3 px-2 text-center font-bold text-slate-800 text-lg">{s.period}</td>
+                                    <td className="py-3 px-2 text-center font-bold text-slate-800 text-lg">
+                                        {s.period}
+                                    </td>
                                     <td className="py-3 px-2 font-bold text-slate-700">{cls?.name}</td>
-                                    <td className="py-3 px-2"><div className="font-semibold text-slate-800">{subj?.name}</div>{s.direction && <div className="text-[10px] text-slate-500 bg-slate-100 inline-block px-1 rounded mt-0.5">{s.direction}</div>}</td>
+                                    <td className="py-3 px-2">
+                                        <div className="font-semibold text-slate-800">{subj?.name}</div>
+                                        {s.direction && (
+                                            <div className="text-[10px] text-slate-500 bg-slate-100 inline-block px-1 rounded mt-0.5">
+                                                {s.direction}
+                                            </div>
+                                        )}
+                                    </td>
                                     <td className="py-3 px-2">
                                         {!isTeacherPresent && !isRoomChangeOnly && !isSwap && (
                                             <>
@@ -1059,20 +1206,30 @@ export const ExportPage = () => {
                                                     {t1?.name}
                                                     <div className="absolute left-0 top-[85%] w-full h-px bg-red-300"></div>
                                                 </div>
-                                                {displayReason && <span className="text-[10px] text-slate-500 block font-bold uppercase mt-0.5">{displayReason}</span>}
+                                                {displayReason && (
+                                                    <span className="text-[10px] text-slate-500 block font-bold uppercase mt-0.5">
+                                                        {displayReason}
+                                                    </span>
+                                                )}
                                             </>
                                         )}
                                     </td>
-                                    <td className={`py-3 px-2 font-bold text-sm ${isCancelled ? 'text-red-600 uppercase font-black' : 'text-emerald-700'}`}>
+                                    <td
+                                        className={`py-3 px-2 font-bold text-sm ${isCancelled ? 'text-red-600 uppercase font-black' : 'text-emerald-700'}`}
+                                    >
                                         {isRoomChangeOnly ? (
                                             <div className="flex flex-col">
                                                 <span className="text-slate-800">{t1?.name}</span>
-                                                <span className="text-[10px] text-indigo-600 font-bold uppercase tracking-wide mt-0.5">Смена кабинета</span>
+                                                <span className="text-[10px] text-indigo-600 font-bold uppercase tracking-wide mt-0.5">
+                                                    Смена кабинета
+                                                </span>
                                             </div>
                                         ) : isSwap ? (
                                             <div className="flex flex-col">
                                                 <span className="text-slate-800">{t1?.name}</span>
-                                                <span className="text-[10px] text-purple-600 font-bold uppercase tracking-wide mt-0.5">Обмен уроками: {swappedClass?.name}</span>
+                                                <span className="text-[10px] text-purple-600 font-bold uppercase tracking-wide mt-0.5">
+                                                    Обмен уроками: {swappedClass?.name}
+                                                </span>
                                             </div>
                                         ) : isCancelled ? (
                                             <div className="flex flex-col">
@@ -1083,17 +1240,26 @@ export const ExportPage = () => {
                                                 {lessonSubs.length > 1 || sub.isMerger ? (
                                                     <>
                                                         <span className="text-slate-800 text-xs">
-                                                            {lessonSubs.map(ls => {
-                                                                const tr = teachers.find(x => x.id === ls.replacementTeacherId);
-                                                                return tr ? tr.name : 'Неизвестно';
-                                                            }).join(', ')}
+                                                            {lessonSubs
+                                                                .map((ls) => {
+                                                                    const tr = teachers.find(
+                                                                        (x) => x.id === ls.replacementTeacherId
+                                                                    );
+                                                                    return tr ? tr.name : 'Неизвестно';
+                                                                })
+                                                                .join(', ')}
                                                         </span>
                                                         <span className="text-[9px] font-black text-purple-600 uppercase tracking-widest mt-0.5">
-                                                            ОБЪЕДИНЕНИЕ {sub.replacementClassId ? `(${classes.find(c => c.id === sub.replacementClassId)?.name})` : ''}
+                                                            ОБЪЕДИНЕНИЕ{' '}
+                                                            {sub.replacementClassId
+                                                                ? `(${classes.find((c) => c.id === sub.replacementClassId)?.name})`
+                                                                : ''}
                                                         </span>
                                                     </>
                                                 ) : (
-                                                    <span>{teachers.find(t => t.id === sub.replacementTeacherId)?.name}</span>
+                                                    <span>
+                                                        {teachers.find((t) => t.id === sub.replacementTeacherId)?.name}
+                                                    </span>
                                                 )}
                                             </div>
                                         )}
@@ -1103,17 +1269,25 @@ export const ExportPage = () => {
                                             </div>
                                         )}
                                     </td>
-                                    <td className={`py-3 px-2 text-right font-mono font-black ${newRoomId ? 'text-indigo-600' : 'text-slate-700'}`}>
+                                    <td
+                                        className={`py-3 px-2 text-right font-mono font-black ${newRoomId ? 'text-indigo-600' : 'text-slate-700'}`}
+                                    >
                                         {newRoomId && newRoomId !== s.roomId ? (
                                             <div className="flex items-center justify-end gap-2 text-xl whitespace-nowrap">
-                                                <span className="text-slate-400 decoration-4 text-xl">{oldRoomName}</span>
+                                                <span className="text-slate-400 decoration-4 text-xl">
+                                                    {oldRoomName}
+                                                </span>
                                                 <span className="text-indigo-600 font-black text-2xl">&rarr;</span>
-                                                <span className="text-indigo-600 font-black text-2xl">{newRoomName}</span>
+                                                <span className="text-indigo-600 font-black text-2xl">
+                                                    {newRoomName}
+                                                </span>
                                             </div>
-                                        ) : <span className="text-xl">{oldRoomName}</span>}
+                                        ) : (
+                                            <span className="text-xl">{oldRoomName}</span>
+                                        )}
                                     </td>
                                 </tr>
-                            ) 
+                            );
                         })}
                     </tbody>
                 </table>
@@ -1124,7 +1298,7 @@ export const ExportPage = () => {
     const handlePublishSchedule = async () => {
         const newPublicId = generateId();
         await dbService.setPublicData(newPublicId, fullAppData);
-        
+
         await saveStaticData({ settings: { ...settings, publicScheduleId: newPublicId } });
 
         const publicUrl = `${window.location.origin}${window.location.pathname}#/public?id=${newPublicId}`;
@@ -1134,7 +1308,12 @@ export const ExportPage = () => {
     };
 
     const clearPublicSchedule = async () => {
-        if (!settings.publicScheduleId || !window.confirm('Вы уверены, что хотите удалить публичное расписание? Оно станет недоступно по текущей ссылке.')) {
+        if (
+            !settings.publicScheduleId ||
+            !window.confirm(
+                'Вы уверены, что хотите удалить публичное расписание? Оно станет недоступно по текущей ссылке.'
+            )
+        ) {
             return;
         }
         await dbService.deletePublicData(settings.publicScheduleId);
@@ -1148,7 +1327,9 @@ export const ExportPage = () => {
         <div className="border-b-2 border-slate-800 pb-4 mb-6">
             <div className="flex justify-between items-end gap-4">
                 <div>
-                    <h1 className="text-3xl font-black uppercase tracking-tight mb-1 text-slate-800">Замена Учителей</h1>
+                    <h1 className="text-3xl font-black uppercase tracking-tight mb-1 text-slate-800">
+                        Замена Учителей
+                    </h1>
                     <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">
                         Гимназия №22 • Официальный документ
                     </p>
@@ -1156,15 +1337,15 @@ export const ExportPage = () => {
                 <div className="text-right">
                     <div className="text-xs text-slate-400 uppercase font-bold tracking-wider mb-1">Дата</div>
                     <div className="text-xl font-bold text-slate-800">
-                        {new Date(exportDate).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
+                        {new Date(exportDate).toLocaleDateString('ru-RU', {
+                            day: 'numeric',
+                            month: 'long',
+                            year: 'numeric'
+                        })}
                     </div>
                 </div>
             </div>
-            {dayComment && (
-                <div className="mt-3 text-xs text-slate-600 max-w-3xl">
-                    {dayComment}
-                </div>
-            )}
+            {dayComment && <div className="mt-3 text-xs text-slate-600 max-w-3xl">{dayComment}</div>}
         </div>
     );
 
@@ -1177,28 +1358,31 @@ export const ExportPage = () => {
             </div>
         </div>
     );
-    
+
     // --- Matrix Print Content Component ---
     const MatrixPrintContent = () => {
         const currentSchedule = getScheduleForExport();
-        const targetClasses = classes.filter(c => c.name.startsWith(matrixGrade)).sort((a,b) => a.name.localeCompare(b.name));
-        const shifts = (Array.from(new Set(targetClasses.map(c => c.shift))) as string[]).sort();
+        const targetClasses = classes
+            .filter((c) => c.name.startsWith(matrixGrade))
+            .sort((a, b) => a.name.localeCompare(b.name));
+        const shifts = (Array.from(new Set(targetClasses.map((c) => c.shift))) as string[]).sort();
 
         // New distinct colors for each day rows matching the Excel export colors
-        const dayStyles: Record<string, { label: string, cell: string }> = {
-            [DayOfWeek.Monday]:    { label: 'bg-red-200',    cell: 'bg-red-100' },
-            [DayOfWeek.Tuesday]:   { label: 'bg-orange-200', cell: 'bg-orange-100' },
+        const dayStyles: Record<string, { label: string; cell: string }> = {
+            [DayOfWeek.Monday]: { label: 'bg-red-200', cell: 'bg-red-100' },
+            [DayOfWeek.Tuesday]: { label: 'bg-orange-200', cell: 'bg-orange-100' },
             [DayOfWeek.Wednesday]: { label: 'bg-yellow-200', cell: 'bg-yellow-100' },
-            [DayOfWeek.Thursday]:  { label: 'bg-green-200',  cell: 'bg-green-100' },
-            [DayOfWeek.Friday]:    { label: 'bg-blue-200',   cell: 'bg-blue-100' },
+            [DayOfWeek.Thursday]: { label: 'bg-green-200', cell: 'bg-green-100' },
+            [DayOfWeek.Friday]: { label: 'bg-blue-200', cell: 'bg-blue-100' }
         };
 
-        if (targetClasses.length === 0) return <div className="text-center p-10">Нет классов для выбранной параллели</div>;
+        if (targetClasses.length === 0)
+            return <div className="text-center p-10">Нет классов для выбранной параллели</div>;
 
         return (
             <div className="font-sans text-black">
                 {shifts.map((shift: string) => {
-                    const shiftClasses = targetClasses.filter(c => c.shift === shift);
+                    const shiftClasses = targetClasses.filter((c) => c.shift === shift);
                     const periods = SHIFT_PERIODS[shift as Shift];
                     if (shiftClasses.length === 0) return null;
 
@@ -1209,15 +1393,21 @@ export const ExportPage = () => {
                                     <tr>
                                         <th className="border-2 border-black w-8"></th>
                                         <th className="border-2 border-black w-8"></th>
-                                        <th colSpan={shiftClasses.length} className="border-2 border-black py-2 text-xl uppercase font-black tracking-widest bg-white">
+                                        <th
+                                            colSpan={shiftClasses.length}
+                                            className="border-2 border-black py-2 text-xl uppercase font-black tracking-widest bg-white"
+                                        >
                                             {shift}
                                         </th>
                                     </tr>
                                     <tr>
                                         <th className="border-2 border-black w-8"></th>
                                         <th className="border-2 border-black w-8"></th>
-                                        {shiftClasses.map(c => (
-                                            <th key={String(c.id)} className="border-2 border-black py-2 font-bold text-lg bg-white w-32">
+                                        {shiftClasses.map((c) => (
+                                            <th
+                                                key={String(c.id)}
+                                                className="border-2 border-black py-2 font-bold text-lg bg-white w-32"
+                                            >
                                                 {c.name}
                                             </th>
                                         ))}
@@ -1232,44 +1422,72 @@ export const ExportPage = () => {
                                                     <tr key={`${String(day)}-${period}`}>
                                                         {/* Day Name Merged Cell */}
                                                         {pIndex === 0 && (
-                                                            <td 
-                                                                rowSpan={periods.length} 
+                                                            <td
+                                                                rowSpan={periods.length}
                                                                 className={`border-2 border-black font-bold uppercase text-xs writing-vertical-lr rotate-180 p-1 ${styles.label}`}
-                                                                style={{ writingMode: 'vertical-lr', transform: 'rotate(180deg)' }}
+                                                                style={{
+                                                                    writingMode: 'vertical-lr',
+                                                                    transform: 'rotate(180deg)'
+                                                                }}
                                                             >
-                                                                {day === DayOfWeek.Monday ? 'ПОНЕДЕЛЬНИК' :
-                                                                 day === DayOfWeek.Tuesday ? 'ВТОРНИК' :
-                                                                 day === DayOfWeek.Wednesday ? 'СРЕДА' :
-                                                                 day === DayOfWeek.Thursday ? 'ЧЕТВЕРГ' :
-                                                                 day === DayOfWeek.Friday ? 'ПЯТНИЦА' : day}
+                                                                {day === DayOfWeek.Monday
+                                                                    ? 'ПОНЕДЕЛЬНИК'
+                                                                    : day === DayOfWeek.Tuesday
+                                                                      ? 'ВТОРНИК'
+                                                                      : day === DayOfWeek.Wednesday
+                                                                        ? 'СРЕДА'
+                                                                        : day === DayOfWeek.Thursday
+                                                                          ? 'ЧЕТВЕРГ'
+                                                                          : day === DayOfWeek.Friday
+                                                                            ? 'ПЯТНИЦА'
+                                                                            : day}
                                                             </td>
                                                         )}
-                                                        
+
                                                         {/* Period Number */}
-                                                        <td className={`border-2 border-black font-bold text-base ${styles.label}`}>
+                                                        <td
+                                                            className={`border-2 border-black font-bold text-base ${styles.label}`}
+                                                        >
                                                             {period}
                                                         </td>
 
                                                         {/* Classes Cells */}
-                                                        {shiftClasses.map(cls => {
-                                                            const lessons = currentSchedule.filter(s => 
-                                                                s.classId === cls.id && 
-                                                                s.day === day && 
-                                                                s.shift === shift && 
-                                                                s.period === period
+                                                        {shiftClasses.map((cls) => {
+                                                            const lessons = currentSchedule.filter(
+                                                                (s) =>
+                                                                    s.classId === cls.id &&
+                                                                    s.day === day &&
+                                                                    s.shift === shift &&
+                                                                    s.period === period
                                                             );
-                                                            
+
                                                             return (
-                                                                <td key={String(cls.id)} className={`border-2 border-black p-1 h-12 ${styles.cell}`}>
-                                                                    {lessons.map(lesson => {
-                                                                        const subj = subjects.find(s => s.id === lesson.subjectId);
-                                                                        const room = rooms.find(r => r.id === lesson.roomId);
-                                                                        const roomName = room ? room.name : (lesson.roomId || '');
-                                                                        
+                                                                <td
+                                                                    key={String(cls.id)}
+                                                                    className={`border-2 border-black p-1 h-12 ${styles.cell}`}
+                                                                >
+                                                                    {lessons.map((lesson) => {
+                                                                        const subj = subjects.find(
+                                                                            (s) => s.id === lesson.subjectId
+                                                                        );
+                                                                        const room = rooms.find(
+                                                                            (r) => r.id === lesson.roomId
+                                                                        );
+                                                                        const roomName = room
+                                                                            ? room.name
+                                                                            : lesson.roomId || '';
+
                                                                         return (
-                                                                            <div key={String(lesson.id)} className="flex justify-center items-center gap-1 leading-tight text-sm font-bold">
+                                                                            <div
+                                                                                key={String(lesson.id)}
+                                                                                className="flex justify-center items-center gap-1 leading-tight text-sm font-bold"
+                                                                            >
                                                                                 <span>{subj?.name}</span>
-                                                                                {roomName && <span className="font-black">{roomName}</span>}
+                                                                                {roomName && (
+                                                                                    <span className="font-black">
+                                                                                        {roomName}
+                                                                                    </span>
+                                                                                )}
                                                                             </div>
                                                                         );
                                                                     })}
@@ -1279,7 +1497,9 @@ export const ExportPage = () => {
                                                     </tr>
                                                 ))}
                                                 {/* Thick separator row between days */}
-                                                <tr className="h-1 bg-black border-2 border-black"><td colSpan={2 + shiftClasses.length}></td></tr>
+                                                <tr className="h-1 bg-black border-2 border-black">
+                                                    <td colSpan={2 + shiftClasses.length}></td>
+                                                </tr>
                                             </React.Fragment>
                                         );
                                     })}
@@ -1296,16 +1516,28 @@ export const ExportPage = () => {
         <div className="max-w-5xl mx-auto space-y-8 pb-20">
             <section className="bg-white dark:bg-dark-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
                 <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
-                    <Icon name="Download" className="text-indigo-600 dark:text-indigo-400"/> Резервное копирование
+                    <Icon name="Download" className="text-indigo-600 dark:text-indigo-400" /> Резервное копирование
                 </h2>
                 <div className="flex flex-wrap gap-4">
-                    <button onClick={() => dbService.exportJson(fullAppData)} className="btn-primary btn-ripple flex items-center gap-2">
-                        <Icon name="Download" size={20}/> Скачать JSON
+                    <button
+                        onClick={() => dbService.exportJson(fullAppData)}
+                        className="btn-primary btn-ripple flex items-center gap-2"
+                    >
+                        <Icon name="Download" size={20} /> Скачать JSON
                     </button>
                     <div className="relative">
-                        <input type="file" ref={fileInputRef} onChange={handleImport} accept=".json" className="hidden" />
-                        <button onClick={() => fileInputRef.current?.click()} className="px-6 py-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 rounded-xl font-bold hover:bg-slate-50 dark:hover:bg-slate-600 transition flex items-center gap-2">
-                            <Icon name="Upload" size={20}/> Загрузить JSON
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            onChange={handleImport}
+                            accept=".json"
+                            className="hidden"
+                        />
+                        <button
+                            onClick={() => fileInputRef.current?.click()}
+                            className="px-6 py-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 rounded-xl font-bold hover:bg-slate-50 dark:hover:bg-slate-600 transition flex items-center gap-2"
+                        >
+                            <Icon name="Upload" size={20} /> Загрузить JSON
                         </button>
                     </div>
                 </div>
@@ -1316,35 +1548,41 @@ export const ExportPage = () => {
                     <button
                         onClick={() => setActiveExportTab('data')}
                         className={[
-                            "px-4 py-2 rounded-xl font-black text-sm transition border",
+                            'px-4 py-2 rounded-xl font-black text-sm transition border',
                             activeExportTab === 'data'
-                                ? "bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-200 dark:shadow-none"
-                                : "bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600"
+                                ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-200 dark:shadow-none'
+                                : 'bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600'
                         ].join(' ')}
                     >
-                        <span className="inline-flex items-center gap-2"><Icon name="FileSpreadsheet" size={18}/> Экспорт</span>
+                        <span className="inline-flex items-center gap-2">
+                            <Icon name="FileSpreadsheet" size={18} /> Экспорт
+                        </span>
                     </button>
                     <button
                         onClick={() => setActiveExportTab('sanitary')}
                         className={[
-                            "px-4 py-2 rounded-xl font-black text-sm transition border",
+                            'px-4 py-2 rounded-xl font-black text-sm transition border',
                             activeExportTab === 'sanitary'
-                                ? "bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-200 dark:shadow-none"
-                                : "bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600"
+                                ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-200 dark:shadow-none'
+                                : 'bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600'
                         ].join(' ')}
                     >
-                        <span className="inline-flex items-center gap-2"><Icon name="Shield" size={18}/> Санстанция</span>
+                        <span className="inline-flex items-center gap-2">
+                            <Icon name="Shield" size={18} /> Санстанция
+                        </span>
                     </button>
                     <button
                         onClick={() => setActiveExportTab('public')}
                         className={[
-                            "px-4 py-2 rounded-xl font-black text-sm transition border",
+                            'px-4 py-2 rounded-xl font-black text-sm transition border',
                             activeExportTab === 'public'
-                                ? "bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-200 dark:shadow-none"
-                                : "bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600"
+                                ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-200 dark:shadow-none'
+                                : 'bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600'
                         ].join(' ')}
                     >
-                        <span className="inline-flex items-center gap-2"><Icon name="QrCode" size={18}/> Публичное</span>
+                        <span className="inline-flex items-center gap-2">
+                            <Icon name="QrCode" size={18} /> Публичное
+                        </span>
                     </button>
                 </div>
             </section>
@@ -1355,25 +1593,50 @@ export const ExportPage = () => {
                         <div className="flex flex-col sm:flex-row justify-between items-center gap-6 mb-6">
                             <div>
                                 <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
-                                    <Icon name="Image" className="text-indigo-600 dark:text-indigo-400"/> Экспорт замен (PNG)
+                                    <Icon name="Image" className="text-indigo-600 dark:text-indigo-400" /> Экспорт замен
+                                    (PNG)
                                 </h2>
-                                <p className="text-slate-500 dark:text-slate-400 text-center">Общее расписание можно экспортировать через меню "Расписание" &rarr; "Печать" на самой странице расписания.</p>
+                                <p className="text-slate-500 dark:text-slate-400 text-center">
+                                    Общее расписание можно экспортировать через меню "Расписание" &rarr; "Печать" на
+                                    самой странице расписания.
+                                </p>
                             </div>
                             <div className="flex gap-4 items-center">
-                                <input type="date" value={exportDate} onChange={e => setExportDate(e.target.value)} className="border border-slate-200 dark:border-slate-600 p-2 rounded-lg font-bold outline-none focus:border-indigo-500 bg-transparent dark:text-white"/>
+                                <input
+                                    type="date"
+                                    value={exportDate}
+                                    onChange={(e) => setExportDate(e.target.value)}
+                                    className="border border-slate-200 dark:border-slate-600 p-2 rounded-lg font-bold outline-none focus:border-indigo-500 bg-transparent dark:text-white"
+                                />
                                 <button
                                     onClick={handleDownloadPngShift1}
                                     disabled={isGenerating || !subsForShift1}
                                     className="btn-primary btn-ripple flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:transform-none"
                                 >
-                                    {isGenerating ? <><Icon name="Loader" size={20} className="animate-spin"/> Создание...</> : <><Icon name="Download" size={20}/> 1-я смена</>}
+                                    {isGenerating ? (
+                                        <>
+                                            <Icon name="Loader" size={20} className="animate-spin" /> Создание...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Icon name="Download" size={20} /> 1-я смена
+                                        </>
+                                    )}
                                 </button>
                                 <button
                                     onClick={handleDownloadPngShift2}
                                     disabled={isGenerating || !subsForShift2}
                                     className="btn-primary btn-ripple flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:transform-none"
                                 >
-                                    {isGenerating ? <><Icon name="Loader" size={20} className="animate-spin"/> Создание...</> : <><Icon name="Download" size={20}/> 2-я смена</>}
+                                    {isGenerating ? (
+                                        <>
+                                            <Icon name="Loader" size={20} className="animate-spin" /> Создание...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Icon name="Download" size={20} /> 2-я смена
+                                        </>
+                                    )}
                                 </button>
                             </div>
                         </div>
@@ -1389,14 +1652,20 @@ export const ExportPage = () => {
                             ) : (
                                 <div className="flex flex-col lg:flex-row gap-8">
                                     {subsForShift1 && (
-                                        <div ref={printRef1} className="bg-white p-8 min-w-[800px] max-w-[1000px] shadow-xl text-slate-900">
+                                        <div
+                                            ref={printRef1}
+                                            className="bg-white p-8 min-w-[800px] max-w-[1000px] shadow-xl text-slate-900"
+                                        >
                                             <ReportHeader />
                                             {renderTableForShift(Shift.First)}
                                             <ReportFooter />
                                         </div>
                                     )}
                                     {subsForShift2 && (
-                                        <div ref={printRef2} className="bg-white p-8 min-w-[800px] max-w-[1000px] shadow-xl text-slate-900">
+                                        <div
+                                            ref={printRef2}
+                                            className="bg-white p-8 min-w-[800px] max-w-[1000px] shadow-xl text-slate-900"
+                                        >
                                             <ReportHeader />
                                             {renderTableForShift(Shift.Second)}
                                             <ReportFooter />
@@ -1409,7 +1678,7 @@ export const ExportPage = () => {
 
                     <section className="bg-white dark:bg-dark-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
                         <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
-                            <Icon name="Printer" className="text-blue-600 dark:text-blue-400"/> Печать сетки
+                            <Icon name="Printer" className="text-blue-600 dark:text-blue-400" /> Печать сетки
                         </h2>
                         <div className="flex flex-wrap gap-4 items-center">
                             <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl p-1.5 pl-3">
@@ -1419,21 +1688,32 @@ export const ExportPage = () => {
                                     onChange={(e) => setMatrixGrade(e.target.value)}
                                     className="bg-transparent text-sm font-bold text-slate-700 dark:text-slate-200 outline-none cursor-pointer"
                                 >
-                                    {availableGrades.map((g: string) => <option key={g} value={g}>{g}-е классы</option>)}
+                                    {availableGrades.map((g: string) => (
+                                        <option key={g} value={g}>
+                                            {g}-е классы
+                                        </option>
+                                    ))}
                                 </select>
                             </div>
-                            <button onClick={() => setIsMatrixPrintOpen(true)} className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200 dark:shadow-none flex items-center gap-2">
-                                <Icon name="Printer" size={20}/> Открыть версию для печати
+                            <button
+                                onClick={() => setIsMatrixPrintOpen(true)}
+                                className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition shadow-lg shadow-blue-200 dark:shadow-none flex items-center gap-2"
+                            >
+                                <Icon name="Printer" size={20} /> Открыть версию для печати
                             </button>
-                            <button onClick={downloadGradeMatrixExcel} className="px-6 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition shadow-lg shadow-emerald-200 dark:shadow-none flex items-center gap-2">
-                                <Icon name="FileSpreadsheet" size={20}/> Скачать Excel
+                            <button
+                                onClick={downloadGradeMatrixExcel}
+                                className="px-6 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition shadow-lg shadow-emerald-200 dark:shadow-none flex items-center gap-2"
+                            >
+                                <Icon name="FileSpreadsheet" size={20} /> Скачать Excel
                             </button>
                         </div>
                     </section>
 
                     <section className="bg-white dark:bg-dark-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
                         <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
-                            <Icon name="FileSpreadsheet" className="text-emerald-600 dark:text-emerald-400"/> Экспорт данных
+                            <Icon name="FileSpreadsheet" className="text-emerald-600 dark:text-emerald-400" /> Экспорт
+                            данных
                         </h2>
                         <div className="flex flex-wrap gap-4 items-center">
                             <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl p-1.5 pl-3">
@@ -1447,23 +1727,41 @@ export const ExportPage = () => {
                                     <option value={2}>2-е (Янв-Май)</option>
                                 </select>
                             </div>
-                            <button onClick={exportStyledExcel} className="px-6 py-3 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900 rounded-xl font-bold hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition flex items-center gap-2">
-                                <Icon name="FileSpreadsheet" size={20}/> Скачать Excel (XLS)
+                            <button
+                                onClick={exportStyledExcel}
+                                className="px-6 py-3 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900 rounded-xl font-bold hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition flex items-center gap-2"
+                            >
+                                <Icon name="FileSpreadsheet" size={20} /> Скачать Excel (XLS)
                             </button>
-                            <button onClick={exportMatrixExcel} className="px-6 py-3 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border border-blue-100 dark:border-blue-900 rounded-xl font-bold hover:bg-blue-100 dark:hover:bg-blue-900/50 transition flex items-center gap-2">
-                                <Icon name="Table" size={20}/> Скачать Матрицу (XLS)
+                            <button
+                                onClick={exportMatrixExcel}
+                                className="px-6 py-3 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border border-blue-100 dark:border-blue-900 rounded-xl font-bold hover:bg-blue-100 dark:hover:bg-blue-900/50 transition flex items-center gap-2"
+                            >
+                                <Icon name="Table" size={20} /> Скачать Матрицу (XLS)
                             </button>
-                            <button onClick={exportPosterMatrixExcel} className="px-6 py-3 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 border border-purple-100 dark:border-purple-900 rounded-xl font-bold hover:bg-purple-100 dark:hover:bg-purple-900/50 transition flex items-center gap-2">
-                                <Icon name="Table" size={20}/> Скачать Плакат (XLS)
+                            <button
+                                onClick={exportPosterMatrixExcel}
+                                className="px-6 py-3 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 border border-purple-100 dark:border-purple-900 rounded-xl font-bold hover:bg-purple-100 dark:hover:bg-purple-900/50 transition flex items-center gap-2"
+                            >
+                                <Icon name="Table" size={20} /> Скачать Плакат (XLS)
                             </button>
-                            <button onClick={copyForGoogleSheets} className="px-6 py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition shadow-lg shadow-green-200 dark:shadow-none flex items-center gap-2">
-                                <Icon name="Clipboard" size={20}/> Копировать для Google Sheets
+                            <button
+                                onClick={copyForGoogleSheets}
+                                className="px-6 py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition shadow-lg shadow-green-200 dark:shadow-none flex items-center gap-2"
+                            >
+                                <Icon name="Clipboard" size={20} /> Копировать для Google Sheets
                             </button>
-                            <button onClick={exportMonthlySubstitutionsExcel} className="px-6 py-3 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 border border-purple-100 dark:border-purple-900 rounded-xl font-bold hover:bg-purple-100 dark:hover:bg-purple-900/50 transition flex items-center gap-2">
-                                <Icon name="List" size={20}/> Отчет по заменам (XLS)
+                            <button
+                                onClick={exportMonthlySubstitutionsExcel}
+                                className="px-6 py-3 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 border border-purple-100 dark:border-purple-900 rounded-xl font-bold hover:bg-purple-100 dark:hover:bg-purple-900/50 transition flex items-center gap-2"
+                            >
+                                <Icon name="List" size={20} /> Отчет по заменам (XLS)
                             </button>
-                            <button onClick={exportRefusalsExcel} className="px-6 py-3 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 border border-red-100 dark:border-red-900 rounded-xl font-bold hover:bg-red-100 dark:hover:bg-red-900/50 transition flex items-center gap-2">
-                                <Icon name="UserX" size={20}/> Отчет об отказах (XLS)
+                            <button
+                                onClick={exportRefusalsExcel}
+                                className="px-6 py-3 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 border border-red-100 dark:border-red-900 rounded-xl font-bold hover:bg-red-100 dark:hover:bg-red-900/50 transition flex items-center gap-2"
+                            >
+                                <Icon name="UserX" size={20} /> Отчет об отказах (XLS)
                             </button>
                         </div>
                     </section>
@@ -1486,46 +1784,78 @@ export const ExportPage = () => {
             {activeExportTab === 'public' && (
                 <section className="bg-white dark:bg-dark-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
                     <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
-                        <Icon name="QrCode" className="text-purple-600 dark:text-purple-400"/> Публичное расписание
+                        <Icon name="QrCode" className="text-purple-600 dark:text-purple-400" /> Публичное расписание
                     </h2>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-                        Опубликуйте актуальное расписание для учеников и родителей. Будет сгенерирована уникальная ссылка с QR-кодом.
+                        Опубликуйте актуальное расписание для учеников и родителей. Будет сгенерирована уникальная
+                        ссылка с QR-кодом.
                     </p>
                     {settings.publicScheduleId ? (
                         <div className="flex flex-col md:flex-row items-center gap-4">
                             <div className="flex-1">
                                 <p className="text-sm font-bold text-slate-600 dark:text-slate-300 mb-2">
-                                    Расписание опубликовано! ID: <span className="font-mono bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded">{settings.publicScheduleId}</span>
+                                    Расписание опубликовано! ID:{' '}
+                                    <span className="font-mono bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded">
+                                        {settings.publicScheduleId}
+                                    </span>
                                 </p>
-                                <button onClick={() => setIsPublishModalOpen(true)} className="px-4 py-2 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition flex items-center gap-2">
-                                    <Icon name="Share2" size={16}/> Показать QR-код и ссылку
+                                <button
+                                    onClick={() => setIsPublishModalOpen(true)}
+                                    className="px-4 py-2 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition flex items-center gap-2"
+                                >
+                                    <Icon name="Share2" size={16} /> Показать QR-код и ссылку
                                 </button>
-                                <button onClick={clearPublicSchedule} className="ml-3 px-4 py-2 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 border border-red-100 dark:border-red-900 rounded-xl font-bold hover:bg-red-100 dark:hover:bg-red-900/50 transition flex items-center gap-2">
-                                    <Icon name="Trash2" size={16}/> Отменить публикацию
+                                <button
+                                    onClick={clearPublicSchedule}
+                                    className="ml-3 px-4 py-2 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 border border-red-100 dark:border-red-900 rounded-xl font-bold hover:bg-red-100 dark:hover:bg-red-900/50 transition flex items-center gap-2"
+                                >
+                                    <Icon name="Trash2" size={16} /> Отменить публикацию
                                 </button>
                             </div>
                         </div>
                     ) : (
-                        <button onClick={handlePublishSchedule} disabled={isGenerating} className="px-6 py-3 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition shadow-lg shadow-purple-200 dark:shadow-none flex items-center gap-2 disabled:opacity-50">
-                            <Icon name="Share2" size={20}/> Опубликовать расписание
+                        <button
+                            onClick={handlePublishSchedule}
+                            disabled={isGenerating}
+                            className="px-6 py-3 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition shadow-lg shadow-purple-200 dark:shadow-none flex items-center gap-2 disabled:opacity-50"
+                        >
+                            <Icon name="Share2" size={20} /> Опубликовать расписание
                         </button>
                     )}
                 </section>
             )}
 
-            <Modal isOpen={isPublishModalOpen} onClose={() => setIsPublishModalOpen(false)} title="Публичное расписание">
+            <Modal
+                isOpen={isPublishModalOpen}
+                onClose={() => setIsPublishModalOpen(false)}
+                title="Публичное расписание"
+            >
                 <div className="flex flex-col items-center justify-center p-4 text-center space-y-4">
                     <p className="text-sm text-slate-600 dark:text-slate-300">
                         Отсканируйте QR-код или перейдите по ссылке, чтобы увидеть публичное расписание.
                     </p>
                     {publicScheduleUrl && (
                         <>
-                            <QRCodeSVG value={publicScheduleUrl} size={256} level="H" includeMargin={true} className="p-2 bg-white border border-slate-200 rounded-lg shadow-md" />
-                            <a href={publicScheduleUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline text-sm font-medium break-all">
+                            <QRCodeSVG
+                                value={publicScheduleUrl}
+                                size={256}
+                                level="H"
+                                includeMargin={true}
+                                className="p-2 bg-white border border-slate-200 rounded-lg shadow-md"
+                            />
+                            <a
+                                href={publicScheduleUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-indigo-600 hover:underline text-sm font-medium break-all"
+                            >
                                 {publicScheduleUrl}
                             </a>
-                            <button onClick={() => navigator.clipboard.writeText(publicScheduleUrl)} className="px-4 py-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 rounded-xl text-sm font-bold hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition flex items-center gap-2">
-                                <Icon name="Copy" size={16}/> Копировать ссылку
+                            <button
+                                onClick={() => navigator.clipboard.writeText(publicScheduleUrl)}
+                                className="px-4 py-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 rounded-xl text-sm font-bold hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition flex items-center gap-2"
+                            >
+                                <Icon name="Copy" size={16} /> Копировать ссылку
                             </button>
                         </>
                     )}
@@ -1536,15 +1866,25 @@ export const ExportPage = () => {
                 <div className="fixed inset-0 z-[100] bg-white flex flex-col">
                     {/* Toolbar */}
                     <div className="p-4 border-b flex justify-between items-center bg-slate-50 no-print">
-                         <h2 className="font-bold text-lg text-slate-800">Печать сетки ({matrixGrade}-е классы)</h2>
-                         <div className="flex gap-2">
-                             <button onClick={() => window.print()} className="btn-primary btn-ripple flex items-center gap-2"><Icon name="Printer" size={16}/> Печать</button>
-                             <button onClick={() => setIsMatrixPrintOpen(false)} className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg font-bold hover:bg-slate-300">Закрыть</button>
-                         </div>
+                        <h2 className="font-bold text-lg text-slate-800">Печать сетки ({matrixGrade}-е классы)</h2>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => window.print()}
+                                className="btn-primary btn-ripple flex items-center gap-2"
+                            >
+                                <Icon name="Printer" size={16} /> Печать
+                            </button>
+                            <button
+                                onClick={() => setIsMatrixPrintOpen(false)}
+                                className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg font-bold hover:bg-slate-300"
+                            >
+                                Закрыть
+                            </button>
+                        </div>
                     </div>
                     {/* Printable Area */}
                     <div className="flex-1 overflow-auto p-8 custom-scrollbar bg-white">
-                         <MatrixPrintContent />
+                        <MatrixPrintContent />
                     </div>
                 </div>
             )}

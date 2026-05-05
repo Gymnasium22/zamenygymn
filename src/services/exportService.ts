@@ -1,4 +1,3 @@
-
 /**
  * Service for handling data exports to various formats (Excel, PNG, CSV).
  * Centralizes the logic for generating downloadable files.
@@ -32,9 +31,9 @@ export const exportService = {
             </html>
         `;
 
-        const blob = new Blob([html], { type: "application/vnd.ms-excel" });
+        const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
         const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
+        const link = document.createElement('a');
         link.href = url;
         link.download = fileName.endsWith('.xls') ? fileName : `${fileName}.xls`;
         document.body.appendChild(link);
@@ -49,7 +48,7 @@ export const exportService = {
     saveAsCSV: (content: string, fileName: string, type: 'csv' | 'tsv' = 'csv') => {
         const blob = new Blob([content], { type: type === 'csv' ? 'text/csv' : 'text/tab-separated-values' });
         const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
+        const link = document.createElement('a');
         link.href = url;
         link.download = fileName.endsWith(`.${type}`) ? fileName : `${fileName}.${type}`;
         document.body.appendChild(link);

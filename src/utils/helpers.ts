@@ -1,4 +1,3 @@
-
 import { AppData, ScheduleItem } from '../types';
 
 /**
@@ -21,22 +20,22 @@ export const getActiveSemester = (date: Date, settings?: AppData['settings']): 1
     }
 
     // По умолчанию: Январь (0) - Май (4) = 2 семестр, остальное = 1 семестр
-    return (currentMonth >= 0 && currentMonth <= 4) ? 2 : 1;
+    return currentMonth >= 0 && currentMonth <= 4 ? 2 : 1;
 };
 
 /**
  * Возвращает актуальное расписание для указанной даты
  */
 export const getScheduleForDate = (
-    date: Date, 
-    data: { 
-        settings?: AppData['settings']; 
-        schedule?: ScheduleItem[]; 
-        schedule2?: ScheduleItem[]; 
+    date: Date,
+    data: {
+        settings?: AppData['settings'];
+        schedule?: ScheduleItem[];
+        schedule2?: ScheduleItem[];
     }
 ): ScheduleItem[] => {
     const semester = getActiveSemester(date, data.settings);
-    return semester === 2 ? (data.schedule2 || []) : (data.schedule || []);
+    return semester === 2 ? data.schedule2 || [] : data.schedule || [];
 };
 
 /**

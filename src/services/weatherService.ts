@@ -1,4 +1,3 @@
-
 export interface WeatherData {
     name: string;
     main: { temp: number };
@@ -33,18 +32,22 @@ class WeatherService {
                     };
                 }
             } catch (e) {
-                console.warn("Weather cache invalid");
+                console.warn('Weather cache invalid');
             }
         }
 
         try {
             // Fetch Current Weather
-            const currentRes = await fetch(`https://api.openweathermap.org/data/2.5/weather?q=${city}&units=metric&lang=ru&appid=${apiKey}`);
+            const currentRes = await fetch(
+                `https://api.openweathermap.org/data/2.5/weather?q=${city}&units=metric&lang=ru&appid=${apiKey}`
+            );
             if (!currentRes.ok) throw new Error('Weather API Error');
             const currentData = await currentRes.json();
 
             // Fetch Forecast (5 days / 3 hour steps)
-            const forecastRes = await fetch(`https://api.openweathermap.org/data/2.5/forecast?q=${city}&units=metric&lang=ru&appid=${apiKey}`);
+            const forecastRes = await fetch(
+                `https://api.openweathermap.org/data/2.5/forecast?q=${city}&units=metric&lang=ru&appid=${apiKey}`
+            );
             if (!forecastRes.ok) throw new Error('Forecast API Error');
             const forecastRaw = await forecastRes.json();
 
@@ -67,10 +70,13 @@ class WeatherService {
                 forecast: dailyForecast
             };
 
-            localStorage.setItem(CACHE_KEY, JSON.stringify({
-                timestamp: Date.now(),
-                ...response
-            }));
+            localStorage.setItem(
+                CACHE_KEY,
+                JSON.stringify({
+                    timestamp: Date.now(),
+                    ...response
+                })
+            );
 
             return response;
         } catch (err) {

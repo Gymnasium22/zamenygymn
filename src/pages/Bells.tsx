@@ -18,7 +18,7 @@ const timeToMin = (t: string) => {
 
 const minToTime = (m: number) => {
     let h = Math.floor(m / 60);
-    let min = m % 60;
+    const min = m % 60;
     if (h >= 24) h -= 24;
     if (h < 0) h += 24;
     return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
@@ -68,7 +68,7 @@ const ShiftTimeline = ({
     handleBellChange,
     toggleBellCancellation,
     timeInputs,
-    setTimeInputValue,
+    setTimeInputValue
 }: {
     shift: Shift;
     currentPresetBells: Bell[];
@@ -80,32 +80,58 @@ const ShiftTimeline = ({
     setTimeInputValue: (key: string, value: string) => void;
 }) => {
     const periods = SHIFT_PERIODS[shift];
-    const shiftBells = currentPresetBells.filter(b => b.shift === shift && b.day === 'default');
+    const shiftBells = currentPresetBells.filter((b) => b.shift === shift && b.day === 'default');
 
     return (
         <div className="bg-white dark:bg-dark-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col h-full">
-            <div className={`p-4 font-bold text-lg text-white text-center bg-gradient-to-r ${shift === Shift.First ? 'from-indigo-600 to-indigo-700' : 'from-purple-600 to-purple-700'}`}>
+            <div
+                className={`p-4 font-bold text-lg text-white text-center bg-gradient-to-r ${shift === Shift.First ? 'from-indigo-600 to-indigo-700' : 'from-purple-600 to-purple-700'}`}
+            >
                 {shift}
             </div>
 
             <div className="bg-slate-50 dark:bg-slate-700/50 p-2 flex justify-center gap-2 border-b border-slate-200 dark:border-slate-600">
-                <button onClick={() => bulkShiftSchedule(shift, -5)} className="px-2 py-1 text-xs font-bold text-slate-500 hover:bg-white dark:hover:bg-slate-600 rounded shadow-sm border border-slate-200 dark:border-slate-500">-5 мин</button>
-                <button onClick={() => bulkShiftSchedule(shift, 5)} className="px-2 py-1 text-xs font-bold text-slate-500 hover:bg-white dark:hover:bg-slate-600 rounded shadow-sm border border-slate-200 dark:border-slate-500">+5 мин</button>
+                <button
+                    onClick={() => bulkShiftSchedule(shift, -5)}
+                    className="px-2 py-1 text-xs font-bold text-slate-500 hover:bg-white dark:hover:bg-slate-600 rounded shadow-sm border border-slate-200 dark:border-slate-500"
+                >
+                    -5 мин
+                </button>
+                <button
+                    onClick={() => bulkShiftSchedule(shift, 5)}
+                    className="px-2 py-1 text-xs font-bold text-slate-500 hover:bg-white dark:hover:bg-slate-600 rounded shadow-sm border border-slate-200 dark:border-slate-500"
+                >
+                    +5 мин
+                </button>
                 <div className="w-px h-6 bg-slate-300 dark:bg-slate-600 mx-1"></div>
-                <button onClick={() => bulkSetDuration(shift, 45)} className="px-2 py-1 text-xs font-bold text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded border border-indigo-200 dark:border-indigo-800">45 мин</button>
-                <button onClick={() => bulkSetDuration(shift, 40)} className="px-2 py-1 text-xs font-bold text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded border border-indigo-200 dark:border-indigo-800">40 мин</button>
+                <button
+                    onClick={() => bulkSetDuration(shift, 45)}
+                    className="px-2 py-1 text-xs font-bold text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded border border-indigo-200 dark:border-indigo-800"
+                >
+                    45 мин
+                </button>
+                <button
+                    onClick={() => bulkSetDuration(shift, 40)}
+                    className="px-2 py-1 text-xs font-bold text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded border border-indigo-200 dark:border-indigo-800"
+                >
+                    40 мин
+                </button>
             </div>
 
             <div className="p-4 space-y-2 relative flex-1 overflow-y-auto custom-scrollbar">
                 <div className="absolute left-[2.85rem] top-4 bottom-4 w-0.5 bg-slate-200 dark:bg-slate-700 z-0"></div>
 
                 {periods.map((period, index) => {
-                    const bell = (shiftBells.find(b => b.period === period) || { start: '00:00', end: '00:00', cancelled: false }) as Bell;
+                    const bell = (shiftBells.find((b) => b.period === period) || {
+                        start: '00:00',
+                        end: '00:00',
+                        cancelled: false
+                    }) as Bell;
                     const startKey = getTimeKey(shift, period, 'start');
                     const endKey = getTimeKey(shift, period, 'end');
                     const startValue = timeInputs[startKey] ?? bell.start;
                     const endValue = timeInputs[endKey] ?? bell.end;
-                    const prevBell = index > 0 ? shiftBells.find(b => b.period === periods[index - 1]) : null;
+                    const prevBell = index > 0 ? shiftBells.find((b) => b.period === periods[index - 1]) : null;
 
                     const hasOverlap = !!(prevBell && timeToMin(bell.start) < timeToMin(prevBell.end));
                     const isInvalid = timeToMin(bell.end) <= timeToMin(bell.start);
@@ -122,7 +148,9 @@ const ShiftTimeline = ({
                                     <div className="w-12 flex justify-center">
                                         <div className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-500"></div>
                                     </div>
-                                    <div className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 ${breakDuration < 5 ? 'bg-red-100 text-red-600' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'}`}>
+                                    <div
+                                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 ${breakDuration < 5 ? 'bg-red-100 text-red-600' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'}`}
+                                    >
                                         <Icon name="Coffee" size={10} />
                                         {breakDuration} мин
                                     </div>
@@ -148,7 +176,9 @@ const ShiftTimeline = ({
 
                                 {bell.cancelled ? (
                                     <div className="flex-1 flex items-center justify-between">
-                                        <span className="text-red-500 font-bold uppercase text-xs tracking-wider bg-white/80 px-2 py-1 rounded">Урок снят</span>
+                                        <span className="text-red-500 font-bold uppercase text-xs tracking-wider bg-white/80 px-2 py-1 rounded">
+                                            Урок снят
+                                        </span>
                                         <button
                                             onClick={() => toggleBellCancellation(shift, period)}
                                             className="p-2 bg-white text-emerald-600 hover:bg-emerald-50 rounded-lg transition shadow-sm"
@@ -166,7 +196,7 @@ const ShiftTimeline = ({
                                                     inputMode="numeric"
                                                     maxLength={5}
                                                     placeholder="чч:мм"
-                                                    onChange={e => {
+                                                    onChange={(e) => {
                                                         const next = e.target.value.replace(/[^\d:]/g, '').slice(0, 5);
                                                         setTimeInputValue(startKey, next);
                                                     }}
@@ -178,10 +208,14 @@ const ShiftTimeline = ({
                                                         }
                                                     }}
                                                     className={`w-full bg-slate-50 dark:bg-slate-800 border rounded-lg px-2 py-1 text-center font-mono font-bold text-lg outline-none focus:ring-2 focus:ring-indigo-500 ${
-                                                        hasOverlap ? 'border-red-500 text-red-600' : 'border-slate-200 dark:border-slate-600 dark:text-white'
+                                                        hasOverlap
+                                                            ? 'border-red-500 text-red-600'
+                                                            : 'border-slate-200 dark:border-slate-600 dark:text-white'
                                                     }`}
                                                 />
-                                                {hasOverlap && <div className="absolute -top-2 -right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>}
+                                                {hasOverlap && (
+                                                    <div className="absolute -top-2 -right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                                                )}
                                             </div>
                                             <span className="text-slate-300 dark:text-slate-600 font-bold">-</span>
                                             <div className="relative">
@@ -191,7 +225,7 @@ const ShiftTimeline = ({
                                                     inputMode="numeric"
                                                     maxLength={5}
                                                     placeholder="чч:мм"
-                                                    onChange={e => {
+                                                    onChange={(e) => {
                                                         const next = e.target.value.replace(/[^\d:]/g, '').slice(0, 5);
                                                         setTimeInputValue(endKey, next);
                                                     }}
@@ -203,7 +237,9 @@ const ShiftTimeline = ({
                                                         }
                                                     }}
                                                     className={`w-full bg-slate-50 dark:bg-slate-800 border rounded-lg px-2 py-1 text-center font-mono font-bold text-lg outline-none focus:ring-2 focus:ring-indigo-500 ${
-                                                        isInvalid ? 'border-red-500 text-red-600' : 'border-slate-200 dark:border-slate-600 dark:text-white'
+                                                        isInvalid
+                                                            ? 'border-red-500 text-red-600'
+                                                            : 'border-slate-200 dark:border-slate-600 dark:text-white'
                                                     }`}
                                                 />
                                             </div>
@@ -244,7 +280,7 @@ export const BellsPage = () => {
     // Initialize bells on load
     useEffect(() => {
         if (settings.bellPresets && settings.bellPresets.length > 0) {
-            const preset = settings.bellPresets.find(p => p.id === selectedPresetId);
+            const preset = settings.bellPresets.find((p) => p.id === selectedPresetId);
             if (preset) {
                 setCurrentPresetBells(preset.bells);
                 setTimeInputs({});
@@ -256,12 +292,12 @@ export const BellsPage = () => {
     }, [selectedPresetId, settings.bellPresets]);
 
     const setTimeInputValue = (key: string, value: string) => {
-        setTimeInputs(prev => ({ ...prev, [key]: value }));
+        setTimeInputs((prev) => ({ ...prev, [key]: value }));
     };
 
     const handleBellChange = (shift: string, period: number, field: 'start' | 'end', value: string) => {
-        let newBells = [...currentPresetBells];
-        let idx = newBells.findIndex(b => b.shift === shift && b.period === period && b.day === 'default');
+        const newBells = [...currentPresetBells];
+        let idx = newBells.findIndex((b) => b.shift === shift && b.period === period && b.day === 'default');
 
         if (idx === -1) {
             newBells.push({ shift, period, [field]: value, start: '00:00', end: '00:00', day: 'default' } as Bell);
@@ -288,7 +324,7 @@ export const BellsPage = () => {
 
     const toggleBellCancellation = (shift: string, period: number) => {
         const newBells = [...currentPresetBells];
-        const idx = newBells.findIndex(b => b.shift === shift && b.period === period && b.day === 'default');
+        const idx = newBells.findIndex((b) => b.shift === shift && b.period === period && b.day === 'default');
 
         if (idx >= 0) {
             newBells[idx] = { ...newBells[idx], cancelled: !newBells[idx].cancelled };
@@ -299,7 +335,7 @@ export const BellsPage = () => {
     };
 
     const bulkShiftSchedule = (shift: Shift, minutes: number) => {
-        const newBells = currentPresetBells.map(b => {
+        const newBells = currentPresetBells.map((b) => {
             if (b.shift !== shift) return b;
             const start = timeToMin(b.start) + minutes;
             const end = timeToMin(b.end) + minutes;
@@ -309,7 +345,7 @@ export const BellsPage = () => {
     };
 
     const bulkSetDuration = (shift: Shift, duration: number) => {
-        const newBells = currentPresetBells.map(b => {
+        const newBells = currentPresetBells.map((b) => {
             if (b.shift !== shift) return b;
             const start = timeToMin(b.start);
             return { ...b, end: minToTime(start + duration) };
@@ -318,8 +354,8 @@ export const BellsPage = () => {
     };
 
     const savePreset = async () => {
-        let presets = [...(settings.bellPresets || [])];
-        const index = presets.findIndex(p => p.id === selectedPresetId);
+        const presets = [...(settings.bellPresets || [])];
+        const index = presets.findIndex((p) => p.id === selectedPresetId);
 
         if (index >= 0) {
             presets[index] = { ...presets[index], bells: currentPresetBells };
@@ -327,7 +363,7 @@ export const BellsPage = () => {
             presets.push({
                 id: selectedPresetId,
                 name: newPresetName || 'Новый режим',
-                bells: currentPresetBells,
+                bells: currentPresetBells
             });
         }
 
@@ -341,7 +377,7 @@ export const BellsPage = () => {
     };
 
     const duplicatePreset = () => {
-        const currentPreset = settings.bellPresets?.find(p => p.id === selectedPresetId);
+        const currentPreset = settings.bellPresets?.find((p) => p.id === selectedPresetId);
         setNewPresetName((currentPreset?.name || 'Копия') + ' (Копия)');
         setIsPresetModalOpen(true);
     };
@@ -354,7 +390,7 @@ export const BellsPage = () => {
         presets.push({
             id: newId,
             name: newPresetName,
-            bells: JSON.parse(JSON.stringify(currentPresetBells)),
+            bells: JSON.parse(JSON.stringify(currentPresetBells))
         });
 
         await saveStaticData({ settings: { ...settings, bellPresets: presets } });
@@ -369,7 +405,7 @@ export const BellsPage = () => {
         }
         if (!window.confirm('Удалить этот режим звонков?')) return;
 
-        const presets = (settings.bellPresets || []).filter(p => p.id !== selectedPresetId);
+        const presets = (settings.bellPresets || []).filter((p) => p.id !== selectedPresetId);
         const nextId = presets[0]?.id || 'preset_normal';
         setSelectedPresetId(nextId);
 
@@ -380,8 +416,8 @@ export const BellsPage = () => {
         if (
             window.confirm(
                 `Применить режим звонков "${
-                    settings.bellPresets?.find(p => p.id === selectedPresetId)?.name
-                }" для всего расписания?`,
+                    settings.bellPresets?.find((p) => p.id === selectedPresetId)?.name
+                }" для всего расписания?`
             )
         ) {
             await saveStaticData({ bellSchedule: currentPresetBells });
@@ -390,7 +426,7 @@ export const BellsPage = () => {
     };
 
     const getExportContent = () => {
-        const presetName = escapeHtml(settings.bellPresets?.find(p => p.id === selectedPresetId)?.name || 'Обычный');
+        const presetName = escapeHtml(settings.bellPresets?.find((p) => p.id === selectedPresetId)?.name || 'Обычный');
         const safeExportDate = exportDate ? escapeHtml(new Date(exportDate).toLocaleDateString('ru-RU')) : '';
 
         return `
@@ -411,8 +447,8 @@ export const BellsPage = () => {
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px;">
                     ${[Shift.First, Shift.Second]
-                        .map(shift => {
-                            const shiftBells = currentPresetBells.filter(b => b.shift === shift);
+                        .map((shift) => {
+                            const shiftBells = currentPresetBells.filter((b) => b.shift === shift);
                             return `
                             <div style="background: #fff; border: 2px solid #e2e8f0; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
                                 <div style="background: ${
@@ -422,13 +458,14 @@ export const BellsPage = () => {
                                 </div>
                                 <div style="padding: 20px;">
                                     ${SHIFT_PERIODS[shift]
-                                        .map(period => {
-                                            const bell =
-                                                shiftBells.find(b => b.period === period && b.day === 'default') || {
-                                                    start: '00:00',
-                                                    end: '00:00',
-                                                    cancelled: false,
-                                                };
+                                        .map((period) => {
+                                            const bell = shiftBells.find(
+                                                (b) => b.period === period && b.day === 'default'
+                                            ) || {
+                                                start: '00:00',
+                                                end: '00:00',
+                                                cancelled: false
+                                            };
 
                                             if (bell.cancelled) {
                                                 return `
@@ -477,7 +514,7 @@ export const BellsPage = () => {
         const canvas = await html2canvas(exportRef.current, { scale: 2, backgroundColor: '#ffffff' });
         const link = document.createElement('a');
         link.href = canvas.toDataURL('image/png');
-        const preset = settings.bellPresets?.find(p => p.id === selectedPresetId);
+        const preset = settings.bellPresets?.find((p) => p.id === selectedPresetId);
         link.download = `Звонки_${preset?.name || 'Расписание'}.png`;
         link.click();
     };
@@ -490,12 +527,12 @@ export const BellsPage = () => {
         const width = pdf.internal.pageSize.getWidth();
         const height = (canvas.height * width) / canvas.width;
         pdf.addImage(imgData, 'PNG', 0, 0, width, height);
-        const preset = settings.bellPresets?.find(p => p.id === selectedPresetId);
+        const preset = settings.bellPresets?.find((p) => p.id === selectedPresetId);
         pdf.save(`Звонки_${preset?.name || 'Расписание'}.pdf`);
     };
 
     const exportBellsToExcel = () => {
-        const preset = settings.bellPresets?.find(p => p.id === selectedPresetId);
+        const preset = settings.bellPresets?.find((p) => p.id === selectedPresetId);
         let content = exportService.getApprovalBlock();
 
         content += `
@@ -512,12 +549,12 @@ export const BellsPage = () => {
                 </tr>
         `;
 
-        [Shift.First, Shift.Second].forEach(shift => {
+        [Shift.First, Shift.Second].forEach((shift) => {
             const shiftName = shift === Shift.First ? '1-я смена' : '2-я смена';
 
             SHIFT_PERIODS[shift].forEach((period, index) => {
                 const bell =
-                    currentPresetBells.find(b => b.shift === shift && b.period === period && b.day === 'default') ||
+                    currentPresetBells.find((b) => b.shift === shift && b.period === period && b.day === 'default') ||
                     ({ start: '00:00', end: '00:00', cancelled: false } as BellItem);
 
                 content += `
@@ -575,7 +612,7 @@ export const BellsPage = () => {
                                 Режим звонков
                             </span>
                             <div className="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0 custom-scrollbar">
-                                {(settings.bellPresets || []).map(p => (
+                                {(settings.bellPresets || []).map((p) => (
                                     <div
                                         key={p.id}
                                         onClick={() => setSelectedPresetId(p.id)}
@@ -589,7 +626,7 @@ export const BellsPage = () => {
                                         {selectedPresetId === p.id && (
                                             <div className="flex items-center gap-1 ml-2 border-l border-indigo-400 pl-2">
                                                 <button
-                                                    onClick={e => {
+                                                    onClick={(e) => {
                                                         e.stopPropagation();
                                                         duplicatePreset();
                                                     }}
@@ -599,7 +636,7 @@ export const BellsPage = () => {
                                                     <Icon name="Copy" size={14} />
                                                 </button>
                                                 <button
-                                                    onClick={e => {
+                                                    onClick={(e) => {
                                                         e.stopPropagation();
                                                         deletePreset();
                                                     }}
@@ -710,7 +747,7 @@ export const BellsPage = () => {
                             className="w-full border border-slate-200 dark:border-slate-600 rounded-xl p-3 text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500"
                             placeholder="Например: Праздничный (30 мин)"
                             value={newPresetName}
-                            onChange={e => setNewPresetName(e.target.value)}
+                            onChange={(e) => setNewPresetName(e.target.value)}
                             autoFocus
                         />
                     </div>
@@ -741,7 +778,7 @@ export const BellsPage = () => {
                             <input
                                 type="date"
                                 value={exportDate}
-                                onChange={e => setExportDate(e.target.value)}
+                                onChange={(e) => setExportDate(e.target.value)}
                                 className="border border-slate-200 dark:border-slate-600 p-2 rounded-xl text-sm font-bold bg-white dark:bg-slate-800 dark:text-white"
                             />
                         </div>
@@ -775,4 +812,3 @@ export const BellsPage = () => {
         </div>
     );
 };
-

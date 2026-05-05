@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef, useMemo, createContext, useContext, ReactNode } from 'react';
 import { Icon } from './Icons';
 import { useStaticData } from '../context/DataContext';
@@ -27,21 +26,21 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
 
     const addToast = (toast: Omit<ToastData, 'id'>) => {
         const id = generateId();
-        setToasts(prev => [...prev, { ...toast, id }]);
+        setToasts((prev) => [...prev, { ...toast, id }]);
     };
 
     const removeToast = (id: string) => {
-        setToasts(prev => prev.filter(toast => toast.id !== id));
+        setToasts((prev) => prev.filter((toast) => toast.id !== id));
     };
 
     useEffect(() => {
         const handleAppToast = (e: Event) => {
-            const customEvent = e as CustomEvent<{type?: string, title?: string, message: string}>;
+            const customEvent = e as CustomEvent<{ type?: string; title?: string; message: string }>;
             const { type = 'danger', title = 'Уведомление', message } = customEvent.detail;
-            
+
             // Generate ID here to avoid dependency issues
             const id = Date.now().toString() + Math.random().toString(36).substring(2, 9);
-            setToasts(prev => [...prev, { type: type as any, title, message, id }]);
+            setToasts((prev) => [...prev, { type: type as any, title, message, id }]);
         };
         window.addEventListener('app-toast', handleAppToast);
         return () => window.removeEventListener('app-toast', handleAppToast);
@@ -76,7 +75,7 @@ interface ToastContainerProps {
 
 export const ToastContainer = ({ toasts, onRemoveToast }: ToastContainerProps) => {
     const clearAllToasts = () => {
-        toasts.forEach(toast => onRemoveToast(toast.id));
+        toasts.forEach((toast) => onRemoveToast(toast.id));
     };
 
     if (toasts.length === 0) return null;
@@ -116,13 +115,7 @@ interface SkeletonProps {
     animation?: boolean;
 }
 
-export const Skeleton = ({
-    className = '',
-    variant = 'text',
-    width,
-    height,
-    animation = true
-}: SkeletonProps) => {
+export const Skeleton = ({ className = '', variant = 'text', width, height, animation = true }: SkeletonProps) => {
     const baseClasses = 'skeleton';
     const variantClasses = {
         text: 'h-4 rounded',
@@ -197,28 +190,37 @@ interface ToastProps {
 export const Modal = ({ isOpen, onClose, title, children, maxWidth = 'max-w-lg' }: ModalProps) => {
     useEffect(() => {
         if (!isOpen) return;
-        
+
         const handleEscape = (e: KeyboardEvent) => {
             if (e.key === 'Escape') onClose();
         };
-        
+
         document.addEventListener('keydown', handleEscape);
         document.body.style.overflow = 'hidden';
-        
+
         return () => {
             document.removeEventListener('keydown', handleEscape);
             document.body.style.overflow = '';
         };
     }, [isOpen, onClose]);
-    
+
     if (!isOpen) return null;
-    
+
     return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-fade-in no-print" onClick={(e) => e.target === e.currentTarget && onClose()}>
-            <div className={`bg-white/90 dark:bg-dark-800/90 rounded-3xl shadow-2xl w-full ${maxWidth} flex flex-col max-h-[90vh] transition-colors duration-300`}>
+        <div
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-fade-in no-print"
+            onClick={(e) => e.target === e.currentTarget && onClose()}
+        >
+            <div
+                className={`bg-white/90 dark:bg-dark-800/90 rounded-3xl shadow-2xl w-full ${maxWidth} flex flex-col max-h-[90vh] transition-colors duration-300`}
+            >
                 <div className="flex items-center justify-between px-6 py-5 border-b border-slate-200/50 dark:border-slate-700/50">
                     <h2 className="text-xl font-bold text-slate-800 dark:text-white tracking-tight">{title}</h2>
-                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700" aria-label="Закрыть">
+                    <button
+                        onClick={onClose}
+                        className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700"
+                        aria-label="Закрыть"
+                    >
                         <Icon name="X" size={20} />
                     </button>
                 </div>
@@ -297,30 +299,25 @@ export const Toast = ({ id, type, title, message, duration = 5000, onClose }: To
     };
 
     const styles = getTypeStyles();
-    const iconName = type === 'success' ? 'CheckCircle' :
-                    type === 'warning' ? 'AlertTriangle' :
-                    type === 'danger' ? 'XCircle' : 'Info';
+    const iconName =
+        type === 'success'
+            ? 'CheckCircle'
+            : type === 'warning'
+              ? 'AlertTriangle'
+              : type === 'danger'
+                ? 'XCircle'
+                : 'Info';
 
     return (
-        <div
-            className={`max-w-sm w-full animate-slide-in ${
-                isExiting ? 'animate-fade-out' : ''
-            }`}
-        >
+        <div className={`max-w-sm w-full animate-slide-in ${isExiting ? 'animate-fade-out' : ''}`}>
             <div className={`modern-card border p-4 ${styles.bg}`}>
                 <div className="flex items-start gap-3">
                     <div className={`flex-shrink-0 ${styles.icon}`}>
                         <Icon name={iconName} size={20} />
                     </div>
                     <div className="flex-1 min-w-0">
-                        <h4 className={`text-sm font-semibold ${styles.title}`}>
-                            {title}
-                        </h4>
-                        {message && (
-                            <p className={`text-sm mt-1 ${styles.message}`}>
-                                {message}
-                            </p>
-                        )}
+                        <h4 className={`text-sm font-semibold ${styles.title}`}>{title}</h4>
+                        {message && <p className={`text-sm mt-1 ${styles.message}`}>{message}</p>}
                     </div>
                     <button
                         onClick={handleClose}
@@ -334,9 +331,6 @@ export const Toast = ({ id, type, title, message, duration = 5000, onClose }: To
         </div>
     );
 };
-
-
-
 
 interface ContextMenuAction {
     label: string;
@@ -355,23 +349,23 @@ interface ContextMenuProps {
 
 export const ContextMenu = ({ x, y, onClose, actions }: ContextMenuProps) => {
     const ref = useRef<HTMLDivElement>(null);
-    
+
     useEffect(() => {
         if (x === null || y === null) return;
-        
+
         const handleClick = (e: MouseEvent) => {
             if (ref.current && !ref.current.contains(e.target as Node)) {
                 onClose();
             }
         };
-        
+
         const handleEscape = (e: KeyboardEvent) => {
             if (e.key === 'Escape') onClose();
         };
-        
+
         window.addEventListener('click', handleClick, true);
         document.addEventListener('keydown', handleEscape);
-        
+
         return () => {
             window.removeEventListener('click', handleClick, true);
             document.removeEventListener('keydown', handleEscape);
@@ -380,19 +374,23 @@ export const ContextMenu = ({ x, y, onClose, actions }: ContextMenuProps) => {
 
     if (x === null || y === null) return null;
 
-    const left = (window.innerWidth - x < 200) ? x - 200 : x;
+    const left = window.innerWidth - x < 200 ? x - 200 : x;
     const style: React.CSSProperties = { top: y, left };
 
     return (
-        <div ref={ref} className="fixed z-[100] bg-white/90 dark:bg-slate-800/90 backdrop-blur-md shadow-xl rounded-2xl border border-slate-100 dark:border-slate-700 py-2 w-56 context-menu no-print" style={style}>
+        <div
+            ref={ref}
+            className="fixed z-[100] bg-white/90 dark:bg-slate-800/90 backdrop-blur-md shadow-xl rounded-2xl border border-slate-100 dark:border-slate-700 py-2 w-56 context-menu no-print"
+            style={style}
+        >
             {actions.map((action) => (
-                <button 
-                    key={action.id || action.label} 
-                    onClick={(e) => { 
-                        e.stopPropagation(); 
-                        action.onClick(); 
-                        onClose(); 
-                    }} 
+                <button
+                    key={action.id || action.label}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        action.onClick();
+                        onClose();
+                    }}
                     className={`w-full text-left px-4 py-2.5 text-sm font-bold flex items-center gap-3 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors ${action.color || 'text-slate-700 dark:text-slate-200'}`}
                 >
                     {action.icon && <Icon name={action.icon} size={16} />}
@@ -405,11 +403,11 @@ export const ContextMenu = ({ x, y, onClose, actions }: ContextMenuProps) => {
 
 export const StatusWidget = () => {
     const { bellSchedule, isSaving } = useStaticData();
-    const [status, setStatus] = useState("Загрузка...");
-    const [details, setDetails] = useState("");
+    const [status, setStatus] = useState('Загрузка...');
+    const [details, setDetails] = useState('');
     const [progress, setProgress] = useState(0);
-    const [color, setColor] = useState("bg-slate-500");
-    const [currentDayName, setCurrentDayName] = useState("");
+    const [color, setColor] = useState('bg-slate-500');
+    const [currentDayName, setCurrentDayName] = useState('');
     const [isOnline, setIsOnline] = useState(navigator.onLine);
 
     // Online/offline status tracking
@@ -430,14 +428,22 @@ export const StatusWidget = () => {
         const updateStatus = () => {
             const now = new Date();
             const dayIndex = now.getDay();
-            const dayMap = [null, DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday, null];
+            const dayMap = [
+                null,
+                DayOfWeek.Monday,
+                DayOfWeek.Tuesday,
+                DayOfWeek.Wednesday,
+                DayOfWeek.Thursday,
+                DayOfWeek.Friday,
+                null
+            ];
             const todayName = dayMap[dayIndex];
-            setCurrentDayName(todayName || "Выходной");
+            setCurrentDayName(todayName || 'Выходной');
 
             if (!todayName) {
-                setStatus("Сегодня выходной");
-                setDetails("Уроков нет");
-                setColor("bg-slate-400");
+                setStatus('Сегодня выходной');
+                setDetails('Уроков нет');
+                setColor('bg-slate-400');
                 setProgress(0);
                 return;
             }
@@ -447,9 +453,9 @@ export const StatusWidget = () => {
                 return h * 60 + m;
             };
             const minutesNow = now.getHours() * 60 + now.getMinutes();
-            let dailyBells = bellSchedule.filter(b => b.day === todayName);
-            if (dailyBells.length === 0) dailyBells = bellSchedule.filter(b => b.day === 'default');
-            
+            let dailyBells = bellSchedule.filter((b) => b.day === todayName);
+            if (dailyBells.length === 0) dailyBells = bellSchedule.filter((b) => b.day === 'default');
+
             dailyBells.sort((a, b) => timeToMin(a.start) - timeToMin(b.start));
 
             let activeLesson = null;
@@ -466,20 +472,20 @@ export const StatusWidget = () => {
                 }
 
                 if (i < dailyBells.length - 1) {
-                    const nextBell = dailyBells[i+1];
+                    const nextBell = dailyBells[i + 1];
                     const nextStart = timeToMin(nextBell.start);
                     if (minutesNow >= end && minutesNow < nextStart) {
                         const breakDuration = nextStart - end;
                         if (breakDuration > 0 && breakDuration < 60) {
-                             const breakPassed = minutesNow - end;
-                             const breakRemaining = nextStart - minutesNow;
-                             breakInfo = {
-                                 nextLesson: nextBell,
-                                 duration: breakDuration,
-                                 passed: breakPassed,
-                                 remaining: breakRemaining,
-                             };
-                             break;
+                            const breakPassed = minutesNow - end;
+                            const breakRemaining = nextStart - minutesNow;
+                            breakInfo = {
+                                nextLesson: nextBell,
+                                duration: breakDuration,
+                                passed: breakPassed,
+                                remaining: breakRemaining
+                            };
+                            break;
                         }
                     }
                 }
@@ -489,26 +495,27 @@ export const StatusWidget = () => {
                 setStatus(`${activeLesson.period} урок`);
                 const remaining = Math.max(0, activeLesson.duration - activeLesson.passed);
                 setDetails(`${activeLesson.shift === Shift.First ? '1 смена' : '2 смена'} • ост. ${remaining} мин`);
-                const progressValue = activeLesson.duration > 0 ? (activeLesson.passed / activeLesson.duration) * 100 : 0;
+                const progressValue =
+                    activeLesson.duration > 0 ? (activeLesson.passed / activeLesson.duration) * 100 : 0;
                 setProgress(Math.min(100, Math.max(0, progressValue)));
-                setColor("bg-indigo-600");
+                setColor('bg-indigo-600');
             } else if (breakInfo) {
-                setStatus("Перемена");
+                setStatus('Перемена');
                 setDetails(`через ${breakInfo.remaining} мин ${breakInfo.nextLesson.period} урок`);
-                setColor("bg-amber-500");
+                setColor('bg-amber-500');
                 const breakProgress = breakInfo.duration > 0 ? (breakInfo.passed / breakInfo.duration) * 100 : 0;
                 setProgress(Math.min(100, Math.max(0, breakProgress)));
             } else {
-                setStatus("Уроков нет");
-                setDetails("Свободное время");
-                setColor("bg-slate-400");
+                setStatus('Уроков нет');
+                setDetails('Свободное время');
+                setColor('bg-slate-400');
                 setProgress(0);
             }
         };
         updateStatus();
         const interval = setInterval(updateStatus, 60000);
         return () => clearInterval(interval);
-    }, [bellSchedule]); 
+    }, [bellSchedule]);
 
     return (
         <div className="mx-4 mt-auto mb-20 md:mb-4 p-4 rounded-2xl flex flex-col gap-3 relative overflow-hidden group">
@@ -524,11 +531,15 @@ export const StatusWidget = () => {
 
             <div className="flex justify-between items-start z-10">
                 <div>
-                    <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-0.5">{currentDayName}</div>
+                    <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-0.5">
+                        {currentDayName}
+                    </div>
                     <div className="text-lg font-black text-slate-800 dark:text-white leading-none mb-1">{status}</div>
                     <div className="text-xs font-medium text-slate-500 dark:text-slate-400">{details}</div>
                 </div>
-                <div className={`w-8 h-8 rounded-full ${color} bg-opacity-10 dark:bg-opacity-20 flex items-center justify-center relative`}>
+                <div
+                    className={`w-8 h-8 rounded-full ${color} bg-opacity-10 dark:bg-opacity-20 flex items-center justify-center relative`}
+                >
                     {isSaving && (
                         <div className="absolute inset-0 flex items-center justify-center">
                             <Icon name="Loader" size={16} className="animate-spin text-indigo-600" />
@@ -540,21 +551,28 @@ export const StatusWidget = () => {
                         </div>
                     )}
                     <Icon
-                        name={isSaving ? "Loader" : (!isOnline ? "WifiOff" : "Clock")}
+                        name={isSaving ? 'Loader' : !isOnline ? 'WifiOff' : 'Clock'}
                         size={16}
                         className={
-                            isSaving ? 'text-indigo-600 animate-spin' :
-                            !isOnline ? 'text-amber-500' :
-                            color === 'bg-indigo-600' ? 'text-indigo-600' :
-                            color === 'bg-amber-500' ? 'text-amber-500' :
-                            'text-slate-400'
+                            isSaving
+                                ? 'text-indigo-600 animate-spin'
+                                : !isOnline
+                                  ? 'text-amber-500'
+                                  : color === 'bg-indigo-600'
+                                    ? 'text-indigo-600'
+                                    : color === 'bg-amber-500'
+                                      ? 'text-amber-500'
+                                      : 'text-slate-400'
                         }
                     />
                 </div>
             </div>
             {progress > 0 && (
                 <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden mt-1">
-                    <div className={`h-full ${color} transition-all duration-1000`} style={{ width: `${progress}%` }}></div>
+                    <div
+                        className={`h-full ${color} transition-all duration-1000`}
+                        style={{ width: `${progress}%` }}
+                    ></div>
                 </div>
             )}
         </div>
@@ -580,13 +598,19 @@ interface SearchableSelectProps {
     groupBy?: boolean;
 }
 
-export const SearchableSelect = ({ options, value, onChange, placeholder = "Выберите...", groupBy }: SearchableSelectProps) => {
+export const SearchableSelect = ({
+    options,
+    value,
+    onChange,
+    placeholder = 'Выберите...',
+    groupBy
+}: SearchableSelectProps) => {
     const [isOpen, setIsOpen] = useState(false);
-    const [search, setSearch] = useState("");
+    const [search, setSearch] = useState('');
     const ref = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => { 
+        const handleClickOutside = (event: MouseEvent) => {
             if (ref.current && !ref.current.contains(event.target as Node)) {
                 setIsOpen(false);
             }
@@ -596,53 +620,86 @@ export const SearchableSelect = ({ options, value, onChange, placeholder = "Вы
                 setIsOpen(false);
             }
         };
-        document.addEventListener("mousedown", handleClickOutside);
-        document.addEventListener("keydown", handleEscape);
+        document.addEventListener('mousedown', handleClickOutside);
+        document.addEventListener('keydown', handleEscape);
         return () => {
-            document.removeEventListener("mousedown", handleClickOutside);
-            document.removeEventListener("keydown", handleEscape);
+            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('keydown', handleEscape);
         };
     }, []);
 
     const flatOptions = groupBy ? (options as SelectGroup[]).flatMap((g) => g.options) : (options as SelectOption[]);
     const selectedLabel = flatOptions.find((o) => o.value === value)?.label || placeholder;
-    
-    const filteredOptionsGroups = groupBy 
-        ? (options as SelectGroup[]).map((g) => ({ 
-            ...g, 
-            options: g.options.filter((o) => o.label.toLowerCase().includes(search.toLowerCase())) 
-        })).filter((g) => g.options.length > 0)
+
+    const filteredOptionsGroups = groupBy
+        ? (options as SelectGroup[])
+              .map((g) => ({
+                  ...g,
+                  options: g.options.filter((o) => o.label.toLowerCase().includes(search.toLowerCase()))
+              }))
+              .filter((g) => g.options.length > 0)
         : null;
-        
+
     const filteredOptionsSimple = !groupBy
         ? (options as SelectOption[]).filter((o) => o.label.toLowerCase().includes(search.toLowerCase()))
         : null;
 
     return (
         <div className="relative w-full" ref={ref}>
-            <div onClick={() => setIsOpen(!isOpen)} className="w-full border border-slate-200 dark:border-slate-600 rounded-xl p-3 text-sm bg-white dark:bg-slate-700 dark:text-white cursor-pointer flex justify-between items-center">
-                <span className={!value ? "text-slate-400" : ""}>{selectedLabel}</span>
+            <div
+                onClick={() => setIsOpen(!isOpen)}
+                className="w-full border border-slate-200 dark:border-slate-600 rounded-xl p-3 text-sm bg-white dark:bg-slate-700 dark:text-white cursor-pointer flex justify-between items-center"
+            >
+                <span className={!value ? 'text-slate-400' : ''}>{selectedLabel}</span>
                 <Icon name="Filter" size={14} className="text-slate-400" />
             </div>
             {isOpen && (
                 <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-600 rounded-xl shadow-xl max-h-96 overflow-auto custom-scrollbar">
                     <div className="p-2 sticky top-0 bg-white dark:bg-slate-800 z-10">
-                        <input autoFocus value={search} onChange={e => setSearch(e.target.value)} placeholder="Поиск..." className="w-full bg-slate-100 dark:bg-slate-700 rounded-lg p-2 text-sm outline-none dark:text-white" />
+                        <input
+                            autoFocus
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            placeholder="Поиск..."
+                            className="w-full bg-slate-100 dark:bg-slate-700 rounded-lg p-2 text-sm outline-none dark:text-white"
+                        />
                     </div>
-                    {groupBy && filteredOptionsGroups ? filteredOptionsGroups.map((g) => (
-                        <div key={g.id || g.label}>
-                            <div className="px-3 py-1 text-xs font-bold text-slate-400 bg-slate-50 dark:bg-slate-700/50 sticky top-10 z-0">{g.label}</div>
-                            {g.options.map((opt) => (
-                                <div key={opt.value} onClick={() => { onChange(opt.value); setIsOpen(false); setSearch(""); }} className={`px-3 py-2 text-sm cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-900/30 dark:text-slate-200 ${value === opt.value ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600' : ''}`}>
+                    {groupBy && filteredOptionsGroups
+                        ? filteredOptionsGroups.map((g) => (
+                              <div key={g.id || g.label}>
+                                  <div className="px-3 py-1 text-xs font-bold text-slate-400 bg-slate-50 dark:bg-slate-700/50 sticky top-10 z-0">
+                                      {g.label}
+                                  </div>
+                                  {g.options.map((opt) => (
+                                      <div
+                                          key={opt.value}
+                                          onClick={() => {
+                                              onChange(opt.value);
+                                              setIsOpen(false);
+                                              setSearch('');
+                                          }}
+                                          className={`px-3 py-2 text-sm cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-900/30 dark:text-slate-200 ${value === opt.value ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600' : ''}`}
+                                      >
+                                          {opt.label}
+                                      </div>
+                                  ))}
+                              </div>
+                          ))
+                        : filteredOptionsSimple
+                          ? filteredOptionsSimple.map((opt) => (
+                                <div
+                                    key={opt.value}
+                                    onClick={() => {
+                                        onChange(opt.value);
+                                        setIsOpen(false);
+                                        setSearch('');
+                                    }}
+                                    className={`px-3 py-2 text-sm cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-900/30 dark:text-slate-200 ${value === opt.value ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600' : ''}`}
+                                >
                                     {opt.label}
                                 </div>
-                            ))}
-                        </div>
-                    )) : filteredOptionsSimple ? filteredOptionsSimple.map((opt) => (
-                        <div key={opt.value} onClick={() => { onChange(opt.value); setIsOpen(false); setSearch(""); }} className={`px-3 py-2 text-sm cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-900/30 dark:text-slate-200 ${value === opt.value ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600' : ''}`}>
-                            {opt.label}
-                        </div>
-                    )) : null}
+                            ))
+                          : null}
                 </div>
             )}
         </div>
@@ -654,7 +711,7 @@ interface StaggerContainerProps {
     className?: string;
 }
 
-export const StaggerContainer = ({ children, className = "" }: StaggerContainerProps) => {
+export const StaggerContainer = ({ children, className = '' }: StaggerContainerProps) => {
     const childrenArray = React.Children.toArray(children);
     return (
         <div className={className}>
@@ -682,20 +739,28 @@ interface BarChartProps {
     barClassName?: string;
 }
 
-export const BarChart = ({ items, max, barClassName = "bg-indigo-500" }: BarChartProps) => {
-    const safeMax = max > 0 ? max : 1; 
-    
+export const BarChart = ({ items, max, barClassName = 'bg-indigo-500' }: BarChartProps) => {
+    const safeMax = max > 0 ? max : 1;
+
     return (
         <div className="space-y-3">
             {items.map((item) => {
                 const key = item.id ?? item.label;
                 const width = Math.min(100, Math.max(0, (item.value / safeMax) * 100));
-                
+
                 return (
                     <div key={key} className="flex items-center gap-3 text-sm">
-                        <div className="w-32 truncate font-medium text-slate-700 dark:text-slate-300" title={item.label}>{item.label}</div>
+                        <div
+                            className="w-32 truncate font-medium text-slate-700 dark:text-slate-300"
+                            title={item.label}
+                        >
+                            {item.label}
+                        </div>
                         <div className="flex-1 h-4 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                            <div className={`h-full rounded-full ${barClassName} transition-all duration-500`} style={{ width: `${width}%` }}></div>
+                            <div
+                                className={`h-full rounded-full ${barClassName} transition-all duration-500`}
+                                style={{ width: `${width}%` }}
+                            ></div>
                         </div>
                         <div className="w-12 text-right font-bold text-slate-800 dark:text-slate-200">{item.value}</div>
                     </div>
@@ -728,36 +793,61 @@ export const BottomNavigation = ({ onMenuClick, role }: BottomNavProps) => {
         <div className="fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-dark-800/90 backdrop-blur-xl border-t border-slate-200 dark:border-slate-700 z-40 pb-safe md:hidden transition-all duration-300 no-select">
             <div className="flex justify-around items-center h-20">
                 {showDashboard && (
-                    <NavLink to="/dashboard" className={({ isActive }) => `flex flex-col items-center justify-center gap-1.5 p-2.5 rounded-2xl transition-all duration-300 flex-1 h-full ${isActive ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/20' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100/50 dark:hover:bg-slate-700/30'}`}>
+                    <NavLink
+                        to="/dashboard"
+                        className={({ isActive }) =>
+                            `flex flex-col items-center justify-center gap-1.5 p-2.5 rounded-2xl transition-all duration-300 flex-1 h-full ${isActive ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/20' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100/50 dark:hover:bg-slate-700/30'}`
+                        }
+                    >
                         <Icon name="Home" size={26} strokeWidth={2.5} />
                         <span className="text-[11px] md:text-[10px] font-bold uppercase tracking-wider">Рабочий</span>
                     </NavLink>
                 )}
-                
+
                 {showSchedule && (
-                    <NavLink to={schedulePath} className={({ isActive }) => `flex flex-col items-center justify-center gap-1.5 p-2.5 rounded-2xl transition-all duration-300 flex-1 h-full ${isActive ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/20' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100/50 dark:hover:bg-slate-700/30'}`}>
+                    <NavLink
+                        to={schedulePath}
+                        className={({ isActive }) =>
+                            `flex flex-col items-center justify-center gap-1.5 p-2.5 rounded-2xl transition-all duration-300 flex-1 h-full ${isActive ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/20' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100/50 dark:hover:bg-slate-700/30'}`
+                        }
+                    >
                         <Icon name="Calendar" size={26} strokeWidth={2.5} />
-                        <span className="text-[11px] md:text-[10px] font-bold uppercase tracking-wider">Расписание</span>
+                        <span className="text-[11px] md:text-[10px] font-bold uppercase tracking-wider">
+                            Расписание
+                        </span>
                     </NavLink>
                 )}
 
                 {showNutrition && (
-                    <NavLink to="/nutrition" className={({ isActive }) => `flex flex-col items-center justify-center gap-1.5 p-2.5 rounded-2xl transition-all duration-300 flex-1 h-full ${isActive ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/20' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100/50 dark:hover:bg-slate-700/30'}`}>
+                    <NavLink
+                        to="/nutrition"
+                        className={({ isActive }) =>
+                            `flex flex-col items-center justify-center gap-1.5 p-2.5 rounded-2xl transition-all duration-300 flex-1 h-full ${isActive ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/20' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100/50 dark:hover:bg-slate-700/30'}`
+                        }
+                    >
                         <Icon name="Coffee" size={26} strokeWidth={2.5} />
                         <span className="text-[11px] md:text-[10px] font-bold uppercase tracking-wider">Питание</span>
                     </NavLink>
                 )}
 
                 {isAdmin && (
-                    <NavLink to="/substitutions" className={({ isActive }) => `flex flex-col items-center justify-center gap-1.5 p-2.5 rounded-2xl transition-all duration-300 flex-1 h-full ${isActive ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/20' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100/50 dark:hover:bg-slate-700/30'}`}>
+                    <NavLink
+                        to="/substitutions"
+                        className={({ isActive }) =>
+                            `flex flex-col items-center justify-center gap-1.5 p-2.5 rounded-2xl transition-all duration-300 flex-1 h-full ${isActive ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/20' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100/50 dark:hover:bg-slate-700/30'}`
+                        }
+                    >
                         <Icon name="Repeat" size={26} strokeWidth={2.5} />
                         <span className="text-[11px] md:text-[10px] font-bold uppercase tracking-wider">Замены</span>
                     </NavLink>
                 )}
 
-                <button onClick={onMenuClick} className="flex flex-col items-center justify-center gap-1.5 p-2.5 rounded-2xl text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 active:text-indigo-600 active:bg-indigo-50/50 dark:active:bg-indigo-900/20 transition-all duration-300 flex-1 h-full hover:bg-slate-100/50 dark:hover:bg-slate-700/30">
+                <button
+                    onClick={onMenuClick}
+                    className="flex flex-col items-center justify-center gap-1.5 p-2.5 rounded-2xl text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 active:text-indigo-600 active:bg-indigo-50/50 dark:active:bg-indigo-900/20 transition-all duration-300 flex-1 h-full hover:bg-slate-100/50 dark:hover:bg-slate-700/30"
+                >
                     <Icon name="Menu" size={26} strokeWidth={2.5} />
-                        <span className="text-[11px] md:text-[10px] font-bold uppercase tracking-wider">Меню</span>
+                    <span className="text-[11px] md:text-[10px] font-bold uppercase tracking-wider">Меню</span>
                 </button>
             </div>
         </div>
@@ -780,36 +870,40 @@ export const CommandPalette = ({ isOpen, onClose }: CommandPaletteProps) => {
     const filteredActions = useMemo(() => {
         if (!isOpen) return [];
         const q = query.toLowerCase().trim();
-        
+
         const actions = [];
-        
+
         // Navigation Actions
-        if (!q || 'рабочий стол'.includes(q)) actions.push({ type: 'nav', label: 'Рабочий стол', icon: 'Home', path: '/dashboard' });
-        if (!q || 'расписание'.includes(q)) actions.push({ type: 'nav', label: 'Расписание', icon: 'Calendar', path: '/schedule' });
-        if (!q || 'замены'.includes(q)) actions.push({ type: 'nav', label: 'Замены', icon: 'Repeat', path: '/substitutions' });
-        if (!q || 'администрация'.includes(q)) actions.push({ type: 'nav', label: 'Администрация', icon: 'Settings', path: '/admin' });
+        if (!q || 'рабочий стол'.includes(q))
+            actions.push({ type: 'nav', label: 'Рабочий стол', icon: 'Home', path: '/dashboard' });
+        if (!q || 'расписание'.includes(q))
+            actions.push({ type: 'nav', label: 'Расписание', icon: 'Calendar', path: '/schedule' });
+        if (!q || 'замены'.includes(q))
+            actions.push({ type: 'nav', label: 'Замены', icon: 'Repeat', path: '/substitutions' });
+        if (!q || 'администрация'.includes(q))
+            actions.push({ type: 'nav', label: 'Администрация', icon: 'Settings', path: '/admin' });
 
         if (q) {
             // Teachers
-            teachers.forEach(t => {
+            teachers.forEach((t) => {
                 if (t.name.toLowerCase().includes(q)) {
                     actions.push({ type: 'teacher', label: t.name, icon: 'User', id: t.id });
                 }
             });
             // Classes
-            classes.forEach(c => {
+            classes.forEach((c) => {
                 if (c.name.toLowerCase().includes(q)) {
                     actions.push({ type: 'class', label: c.name, icon: 'GraduationCap', id: c.id });
                 }
             });
             // Subjects
-            subjects.forEach(s => {
+            subjects.forEach((s) => {
                 if (s.name.toLowerCase().includes(q)) {
                     actions.push({ type: 'subject', label: s.name, icon: 'BookOpen', id: s.id });
                 }
             });
         }
-        
+
         return actions.slice(0, 10); // Limit results
     }, [query, teachers, classes, subjects, isOpen]);
 
@@ -831,10 +925,10 @@ export const CommandPalette = ({ isOpen, onClose }: CommandPaletteProps) => {
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'ArrowDown') {
             e.preventDefault();
-            setActiveIndex(prev => (prev + 1) % filteredActions.length);
+            setActiveIndex((prev) => (prev + 1) % filteredActions.length);
         } else if (e.key === 'ArrowUp') {
             e.preventDefault();
-            setActiveIndex(prev => (prev - 1 + filteredActions.length) % filteredActions.length);
+            setActiveIndex((prev) => (prev - 1 + filteredActions.length) % filteredActions.length);
         } else if (e.key === 'Enter') {
             e.preventDefault();
             if (filteredActions[activeIndex]) {
@@ -861,41 +955,60 @@ export const CommandPalette = ({ isOpen, onClose }: CommandPaletteProps) => {
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh] px-4 bg-slate-900/60 backdrop-blur-sm transition-all" onClick={(e) => e.target === e.currentTarget && onClose()}>
+        <div
+            className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh] px-4 bg-slate-900/60 backdrop-blur-sm transition-all"
+            onClick={(e) => e.target === e.currentTarget && onClose()}
+        >
             <div className="w-full max-w-xl bg-white dark:bg-dark-800 rounded-2xl shadow-2xl overflow-hidden animate-fade-in ring-1 ring-slate-900/5">
                 <div className="flex items-center gap-3 p-4 border-b border-slate-100 dark:border-slate-700">
-                    <Icon name="Search" className="text-slate-400" size={20}/>
-                    <input 
+                    <Icon name="Search" className="text-slate-400" size={20} />
+                    <input
                         ref={inputRef}
                         inputMode="search"
                         className="flex-1 bg-transparent outline-none text-lg text-slate-800 dark:text-white placeholder:text-slate-400"
                         placeholder="Куда перейти? Или кого найти..."
                         value={query}
-                        onChange={e => setQuery(e.target.value)}
+                        onChange={(e) => setQuery(e.target.value)}
                         onKeyDown={handleKeyDown}
                     />
-                    <div className="text-xs font-bold bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 px-2 py-1 rounded-md">ESC</div>
+                    <div className="text-xs font-bold bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 px-2 py-1 rounded-md">
+                        ESC
+                    </div>
                 </div>
                 <div className="max-h-[300px] overflow-y-auto custom-scrollbar p-2">
                     {filteredActions.length === 0 ? (
                         <div className="p-4 text-center text-slate-400 text-sm">Нет результатов</div>
                     ) : (
                         filteredActions.map((action, idx) => (
-                            <button 
+                            <button
                                 key={idx}
                                 onClick={() => executeAction(action)}
                                 className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition-colors ${idx === activeIndex ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}
                             >
-                                <Icon name={action.icon} size={18} className={idx === activeIndex ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'}/>
+                                <Icon
+                                    name={action.icon}
+                                    size={18}
+                                    className={
+                                        idx === activeIndex ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'
+                                    }
+                                />
                                 <div className="flex-1 font-medium">{action.label}</div>
-                                {action.type !== 'nav' && <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">{action.type}</span>}
+                                {action.type !== 'nav' && (
+                                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                                        {action.type}
+                                    </span>
+                                )}
                             </button>
                         ))
                     )}
                 </div>
                 <div className="p-2 bg-slate-50 dark:bg-slate-700/50 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-4 text-[10px] text-slate-400 font-medium px-4">
-                    <span className="flex items-center gap-1"><span className="bg-white dark:bg-slate-600 px-1 rounded shadow-sm">↵</span> выбрать</span>
-                    <span className="flex items-center gap-1"><span className="bg-white dark:bg-slate-600 px-1 rounded shadow-sm">↑↓</span> навигация</span>
+                    <span className="flex items-center gap-1">
+                        <span className="bg-white dark:bg-slate-600 px-1 rounded shadow-sm">↵</span> выбрать
+                    </span>
+                    <span className="flex items-center gap-1">
+                        <span className="bg-white dark:bg-slate-600 px-1 rounded shadow-sm">↑↓</span> навигация
+                    </span>
                 </div>
             </div>
         </div>

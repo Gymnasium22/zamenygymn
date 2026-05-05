@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from '../services/firebase';
@@ -28,7 +27,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     useEffect(() => {
         if (!auth) {
-            console.warn("Firebase Auth is not initialized.");
+            console.warn('Firebase Auth is not initialized.');
             setLoading(false);
             return;
         }
@@ -69,14 +68,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     return (
-        <AuthContext.Provider value={{ user, role, loading, logout, setGuestRole }}>
-            {children}
-        </AuthContext.Provider>
+        <AuthContext.Provider value={{ user, role, loading, logout, setGuestRole }}>{children}</AuthContext.Provider>
     );
 };
 
 export const useAuth = () => {
     const context = useContext(AuthContext);
-    if (!context) throw new Error("useAuth must be used within AuthProvider");
+    if (!context) throw new Error('useAuth must be used within AuthProvider');
     return context;
 };

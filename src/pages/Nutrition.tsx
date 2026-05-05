@@ -1,4 +1,3 @@
-
 import { useState, useMemo, useRef, useCallback } from 'react';
 import { useStaticData, useScheduleData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
@@ -36,13 +35,13 @@ export const NutritionPage = () => {
 
     // Get records for selected date
     const recordsForDate = useMemo(() => {
-        return nutritionRecords.filter(r => r.date === selectedDate);
+        return nutritionRecords.filter((r) => r.date === selectedDate);
     }, [nutritionRecords, selectedDate]);
 
     // Get records for selected month
     const recordsForMonth = useMemo(() => {
         const [year, month] = selectedMonth.split('-').map(Number);
-        return nutritionRecords.filter(r => {
+        return nutritionRecords.filter((r) => {
             const recordDate = new Date(r.date);
             return recordDate.getFullYear() === year && recordDate.getMonth() + 1 === month;
         });
@@ -57,7 +56,7 @@ export const NutritionPage = () => {
             classCount: recordsForDate.length,
             records: recordsForDate
         };
-        recordsForDate.forEach(r => {
+        recordsForDate.forEach((r) => {
             stats.totalStudents += r.totalCount;
             stats.totalBenefit += r.benefitCount;
             stats.totalRegular += r.regularCount;
@@ -68,8 +67,8 @@ export const NutritionPage = () => {
     // Statistics for selected month
     const monthStats = useMemo(() => {
         const statsByDate = new Map<string, { total: number; benefit: number; regular: number; classCount: number }>();
-        
-        recordsForMonth.forEach(r => {
+
+        recordsForMonth.forEach((r) => {
             const existing = statsByDate.get(r.date) || { total: 0, benefit: 0, regular: 0, classCount: 0 };
             existing.total += r.totalCount;
             existing.benefit += r.benefitCount;
@@ -78,18 +77,24 @@ export const NutritionPage = () => {
             statsByDate.set(r.date, existing);
         });
 
-        const total = Array.from(statsByDate.values()).reduce((acc, day) => ({
-            total: acc.total + day.total,
-            benefit: acc.benefit + day.benefit,
-            regular: acc.regular + day.regular,
-            classCount: Math.max(acc.classCount, day.classCount)
-        }), { total: 0, benefit: 0, regular: 0, classCount: 0 });
+        const total = Array.from(statsByDate.values()).reduce(
+            (acc, day) => ({
+                total: acc.total + day.total,
+                benefit: acc.benefit + day.benefit,
+                regular: acc.regular + day.regular,
+                classCount: Math.max(acc.classCount, day.classCount)
+            }),
+            { total: 0, benefit: 0, regular: 0, classCount: 0 }
+        );
 
-        const avgPerDay = statsByDate.size > 0 ? {
-            total: Math.round(total.total / statsByDate.size),
-            benefit: Math.round(total.benefit / statsByDate.size),
-            regular: Math.round(total.regular / statsByDate.size)
-        } : { total: 0, benefit: 0, regular: 0 };
+        const avgPerDay =
+            statsByDate.size > 0
+                ? {
+                      total: Math.round(total.total / statsByDate.size),
+                      benefit: Math.round(total.benefit / statsByDate.size),
+                      regular: Math.round(total.regular / statsByDate.size)
+                  }
+                : { total: 0, benefit: 0, regular: 0 };
 
         return {
             total,
@@ -101,11 +106,11 @@ export const NutritionPage = () => {
 
     // Get class name and order helpers to respect directory ordering
     const getClassName = (classId: string) => {
-        return classes.find(c => c.id === classId)?.name || classId;
+        return classes.find((c) => c.id === classId)?.name || classId;
     };
 
     const getClassOrder = (classId: string) => {
-        const cls = classes.find(c => c.id === classId);
+        const cls = classes.find((c) => c.id === classId);
         if (!cls) return Number.MAX_SAFE_INTEGER;
         return typeof cls.order === 'number' ? cls.order : Number.MAX_SAFE_INTEGER;
     };
@@ -161,7 +166,7 @@ export const NutritionPage = () => {
 
         if (editingRecord) {
             // Update existing
-            updatedRecords = nutritionRecords.map(r =>
+            updatedRecords = nutritionRecords.map((r) =>
                 r.id === editingRecord.id
                     ? {
                           ...r,
@@ -176,13 +181,11 @@ export const NutritionPage = () => {
             );
         } else {
             // Check if record already exists for this date and class
-            const existing = nutritionRecords.find(
-                r => r.date === selectedDate && r.classId === selectedClassId
-            );
+            const existing = nutritionRecords.find((r) => r.date === selectedDate && r.classId === selectedClassId);
 
             if (existing) {
                 // Update existing
-                updatedRecords = nutritionRecords.map(r =>
+                updatedRecords = nutritionRecords.map((r) =>
                     r.id === existing.id
                         ? {
                               ...r,
@@ -213,33 +216,46 @@ export const NutritionPage = () => {
         await saveScheduleData({ nutritionRecords: updatedRecords } as any);
         addToast({ type: 'success', title: 'Данные сохранены' });
         closeModal();
-    }, [selectedClassId, totalCount, benefitCount, editingRecord, selectedDate, nutritionRecords, saveScheduleData, user, addToast]);
+    }, [
+        selectedClassId,
+        totalCount,
+        benefitCount,
+        editingRecord,
+        selectedDate,
+        nutritionRecords,
+        saveScheduleData,
+        user,
+        addToast
+    ]);
 
     // Delete record (admin can delete any, teachers can delete their own)
-    const deleteRecord = useCallback(async (recordId: string) => {
-        const record = nutritionRecords.find(r => r.id === recordId);
-        if (!record) return;
+    const deleteRecord = useCallback(
+        async (recordId: string) => {
+            const record = nutritionRecords.find((r) => r.id === recordId);
+            if (!record) return;
 
-        // Teachers can only delete their own records
-        if (!isAdmin && record.enteredBy !== user?.uid) {
-            addToast({ type: 'warning', title: 'Вы можете удалять только свои записи' });
-            return;
-        }
+            // Teachers can only delete their own records
+            if (!isAdmin && record.enteredBy !== user?.uid) {
+                addToast({ type: 'warning', title: 'Вы можете удалять только свои записи' });
+                return;
+            }
 
-        if (!window.confirm('Удалить запись?')) return;
+            if (!window.confirm('Удалить запись?')) return;
 
-        const updatedRecords = nutritionRecords.filter(r => r.id !== recordId);
-        await saveScheduleData({ nutritionRecords: updatedRecords } as any);
-        addToast({ type: 'success', title: 'Запись удалена' });
-    }, [nutritionRecords, saveScheduleData, isAdmin, user, addToast]);
+            const updatedRecords = nutritionRecords.filter((r) => r.id !== recordId);
+            await saveScheduleData({ nutritionRecords: updatedRecords } as any);
+            addToast({ type: 'success', title: 'Запись удалена' });
+        },
+        [nutritionRecords, saveScheduleData, isAdmin, user, addToast]
+    );
 
     // Export to PDF (using print)
     const exportToPDF = () => {
         if (!printRef.current) return;
-        
+
         const printContent = printRef.current.innerHTML;
         const success = exportService.printHTML(printContent, 'Отчёт по питанию');
-        
+
         if (!success) {
             addToast({ type: 'warning', title: 'Разрешите всплывающие окна для экспорта' });
         }
@@ -257,10 +273,10 @@ export const NutritionPage = () => {
     // Get classes without data for today (respect directory order)
     const classesWithoutData = useMemo(() => {
         if (viewMode !== 'day') return [];
-        
-        const todayRecords = recordsForDate.map(r => r.classId);
+
+        const todayRecords = recordsForDate.map((r) => r.classId);
         return classes
-            .filter(cls => !todayRecords.includes(cls.id))
+            .filter((cls) => !todayRecords.includes(cls.id))
             .sort((a, b) => {
                 const orderA = typeof a.order === 'number' ? a.order : Number.MAX_SAFE_INTEGER;
                 const orderB = typeof b.order === 'number' ? b.order : Number.MAX_SAFE_INTEGER;
@@ -275,9 +291,11 @@ export const NutritionPage = () => {
                 <div>
                     <h1 className="text-3xl font-black text-slate-800 dark:text-white mb-2">Питание</h1>
                     <p className="text-slate-500 dark:text-slate-400">
-                        {isAdmin ? 'Управление питанием и статистика' :
-                         isCanteen ? 'Просмотр данных о питании' :
-                         'Ввод данных о питании'}
+                        {isAdmin
+                            ? 'Управление питанием и статистика'
+                            : isCanteen
+                              ? 'Просмотр данных о питании'
+                              : 'Ввод данных о питании'}
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -303,9 +321,7 @@ export const NutritionPage = () => {
             <div className="mb-6 flex flex-wrap items-center gap-4">
                 {viewMode === 'day' ? (
                     <>
-                        <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                            Дата:
-                        </label>
+                        <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Дата:</label>
                         <input
                             type="date"
                             value={selectedDate}
@@ -315,9 +331,7 @@ export const NutritionPage = () => {
                     </>
                 ) : (
                     <>
-                        <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                            Месяц:
-                        </label>
+                        <label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Месяц:</label>
                         <input
                             type="month"
                             value={selectedMonth}
@@ -340,11 +354,17 @@ export const NutritionPage = () => {
                                 Классы без данных за сегодня
                             </h3>
                             <p className="text-sm text-slate-600 dark:text-slate-400">
-                                {classesWithoutData.length} {classesWithoutData.length === 1 ? 'класс' : classesWithoutData.length < 5 ? 'класса' : 'классов'} не внесли данные
+                                {classesWithoutData.length}{' '}
+                                {classesWithoutData.length === 1
+                                    ? 'класс'
+                                    : classesWithoutData.length < 5
+                                      ? 'класса'
+                                      : 'классов'}{' '}
+                                не внесли данные
                             </p>
                         </div>
                     </div>
-                    {(isTeacher || isAdmin) ? (
+                    {isTeacher || isAdmin ? (
                         <div className="flex flex-wrap gap-2">
                             {classesWithoutData.map((cls) => (
                                 <button
@@ -379,7 +399,9 @@ export const NutritionPage = () => {
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                     <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-200 dark:border-slate-700">
                         <div className="text-sm text-slate-500 dark:text-slate-400 mb-1">Всего питающихся</div>
-                        <div className="text-3xl font-black text-slate-800 dark:text-white">{dayStats.totalStudents}</div>
+                        <div className="text-3xl font-black text-slate-800 dark:text-white">
+                            {dayStats.totalStudents}
+                        </div>
                     </div>
                     <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-200 dark:border-slate-700">
                         <div className="text-sm text-slate-500 dark:text-slate-400 mb-1">Льготники</div>
@@ -398,7 +420,9 @@ export const NutritionPage = () => {
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                     <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-200 dark:border-slate-700">
                         <div className="text-sm text-slate-500 dark:text-slate-400 mb-1">Всего за месяц</div>
-                        <div className="text-3xl font-black text-slate-800 dark:text-white">{monthStats.total.total}</div>
+                        <div className="text-3xl font-black text-slate-800 dark:text-white">
+                            {monthStats.total.total}
+                        </div>
                         <div className="text-xs text-slate-400 mt-1">Среднее: {monthStats.avgPerDay.total}/день</div>
                     </div>
                     <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-sm border border-slate-200 dark:border-slate-700">
@@ -422,7 +446,9 @@ export const NutritionPage = () => {
             <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
                 <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
                     <h2 className="text-lg font-bold text-slate-800 dark:text-white">
-                        {viewMode === 'day' ? `Данные за ${new Date(selectedDate).toLocaleDateString('ru-RU')}` : `Данные за ${new Date(selectedMonth + '-01').toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}`}
+                        {viewMode === 'day'
+                            ? `Данные за ${new Date(selectedDate).toLocaleDateString('ru-RU')}`
+                            : `Данные за ${new Date(selectedMonth + '-01').toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}`}
                     </h2>
                     {(isTeacher || isAdmin) && viewMode === 'day' && (
                         <button
@@ -440,18 +466,37 @@ export const NutritionPage = () => {
                         <table className="w-full">
                             <thead className="bg-slate-50 dark:bg-slate-900">
                                 <tr>
-                                    <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700 dark:text-slate-300">Класс</th>
-                                    <th className="px-4 py-3 text-center text-sm font-semibold text-slate-700 dark:text-slate-300">Всего</th>
-                                    <th className="px-4 py-3 text-center text-sm font-semibold text-slate-700 dark:text-slate-300">Льготники</th>
-                                    <th className="px-4 py-3 text-center text-sm font-semibold text-slate-700 dark:text-slate-300">Обычные</th>
-                                    {isAdmin && <th className="px-4 py-3 text-center text-sm font-semibold text-slate-700 dark:text-slate-300">Действия</th>}
-                                    {isTeacher && <th className="px-4 py-3 text-center text-sm font-semibold text-slate-700 dark:text-slate-300">Действия</th>}
+                                    <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700 dark:text-slate-300">
+                                        Класс
+                                    </th>
+                                    <th className="px-4 py-3 text-center text-sm font-semibold text-slate-700 dark:text-slate-300">
+                                        Всего
+                                    </th>
+                                    <th className="px-4 py-3 text-center text-sm font-semibold text-slate-700 dark:text-slate-300">
+                                        Льготники
+                                    </th>
+                                    <th className="px-4 py-3 text-center text-sm font-semibold text-slate-700 dark:text-slate-300">
+                                        Обычные
+                                    </th>
+                                    {isAdmin && (
+                                        <th className="px-4 py-3 text-center text-sm font-semibold text-slate-700 dark:text-slate-300">
+                                            Действия
+                                        </th>
+                                    )}
+                                    {isTeacher && (
+                                        <th className="px-4 py-3 text-center text-sm font-semibold text-slate-700 dark:text-slate-300">
+                                            Действия
+                                        </th>
+                                    )}
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
                                 {recordsForDate.length === 0 ? (
                                     <tr>
-                                        <td colSpan={isAdmin ? 5 : 4} className="px-4 py-8 text-center text-slate-500 dark:text-slate-400">
+                                        <td
+                                            colSpan={isAdmin ? 5 : 4}
+                                            className="px-4 py-8 text-center text-slate-500 dark:text-slate-400"
+                                        >
                                             Нет данных за выбранную дату
                                         </td>
                                     </tr>
@@ -465,7 +510,10 @@ export const NutritionPage = () => {
                                             return getClassName(a.classId).localeCompare(getClassName(b.classId));
                                         })
                                         .map((record) => (
-                                            <tr key={record.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
+                                            <tr
+                                                key={record.id}
+                                                className="hover:bg-slate-50 dark:hover:bg-slate-700/50"
+                                            >
                                                 <td className="px-4 py-3 font-semibold text-slate-800 dark:text-white">
                                                     {getClassName(record.classId)}
                                                 </td>
@@ -511,17 +559,30 @@ export const NutritionPage = () => {
                         <table className="w-full">
                             <thead className="bg-slate-50 dark:bg-slate-900">
                                 <tr>
-                                    <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700 dark:text-slate-300">Дата</th>
-                                    <th className="px-4 py-3 text-center text-sm font-semibold text-slate-700 dark:text-slate-300">Всего</th>
-                                    <th className="px-4 py-3 text-center text-sm font-semibold text-slate-700 dark:text-slate-300">Льготники</th>
-                                    <th className="px-4 py-3 text-center text-sm font-semibold text-slate-700 dark:text-slate-300">Обычные</th>
-                                    <th className="px-4 py-3 text-center text-sm font-semibold text-slate-700 dark:text-slate-300">Классов</th>
+                                    <th className="px-4 py-3 text-left text-sm font-semibold text-slate-700 dark:text-slate-300">
+                                        Дата
+                                    </th>
+                                    <th className="px-4 py-3 text-center text-sm font-semibold text-slate-700 dark:text-slate-300">
+                                        Всего
+                                    </th>
+                                    <th className="px-4 py-3 text-center text-sm font-semibold text-slate-700 dark:text-slate-300">
+                                        Льготники
+                                    </th>
+                                    <th className="px-4 py-3 text-center text-sm font-semibold text-slate-700 dark:text-slate-300">
+                                        Обычные
+                                    </th>
+                                    <th className="px-4 py-3 text-center text-sm font-semibold text-slate-700 dark:text-slate-300">
+                                        Классов
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
                                 {monthStats.statsByDate.length === 0 ? (
                                     <tr>
-                                        <td colSpan={5} className="px-4 py-8 text-center text-slate-500 dark:text-slate-400">
+                                        <td
+                                            colSpan={5}
+                                            className="px-4 py-8 text-center text-slate-500 dark:text-slate-400"
+                                        >
                                             Нет данных за выбранный месяц
                                         </td>
                                     </tr>
@@ -529,7 +590,11 @@ export const NutritionPage = () => {
                                     monthStats.statsByDate.map(([date, stats]) => (
                                         <tr key={date} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
                                             <td className="px-4 py-3 font-semibold text-slate-800 dark:text-white">
-                                                {new Date(date).toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'short' })}
+                                                {new Date(date).toLocaleDateString('ru-RU', {
+                                                    weekday: 'short',
+                                                    day: 'numeric',
+                                                    month: 'short'
+                                                })}
                                             </td>
                                             <td className="px-4 py-3 text-center text-slate-700 dark:text-slate-300">
                                                 {stats.total}
@@ -559,7 +624,12 @@ export const NutritionPage = () => {
                     {viewMode === 'day' ? (
                         <>
                             <p className="text-center mb-6 text-slate-600">
-                                Дата: {new Date(selectedDate).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
+                                Дата:{' '}
+                                {new Date(selectedDate).toLocaleDateString('ru-RU', {
+                                    day: 'numeric',
+                                    month: 'long',
+                                    year: 'numeric'
+                                })}
                             </p>
                             <table className="w-full border-collapse">
                                 <thead>
@@ -581,19 +651,33 @@ export const NutritionPage = () => {
                                         })
                                         .map((record) => (
                                             <tr key={record.id}>
-                                                <td className="border border-slate-300 px-4 py-2">{getClassName(record.classId)}</td>
-                                                <td className="border border-slate-300 px-4 py-2 text-center">{record.totalCount}</td>
-                                                <td className="border border-slate-300 px-4 py-2 text-center">{record.benefitCount}</td>
-                                                <td className="border border-slate-300 px-4 py-2 text-center">{record.regularCount}</td>
+                                                <td className="border border-slate-300 px-4 py-2">
+                                                    {getClassName(record.classId)}
+                                                </td>
+                                                <td className="border border-slate-300 px-4 py-2 text-center">
+                                                    {record.totalCount}
+                                                </td>
+                                                <td className="border border-slate-300 px-4 py-2 text-center">
+                                                    {record.benefitCount}
+                                                </td>
+                                                <td className="border border-slate-300 px-4 py-2 text-center">
+                                                    {record.regularCount}
+                                                </td>
                                             </tr>
                                         ))}
                                 </tbody>
                                 <tfoot className="bg-slate-100 font-bold">
                                     <tr>
                                         <td className="border border-slate-300 px-4 py-2">Итого</td>
-                                        <td className="border border-slate-300 px-4 py-2 text-center">{dayStats.totalStudents}</td>
-                                        <td className="border border-slate-300 px-4 py-2 text-center">{dayStats.totalBenefit}</td>
-                                        <td className="border border-slate-300 px-4 py-2 text-center">{dayStats.totalRegular}</td>
+                                        <td className="border border-slate-300 px-4 py-2 text-center">
+                                            {dayStats.totalStudents}
+                                        </td>
+                                        <td className="border border-slate-300 px-4 py-2 text-center">
+                                            {dayStats.totalBenefit}
+                                        </td>
+                                        <td className="border border-slate-300 px-4 py-2 text-center">
+                                            {dayStats.totalRegular}
+                                        </td>
                                     </tr>
                                 </tfoot>
                             </table>
@@ -601,7 +685,11 @@ export const NutritionPage = () => {
                     ) : (
                         <>
                             <p className="text-center mb-6 text-slate-600">
-                                Месяц: {new Date(selectedMonth + '-01').toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}
+                                Месяц:{' '}
+                                {new Date(selectedMonth + '-01').toLocaleDateString('ru-RU', {
+                                    month: 'long',
+                                    year: 'numeric'
+                                })}
                             </p>
                             <table className="w-full border-collapse">
                                 <thead>
@@ -619,26 +707,46 @@ export const NutritionPage = () => {
                                             <td className="border border-slate-300 px-4 py-2">
                                                 {new Date(date).toLocaleDateString('ru-RU')}
                                             </td>
-                                            <td className="border border-slate-300 px-4 py-2 text-center">{stats.total}</td>
-                                            <td className="border border-slate-300 px-4 py-2 text-center">{stats.benefit}</td>
-                                            <td className="border border-slate-300 px-4 py-2 text-center">{stats.regular}</td>
-                                            <td className="border border-slate-300 px-4 py-2 text-center">{stats.classCount}</td>
+                                            <td className="border border-slate-300 px-4 py-2 text-center">
+                                                {stats.total}
+                                            </td>
+                                            <td className="border border-slate-300 px-4 py-2 text-center">
+                                                {stats.benefit}
+                                            </td>
+                                            <td className="border border-slate-300 px-4 py-2 text-center">
+                                                {stats.regular}
+                                            </td>
+                                            <td className="border border-slate-300 px-4 py-2 text-center">
+                                                {stats.classCount}
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>
                                 <tfoot className="bg-slate-100 font-bold">
                                     <tr>
                                         <td className="border border-slate-300 px-4 py-2">Итого</td>
-                                        <td className="border border-slate-300 px-4 py-2 text-center">{monthStats.total.total}</td>
-                                        <td className="border border-slate-300 px-4 py-2 text-center">{monthStats.total.benefit}</td>
-                                        <td className="border border-slate-300 px-4 py-2 text-center">{monthStats.total.regular}</td>
+                                        <td className="border border-slate-300 px-4 py-2 text-center">
+                                            {monthStats.total.total}
+                                        </td>
+                                        <td className="border border-slate-300 px-4 py-2 text-center">
+                                            {monthStats.total.benefit}
+                                        </td>
+                                        <td className="border border-slate-300 px-4 py-2 text-center">
+                                            {monthStats.total.regular}
+                                        </td>
                                         <td className="border border-slate-300 px-4 py-2 text-center">-</td>
                                     </tr>
                                     <tr>
                                         <td className="border border-slate-300 px-4 py-2">Среднее за день</td>
-                                        <td className="border border-slate-300 px-4 py-2 text-center">{monthStats.avgPerDay.total}</td>
-                                        <td className="border border-slate-300 px-4 py-2 text-center">{monthStats.avgPerDay.benefit}</td>
-                                        <td className="border border-slate-300 px-4 py-2 text-center">{monthStats.avgPerDay.regular}</td>
+                                        <td className="border border-slate-300 px-4 py-2 text-center">
+                                            {monthStats.avgPerDay.total}
+                                        </td>
+                                        <td className="border border-slate-300 px-4 py-2 text-center">
+                                            {monthStats.avgPerDay.benefit}
+                                        </td>
+                                        <td className="border border-slate-300 px-4 py-2 text-center">
+                                            {monthStats.avgPerDay.regular}
+                                        </td>
                                         <td className="border border-slate-300 px-4 py-2 text-center">-</td>
                                     </tr>
                                 </tfoot>
@@ -649,7 +757,11 @@ export const NutritionPage = () => {
             </div>
 
             {/* Edit/Create Modal */}
-            <Modal isOpen={isModalOpen} onClose={closeModal} title={editingRecord ? 'Редактировать запись' : 'Добавить запись'}>
+            <Modal
+                isOpen={isModalOpen}
+                onClose={closeModal}
+                title={editingRecord ? 'Редактировать запись' : 'Добавить запись'}
+            >
                 <div className="space-y-4">
                     <div>
                         <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2">

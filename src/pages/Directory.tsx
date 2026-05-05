@@ -13,7 +13,7 @@ export const DirectoryPage = () => {
     const [activeTab, setActiveTab] = useState<DirectoryTabId>('teachers');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
-    
+
     const [teacherForm, setTeacherForm] = useState<Partial<Teacher>>({});
     const [subjectForm, setSubjectForm] = useState<Partial<Subject>>({});
     const [classForm, setClassForm] = useState<Partial<ClassEntity>>({});
@@ -26,32 +26,28 @@ export const DirectoryPage = () => {
         if (activeTab === 'teachers') {
             setTeacherForm(
                 id
-                    ? teachers.find(x => x.id === id) ?? {}
+                    ? (teachers.find((x) => x.id === id) ?? {})
                     : {
                           subjectIds: [],
                           unavailableDates: [],
                           shifts: [Shift.First, Shift.Second],
-                          telegramChatId: '',
+                          telegramChatId: ''
                       }
             );
         } else if (activeTab === 'subjects') {
             setSubjectForm(
                 id
-                    ? subjects.find(x => x.id === id) ?? {}
+                    ? (subjects.find((x) => x.id === id) ?? {})
                     : { color: '#e0e7ff', difficulty: 5, requiredRoomType: 'Обычный' }
             );
         } else if (activeTab === 'classes') {
             setClassForm(
                 id
-                    ? classes.find(x => x.id === id) ?? {}
+                    ? (classes.find((x) => x.id === id) ?? {})
                     : { shift: Shift.First, studentsCount: 25, excludeFromReports: false }
             );
         } else if (activeTab === 'rooms') {
-            setRoomForm(
-                id
-                    ? rooms.find(x => x.id === id) ?? {}
-                    : { capacity: 30, type: 'Обычный' }
-            );
+            setRoomForm(id ? (rooms.find((x) => x.id === id) ?? {}) : { capacity: 30, type: 'Обычный' });
         }
         setIsModalOpen(true);
     };
@@ -61,7 +57,7 @@ export const DirectoryPage = () => {
             teachers: { list: teachers, form: teacherForm, key: 'teachers' as const },
             subjects: { list: subjects, form: subjectForm, key: 'subjects' as const },
             classes: { list: classes, form: classForm, key: 'classes' as const },
-            rooms: { list: rooms, form: roomForm, key: 'rooms' as const },
+            rooms: { list: rooms, form: roomForm, key: 'rooms' as const }
         };
 
         const activeConfig = configMap[activeTab];
@@ -71,7 +67,7 @@ export const DirectoryPage = () => {
 
         let newList: (Teacher | Subject | ClassEntity | Room)[] = [...list];
         if (editingId) {
-            newList = newList.map(item => (item.id === editingId ? { ...item, ...form } : item));
+            newList = newList.map((item) => (item.id === editingId ? { ...item, ...form } : item));
         } else {
             const maxOrder = list.reduce((max, item) => {
                 const itemWithOrder = item as { order?: number };
@@ -90,16 +86,16 @@ export const DirectoryPage = () => {
 
         switch (activeTab) {
             case 'teachers':
-                await saveStaticData({ teachers: teachers.filter(t => t.id !== id) });
+                await saveStaticData({ teachers: teachers.filter((t) => t.id !== id) });
                 break;
             case 'subjects':
-                await saveStaticData({ subjects: subjects.filter(s => s.id !== id) });
+                await saveStaticData({ subjects: subjects.filter((s) => s.id !== id) });
                 break;
             case 'classes':
-                await saveStaticData({ classes: classes.filter(c => c.id !== id) });
+                await saveStaticData({ classes: classes.filter((c) => c.id !== id) });
                 break;
             case 'rooms':
-                await saveStaticData({ rooms: rooms.filter(r => r.id !== id) });
+                await saveStaticData({ rooms: rooms.filter((r) => r.id !== id) });
                 break;
         }
     };
@@ -154,8 +150,8 @@ export const DirectoryPage = () => {
                         { id: 'teachers', icon: 'Users', label: 'Учителя' },
                         { id: 'subjects', icon: 'BookOpen', label: 'Предметы' },
                         { id: 'classes', icon: 'GraduationCap', label: 'Классы' },
-                        { id: 'rooms', icon: 'DoorOpen', label: 'Кабинеты' },
-                    ].map(tab => (
+                        { id: 'rooms', icon: 'DoorOpen', label: 'Кабинеты' }
+                    ].map((tab) => (
                         <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id as DirectoryTabId)}
@@ -184,15 +180,21 @@ export const DirectoryPage = () => {
                             <div
                                 key={t.id}
                                 draggable
-                                onDragStart={e => onDragStart(e, i)}
+                                onDragStart={(e) => onDragStart(e, i)}
                                 onDragOver={onDragOver}
-                                onDrop={e => onDrop(e, i)}
+                                onDrop={(e) => onDrop(e, i)}
                                 className="bg-white dark:bg-dark-800 p-5 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm hover:shadow-md transition-all group flex flex-col cursor-grab active:cursor-grabbing"
                             >
                                 <div className="flex justify-between items-start mb-2">
                                     <div className="flex items-center gap-3">
-                                        <Icon name="GripVertical" className="text-slate-300 dark:text-slate-600" size={16} />
-                                        <div className="font-bold text-slate-800 dark:text-slate-100 text-lg">{t.name}</div>
+                                        <Icon
+                                            name="GripVertical"
+                                            className="text-slate-300 dark:text-slate-600"
+                                            size={16}
+                                        />
+                                        <div className="font-bold text-slate-800 dark:text-slate-100 text-lg">
+                                            {t.name}
+                                        </div>
                                     </div>
                                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                         <button
@@ -214,15 +216,19 @@ export const DirectoryPage = () => {
                                 </div>
                                 <div className="flex gap-2 mb-3">
                                     {t.shifts.includes(Shift.First) && (
-                                        <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-bold">1 см</span>
+                                        <span className="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-bold">
+                                            1 см
+                                        </span>
                                     )}
                                     {t.shifts.includes(Shift.Second) && (
-                                        <span className="text-[10px] bg-purple-50 text-purple-700 px-2 py-0.5 rounded font-bold">2 см</span>
+                                        <span className="text-[10px] bg-purple-50 text-purple-700 px-2 py-0.5 rounded font-bold">
+                                            2 см
+                                        </span>
                                     )}
                                 </div>
                                 <div className="flex flex-wrap gap-1 mt-auto pl-7">
-                                    {t.subjectIds.map(sid => {
-                                        const s = subjects.find(sub => sub.id === sid);
+                                    {t.subjectIds.map((sid) => {
+                                        const s = subjects.find((sub) => sub.id === sid);
                                         return s ? (
                                             <span
                                                 key={sid}
@@ -245,14 +251,18 @@ export const DirectoryPage = () => {
                             <div
                                 key={s.id}
                                 draggable
-                                onDragStart={e => onDragStart(e, i)}
+                                onDragStart={(e) => onDragStart(e, i)}
                                 onDragOver={onDragOver}
-                                onDrop={e => onDrop(e, i)}
+                                onDrop={(e) => onDrop(e, i)}
                                 className="bg-white dark:bg-dark-800 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm flex items-center justify-between group cursor-grab active:cursor-grabbing border-l-4"
                                 style={{ borderLeftColor: s.color }}
                             >
                                 <div className="flex items-center gap-3">
-                                    <Icon name="GripVertical" className="text-slate-300 dark:text-slate-600" size={16} />
+                                    <Icon
+                                        name="GripVertical"
+                                        className="text-slate-300 dark:text-slate-600"
+                                        size={16}
+                                    />
                                     <div>
                                         <div className="font-bold text-slate-700 dark:text-slate-200">{s.name}</div>
                                         <div className="text-xs text-slate-400">
@@ -285,9 +295,9 @@ export const DirectoryPage = () => {
                             <div
                                 key={c.id}
                                 draggable
-                                onDragStart={e => onDragStart(e, i)}
+                                onDragStart={(e) => onDragStart(e, i)}
                                 onDragOver={onDragOver}
-                                onDrop={e => onDrop(e, i)}
+                                onDrop={(e) => onDrop(e, i)}
                                 className={`bg-white dark:bg-dark-800 p-4 rounded-2xl border ${
                                     c.excludeFromReports
                                         ? 'border-dashed border-slate-300 bg-slate-50'
@@ -344,13 +354,17 @@ export const DirectoryPage = () => {
                             <div
                                 key={r.id}
                                 draggable
-                                onDragStart={e => onDragStart(e, i)}
+                                onDragStart={(e) => onDragStart(e, i)}
                                 onDragOver={onDragOver}
-                                onDrop={e => onDrop(e, i)}
+                                onDrop={(e) => onDrop(e, i)}
                                 className="bg-white dark:bg-dark-800 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm flex items-center justify-between group cursor-grab active:cursor-grabbing"
                             >
                                 <div className="flex items-center gap-3">
-                                    <Icon name="GripVertical" className="text-slate-300 dark:text-slate-600" size={16} />
+                                    <Icon
+                                        name="GripVertical"
+                                        className="text-slate-300 dark:text-slate-600"
+                                        size={16}
+                                    />
                                     <div className="bg-indigo-50 dark:bg-indigo-900/30 p-2 rounded-lg text-indigo-600">
                                         <Icon name="DoorOpen" size={20} />
                                     </div>
@@ -394,7 +408,7 @@ export const DirectoryPage = () => {
                                 className="w-full border border-slate-200 dark:border-slate-600 rounded-xl p-3 text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500"
                                 placeholder="ФИО Учителя"
                                 value={teacherForm.name || ''}
-                                onChange={e => setTeacherForm({ ...teacherForm, name: e.target.value })}
+                                onChange={(e) => setTeacherForm({ ...teacherForm, name: e.target.value })}
                             />
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">
@@ -404,9 +418,7 @@ export const DirectoryPage = () => {
                                     type="date"
                                     className="w-full border border-slate-200 dark:border-slate-600 rounded-xl p-3 text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500"
                                     value={teacherForm.birthDate || ''}
-                                    onChange={e =>
-                                        setTeacherForm({ ...teacherForm, birthDate: e.target.value })
-                                    }
+                                    onChange={(e) => setTeacherForm({ ...teacherForm, birthDate: e.target.value })}
                                 />
                             </div>
 
@@ -418,9 +430,7 @@ export const DirectoryPage = () => {
                                     type="text"
                                     className="w-full border border-slate-200 dark:border-slate-600 rounded-xl p-3 text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500"
                                     value={teacherForm.telegramChatId || ''}
-                                    onChange={e =>
-                                        setTeacherForm({ ...teacherForm, telegramChatId: e.target.value })
-                                    }
+                                    onChange={(e) => setTeacherForm({ ...teacherForm, telegramChatId: e.target.value })}
                                     placeholder="12345678"
                                 />
                             </div>
@@ -440,14 +450,12 @@ export const DirectoryPage = () => {
                                                 setTeacherForm({
                                                     ...teacherForm,
                                                     shifts: current.includes(Shift.First)
-                                                        ? current.filter(s => s !== Shift.First)
-                                                        : [...current, Shift.First],
+                                                        ? current.filter((s) => s !== Shift.First)
+                                                        : [...current, Shift.First]
                                                 });
                                             }}
                                         />
-                                        <span className="text-sm font-medium dark:text-slate-300">
-                                            1 смена
-                                        </span>
+                                        <span className="text-sm font-medium dark:text-slate-300">1 смена</span>
                                     </label>
                                     <label className="flex items-center gap-2 cursor-pointer">
                                         <input
@@ -459,14 +467,12 @@ export const DirectoryPage = () => {
                                                 setTeacherForm({
                                                     ...teacherForm,
                                                     shifts: current.includes(Shift.Second)
-                                                        ? current.filter(s => s !== Shift.Second)
-                                                        : [...current, Shift.Second],
+                                                        ? current.filter((s) => s !== Shift.Second)
+                                                        : [...current, Shift.Second]
                                                 });
                                             }}
                                         />
-                                        <span className="text-sm font-medium dark:text-slate-300">
-                                            2 смена
-                                        </span>
+                                        <span className="text-sm font-medium dark:text-slate-300">2 смена</span>
                                     </label>
                                 </div>
                             </div>
@@ -475,7 +481,7 @@ export const DirectoryPage = () => {
                                 Предметы
                             </div>
                             <div className="grid grid-cols-2 gap-2 max-h-48 overflow-y-auto custom-scrollbar border border-slate-100 dark:border-slate-700 p-2 rounded-xl">
-                                {subjects.map(s => (
+                                {subjects.map((s) => (
                                     <label
                                         key={s.id}
                                         className="flex items-center gap-2 p-1 rounded hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer"
@@ -484,13 +490,13 @@ export const DirectoryPage = () => {
                                             type="checkbox"
                                             className="rounded text-indigo-600 focus:ring-indigo-500"
                                             checked={teacherForm.subjectIds?.includes(s.id)}
-                                            onChange={e => {
+                                            onChange={(e) => {
                                                 const current = teacherForm.subjectIds || [];
                                                 setTeacherForm({
                                                     ...teacherForm,
                                                     subjectIds: e.target.checked
                                                         ? [...current, s.id]
-                                                        : current.filter((x: string) => x !== s.id),
+                                                        : current.filter((x: string) => x !== s.id)
                                                 });
                                             }}
                                         />
@@ -507,19 +513,15 @@ export const DirectoryPage = () => {
                                 className="w-full border border-slate-200 dark:border-slate-600 rounded-xl p-3 text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500"
                                 placeholder="Название предмета"
                                 value={subjectForm.name || ''}
-                                onChange={e => setSubjectForm({ ...subjectForm, name: e.target.value })}
+                                onChange={(e) => setSubjectForm({ ...subjectForm, name: e.target.value })}
                             />
                             <div className="flex items-center gap-4">
-                                <span className="text-sm font-bold text-slate-600 dark:text-slate-300">
-                                    Цвет
-                                </span>
+                                <span className="text-sm font-bold text-slate-600 dark:text-slate-300">Цвет</span>
                                 <input
                                     type="color"
                                     className="w-20 h-10 cursor-pointer bg-transparent"
                                     value={subjectForm.color || '#ffffff'}
-                                    onChange={e =>
-                                        setSubjectForm({ ...subjectForm, color: e.target.value })
-                                    }
+                                    onChange={(e) => setSubjectForm({ ...subjectForm, color: e.target.value })}
                                 />
                             </div>
                             <div>
@@ -533,10 +535,10 @@ export const DirectoryPage = () => {
                                     max={12}
                                     className="w-full border border-slate-200 dark:border-slate-600 rounded-xl p-3 text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500"
                                     value={subjectForm.difficulty || 5}
-                                    onChange={e =>
+                                    onChange={(e) =>
                                         setSubjectForm({
                                             ...subjectForm,
-                                            difficulty: parseInt(e.target.value, 10),
+                                            difficulty: parseInt(e.target.value, 10)
                                         })
                                     }
                                 />
@@ -548,14 +550,14 @@ export const DirectoryPage = () => {
                                 <select
                                     className="w-full border border-slate-200 dark:border-slate-600 rounded-xl p-3 text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500"
                                     value={subjectForm.requiredRoomType}
-                                    onChange={e =>
+                                    onChange={(e) =>
                                         setSubjectForm({
                                             ...subjectForm,
-                                            requiredRoomType: e.target.value,
+                                            requiredRoomType: e.target.value
                                         })
                                     }
                                 >
-                                    {ROOM_TYPES.map(type => (
+                                    {ROOM_TYPES.map((type) => (
                                         <option key={type} value={type}>
                                             {type}
                                         </option>
@@ -571,7 +573,7 @@ export const DirectoryPage = () => {
                                 className="w-full border border-slate-200 dark:border-slate-600 rounded-xl p-3 text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500"
                                 placeholder="Название класса (5А)"
                                 value={classForm.name || ''}
-                                onChange={e => setClassForm({ ...classForm, name: e.target.value })}
+                                onChange={(e) => setClassForm({ ...classForm, name: e.target.value })}
                             />
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">
@@ -582,10 +584,10 @@ export const DirectoryPage = () => {
                                     inputMode="numeric"
                                     className="w-full border border-slate-200 dark:border-slate-600 rounded-xl p-3 text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500"
                                     value={classForm.studentsCount || 25}
-                                    onChange={e =>
+                                    onChange={(e) =>
                                         setClassForm({
                                             ...classForm,
-                                            studentsCount: parseInt(e.target.value, 10),
+                                            studentsCount: parseInt(e.target.value, 10)
                                         })
                                     }
                                 />
@@ -618,10 +620,10 @@ export const DirectoryPage = () => {
                                     type="checkbox"
                                     className="rounded text-indigo-600 focus:ring-indigo-500"
                                     checked={classForm.excludeFromReports || false}
-                                    onChange={e =>
+                                    onChange={(e) =>
                                         setClassForm({
                                             ...classForm,
-                                            excludeFromReports: e.target.checked,
+                                            excludeFromReports: e.target.checked
                                         })
                                     }
                                 />
@@ -641,7 +643,7 @@ export const DirectoryPage = () => {
                                 className="w-full border border-slate-200 dark:border-slate-600 rounded-xl p-3 text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500"
                                 placeholder="Номер/Название (напр. 101)"
                                 value={roomForm.name || ''}
-                                onChange={e => setRoomForm({ ...roomForm, name: e.target.value })}
+                                onChange={(e) => setRoomForm({ ...roomForm, name: e.target.value })}
                             />
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">
@@ -652,10 +654,10 @@ export const DirectoryPage = () => {
                                     inputMode="numeric"
                                     className="w-full border border-slate-200 dark:border-slate-600 rounded-xl p-3 text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500"
                                     value={roomForm.capacity || 30}
-                                    onChange={e =>
+                                    onChange={(e) =>
                                         setRoomForm({
                                             ...roomForm,
-                                            capacity: parseInt(e.target.value, 10),
+                                            capacity: parseInt(e.target.value, 10)
                                         })
                                     }
                                 />
@@ -667,14 +669,14 @@ export const DirectoryPage = () => {
                                 <select
                                     className="w-full border border-slate-200 dark:border-slate-600 rounded-xl p-3 text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500"
                                     value={roomForm.type}
-                                    onChange={e =>
+                                    onChange={(e) =>
                                         setRoomForm({
                                             ...roomForm,
-                                            type: e.target.value,
+                                            type: e.target.value
                                         })
                                     }
                                 >
-                                    {ROOM_TYPES.map(type => (
+                                    {ROOM_TYPES.map((type) => (
                                         <option key={type} value={type}>
                                             {type}
                                         </option>
@@ -696,5 +698,4 @@ export const DirectoryPage = () => {
             </Modal>
         </div>
     );
-}
-
+};
