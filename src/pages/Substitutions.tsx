@@ -3,8 +3,8 @@ import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { useLocation } from 'react-router-dom';
 import { useStaticData, useScheduleData } from '../context/DataContext'; 
 import { Icon } from '../components/Icons';
-import { Modal, SearchableSelect, useToast } from '../components/UI';
-import { DAYS, Shift, Teacher, ScheduleItem, ClassEntity, Subject, Room, Substitution } from '../types';
+import { Modal, useToast } from '../components/UI';
+import { DAYS, Shift, ScheduleItem, ClassEntity, Substitution } from '../types';
 import { formatDateISO, getScheduleForDate, generateId } from '../utils/helpers';
 import useMedia from 'use-media';
 
@@ -59,8 +59,6 @@ export const SubstitutionsPage = () => {
     const [substitutionComment, setSubstitutionComment] = useState<string>(''); // New: per-substitution comment
     
     const [refusedTeacherIds, setRefusedTeacherIds] = useState<string[]>([]);
-    const [showSwapOptions, setShowSwapOptions] = useState(false);
-    const [showMergeOptions, setShowMergeOptions] = useState(false);
     const [swapKeepRooms, setSwapKeepRooms] = useState(false);
     
     const [isCompactMode, setIsCompactMode] = useState(false); // New: Compact mode
@@ -96,8 +94,6 @@ export const SubstitutionsPage = () => {
             setSubstitutionComment('');
             setRefusedTeacherIds([]);
             setActiveReplacementId(null);
-            setShowSwapOptions(false);
-            setShowMergeOptions(false);
             setSwapKeepRooms(false);
             setSubMode('teacher');
             setIsModalOpen(true);
@@ -132,8 +128,6 @@ export const SubstitutionsPage = () => {
                 setActiveReplacementId(null);
                 setSubstitutionComment('');
             }
-            setShowSwapOptions(false);
-            setShowMergeOptions(false);
             setSwapKeepRooms(false);
         }
     }, [isModalOpen, currentSubParams, substitutions, selectedDate]);
@@ -406,7 +400,6 @@ export const SubstitutionsPage = () => {
         setSelectedRoomId('');
         setLessonAbsenceReason('');
         setCurrentSubParams(null);
-        setShowMergeOptions(false);
 
     }, [currentSubParams, selectedDate, selectedDayOfWeek, activeSchedule, substitutions, lessonAbsenceReason, saveScheduleData]);
 
@@ -472,7 +465,6 @@ export const SubstitutionsPage = () => {
         setIsModalOpen(false); 
         setCurrentSubParams(null);
         setSelectedRoomId(''); 
-        setShowSwapOptions(false);
         setSwapKeepRooms(false);
 
     }, [currentSubParams, activeSchedule, substitutions, selectedDate, saveScheduleData, selectedRoomId, swapKeepRooms, dayComment]);
@@ -618,7 +610,7 @@ export const SubstitutionsPage = () => {
 
     const confirmSendTelegram = async (mode: 'single' | 'all') => {
         if (!telegramTarget) return;
-        const { teacherId, lessonId, roomName, className, subjectName, period, roomChanged } = telegramTarget;
+        const { teacherId, roomName, className, subjectName, period } = telegramTarget;
         
         const teacher = teachers.find(t => t.id === teacherId);
         if (!teacher?.telegramChatId || !settings.telegramToken) {
@@ -1673,7 +1665,6 @@ export const SubstitutionsPage = () => {
             <Modal isOpen={!!viewScheduleTeacherId} onClose={() => setViewScheduleTeacherId(null)} title="Расписание учителя" maxWidth="max-w-md">
                  <div className="space-y-3">
                      {viewScheduleTeacherId && (() => {
-                         const t = teachers.find(x => x.id === viewScheduleTeacherId);
                          const schedule = activeSchedule.filter(s => s.teacherId === viewScheduleTeacherId && s.day === selectedDayOfWeek).sort((a,b) => a.period - b.period);
                          if (schedule.length === 0) return <div className="text-center text-slate-400 py-8">Уроков нет</div>;
                          return schedule.map(s => {

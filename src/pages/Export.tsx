@@ -31,7 +31,7 @@ export const ExportPage = () => {
     const [isGenerating, setIsGenerating] = useState(false);
     const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
     const [publicScheduleUrl, setPublicScheduleUrl] = useState('');
-    const [publicScheduleId, setPublicScheduleId] = useState('');
+    const [, setPublicScheduleId] = useState('');
 
     // Matrix Print State
     const [isMatrixPrintOpen, setIsMatrixPrintOpen] = useState(false);

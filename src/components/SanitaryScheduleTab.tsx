@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import html2canvas from 'html2canvas';
 import { ClassEntity, DAYS, DayOfWeek, ScheduleItem, SHIFT_PERIODS, Shift, Subject, Room, Teacher } from '../types';
 import { Icon } from './Icons';
@@ -54,7 +54,7 @@ export function SanitaryScheduleTab(props: {
   rooms: Room[];
   teachers: Teacher[];
 }) {
-  const { semester, onSemesterChange, schedule1, schedule2, classes, subjects, rooms, teachers } = props;
+  const { semester, onSemesterChange, schedule1, schedule2, classes, subjects, rooms } = props;
 
   const baseSchedule = useMemo(() => (semester === 2 ? schedule2 : schedule1), [semester, schedule1, schedule2]);
 

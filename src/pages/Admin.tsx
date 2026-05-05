@@ -7,7 +7,7 @@ import { formatDateISO, getScheduleForDate } from '../utils/helpers';
 import { Modal, useToast } from '../components/UI';
 
 export const AdminPage = () => {
-    const { subjects, teachers, classes, rooms, settings, saveStaticData } = useStaticData();
+    const { subjects, teachers, rooms, settings, saveStaticData } = useStaticData();
     const { addToast } = useToast(); 
     const { schedule1, schedule2 } = useScheduleData();
 

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { useStaticData, useScheduleData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { dbService } from '../services/db';
@@ -7,10 +7,9 @@ import { Modal, useToast } from '../components/UI';
 import { AbsenteeismRecord, StudentAbsence } from '../types';
 import { formatDateISO, generateId } from '../utils/helpers';
 
-const MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
 
 export const AbsenteeismPage = () => {
-    const { classes, teachers } = useStaticData();
+    const { classes } = useStaticData();
     const { absenteeismRecords, saveScheduleData } = useScheduleData();
     const { role, user } = useAuth();
     const { addToast } = useToast();
@@ -90,10 +89,6 @@ export const AbsenteeismPage = () => {
         return classes.find(c => c.id === classId)?.name || classId;
     };
 
-    const getEnteredByName = (userId?: string) => {
-        if (!userId) return 'Неизвестно';
-        return teachers.find(t => t.id === userId)?.name || 'Администратор';
-    };
 
     const getReasonLabel = (reason: StudentAbsence['reason'], other?: string) => {
         switch (reason) {

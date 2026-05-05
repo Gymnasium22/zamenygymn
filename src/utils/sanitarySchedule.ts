@@ -1,4 +1,4 @@
-import { DAYS, DayOfWeek, ScheduleItem, Shift, Subject } from '../types';
+import { DAYS, DayOfWeek, ScheduleItem, Subject } from '../types';
 
 type SlotKey = string;
 
@@ -380,7 +380,6 @@ function classPenalty(params: {
   const grade = getGradeNumber(className);
   const analysis = analyzeClassSchedule(params);
   const v = analysis.violations;
-  const isProfileClass = grade === 10 || grade === 11;
 
   // Base penalties from violations - увеличенные штрафы для критических нарушений
   let penalty = 0;
@@ -694,17 +693,6 @@ export function generateSanitarySchedule(params: {
       return slot.some((it) => isHeavySubject(subjectsById.get(it.subjectId), undefined, grade));
     };
 
-    const getNonHeavySlot = (day?: string, period?: number): SlotKey | null => {
-      const targetDays = day ? [day] : DAYS;
-      const targetPeriods = period ? [period] : preferred;
-      for (const d of targetDays) {
-        for (const p of targetPeriods) {
-          const key = `${cls.id}__${cls.shift}__${d}__${p}`;
-          if (!hasHeavyInSlot(key)) return key;
-        }
-      }
-      return null;
-    };
 
     // Reduce heavy on first/last (keep <= 1 per week) - агрессивная фаза
     for (let pass = 0; pass < 25; pass++) {

@@ -217,7 +217,7 @@ const ShiftTimeline = ({
 };
 
 export const BellsPage = () => {
-    const { bellSchedule, settings, saveStaticData } = useStaticData();
+    const { settings, saveStaticData } = useStaticData();
     const { addToast } = useToast();
 
     const [selectedPresetId, setSelectedPresetId] = useState<string>('preset_normal');
@@ -381,7 +381,6 @@ export const BellsPage = () => {
     };
 
     const getExportContent = () => {
-        const preset = settings.bellPresets?.find(p => p.id === selectedPresetId);
 
         return `
             <div style="font-family: 'Segoe UI', Arial, sans-serif; padding: 10px 40px 20px 40px; background: white; width: 1000px; max-width: 1000px; margin: 0 auto; color: #1e293b; box-sizing: border-box;">

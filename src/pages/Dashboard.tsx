@@ -1,11 +1,11 @@
 
-import React, { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useStaticData, useScheduleData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { Icon } from '../components/Icons';
 import { DayOfWeek, DAYS, ScheduleItem, Shift } from '../types';
 import { useNavigate, NavLink } from 'react-router-dom';
-import { Modal, useToast, SkeletonCard, SkeletonText } from '../components/UI';
+import { Modal, useToast } from '../components/UI';
 import { getActiveSemester, getLocalDateString } from '../utils/helpers';
 // Notifications component removed
 
@@ -184,7 +184,7 @@ const WeatherWidget = () => {
 
 export const DashboardPage = () => {
     const { subjects, teachers, classes, rooms, bellSchedule, settings } = useStaticData();
-    const { schedule, substitutions, nutritionRecords } = useScheduleData();
+    const { schedule, substitutions } = useScheduleData();
     const { role } = useAuth();
     const navigate = useNavigate();
     const { addToast } = useToast(); 
@@ -497,12 +497,6 @@ export const DashboardPage = () => {
         return count;
     }, [schedule, teachers, substitutions, todayStr, todayDayOfWeek]);
 
-    const classesWithoutDataForToday = useMemo(() => {
-        if (role !== 'canteen') return 0;
-        const todayRecords = nutritionRecords.filter(r => r.date === todayStr);
-        const classesWithData = new Set(todayRecords.map(r => r.classId));
-        return classes.filter(cls => !classesWithData.has(cls.id)).length;
-    }, [role, nutritionRecords, todayStr, classes]);
 
     const handleSendFeedback = async () => {
         if (!feedbackMessage.trim()) { addToast({ type: 'warning', title: 'Внимание', message: 'Пожалуйста, введите ваше сообщение.' }); return; }

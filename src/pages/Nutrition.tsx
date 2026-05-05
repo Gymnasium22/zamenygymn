@@ -1,15 +1,14 @@
 
-import React, { useState, useMemo, useRef, useCallback } from 'react';
+import { useState, useMemo, useRef, useCallback } from 'react';
 import { useStaticData, useScheduleData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { Icon } from '../components/Icons';
 import { Modal, useToast, SearchableSelect } from '../components/UI';
-import { ClassEntity, NutritionRecord } from '../types';
+import { NutritionRecord } from '../types';
 import { formatDateISO, generateId } from '../utils/helpers';
-import html2canvas from 'html2canvas';
 
 export const NutritionPage = () => {
-    const { classes, teachers } = useStaticData();
+    const { classes } = useStaticData();
     const { nutritionRecords, saveScheduleData } = useScheduleData();
     const { role, user } = useAuth();
     const { addToast } = useToast();
@@ -111,10 +110,6 @@ export const NutritionPage = () => {
     };
 
     // Get teacher name who entered
-    const getEnteredByName = (record: NutritionRecord) => {
-        if (!record.enteredBy) return 'Неизвестно';
-        return teachers.find(t => t.id === record.enteredBy)?.name || 'Неизвестно';
-    };
 
     // Open modal for editing/creating
     const openModal = (classId?: string, record?: NutritionRecord) => {

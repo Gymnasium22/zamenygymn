@@ -1,5 +1,5 @@
 
-import { AppData, Teacher, Subject, ClassEntity, Room, ScheduleItem, Substitution } from '../types';
+import { AppData } from '../types';
 import { INITIAL_DATA } from '../constants';
 import { firestoreDB, auth } from './firebase';
 import { 
@@ -10,8 +10,7 @@ import {
     onSnapshot, 
     getDocs, 
     query,
-    deleteDoc,
-    updateDoc
+    deleteDoc
 } from "firebase/firestore";
 
 // Конфигурация коллекций
