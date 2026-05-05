@@ -4,7 +4,7 @@ import { useLocation } from 'react-router-dom';
 import { useStaticData, useScheduleData } from '../context/DataContext'; 
 import { Icon } from '../components/Icons';
 import { Modal, useToast } from '../components/UI';
-import { DAYS, ScheduleItem, ClassEntity, Substitution } from '../types';
+import { DAYS, ScheduleItem, ClassEntity, Substitution, SubstitutionParams } from '../types';
 import { formatDateISO, getScheduleForDate, generateId } from '../utils/helpers';
 import useMedia from 'use-media';
 
@@ -37,7 +37,7 @@ export const SubstitutionsPage = () => {
     
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [currentSubParams, setCurrentSubParams] = useState<any>(null);
+    const [currentSubParams, setCurrentSubParams] = useState<SubstitutionParams | null>(null);
     const [absenceModalOpen, setAbsenceModalOpen] = useState(false);
     const [manualSearchModalOpen, setManualSearchModalOpen] = useState(false);
     const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
@@ -616,7 +616,15 @@ export const SubstitutionsPage = () => {
         }
     };
 
-    const handleTelegramClick = (params: any) => {
+    const handleTelegramClick = (params: {
+        teacherId: string;
+        lessonId: string;
+        roomName: string;
+        className: string;
+        subjectName: string;
+        period: number;
+        roomChanged: boolean;
+    }) => {
         setTelegramTarget(params);
         setTelegramChoiceOpen(true);
     };

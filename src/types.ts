@@ -79,6 +79,18 @@ export interface Substitution {
   dayComment?: string; // NEW: Common comment for all substitutions on this date
 }
 
+export interface SubstitutionParams {
+  scheduleItemId: string;
+  subjectId: string;
+  period: number;
+  shift: string;
+  classId: string;
+  teacherId: string;
+  roomId?: string;
+  day: string;
+  isEditing?: boolean;
+}
+
 export interface Bell {
   shift: string;
   period: number;
@@ -195,16 +207,19 @@ export interface StaticAppData {
   dutyZones: DutyZone[]; // New
 }
 
-export interface ScheduleAndSubstitutionData {
+export interface ScheduleAndSubstitutionData extends ScheduleAndSubstitutionDataFields {
+  saveSemesterSchedule: (semester: 1 | 2, newData: ScheduleItem[]) => Promise<void>;
+  saveScheduleData: (newData: Partial<ScheduleAndSubstitutionDataFields>, addToHistory?: boolean) => Promise<void>; 
+}
+
+export interface ScheduleAndSubstitutionDataFields {
   schedule: ScheduleItem[]; // АВТОМАТИЧЕСКИ ВЫБРАННОЕ ТЕКУЩЕЕ РАСПИСАНИЕ (зависит от месяца)
   schedule1: ScheduleItem[]; // Явное 1 полугодие
   schedule2: ScheduleItem[]; // Явное 2 полугодие
   substitutions: Substitution[];
-  dutySchedule: DutyRecord[]; // New
-  nutritionRecords: NutritionRecord[]; // New
-  absenteeismRecords: AbsenteeismRecord[]; // New
-  saveSemesterSchedule: (semester: 1 | 2, newData: ScheduleItem[]) => Promise<void>;
-  saveScheduleData: (newData: Partial<ScheduleAndSubstitutionData>, addToHistory?: boolean) => Promise<void>; // Legacy support
+  dutySchedule: DutyRecord[]; 
+  nutritionRecords: NutritionRecord[]; 
+  absenteeismRecords: AbsenteeismRecord[];
 }
 
 export interface AppData extends StaticAppData {

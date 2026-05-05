@@ -88,7 +88,7 @@ const deepEqual = (a: any, b: any): boolean => {
 };
 
 // Wrapper to safely execute getDocs even if it fails
-async function awaitHZ(fn: Function, options: { throwOnError?: boolean } = {}) {
+async function awaitHZ<T>(fn: () => Promise<T>, options: { throwOnError?: boolean } = {}): Promise<T | { docs: any[] }> {
     try {
         return await fn();
     } catch(e) {
