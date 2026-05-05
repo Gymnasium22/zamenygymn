@@ -27,7 +27,8 @@ const COLLECTIONS = {
     DUTY_ZONES: 'duty_zones',
     DUTY_SCHEDULE: 'duty_schedule',
     NUTRITION: 'nutrition_records',
-    ABSENTEEISM: 'absenteeism_records'
+    ABSENTEEISM: 'absenteeism_records',
+    SECRETS: 'secrets'
 };
 
 // Кеш предыдущих состояний коллекций для оптимизации
@@ -246,6 +247,9 @@ export const dbService = {
         if (data.settings) {
             promises.push(setDoc(doc(firestoreDB, COLLECTIONS.CONFIG, 'settings'), sanitizeForFirestore(data.settings), { merge: true }));
         }
+        if (data.privateSettings && user.email === 'admin@gymnasium22.com') {
+            promises.push(setDoc(doc(firestoreDB, COLLECTIONS.CONFIG, 'secrets'), sanitizeForFirestore(data.privateSettings), { merge: true }));
+        }
         if (data.bellSchedule) {
             promises.push(setDoc(doc(firestoreDB, COLLECTIONS.CONFIG, 'bells'), sanitizeForFirestore({ items: data.bellSchedule })));
         }
@@ -267,7 +271,7 @@ export const dbService = {
             'teachers', 'subjects', 'classes', 'rooms', 
             'schedule', 'schedule2', 'substitutions', 
             'dutyZones', 'dutySchedule', 'nutritionRecords', 
-            'absenteeismRecords', 'settings', 'bellSchedule'
+            'absenteeismRecords', 'settings', 'bellSchedule', 'privateSettings'
         ];
         const loadedCollections = new Set<string>();
 
@@ -336,19 +340,59 @@ export const dbService = {
         unsubs.push(subColl(COLLECTIONS.NUTRITION, 'nutritionRecords'));
         unsubs.push(subColl(COLLECTIONS.ABSENTEEISM, 'absenteeismRecords'));
 
-        unsubs.push(onSnapshot(collection(firestoreDB, COLLECTIONS.CONFIG), (snapshot) => {
-            snapshot.docs.forEach(doc => {
-                if (doc.id === 'settings') {
-                    localData.settings = { ...INITIAL_DATA.settings, ...doc.data() };
-                    loadedCollections.add('settings');
-                } else if (doc.id === 'bells') {
-                    const data = doc.data();
-                    localData.bellSchedule = data.items || INITIAL_DATA.bellSchedule;
-                    loadedCollections.add('bellSchedule');
-                }
-            });
+        // Listen to settings
+        unsubs.push(onSnapshot(doc(firestoreDB, COLLECTIONS.CONFIG, 'settings'), (snapshot) => {
+            if (snapshot.exists()) {
+                localData.settings = { ...INITIAL_DATA.settings, ...snapshot.data() };
+            } else {
+                localData.settings = INITIAL_DATA.settings;
+            }
+            loadedCollections.add('settings');
+            triggerUpdate();
+        }, (err) => {
+            console.warn("Error reading settings:", err);
+            loadedCollections.add('settings'); // Mark as loaded even if failed
             triggerUpdate();
         }));
+
+        // Listen to bells
+        unsubs.push(onSnapshot(doc(firestoreDB, COLLECTIONS.CONFIG, 'bells'), (snapshot) => {
+            if (snapshot.exists()) {
+                const data = snapshot.data();
+                localData.bellSchedule = data.items || INITIAL_DATA.bellSchedule;
+            } else {
+                localData.bellSchedule = INITIAL_DATA.bellSchedule;
+            }
+            loadedCollections.add('bellSchedule');
+            triggerUpdate();
+        }, (err) => {
+            console.warn("Error reading bells:", err);
+            loadedCollections.add('bellSchedule');
+            triggerUpdate();
+        }));
+
+        // Listen to secrets (ONLY if admin)
+        const user = auth?.currentUser;
+        if (user && user.email === 'admin@gymnasium22.com') {
+            unsubs.push(onSnapshot(doc(firestoreDB, COLLECTIONS.CONFIG, 'secrets'), (snapshot) => {
+                if (snapshot.exists()) {
+                    localData.privateSettings = snapshot.data();
+                } else {
+                    localData.privateSettings = INITIAL_DATA.privateSettings;
+                }
+                loadedCollections.add('privateSettings');
+                triggerUpdate();
+            }, (err) => {
+                console.warn("Error reading secrets:", err);
+                loadedCollections.add('privateSettings');
+                triggerUpdate();
+            }));
+        } else {
+            // Not an admin or not logged in, mark as "loaded" with empty defaults
+            localData.privateSettings = INITIAL_DATA.privateSettings;
+            loadedCollections.add('privateSettings');
+            triggerUpdate();
+        }
 
         return () => {
             unsubs.forEach(unsub => unsub());

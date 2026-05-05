@@ -307,6 +307,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                     
                     if (!fixedData.settings) fixedData.settings = INITIAL_DATA.settings;
                     else fixedData.settings = { ...INITIAL_DATA.settings, ...fixedData.settings };
+
+                    if (!fixedData.privateSettings) fixedData.privateSettings = INITIAL_DATA.privateSettings;
+                    else fixedData.privateSettings = { ...INITIAL_DATA.privateSettings, ...fixedData.privateSettings };
                     
                     // Apply pending changes on top of Firebase data
                     // This ensures that local changes are not overwritten by stale server data
@@ -500,8 +503,9 @@ export const StaticDataProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         rooms: data.rooms,
         bellSchedule: data.bellSchedule,
         settings: data.settings,
+        privateSettings: data.privateSettings,
         dutyZones: data.dutyZones,
-    }), [data.subjects, data.teachers, data.classes, data.rooms, data.bellSchedule, data.settings, data.dutyZones]);
+    }), [data.subjects, data.teachers, data.classes, data.rooms, data.bellSchedule, data.settings, data.privateSettings, data.dutyZones]);
 
     const saveStaticData = useCallback(async (newData: Partial<StaticAppData>, addToHistory?: boolean) => {
         await saveData(newData, addToHistory);
@@ -578,6 +582,7 @@ export const useStaticData = () => {
         rooms: context.rooms || [],
         bellSchedule: context.bellSchedule || [],
         settings: context.settings || INITIAL_DATA.settings,
+        privateSettings: context.privateSettings || INITIAL_DATA.privateSettings,
         dutyZones: context.dutyZones || []
     };
 

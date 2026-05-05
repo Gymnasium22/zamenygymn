@@ -139,6 +139,11 @@ export interface Settings {
   currentYear?: number;       // 2026
 }
 
+export interface PrivateSettings {
+  telegramToken?: string;
+  weatherApiKey?: string;
+}
+
 // --- NEW DUTY TYPES ---
 export interface DutyZone {
     id: string;
@@ -204,6 +209,7 @@ export interface StaticAppData {
   rooms: Room[];
   bellSchedule: Bell[];
   settings: Settings;
+  privateSettings: PrivateSettings; // New
   dutyZones: DutyZone[]; // New
 }
 
@@ -229,6 +235,7 @@ export interface AppData extends StaticAppData {
   dutySchedule: DutyRecord[]; // New
   nutritionRecords: NutritionRecord[]; // New
   absenteeismRecords: AbsenteeismRecord[]; // New
+  privateSettings: PrivateSettings; // New
 }
 
 export const DAYS = [DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday];

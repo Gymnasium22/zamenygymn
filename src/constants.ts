@@ -98,10 +98,8 @@ export const INITIAL_DATA: AppData = {
     nutritionRecords: [], // New
     absenteeismRecords: [], // New
     settings: {
-        telegramToken: '',
         publicScheduleId: null,
         feedbackChatId: '',
-        weatherApiKey: '',
         weatherCity: 'Minsk,BY',
         bellPresets: [
             { id: 'preset_normal', name: 'Обычный (45 мин)', bells: DEFAULT_BELLS },
@@ -122,5 +120,9 @@ export const INITIAL_DATA: AppData = {
             lastUpdated: ""
         },
         substitutionDayComments: {}
+    },
+    privateSettings: {
+        telegramToken: '',
+        weatherApiKey: ''
     }
 };

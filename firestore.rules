@@ -25,8 +25,14 @@ service cloud.firestore {
     match /schedule_sem2/{document} {
       allow read: if request.auth != null;
     }
-    match /config/{document} {
+    match /config/settings {
       allow read: if request.auth != null;
+    }
+    match /config/bells {
+      allow read: if request.auth != null;
+    }
+    match /config/secrets {
+      allow read, write: if request.auth != null && request.auth.token.email == "admin@gymnasium22.com";
     }
 
     // Специальные правила для записей о питании

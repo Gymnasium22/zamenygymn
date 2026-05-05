@@ -22,7 +22,7 @@ import {
 import { AssignmentModal } from '../components/Substitutions/AssignmentModal';
 
 export const SubstitutionsPage = () => {
-    const { subjects, teachers, classes, rooms, settings, saveStaticData } = useStaticData(); 
+    const { subjects, teachers, classes, rooms, settings, privateSettings, saveStaticData } = useStaticData(); 
     const { schedule1, schedule2, substitutions, saveScheduleData } = useScheduleData();
     const { addToast } = useToast();
 
@@ -590,7 +590,7 @@ export const SubstitutionsPage = () => {
     };
 
     const sendSummaryToTelegram = async () => {
-        if (!settings.telegramToken || !settings.feedbackChatId) {
+        if (!privateSettings.telegramToken || !settings.feedbackChatId) {
              addToast({ type: 'warning', title: 'Ошибка', message: 'Telegram не настроен' });
              return;
         }
@@ -598,7 +598,7 @@ export const SubstitutionsPage = () => {
         const text = generateSubstitutionText();
         setIsSendingSummary(true);
         try {
-            await fetch(`https://api.telegram.org/bot${settings.telegramToken}/sendMessage`, {
+            await fetch(`https://api.telegram.org/bot${privateSettings.telegramToken}/sendMessage`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -634,7 +634,7 @@ export const SubstitutionsPage = () => {
         const { teacherId, roomName, className, subjectName, period } = telegramTarget;
         
         const teacher = teachers.find(t => t.id === teacherId);
-        if (!teacher?.telegramChatId || !settings.telegramToken) {
+        if (!teacher?.telegramChatId || !privateSettings.telegramToken) {
             addToast({ type: 'warning', title: 'Внимание', message: 'У учителя не настроен Telegram ID или нет токена бота.' });
             setTelegramChoiceOpen(false);
             return;
@@ -698,7 +698,7 @@ export const SubstitutionsPage = () => {
         }
         
         try {
-            await fetch(`https://api.telegram.org/bot${settings.telegramToken}/sendMessage`, {
+            await fetch(`https://api.telegram.org/bot${privateSettings.telegramToken}/sendMessage`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

@@ -7,7 +7,7 @@ import { formatDateISO, getScheduleForDate } from '../utils/helpers';
 import { Modal, useToast } from '../components/UI';
 
 export const AdminPage = () => {
-    const { subjects, teachers, rooms, settings, saveStaticData } = useStaticData();
+    const { subjects, teachers, rooms, settings, privateSettings, saveStaticData } = useStaticData();
     const { addToast } = useToast(); 
     const { schedule1, schedule2 } = useScheduleData();
 
@@ -49,9 +49,9 @@ export const AdminPage = () => {
 
     useEffect(() => {
         if (settings) {
-            setTelegramToken(settings.telegramToken || '');
+            setTelegramToken(privateSettings.telegramToken || '');
             setFeedbackChatId(settings.feedbackChatId || '');
-            setWeatherApiKey(settings.weatherApiKey || '');
+            setWeatherApiKey(privateSettings.weatherApiKey || '');
             setWeatherCity(settings.weatherCity || 'Minsk,BY');
             setSchoolName(settings.schoolName || '');
             setDirectorName(settings.directorName || '');
@@ -116,9 +116,7 @@ export const AdminPage = () => {
         await saveStaticData({ 
             settings: { 
                 ...settings, 
-                telegramToken, 
                 feedbackChatId,
-                weatherApiKey,
                 weatherCity,
                 schoolName,
                 directorName,
@@ -130,7 +128,12 @@ export const AdminPage = () => {
                     ...announcement, 
                     lastUpdated: new Date().toISOString() 
                 } 
-            } 
+            },
+            privateSettings: {
+                ...privateSettings,
+                telegramToken,
+                weatherApiKey
+            }
         });
         addToast({ type: 'success', title: 'Успешно', message: "Настройки сохранены!" });
         setIsTemplatesModalOpen(false);
