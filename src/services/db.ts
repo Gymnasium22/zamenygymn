@@ -117,6 +117,11 @@ export const dbService = {
             throw error;
         }
     },
+    
+    clearCache: () => {
+        collectionCache.clear();
+        console.log('DB cache cleared');
+    },
 
     // Оптимизированная синхронизация с использованием локального кеша
     syncCollection: async (collectionName: string, items: any[]) => {
@@ -258,22 +263,34 @@ export const dbService = {
 
         let localData: Partial<AppData> = {};
         let isInitialLoad = true;
+        const collectionsToLoad = [
+            'teachers', 'subjects', 'classes', 'rooms', 
+            'schedule', 'schedule2', 'substitutions', 
+            'dutyZones', 'dutySchedule', 'nutritionRecords', 
+            'absenteeismRecords', 'settings', 'bellSchedule'
+        ];
+        const loadedCollections = new Set<string>();
 
         let updateTimeout: any;
-        const triggerUpdate = () => {
+        const triggerUpdate = (collectionKey?: string) => {
+            if (collectionKey) loadedCollections.add(collectionKey);
+            
             clearTimeout(updateTimeout);
             updateTimeout = setTimeout(async () => {
+                // Wait for all collections to load initially before the first update
+                if (isInitialLoad && loadedCollections.size < collectionsToLoad.length) {
+                    return;
+                }
+
                 const data = { ...localData };
 
-                // При первой загрузке НЕ делаем полную синхронизацию кеша
-                // Это экономит квоты Firestore - данные будут загружаться по требованию
                 if (isInitialLoad) {
                     isInitialLoad = false;
-                    console.log('Skipping initial cache synchronization to save Firestore quota');
+                    console.log('Initial data load complete, all collections synced');
                 }
 
                 onNext(data);
-            }, 50);
+            }, isInitialLoad ? 200 : 50);
         };
 
         const unsubs: (() => void)[] = [];
@@ -301,7 +318,7 @@ export const dbService = {
                     return orderA - orderB;
                 });
                 (localData as any)[key] = items;
-                triggerUpdate();
+                triggerUpdate(key as string);
             }, (err) => {
                 console.warn(`Error reading ${colName}:`, err);
             });
@@ -319,19 +336,18 @@ export const dbService = {
         unsubs.push(subColl(COLLECTIONS.NUTRITION, 'nutritionRecords'));
         unsubs.push(subColl(COLLECTIONS.ABSENTEEISM, 'absenteeismRecords'));
 
-        unsubs.push(onSnapshot(doc(firestoreDB, COLLECTIONS.CONFIG, 'settings'), (doc) => {
-            if (doc.exists()) {
-                localData.settings = { ...INITIAL_DATA.settings, ...doc.data() };
-                triggerUpdate();
-            }
-        }));
-
-        unsubs.push(onSnapshot(doc(firestoreDB, COLLECTIONS.CONFIG, 'bells'), (doc) => {
-            if (doc.exists()) {
-                const data = doc.data();
-                localData.bellSchedule = data.items || INITIAL_DATA.bellSchedule;
-                triggerUpdate();
-            }
+        unsubs.push(onSnapshot(collection(firestoreDB, COLLECTIONS.CONFIG), (snapshot) => {
+            snapshot.docs.forEach(doc => {
+                if (doc.id === 'settings') {
+                    localData.settings = { ...INITIAL_DATA.settings, ...doc.data() };
+                    loadedCollections.add('settings');
+                } else if (doc.id === 'bells') {
+                    const data = doc.data();
+                    localData.bellSchedule = data.items || INITIAL_DATA.bellSchedule;
+                    loadedCollections.add('bellSchedule');
+                }
+            });
+            triggerUpdate();
         }));
 
         return () => {
