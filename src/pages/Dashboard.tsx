@@ -192,6 +192,7 @@ export const DashboardPage = () => {
     const [notes, setNotes] = useState(localStorage.getItem('gym_notes') || '');
     const [currentDate] = useState(new Date());
     const [searchQuery, setSearchQuery] = useState("");
+    const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
     const [searchResults, setSearchResults] = useState<EntityStatus[]>([]);
     const [showAbsentList, setShowAbsentList] = useState(false);
     const [notesChanged, setNotesChanged] = useState(false);
@@ -206,6 +207,14 @@ export const DashboardPage = () => {
     const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
     const [feedbackMessage, setFeedbackMessage] = useState('');
     const [isSendingFeedback, setIsSendingFeedback] = useState(false);
+
+    // Debounce search query
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearchQuery(searchQuery);
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [searchQuery]);
 
     // Базовая санитизация заметок
     const sanitizeNotes = (text: string): string => {
@@ -306,12 +315,12 @@ export const DashboardPage = () => {
 
     // 2. Perform Live Search
     useEffect(() => {
-        if (!searchQuery.trim()) {
+        if (!debouncedSearchQuery.trim()) {
             setSearchResults([]);
             return;
         }
 
-        const q = searchQuery.toLowerCase();
+        const q = debouncedSearchQuery.toLowerCase();
         const results: EntityStatus[] = [];
         const isLessonNow = schoolStatus.type === 'lesson';
         const activeBell = schoolStatus.type === 'lesson' ? schoolStatus.bell : null;
@@ -410,7 +419,7 @@ export const DashboardPage = () => {
              }
         });
         setSearchResults(results.slice(0, 5));
-    }, [searchQuery, teachers, classes, rooms, schedule, substitutions, schoolStatus, todayStr, todayDayOfWeek, subjects]);
+    }, [debouncedSearchQuery, teachers, classes, rooms, schedule, substitutions, schoolStatus, todayStr, todayDayOfWeek, subjects]);
 
     // Other calculated values (birthdays, stats, etc.)
     const upcomingBirthdays = useMemo(() => {
