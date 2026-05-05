@@ -43,7 +43,7 @@ export const AdminPage = () => {
     // Определяем актуальное расписание на основе выбранной даты
     const activeSchedule = useMemo(() => {
         const data = { schedule: schedule1, schedule2, settings };
-        const schedule = getScheduleForDate(new Date(selectedDate), data as any);
+        const schedule = getScheduleForDate(new Date(selectedDate), data);
         return schedule;
     }, [selectedDate, schedule1, schedule2, settings]);
 

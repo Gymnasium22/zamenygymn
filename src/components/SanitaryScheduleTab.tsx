@@ -5,6 +5,7 @@ import { Icon } from './Icons';
 import { analyzeSanitarySchedule, applySlotSwaps, generateSanitarySchedule } from '../utils/sanitarySchedule';
 import { Modal } from './UI';
 import { BarChart } from './UI';
+import { exportService } from '../services/exportService';
 
 type Slot = { day: string; period: number };
 
@@ -229,47 +230,36 @@ export function SanitaryScheduleTab(props: {
         .join('');
     };
 
-    let html = `
-      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-      <head><meta charset="UTF-8"><style>
-        table { border-collapse: collapse; font-family: Arial, sans-serif; width: 100%; }
-        td, th { border: 2px solid #000; padding: 6px; vertical-align: top; text-align: center; }
-        .hdr { background-color: #f3f4f6; font-weight: 800; text-transform: uppercase; }
-        .p { width: 50px; background-color: #f8fafc; font-weight: 900; }
-        .cell { height: 60px; }
-        .title { font-size: 18px; font-weight: 900; }
-        .sub { font-size: 11px; color: #334155; }
-      </style></head><body>
-    `;
+    let content = `<div class="title">Плакат для санстанции — ${safeName}</div>`;
+    content += `<div class="sub">${selectedClass.shift} • ${semester}-е полугодие</div><br/>`;
 
-    html += `<div class="title">Плакат для санстанции — ${safeName}</div>`;
-    html += `<div class="sub">${selectedClass.shift} • ${semester}-е полугодие</div><br/>`;
-
-    html += `<table>`;
-    html += `<tr><th class="hdr">Урок</th>`;
-    DAYS.forEach((d) => (html += `<th class="hdr">${d}</th>`));
-    html += `</tr>`;
+    content += `<table>`;
+    content += `<tr><th class="hdr">Урок</th>`;
+    DAYS.forEach((d) => (content += `<th class="hdr">${d}</th>`));
+    content += `</tr>`;
 
     periods.forEach((p) => {
-      html += `<tr><td class="p">${p}</td>`;
+      content += `<tr><td class="p">${p}</td>`;
       DAYS.forEach((day) => {
         const items = sanitaryGrid.get(slotId({ day, period: p })) || [];
-        html += `<td class="cell">${renderCell(items)}</td>`;
+        content += `<td class="cell">${renderCell(items)}</td>`;
       });
-      html += `</tr>`;
+      content += `</tr>`;
     });
 
-    html += `</table></body></html>`;
+    content += `</table>`;
 
-    const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `Плакат_Санстанция_${safeName}_${semester}пол.xls`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    const styles = `
+      table { border-collapse: collapse; font-family: Arial, sans-serif; width: 100%; }
+      td, th { border: 2px solid #000; padding: 6px; vertical-align: top; text-align: center; }
+      .hdr { background-color: #f3f4f6; font-weight: 800; text-transform: uppercase; }
+      .p { width: 50px; background-color: #f8fafc; font-weight: 900; }
+      .cell { height: 60px; }
+      .title { font-size: 18px; font-weight: 900; }
+      .sub { font-size: 11px; color: #334155; }
+    `;
+
+    exportService.saveAsExcel(content, `Плакат_Санстанция_${safeName}_${semester}пол.xls`, styles);
   };
 
   const downloadAllClassesXls = () => {
@@ -344,40 +334,7 @@ export function SanitaryScheduleTab(props: {
       return subjectName;
     };
 
-    let html = `
-      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-      <head>
-        <meta charset="UTF-8">
-        <style>
-          table { border-collapse: collapse; font-family: Arial, sans-serif; width: 100%; }
-          td, th { border: 1px solid #000000; text-align: center; vertical-align: middle; padding: 4px; }
-          .shift-header { font-size: 16pt; font-weight: bold; background-color: #ffffff; text-align: center; border: 2px solid #000; }
-          .class-header { font-size: 12pt; font-weight: bold; background-color: #ffffff; text-align: center; border: 2px solid #000; }
-          .day-cell {
-            font-weight: bold;
-            text-transform: uppercase;
-            writing-mode: vertical-lr;
-            transform: rotate(180deg);
-            text-align: center;
-            vertical-align: middle;
-            border: 2px solid #000;
-            mso-rotate: 90;
-          }
-          .period-cell { font-weight: bold; border: 2px solid #000; }
-          .content-cell { font-weight: bold; border: 1px solid #000; height: 50px; }
-          .subject { font-weight: bold; }
-          .room { font-size: 8pt; font-weight: bold; }
-          .difficulty { font-size: 7pt; font-weight: bold; color: #666; }
-          .day-total { font-size: 9pt; font-weight: bold; background-color: #fef3c7; }
-          .week-total { font-size: 10pt; font-weight: bold; background-color: #fde68a; border: 2px solid #000; }
-          .legend { font-size: 8pt; }
-        </style>
-      </head>
-      <body>
-    `;
-
-    // Легенда цветов
-    html += `
+    let content = `
       <table style="width: 100%; margin-bottom: 10px; border: none;">
         <tr>
           <td style="border: none; padding: 4px;"><span class="legend">🔴 <b>11-12 баллов</b> (макс. трудность): математика, ин.яз</span></td>
@@ -393,43 +350,43 @@ export function SanitaryScheduleTab(props: {
       const periods = SHIFT_PERIODS[shift as Shift];
       if (shiftClasses.length === 0) return;
 
-      html += `<table>`;
+      content += `<table>`;
 
-      html += `<tr>`;
-      html += `<td style="border:none"></td>`;
-      html += `<td style="border:none"></td>`;
-      html += `<td style="border:none"></td>`;
-      html += `<td colspan="${shiftClasses.length}" class="shift-header">${shift}</td>`;
-      html += `</tr>`;
+      content += `<tr>`;
+      content += `<td style="border:none"></td>`;
+      content += `<td style="border:none"></td>`;
+      content += `<td style="border:none"></td>`;
+      content += `<td colspan="${shiftClasses.length}" class="shift-header">${shift}</td>`;
+      content += `</tr>`;
 
-      html += `<tr>`;
-      html += `<td style="border:none"></td>`;
-      html += `<td style="border:none"></td>`;
-      html += `<td style="border:none"></td>`;
+      content += `<tr>`;
+      content += `<td style="border:none"></td>`;
+      content += `<td style="border:none"></td>`;
+      content += `<td style="border:none"></td>`;
       shiftClasses.forEach((c) => {
-        html += `<td class="class-header">${c.name}</td>`;
+        content += `<td class="class-header">${c.name}</td>`;
       });
-      html += `</tr>`;
+      content += `</tr>`;
 
       DAYS.forEach((day) => {
         const colors = dayStyles[day as string] || { label: '#e5e7eb', cell: '#f3f4f6' };
 
         periods.forEach((period, pIndex) => {
-          html += `<tr>`;
+          content += `<tr>`;
           if (pIndex === 0) {
-            html += `<td rowspan="${periods.length}" class="day-cell" style="background-color: ${colors.label};">${day.toUpperCase()}</td>`;
+            content += `<td rowspan="${periods.length}" class="day-cell" style="background-color: ${colors.label};">${day.toUpperCase()}</td>`;
           }
-          html += `<td class="period-cell" style="background-color: ${colors.label};">${period}</td>`;
-          html += `<td class="period-cell" style="background-color: ${colors.label}; font-size: 8pt;">Балл</td>`;
+          content += `<td class="period-cell" style="background-color: ${colors.label};">${period}</td>`;
+          content += `<td class="period-cell" style="background-color: ${colors.label}; font-size: 8pt;">Балл</td>`;
 
           shiftClasses.forEach((cls) => {
             const lessons = currentSchedule.filter(
               (s) => s.classId === cls.id && s.day === day && s.shift === shift && s.period === period,
             );
 
-            html += `<td class="content-cell" style="background-color: ${colors.cell};">`;
+            content += `<td class="content-cell" style="background-color: ${colors.cell};">`;
             lessons.forEach((lesson, i) => {
-              if (i > 0) html += `<br style="mso-data-placement:same-cell;">`;
+              if (i > 0) content += `<br style="mso-data-placement:same-cell;">`;
               const sub = subjects.find((s) => s.id === lesson.subjectId);
               const room = rooms.find((r) => r.id === lesson.roomId);
               const roomName = room ? room.name : (lesson.roomId || '');
@@ -437,60 +394,75 @@ export function SanitaryScheduleTab(props: {
               const bgColor = getDifficultyColor(difficulty);
               const displayName = getLessonDisplayName(sub?.name || '', lesson.direction);
 
-              html += `<span class="subject" style="background-color: ${bgColor}; padding: 2px;">${displayName}</span>`;
-              if (roomName) html += ` <span class="room">${roomName}</span>`;
-              html += ` <span class="difficulty">(${difficulty})</span>`;
+              content += `<span class="subject" style="background-color: ${bgColor}; padding: 2px;">${displayName}</span>`;
+              if (roomName) content += ` <span class="room">${roomName}</span>`;
+              content += ` <span class="difficulty">(${difficulty})</span>`;
             });
-            html += `</td>`;
+            content += `</td>`;
           });
 
-          html += `</tr>`;
+          content += `</tr>`;
         });
 
         // Row for day totals per class
-        html += `<tr>`;
-        html += `<td colspan="2" class="day-total" style="background-color: ${colors.label}; text-align: right; padding-right: 8px;">Сумма баллов за день:</td>`;
-        html += `<td class="day-total" style="background-color: ${colors.label};"></td>`;
+        content += `<tr>`;
+        content += `<td colspan="2" class="day-total" style="background-color: ${colors.label}; text-align: right; padding-right: 8px;">Сумма баллов за день:</td>`;
+        content += `<td class="day-total" style="background-color: ${colors.label};"></td>`;
 
         shiftClasses.forEach((cls) => {
           const dayLessons = currentSchedule.filter(
             (s) => s.classId === cls.id && s.day === day && s.shift === shift,
           );
           const totalDifficulty = dayLessons.reduce((sum, lesson) => sum + getSubjectDifficulty(lesson.subjectId), 0);
-          html += `<td class="day-total" style="background-color: ${colors.cell}; font-weight: bold;">${totalDifficulty}</td>`;
+          content += `<td class="day-total" style="background-color: ${colors.cell}; font-weight: bold;">${totalDifficulty}</td>`;
         });
 
-        html += `</tr>`;
+        content += `</tr>`;
 
-        html += `<tr><td colspan="${3 + shiftClasses.length}" style="height: 3px; background-color: #000000; border: none;"></td></tr>`;
+        content += `<tr><td colspan="${3 + shiftClasses.length}" style="height: 3px; background-color: #000000; border: none;"></td></tr>`;
       });
 
       // Итоговая строка: сумма баллов за неделю по каждому классу
-      html += `<tr>`;
-      html += `<td colspan="3" class="week-total" style="text-align: right; padding-right: 8px;">ВСЕГО БАЛЛОВ ЗА НЕДЕЛЮ:</td>`;
+      content += `<tr>`;
+      content += `<td colspan="3" class="week-total" style="text-align: right; padding-right: 8px;">ВСЕГО БАЛЛОВ ЗА НЕДЕЛЮ:</td>`;
       shiftClasses.forEach((cls) => {
         const weekLessons = currentSchedule.filter(
           (s) => s.classId === cls.id && s.shift === shift,
         );
         const weekTotal = weekLessons.reduce((sum, lesson) => sum + getSubjectDifficulty(lesson.subjectId), 0);
-        html += `<td class="week-total">${weekTotal}</td>`;
+        content += `<td class="week-total">${weekTotal}</td>`;
       });
-      html += `</tr>`;
+      content += `</tr>`;
 
-      html += `</table><br><br>`;
+      content += `</table><br><br>`;
     });
 
-    html += `</body></html>`;
+    const styles = `
+      table { border-collapse: collapse; font-family: Arial, sans-serif; width: 100%; }
+      td, th { border: 1px solid #000000; text-align: center; vertical-align: middle; padding: 4px; }
+      .shift-header { font-size: 16pt; font-weight: bold; background-color: #ffffff; text-align: center; border: 2px solid #000; }
+      .class-header { font-size: 12pt; font-weight: bold; background-color: #ffffff; text-align: center; border: 2px solid #000; }
+      .day-cell {
+        font-weight: bold;
+        text-transform: uppercase;
+        writing-mode: vertical-lr;
+        transform: rotate(180deg);
+        text-align: center;
+        vertical-align: middle;
+        border: 2px solid #000;
+        mso-rotate: 90;
+      }
+      .period-cell { font-weight: bold; border: 2px solid #000; }
+      .content-cell { font-weight: bold; border: 1px solid #000; height: 50px; }
+      .subject { font-weight: bold; }
+      .room { font-size: 8pt; font-weight: bold; }
+      .difficulty { font-size: 7pt; font-weight: bold; color: #666; }
+      .day-total { font-size: 9pt; font-weight: bold; background-color: #fef3c7; }
+      .week-total { font-size: 10pt; font-weight: bold; background-color: #fde68a; border: 2px solid #000; }
+      .legend { font-size: 8pt; }
+    `;
 
-    const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `Сетка_Расписания_ВСЕ_${semester}пол.xls`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    exportService.saveAsExcel(content, `Сетка_Расписания_ВСЕ_${semester}пол.xls`, styles);
   };
 
   const resetManual = () => {

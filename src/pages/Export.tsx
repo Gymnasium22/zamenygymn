@@ -7,6 +7,7 @@ import { DAYS, DayOfWeek, Shift, SHIFT_PERIODS, AppData, Substitution, ScheduleI
 import { INITIAL_DATA } from '../constants';
 import { formatDateISO, generateId, getActiveSemester } from '../utils/helpers';
 import html2canvas from 'html2canvas';
+import { exportService } from '../services/exportService';
 
 import { QRCodeSVG } from 'qrcode.react';
 import { Modal, useToast } from '../components/UI';
@@ -115,60 +116,51 @@ export const ExportPage = () => {
     const exportStyledExcel = () => {
         const currentSchedule = getScheduleForExport();
         
-        let html = `
-            <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-            <head><meta charset="UTF-8"><style>
-                table { border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; }
-                td, th { border: 1px solid #999; padding: 5px; vertical-align: top; }
-                .header { background-color: #f3f4f6; font-weight: bold; text-align: center; }
-                .class-cell { font-size: 14px; font-weight: bold; text-align: center; vertical-align: middle; }
-                .subject { font-weight: bold; font-size: 11px; }
-                .meta { font-size: 10px; color: #555; }
-            </style></head><body><table>
-        `;
+        let content = `<table>`;
 
         DAYS.forEach(day => {
-            html += `<tr><td colspan="8" style="background-color:#4f46e5; color:white; font-size:16px; font-weight:bold; text-align:center;">${day}</td></tr>`;
+            content += `<tr><td colspan="8" style="background-color:#4f46e5; color:white; font-size:16px; font-weight:bold; text-align:center;">${day}</td></tr>`;
             [Shift.First, Shift.Second].forEach(shift => {
                 const filteredClasses = classes.filter(c => c.shift === shift);
                 if (filteredClasses.length === 0) return;
                 
-                html += `<tr><td colspan="8" style="background-color:#e0e7ff; font-weight:bold;">${shift}</td></tr>`;
-                html += `<tr><th class="header">Класс</th>`;
-                SHIFT_PERIODS[shift].forEach(p => html += `<th class="header">${p} урок</th>`);
-                html += `</tr>`;
+                content += `<tr><td colspan="8" style="background-color:#e0e7ff; font-weight:bold;">${shift}</td></tr>`;
+                content += `<tr><th class="header">Класс</th>`;
+                SHIFT_PERIODS[shift].forEach(p => content += `<th class="header">${p} урок</th>`);
+                content += `</tr>`;
 
                 filteredClasses.forEach(c => {
-                    html += `<tr><td class="class-cell">${c.name}</td>`;
+                    content += `<tr><td class="class-cell">${c.name}</td>`;
                     SHIFT_PERIODS[shift].forEach(p => {
                         const items = currentSchedule.filter(s => s.classId === c.id && s.day === day && s.shift === shift && s.period === p);
-                        html += `<td style="height: 60px;">`;
+                        content += `<td style="height: 60px;">`;
                         items.forEach(item => {
                             const sub = subjects.find(s => s.id === item.subjectId);
                             const teach = teachers.find(t => t.id === item.teacherId);
                             const room = rooms.find(r => r.id === item.roomId);
                             const roomName = room ? room.name : item.roomId;
-                            html += `<div style="background-color: ${sub?.color || '#fff'}; padding: 2px; margin-bottom: 2px; border: 1px solid #eee;">
+                            content += `<div style="background-color: ${sub?.color || '#fff'}; padding: 2px; margin-bottom: 2px; border: 1px solid #eee;">
                                 <div class="subject">${sub?.name || ''} ${item.direction || ''}</div>
                                 <div class="meta">${teach?.name || ''} ${roomName ? `(Каб. ${roomName})` : ''}</div>
                             </div>`;
                         });
-                        html += `</td>`;
+                        content += `</td>`;
                     });
-                    html += `</tr>`;
+                    content += `</tr>`;
                 });
             });
         });
         
-        html += `</table></body></html>`;
-        const blob = new Blob([html], { type: "application/vnd.ms-excel" });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `Расписание_Гимназия22_${exportSemester}пол.xls`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        content += `</table>`;
+
+        const styles = `
+            td, th { border: 1px solid #999; padding: 5px; vertical-align: top; }
+            .class-cell { font-size: 14px; font-weight: bold; text-align: center; vertical-align: middle; }
+            .subject { font-weight: bold; font-size: 11px; }
+            .meta { font-size: 10px; color: #555; }
+        `;
+
+        exportService.saveAsExcel(content, `Расписание_Гимназия22_${exportSemester}пол.xls`, styles);
     };
 
     const exportMatrixExcel = () => {
@@ -183,25 +175,10 @@ export const ExportPage = () => {
             [DayOfWeek.Friday]:    { header: '#bfdbfe', cell: '#dbeafe' }, // Blue
         };
 
-        let html = `
-            <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-            <head><meta charset="UTF-8"><style>
-                table { border-collapse: collapse; font-family: Arial, sans-serif; font-size: 10pt; margin-bottom: 20px; width: 100%; }
-                td, th { border: 1px solid #000; padding: 2px; vertical-align: middle; text-align: center; }
-                .header { font-weight: bold; }
-                .subject-cell { font-weight: bold; vertical-align: middle; background-color: #fff; }
-                .teacher-cell { text-align: left; padding-left: 5px; }
-                sub { font-size: 10px; vertical-align: sub; }
-                
-                /* Doc Header/Footer Styles */
-                .doc-table td { border: none !important; padding: 5px; vertical-align: top; }
-                .doc-left { text-align: left; }
-                .doc-right { text-align: right; }
-            </style></head><body>
-        `;
+        let content = '';
 
         // HEADER
-        html += `
+        content += `
             <table class="doc-table" style="width: 100%; border: none;">
                 <tr>
                     <td colspan="10" class="doc-left">СОГЛАСОВАНО</td>
@@ -230,49 +207,49 @@ export const ExportPage = () => {
         [Shift.First, Shift.Second].forEach(shift => {
             const periods = SHIFT_PERIODS[shift];
             
-            html += `<table>`;
-            html += `<tr>
+            content += `<table>`;
+            content += `<tr>
                 <th rowspan="3" class="header" style="border: 2px solid #000; width: 150px; background-color: #e9d5ff;">Учебный предмет</th>
                 <th rowspan="3" class="header" style="border: 2px solid #000; width: 200px; background-color: #e9d5ff;">ФИО</th>
                 <th colspan="${DAYS.length * periods.length}" class="header" style="border: 2px solid #000; font-size: 14px; background-color: #f3f4f6;">День недели</th>
             </tr>`;
 
-            html += `<tr>`;
+            content += `<tr>`;
             DAYS.forEach(day => {
                 const bg = dayColors[day]?.header || '#f3f4f6';
-                html += `<th colspan="${periods.length}" class="header" style="border: 2px solid #000; background-color: ${bg};">${day}</th>`;
+                content += `<th colspan="${periods.length}" class="header" style="border: 2px solid #000; background-color: ${bg};">${day}</th>`;
             });
-            html += `</tr>`;
+            content += `</tr>`;
 
-            html += `<tr>`;
+            content += `<tr>`;
             DAYS.forEach((day) => {
                 const bg = dayColors[day]?.header || '#f3f4f6';
-                periods.forEach(p => html += `<th class="header" style="border-bottom: 2px solid #000; background-color: ${bg};">Урок</th>`);
+                periods.forEach(p => content += `<th class="header" style="border-bottom: 2px solid #000; background-color: ${bg};">Урок</th>`);
             });
-            html += `</tr>`;
+            content += `</tr>`;
             
             const shiftGray = '#e5e7eb'; 
 
-            html += `<tr>
+            content += `<tr>
                 <th class="header" style="border: 2px solid #000; background-color: ${shiftGray};">${shift}</th>
                 <th class="header" style="border: 2px solid #000; background-color: ${shiftGray};"></th>
             `;
             DAYS.forEach((day) => {
                 const bg = dayColors[day]?.header || '#f3f4f6';
-                periods.forEach(p => html += `<th class="header" style="width: 40px; background-color: ${bg};">${p}</th>`);
+                periods.forEach(p => content += `<th class="header" style="width: 40px; background-color: ${bg};">${p}</th>`);
             });
-            html += `</tr>`;
+            content += `</tr>`;
 
             subjects.forEach(subject => {
                 const filteredTeachers = teachers.filter(t => t.subjectIds.includes(subject.id) && t.shifts.includes(shift));
                 if (filteredTeachers.length === 0) return;
 
                 filteredTeachers.forEach((teacher, tIndex) => {
-                    html += `<tr>`;
+                    content += `<tr>`;
                     if (tIndex === 0) {
-                        html += `<td rowspan="${filteredTeachers.length}" class="subject-cell" style="border: 2px solid #000; background-color: #e9d5ff;">${subject.name}</td>`;
+                        content += `<td rowspan="${filteredTeachers.length}" class="subject-cell" style="border: 2px solid #000; background-color: #e9d5ff;">${subject.name}</td>`;
                     }
-                    html += `<td class="teacher-cell" style="border-right: 2px solid #000; background-color: #e9d5ff;">${teacher.name}</td>`;
+                    content += `<td class="teacher-cell" style="border-right: 2px solid #000; background-color: #e9d5ff;">${teacher.name}</td>`;
 
                     DAYS.forEach(day => {
                         const cellBg = dayColors[day]?.cell || '#fff';
@@ -293,22 +270,22 @@ export const ExportPage = () => {
                                 const dir = item.direction ? ` <span style="font-size:10px">(${item.direction})</span>` : '';
                                 // Убрали индивидуальный цвет предмета, используем цвет дня
                                 const bgColor = cellBg;
-                                html += `<td style="border: 1px solid #000; font-weight: bold; background-color: ${bgColor};">${cls ? cls.name : ''}${dir}${room}</td>`;
+                                content += `<td style="border: 1px solid #000; font-weight: bold; background-color: ${bgColor};">${cls ? cls.name : ''}${dir}${room}</td>`;
                             } else {
                                 // Пустые ячейки красим в цвет дня
-                                html += `<td style="border: 1px solid #000; background-color: ${cellBg};"></td>`;
+                                content += `<td style="border: 1px solid #000; background-color: ${cellBg};"></td>`;
                             }
                         });
                     });
-                    html += `</tr>`;
+                    content += `</tr>`;
                 });
-                html += `<tr><td colspan="${2 + DAYS.length * periods.length}" style="height: 2px; background-color: #000;"></td></tr>`;
+                content += `<tr><td colspan="${2 + DAYS.length * periods.length}" style="height: 2px; background-color: #000;"></td></tr>`;
             });
-            html += `</table><br/><br/>`;
+            content += `</table><br/><br/>`;
         });
 
         // FOOTER
-        html += `
+        content += `
             <br/>
             <table class="doc-table" style="width: 100%; border: none;">
                 <tr>
@@ -319,15 +296,18 @@ export const ExportPage = () => {
             </table>
         `;
 
-        html += `</body></html>`;
-        const blob = new Blob([html], { type: "application/vnd.ms-excel" });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `Матрица_Расписания_${exportSemester}пол.xls`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        const styles = `
+            table { border-collapse: collapse; font-family: Arial, sans-serif; font-size: 10pt; margin-bottom: 20px; width: 100%; }
+            td, th { border: 1px solid #000; padding: 2px; vertical-align: middle; text-align: center; }
+            .subject-cell { font-weight: bold; vertical-align: middle; background-color: #fff; }
+            .teacher-cell { text-align: left; padding-left: 5px; }
+            sub { font-size: 10px; vertical-align: sub; }
+            .doc-table td { border: none !important; padding: 5px; vertical-align: top; }
+            .doc-left { text-align: left; }
+            .doc-right { text-align: right; }
+        `;
+
+        exportService.saveAsExcel(content, `Матрица_Расписания_${exportSemester}пол.xls`, styles);
     };
 
     const exportPosterMatrixExcel = () => {
@@ -343,26 +323,10 @@ export const ExportPage = () => {
         };
 
         // Увеличенные шрифты и размеры для плаката
-        let html = `
-            <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-            <head><meta charset="UTF-8"><style>
-                /* Poster scaling */
-                table { border-collapse: collapse; font-family: Arial, sans-serif; font-size: 16pt; margin-bottom: 40px; width: 100%; }
-                td, th { border: 2px solid #000; padding: 4px; vertical-align: middle; text-align: center; }
-                .header { font-weight: bold; }
-                .subject-cell { font-weight: bold; vertical-align: middle; background-color: #fff; font-size: 20pt; }
-                .teacher-cell { text-align: left; padding-left: 10px; font-size: 20pt; }
-                sub { font-size: 12pt; vertical-align: sub; }
-                
-                /* Doc Header/Footer Styles - Scaled */
-                .doc-table td { border: none !important; padding: 10px; vertical-align: top; font-size: 16pt; }
-                .doc-left { text-align: left; }
-                .doc-right { text-align: right; }
-            </style></head><body>
-        `;
+        let content = '';
 
         // HEADER
-        html += `
+        content += `
             <table class="doc-table" style="width: 100%; border: none;">
                 <tr>
                     <td colspan="10" class="doc-left">СОГЛАСОВАНО</td>
@@ -391,43 +355,43 @@ export const ExportPage = () => {
         [Shift.First, Shift.Second].forEach(shift => {
             const periods = SHIFT_PERIODS[shift];
             
-            html += `<table>`;
+            content += `<table>`;
             
             // --- ROW 1: Main Headers ---
-            html += `<tr>
+            content += `<tr>
                 <th rowspan="3" class="header" style="border: 3px solid #000; width: 350px; background-color: #e9d5ff; font-size: 24pt;">Учебный предмет</th>
                 <th rowspan="3" class="header" style="border: 3px solid #000; width: 450px; background-color: #e9d5ff; font-size: 24pt;">ФИО</th>
                 <th colspan="${DAYS.length * periods.length}" class="header" style="border: 3px solid #000; font-size: 24pt; background-color: #f3f4f6;">День недели</th>
             </tr>`;
 
             // --- ROW 2: Day Names ---
-            html += `<tr>`;
+            content += `<tr>`;
             DAYS.forEach(day => {
                 const bg = dayColors[day]?.header || '#f3f4f6';
-                html += `<th colspan="${periods.length}" class="header" style="border: 3px solid #000; background-color: ${bg}; font-size: 20pt;">${day}</th>`;
+                content += `<th colspan="${periods.length}" class="header" style="border: 3px solid #000; background-color: ${bg}; font-size: 20pt;">${day}</th>`;
             });
-            html += `</tr>`;
+            content += `</tr>`;
 
             // --- ROW 3: "Урок" label (Merged per day) ---
-            html += `<tr>`;
+            content += `<tr>`;
             DAYS.forEach((day) => {
                 const bg = dayColors[day]?.header || '#f3f4f6';
                 // Одна ячейка "Урок" на весь день
-                html += `<th colspan="${periods.length}" class="header" style="border-bottom: 3px solid #000; background-color: ${bg}; font-size: 16pt;">Урок</th>`;
+                content += `<th colspan="${periods.length}" class="header" style="border-bottom: 3px solid #000; background-color: ${bg}; font-size: 16pt;">Урок</th>`;
             });
-            html += `</tr>`;
+            content += `</tr>`;
             
             // --- ROW 4: Shift Name + Period Numbers ---
             const shiftGray = '#e5e7eb'; 
-            html += `<tr>
+            content += `<tr>
                 <th class="header" style="border: 3px solid #000; background-color: ${shiftGray}; font-size: 24pt;">${shift}</th>
                 <th class="header" style="border: 3px solid #000; background-color: ${shiftGray};"></th>
             `;
             DAYS.forEach((day) => {
                 const bg = dayColors[day]?.header || '#f3f4f6';
-                periods.forEach(p => html += `<th class="header" style="width: 20px; background-color: ${bg}; font-size: 16pt;">${p}</th>`);
+                periods.forEach(p => content += `<th class="header" style="width: 20px; background-color: ${bg}; font-size: 16pt;">${p}</th>`);
             });
-            html += `</tr>`;
+            content += `</tr>`;
 
             // --- DATA ROWS ---
             subjects.forEach(subject => {
@@ -435,11 +399,11 @@ export const ExportPage = () => {
                 if (filteredTeachers.length === 0) return;
 
                 filteredTeachers.forEach((teacher, tIndex) => {
-                    html += `<tr>`;
+                    content += `<tr>`;
                     if (tIndex === 0) {
-                        html += `<td rowspan="${filteredTeachers.length}" class="subject-cell" style="border: 3px solid #000; background-color: #e9d5ff;">${subject.name}</td>`;
+                        content += `<td rowspan="${filteredTeachers.length}" class="subject-cell" style="border: 3px solid #000; background-color: #e9d5ff;">${subject.name}</td>`;
                     }
-                    html += `<td class="teacher-cell" style="border-right: 3px solid #000; background-color: #e9d5ff;">${teacher.name}</td>`;
+                    content += `<td class="teacher-cell" style="border-right: 3px solid #000; background-color: #e9d5ff;">${teacher.name}</td>`;
 
                     DAYS.forEach(day => {
                         const cellBg = dayColors[day]?.cell || '#fff';
@@ -459,21 +423,21 @@ export const ExportPage = () => {
                                 const room = roomName ? `<sub>${roomName}</sub>` : '';
                                 const dir = item.direction ? ` <span style="font-size:14px">(${item.direction})</span>` : '';
                                 
-                                html += `<td style="border: 1px solid #000; font-weight: bold; background-color: ${cellBg}; height: 60px;">${cls ? cls.name : ''}${dir}${room}</td>`;
+                                content += `<td style="border: 1px solid #000; font-weight: bold; background-color: ${cellBg}; height: 60px;">${cls ? cls.name : ''}${dir}${room}</td>`;
                             } else {
-                                html += `<td style="border: 1px solid #000; background-color: ${cellBg};"></td>`;
+                                content += `<td style="border: 1px solid #000; background-color: ${cellBg};"></td>`;
                             }
                         });
                     });
-                    html += `</tr>`;
+                    content += `</tr>`;
                 });
-                html += `<tr><td colspan="${2 + DAYS.length * periods.length}" style="height: 4px; background-color: #000;"></td></tr>`;
+                content += `<tr><td colspan="${2 + DAYS.length * periods.length}" style="height: 4px; background-color: #000;"></td></tr>`;
             });
-            html += `</table><br/><br/>`;
+            content += `</table><br/><br/>`;
         });
 
         // FOOTER
-        html += `
+        content += `
             <br/>
             <table class="doc-table" style="width: 100%; border: none;">
                 <tr>
@@ -484,15 +448,18 @@ export const ExportPage = () => {
             </table>
         `;
 
-        html += `</body></html>`;
-        const blob = new Blob([html], { type: "application/vnd.ms-excel" });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `Плакат_Матрица_${exportSemester}пол.xls`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        const styles = `
+            table { border-collapse: collapse; font-family: Arial, sans-serif; font-size: 16pt; margin-bottom: 40px; width: 100%; }
+            td, th { border: 2px solid #000; padding: 4px; vertical-align: middle; text-align: center; }
+            .subject-cell { font-weight: bold; vertical-align: middle; background-color: #fff; font-size: 20pt; }
+            .teacher-cell { text-align: left; padding-left: 10px; font-size: 20pt; }
+            sub { font-size: 12pt; vertical-align: sub; }
+            .doc-table td { border: none !important; padding: 10px; vertical-align: top; font-size: 16pt; }
+            .doc-left { text-align: left; }
+            .doc-right { text-align: right; }
+        `;
+
+        exportService.saveAsExcel(content, `Плакат_Матрица_${exportSemester}пол.xls`, styles);
     };
 
     const downloadGradeMatrixExcel = () => {
@@ -509,71 +476,45 @@ export const ExportPage = () => {
             [DayOfWeek.Friday]:    { label: '#bfdbfe', cell: '#dbeafe' }, // Blue 200/100
         };
 
-        let html = `
-            <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-            <head>
-                <meta charset="UTF-8">
-                <style>
-                    table { border-collapse: collapse; font-family: Arial, sans-serif; width: 100%; }
-                    td, th { border: 1px solid #000000; text-align: center; vertical-align: middle; padding: 4px; }
-                    .shift-header { font-size: 16pt; font-weight: bold; background-color: #ffffff; text-align: center; border: 2px solid #000; }
-                    .class-header { font-size: 12pt; font-weight: bold; background-color: #ffffff; text-align: center; border: 2px solid #000; }
-                    .day-cell { 
-                        font-weight: bold; 
-                        text-transform: uppercase; 
-                        writing-mode: vertical-lr; 
-                        transform: rotate(180deg);
-                        text-align: center;
-                        vertical-align: middle;
-                        border: 2px solid #000;
-                        mso-rotate: 90; 
-                    }
-                    .period-cell { font-weight: bold; border: 2px solid #000; }
-                    .content-cell { font-weight: bold; border: 1px solid #000; height: 50px; }
-                    .subject { font-weight: bold; }
-                    .room { font-size: 8pt; font-weight: bold; }
-                </style>
-            </head>
-            <body>
-        `;
+        let content = '';
 
         shifts.forEach((shift) => {
             const shiftClasses = targetClasses.filter(c => c.shift === shift);
             const periods = SHIFT_PERIODS[shift as Shift];
             if (shiftClasses.length === 0) return;
 
-            html += `<table>`;
+            content += `<table>`;
             
             // Row 1: "1 СМЕНА" merged
-            html += `<tr>`;
-            html += `<td style="border:none"></td>`;
-            html += `<td style="border:none"></td>`;
-            html += `<td colspan="${shiftClasses.length}" class="shift-header">${shift}</td>`;
-            html += `</tr>`;
+            content += `<tr>`;
+            content += `<td style="border:none"></td>`;
+            content += `<td style="border:none"></td>`;
+            content += `<td colspan="${shiftClasses.length}" class="shift-header">${shift}</td>`;
+            content += `</tr>`;
 
             // Row 2: Classes
-            html += `<tr>`;
-            html += `<td style="border:none"></td>`;
-            html += `<td style="border:none"></td>`;
+            content += `<tr>`;
+            content += `<td style="border:none"></td>`;
+            content += `<td style="border:none"></td>`;
             shiftClasses.forEach(c => {
-                html += `<td class="class-header">${c.name}</td>`;
+                content += `<td class="class-header">${c.name}</td>`;
             });
-            html += `</tr>`;
+            content += `</tr>`;
 
             // Data Rows
             DAYS.forEach((day) => {
                 const colors = dayStyles[day as string] || { label: '#e5e7eb', cell: '#f3f4f6' };
                 
                 periods.forEach((period, pIndex) => {
-                    html += `<tr>`;
+                    content += `<tr>`;
 
                     // Day Column (Merged)
                     if (pIndex === 0) {
-                        html += `<td rowspan="${periods.length}" class="day-cell" style="background-color: ${colors.label};">${day.toUpperCase()}</td>`;
+                        content += `<td rowspan="${periods.length}" class="day-cell" style="background-color: ${colors.label};">${day.toUpperCase()}</td>`;
                     }
 
                     // Period Column
-                    html += `<td class="period-cell" style="background-color: ${colors.label};">${period}</td>`;
+                    content += `<td class="period-cell" style="background-color: ${colors.label};">${period}</td>`;
 
                     // Class Columns
                     shiftClasses.forEach(cls => {
@@ -584,41 +525,51 @@ export const ExportPage = () => {
                             s.period === period
                         );
                         
-                        html += `<td class="content-cell" style="background-color: ${colors.cell};">`;
+                        content += `<td class="content-cell" style="background-color: ${colors.cell};">`;
                         
                         lessons.forEach((lesson, i) => {
-                            if (i > 0) html += `<br style="mso-data-placement:same-cell;">`;
+                            if (i > 0) content += `<br style="mso-data-placement:same-cell;">`;
                             const sub = subjects.find(s => s.id === lesson.subjectId);
                             const room = rooms.find(r => r.id === lesson.roomId);
                             const roomName = room ? room.name : (lesson.roomId || '');
                             
-                            html += `<span class="subject">${sub?.name || ''}</span>`;
-                            if (roomName) html += ` <span class="room">${roomName}</span>`;
+                            content += `<span class="subject">${sub?.name || ''}</span>`;
+                            if (roomName) content += ` <span class="room">${roomName}</span>`;
                         });
                         
-                        html += `</td>`;
+                        content += `</td>`;
                     });
 
-                    html += `</tr>`;
+                    content += `</tr>`;
                 });
                 
                 // Add a black separator row to mimic the thick border in the image
-                html += `<tr><td colspan="${2 + shiftClasses.length}" style="height: 3px; background-color: #000000; border: none;"></td></tr>`;
+                content += `<tr><td colspan="${2 + shiftClasses.length}" style="height: 3px; background-color: #000000; border: none;"></td></tr>`;
             });
 
-            html += `</table><br><br>`;
+            content += `</table><br><br>`;
         });
 
-        html += `</body></html>`;
-        
-        const blob = new Blob([html], { type: "application/vnd.ms-excel" });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `Сетка_Расписания_${matrixGrade}_параллель.xls`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        const styles = `
+            .shift-header { font-size: 16pt; font-weight: bold; background-color: #ffffff; text-align: center; border: 2px solid #000; }
+            .class-header { font-size: 12pt; font-weight: bold; background-color: #ffffff; text-align: center; border: 2px solid #000; }
+            .day-cell { 
+                font-weight: bold; 
+                text-transform: uppercase; 
+                writing-mode: vertical-lr; 
+                transform: rotate(180deg);
+                text-align: center;
+                vertical-align: middle;
+                border: 2px solid #000;
+                mso-rotate: 90; 
+            }
+            .period-cell { font-weight: bold; border: 2px solid #000; }
+            .content-cell { font-weight: bold; border: 1px solid #000; height: 50px; }
+            .subject { font-weight: bold; }
+            .room { font-size: 8pt; font-weight: bold; }
+        `;
+
+        exportService.saveAsExcel(content, `Сетка_Расписания_${matrixGrade}_параллель.xls`, styles);
     };
 
     const exportMonthlySubstitutionsExcel = () => {
@@ -684,21 +635,9 @@ export const ExportPage = () => {
             }
         });
 
-        // HTML Header and Style
-        let html = `
-            <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-            <head><meta charset="UTF-8"><style>
-                body { font-family: Arial, sans-serif; font-size: 12px; }
-                table { border-collapse: collapse; width: 100%; }
-                td, th { border: 1px solid #999; padding: 4px; vertical-align: middle; text-align: left; }
-                .header { background-color: #e0e7ff; font-weight: bold; text-align: center; }
-                .header-warning { background-color: #fee2e2; font-weight: bold; text-align: center; }
-                .date-row { background-color: #f3f4f6; font-weight: bold; }
-            </style></head><body>
-            <h3>Отчет по заменам за ${targetDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}</h3>
-        `;
+        let content = `<h3>Отчет по заменам за ${targetDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}</h3>`;
 
-        const renderRows = (items: SubstitutionDetail[]) => {
+        const renderRowsLocal = (items: SubstitutionDetail[]) => {
             return items.map(item => {
                 const { subs, scheduleItem, cls, subj, origTeacher, reason } = item;
                 const firstSub = subs[0];
@@ -709,7 +648,6 @@ export const ExportPage = () => {
                 if (firstSub.replacementTeacherId === 'conducted') repTeacherName = 'Урок проведен';
                 else if (firstSub.replacementTeacherId === 'cancelled') repTeacherName = 'Урок снят';
                 else {
-                    // Combine names for merged/split subs
                     const names = subs.map(s => {
                         const t = teachers.find(x => x.id === s.replacementTeacherId);
                         return t ? t.name : 'Неизвестно';
@@ -754,8 +692,8 @@ export const ExportPage = () => {
             }).join('');
         };
 
-        const renderTable = (items: SubstitutionDetail[], isWarning = false) => `
-            <table>
+        const renderTableLocal = (items: SubstitutionDetail[], isWarning = false) => `
+            <table style="margin-bottom: 20px;">
             <thead>
                 <tr class="${isWarning ? 'header-warning' : 'header'}">
                     <th>Дата</th>
@@ -770,23 +708,23 @@ export const ExportPage = () => {
                 </tr>
             </thead>
             <tbody>
-                ${renderRows(items)}
+                ${renderRowsLocal(items)}
             </tbody>
             </table>
         `;
 
         // Render Main Table
         if (mainSubs.length > 0) {
-            html += renderTable(mainSubs);
+            content += renderTableLocal(mainSubs);
         } else {
-             html += `<p>Замен с подтвержденной причиной не найдено.</p>`;
+            content += `<p>Замен с подтвержденной причиной не найдено.</p>`;
         }
 
         // Render No Record Table (if any)
         if (noRecordSubs.length > 0) {
-            html += `<br/><br/>`;
-            html += `<h3 style="color: #b91c1c;">Замены без записи (Не подтверждена причина)</h3>`;
-            html += renderTable(noRecordSubs, true);
+            content += `<br/><br/>`;
+            content += `<h3 style="color: #b91c1c;">Замены без записи (Не подтверждена причина)</h3>`;
+            content += renderTableLocal(noRecordSubs, true);
         }
 
         // --- NEW SUMMARY TABLE ---
@@ -828,9 +766,9 @@ export const ExportPage = () => {
         const statsArray = Array.from(teacherStats.values()).sort((a, b) => a.name.localeCompare(b.name));
 
         if (statsArray.length > 0) {
-             html += `<br/><br/>`;
-             html += `<h3>Сводная ведомость заменяющих учителей</h3>`;
-             html += `
+             content += `<br/><br/>`;
+             content += `<h3>Сводная ведомость заменяющих учителей</h3>`;
+             content += `
              <table style="border-collapse: collapse; width: 60%;">
              <thead>
                  <tr class="header">
@@ -845,7 +783,7 @@ export const ExportPage = () => {
              <tbody>
              `;
              statsArray.forEach(stat => {
-                 html += `
+                 content += `
                      <tr>
                          <td style="border: 1px solid #999; padding: 4px;">${stat.name}</td>
                          <td style="text-align: center; border: 1px solid #999; padding: 4px;">${stat.total}</td>
@@ -856,18 +794,17 @@ export const ExportPage = () => {
                      </tr>
                  `;
              });
-             html += `</tbody></table>`;
+             content += `</tbody></table>`;
         }
 
-        html += `</body></html>`;
-        const blob = new Blob([html], { type: "application/vnd.ms-excel" });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `Отчет_Замены_${targetDate.getMonth()+1}_${targetDate.getFullYear()}.xls`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        const styles = `
+            body { font-family: Arial, sans-serif; font-size: 12px; }
+            td, th { border: 1px solid #999; padding: 4px; vertical-align: middle; text-align: left; }
+            .header-warning { background-color: #fee2e2; font-weight: bold; text-align: center; }
+            .date-row { background-color: #f3f4f6; font-weight: bold; }
+        `;
+
+        exportService.saveAsExcel(content, `Отчет_Замены_${targetDate.getMonth()+1}_${targetDate.getFullYear()}.xls`, styles);
     };
 
     const exportRefusalsExcel = () => {
@@ -888,12 +825,6 @@ export const ExportPage = () => {
         }
 
         let html = `
-            <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-            <head><meta charset="UTF-8"><style>
-                table { border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; font-size: 12px; }
-                td, th { border: 1px solid #999; padding: 4px; vertical-align: middle; text-align: left; }
-                .header { background-color: #fca5a5; font-weight: bold; text-align: center; } 
-            </style></head><body>
             <h3>Отчет об отказах за ${targetDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}</h3>
             <table>
             <thead>
@@ -947,18 +878,13 @@ export const ExportPage = () => {
             `;
         });
 
-        html += `</tbody></table></body></html>`;
-        const blob = new Blob([html], { type: "application/vnd.ms-excel" });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `Отчет_Отказы_${targetDate.getMonth()+1}_${targetDate.getFullYear()}.xls`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        html += `</tbody></table>`;
+        
+        const fileName = `Отчет_Отказы_${targetDate.getMonth()+1}_${targetDate.getFullYear()}`;
+        exportService.saveAsExcel(html, fileName);
     };
 
-    const copyForGoogleSheets = () => {
+    const copyForGoogleSheets = async () => {
         const currentSchedule = getScheduleForExport();
         let tsv = "День\tСмена\tКласс\tУрок\tПредмет\tУчитель\tКабинет\tГруппа\n";
         DAYS.forEach(day => {
@@ -978,9 +904,13 @@ export const ExportPage = () => {
                 });
             });
         });
-        navigator.clipboard.writeText(tsv).then(() => {
+        
+        const success = await exportService.copyToClipboard(tsv);
+        if (success) {
             addToast({ type: 'info', title: 'Скопировано', message: "Данные скопированы! Откройте Google Sheets и нажмите Ctrl+V (Cmd+V)." });
-        });
+        } else {
+            addToast({ type: 'danger', title: 'Ошибка', message: "Не удалось скопировать данные в буфер обмена." });
+        }
     };
 
     const handleDownloadPngShift1 = async () => {

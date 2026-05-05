@@ -3,6 +3,7 @@ import { useStaticData } from '../context/DataContext';
 import { Icon } from '../components/Icons';
 import { Modal, useToast } from '../components/UI';
 import { Shift, SHIFT_PERIODS, Bell } from '../types';
+import { exportService } from '../services/exportService';
 import { DEFAULT_BELLS } from '../constants';
 import { generateId } from '../utils/helpers';
 import html2canvas from 'html2canvas';
@@ -495,56 +496,19 @@ export const BellsPage = () => {
 
     const exportBellsToExcel = () => {
         const preset = settings.bellPresets?.find(p => p.id === selectedPresetId);
+        let content = exportService.getApprovalBlock();
 
-        let html = `
-            <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-            <head>
-                <meta charset="UTF-8">
-                <style>
-                    table { border-collapse: collapse; font-family: Arial, sans-serif; width: 100%; text-align: center; }
-                    td, th { border: 2px solid #000000; padding: 8px; vertical-align: middle; text-align: center; }
-                    .title-main { font-size: 18pt; font-weight: bold; border: none; text-align: center; }
-                    .title-sub { font-size: 16pt; border: none; text-align: center; }
-                    .shift-header { font-size: 16pt; font-weight: bold; background-color: #312e81; color: white; border: 2px solid #000; }
-                    .lesson-header { font-size: 14pt; font-weight: bold; background-color: #e5e7eb; border: 2px solid #000; }
-                    .time-cell { font-size: 16pt; font-weight: bold; background-color: #fff; width: 150px; }
-                    .cancelled-cell { font-size: 14pt; font-weight: bold; background-color: #fef2f2; color: #dc2626; text-transform: uppercase; letter-spacing: 0.1em; }
-                    .approval-block { text-align: left; border: none !important; font-family: "Times New Roman", serif; font-size: 11pt; }
-                    .footer-block { border: none !important; font-weight: bold; text-align: left; padding-top: 20px; font-size: 11pt; font-family: "Times New Roman", serif; }
-                    .empty-row { border: none !important; height: 15px; }
-                </style>
-            </head>
-            <body>
-        `;
-
-        html += `
-            <table>
-                <tr>
-                    <td colspan="2" style="border:none"></td>
-                    <td colspan="2" class="approval-block">
-                        <b>УТВЕРЖДАЮ</b><br>
-                        Директор государственного<br>
-                        учреждения образования<br>
-                        «Гимназия № 22 г. Минска»<br><br>
-                        __________ Н.В.Кисель<br>
-                        "__" ______ 2025г.
-                    </td>
-                </tr>
-                <tr class="empty-row"><td colspan="4" style="border:none"></td></tr>
-            </table>
-        `;
-
-        html += `
+        content += `
             <table>
                 <tr><td colspan="4" class="title-main">РАСПИСАНИЕ ЗВОНКОВ</td></tr>
                 ${exportDate ? `<tr><td colspan="4" class="title-sub">на ${new Date(exportDate).toLocaleDateString('ru-RU')}</td></tr>` : ''}
                 <tr><td colspan="4" class="title-sub">Режим: ${escapeHtml(preset?.name || 'Обычный')}</td></tr>
                 <tr class="empty-row"><td colspan="4" style="border:none"></td></tr>
-                <tr>
-                    <th class="lesson-header">Смена</th>
-                    <th class="lesson-header">Урок №</th>
-                    <th class="lesson-header">Время начала</th>
-                    <th class="lesson-header">Время окончания</th>
+                <tr class="header">
+                    <th>Смена</th>
+                    <th>Урок №</th>
+                    <th>Время начала</th>
+                    <th>Время окончания</th>
                 </tr>
         `;
 
@@ -554,25 +518,25 @@ export const BellsPage = () => {
             SHIFT_PERIODS[shift].forEach((period, index) => {
                 const bell =
                     currentPresetBells.find(b => b.shift === shift && b.period === period && b.day === 'default') ||
-                    ({ start: '00:00', end: '00:00', cancelled: false } as Bell);
+                    ({ start: '00:00', end: '00:00', cancelled: false } as BellItem);
 
-                html += `
+                content += `
                     <tr>
-                        ${index === 0 ? `<td rowspan="${SHIFT_PERIODS[shift].length}" class="shift-header">${shiftName}</td>` : ''}
-                        <td class="lesson-header">${period}</td>
+                        ${index === 0 ? `<td rowspan="${SHIFT_PERIODS[shift].length}" class="font-bold text-center">${shiftName}</td>` : ''}
+                        <td class="text-center">${period}</td>
                         ${
                             bell.cancelled
-                                ? `<td colspan="2" class="cancelled-cell">УРОК СНЯТ</td>`
-                                : `<td class="time-cell">${bell.start}</td><td class="time-cell">${bell.end}</td>`
+                                ? `<td colspan="2" style="background-color: #fef2f2; color: #dc2626; text-align: center; font-weight: bold;">УРОК СНЯТ</td>`
+                                : `<td class="text-center">${bell.start}</td><td class="text-center">${bell.end}</td>`
                         }
                     </tr>
                 `;
             });
 
-            html += '<tr class="empty-row"><td colspan="4" style="border:none"></td></tr>';
+            content += '<tr class="empty-row"><td colspan="4" style="border:none"></td></tr>';
         });
 
-        html += `
+        content += `
                 <tr class="empty-row"><td colspan="4" style="border:none"></td></tr>
                 <tr>
                     <td colspan="4" class="footer-block">
@@ -580,18 +544,10 @@ export const BellsPage = () => {
                     </td>
                 </tr>
             </table>
-            </body>
-            </html>
         `;
 
-        const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
         const dateStr = exportDate ? `_${new Date(exportDate).toLocaleDateString('ru-RU').replace(/\./g, '-')}` : '';
-        link.download = `Расписание_звонков_${preset?.name || 'Обычное'}${dateStr}.xls`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        exportService.saveAsExcel(content, `Расписание_звонков_${preset?.name || 'Обычное'}${dateStr}`);
     };
 
     return (

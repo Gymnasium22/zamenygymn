@@ -6,6 +6,7 @@ import { Modal, SearchableSelect } from '../components/UI';
 import { DAYS, Shift, DutyZone, DayOfWeek } from '../types';
 import { generateId } from '../utils/helpers';
 import html2canvas from 'html2canvas';
+import { exportService } from '../services/exportService';
 
 export const DutyPage = () => {
     const { teachers, dutyZones, rooms, saveStaticData } = useStaticData();
@@ -104,7 +105,7 @@ export const DutyPage = () => {
     const autoGenerate = async () => {
         if (!window.confirm("Это перезапишет текущий график дежурств. Продолжить?")) return;
 
-        let newSchedule: any[] = [];
+        let newSchedule: DutyRecord[] = [];
         const shifts = [Shift.First, Shift.Second];
         const usedTeachersPerDay: Record<string, Set<string>> = {};
         
@@ -194,30 +195,10 @@ export const DutyPage = () => {
         // Строки = Зоны, Столбцы = Дни недели
         const totalColspan = 6; // 1 (Зона) + 5 (Дней)
 
-        let html = `
-            <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-            <head>
-                <meta charset="UTF-8">
-                <style>
-                    table { border-collapse: collapse; font-family: Arial, sans-serif; width: 100%; text-align: center; }
-                    td, th { border: 2px solid #000000; padding: 6px; vertical-align: middle; text-align: center; }
-                    .title-main { font-size: 18pt; font-weight: bold; border: none; text-align: center; }
-                    .title-sub { font-size: 12pt; border: none; text-align: center; }
-                    .shift-header { font-size: 16pt; font-weight: bold; background-color: #312e81; color: white; border: 2px solid #000; text-transform: uppercase; }
-                    .floor-header { font-size: 12pt; font-weight: bold; background-color: #e5e7eb; border: 2px solid #000; text-align: left; padding-left: 10px; }
-                    .zone-cell { font-size: 11pt; font-weight: bold; background-color: #fff; text-align: left; width: 250px; mso-number-format: "\\@"; }
-                    .day-header { font-weight: bold; font-size: 12pt; border: 2px solid #000; }
-                    .content-cell { font-size: 10pt; font-weight: bold; height: 35px; border: 1px solid #000; }
-                    .approval-block { text-align: left; border: none !important; font-family: "Times New Roman", serif; font-size: 11pt; }
-                    .footer-block { border: none !important; font-weight: bold; text-align: left; padding-top: 20px; font-size: 11pt; font-family: "Times New Roman", serif; }
-                    .empty-row { border: none !important; height: 15px; }
-                </style>
-            </head>
-            <body>
-        `;
+        let content = '';
 
         // Approval Block (Aligned right for narrow layout)
-        html += `
+        content += `
             <table>
                 <tr>
                     <td colspan="${Math.max(1, totalColspan - 3)}" style="border:none"></td>
@@ -235,7 +216,7 @@ export const DutyPage = () => {
         `;
 
         // Title
-        html += `
+        content += `
             <table>
                 <tr><td colspan="${totalColspan}" class="title-main">ГРАФИК ДЕЖУРСТВА</td></tr>
                 <tr><td colspan="${totalColspan}" class="title-sub">на ${semester}-е полугодие ${new Date().getFullYear()}/${new Date().getFullYear()+1} учебного года</td></tr>
@@ -244,44 +225,44 @@ export const DutyPage = () => {
         `;
 
         [Shift.First, Shift.Second].forEach(shift => {
-            html += `<table>`;
+            content += `<table>`;
             // Shift Header
-            html += `<tr><th colspan="${totalColspan}" class="shift-header">${shift}</th></tr>`;
+            content += `<tr><th colspan="${totalColspan}" class="shift-header">${shift}</th></tr>`;
             
             // Header Row (Zone Name + Days)
-            html += `<tr>`;
-            html += `<th class="day-header" style="background-color: #f3f4f6;">Пост дежурства</th>`;
+            content += `<tr>`;
+            content += `<th class="day-header" style="background-color: #f3f4f6;">Пост дежурства</th>`;
             DAYS.forEach(day => {
                 const styles = dayStyles[day as string] || { label: '#ffffff', cell: '#ffffff' };
-                html += `<th class="day-header" style="background-color: ${styles.label};">${day}</th>`;
+                content += `<th class="day-header" style="background-color: ${styles.label};">${day}</th>`;
             });
-            html += `</tr>`;
+            content += `</tr>`;
 
             // Data Rows (Grouped by Floor)
             zonesByFloor.forEach(group => {
                 // Floor Sub-Header
-                html += `<tr><td colspan="${totalColspan}" class="floor-header">${group.floor}</td></tr>`;
+                content += `<tr><td colspan="${totalColspan}" class="floor-header">${group.floor}</td></tr>`;
 
                 group.zones.forEach(zone => {
-                    html += `<tr>`;
+                    content += `<tr>`;
                     // Zone Name ONLY
-                    html += `<td class="zone-cell">${zone.name}</td>`;
+                    content += `<td class="zone-cell">${zone.name}</td>`;
 
                     // Teacher cells for each day
                     DAYS.forEach(day => {
                         const styles = dayStyles[day as string] || { label: '#ffffff', cell: '#ffffff' };
                         const teacher = getTeacher(zone.id, day, shift);
-                        html += `<td class="content-cell" style="background-color: ${styles.cell};">${teacher ? teacher.name : ''}</td>`;
+                        content += `<td class="content-cell" style="background-color: ${styles.cell};">${teacher ? teacher.name : ''}</td>`;
                     });
-                    html += `</tr>`;
+                    content += `</tr>`;
                 });
             });
             
-            html += `</table><br/><br/>`;
+            content += `</table><br/><br/>`;
         });
 
         // Footer
-        html += `
+        content += `
             <table>
                 <tr>
                     <td colspan="3" class="footer-block">Секретарь учебной части</td>
@@ -291,49 +272,27 @@ export const DutyPage = () => {
             </table>
         `;
 
-        html += `</body></html>`;
-        
-        const blob = new Blob([html], { type: "application/vnd.ms-excel" });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `Плакат_Дежурство_${semester}_полугодие_Вертикально.xls`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        const styles = `
+            table { border-collapse: collapse; font-family: Arial, sans-serif; width: 100%; text-align: center; }
+            td, th { border: 2px solid #000000; padding: 6px; vertical-align: middle; text-align: center; }
+            .shift-header { font-size: 16pt; font-weight: bold; background-color: #312e81; color: white; border: 2px solid #000; text-transform: uppercase; }
+            .floor-header { font-size: 12pt; font-weight: bold; background-color: #e5e7eb; border: 2px solid #000; text-align: left; padding-left: 10px; }
+            .zone-cell { font-size: 11pt; font-weight: bold; background-color: #fff; text-align: left; width: 250px; mso-number-format: "\\@"; }
+            .day-header { font-weight: bold; font-size: 12pt; border: 2px solid #000; }
+            .content-cell { font-size: 10pt; font-weight: bold; height: 35px; border: 1px solid #000; }
+        `;
+
+        exportService.saveAsExcel(content, `Плакат_Дежурство_${semester}_полугодие_Вертикально.xls`, styles);
     };
 
     const exportToExcel = () => {
         const zonesCount = allZonesSorted.length;
         const totalColspan = zonesCount + 1;
 
-        const headerColor = '#d1d5db'; // Темно-серый для шапки этажей
-        const zoneColor = '#f3f4f6'; // Светло-серый для зон
-
-        let html = `
-            <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-            <head>
-                <meta charset="UTF-8">
-                <style>
-                    table { border-collapse: collapse; font-family: Arial, sans-serif; width: 100%; text-align: center; }
-                    td, th { border: 2px solid #000000; padding: 5px; vertical-align: middle; text-align: center; }
-                    .title-main { font-size: 20pt; font-weight: bold; border: none; text-align: center; }
-                    .title-sub { font-size: 14pt; border: none; text-align: center; }
-                    .shift-header { font-size: 16pt; font-weight: bold; background-color: #e5e7eb; border: 3px solid #000; text-transform: uppercase; }
-                    .floor-header { font-size: 12pt; font-weight: bold; background-color: ${headerColor}; border: 2px solid #000; text-transform: uppercase; }
-                    .zone-header { font-size: 10pt; font-weight: bold; background-color: ${zoneColor}; border: 2px solid #000; mso-number-format: "\\@"; }
-                    .day-label { font-weight: bold; font-size: 12pt; border: 2px solid #000; }
-                    .content-cell { font-size: 11pt; font-weight: bold; height: 40px; border: 1px solid #000; }
-                    .approval-block { text-align: left; border: none !important; font-family: "Times New Roman", serif; font-size: 12pt; }
-                    .footer-block { border: none !important; font-weight: bold; text-align: left; padding-top: 20px; font-size: 12pt; font-family: "Times New Roman", serif; }
-                    .empty-row { border: none !important; height: 20px; }
-                </style>
-            </head>
-            <body>
-        `;
+        let content = '';
 
         // Approval Block
-        html += `
+        content += `
             <table>
                 <tr>
                     <td colspan="${Math.max(1, totalColspan - 4)}" style="border:none"></td>
@@ -351,7 +310,7 @@ export const DutyPage = () => {
         `;
 
         // Title
-        html += `
+        content += `
             <table>
                 <tr><td colspan="${totalColspan}" class="title-main">ГРАФИК ДЕЖУРСТВА</td></tr>
                 <tr><td colspan="${totalColspan}" class="title-sub">учителей по государственному учреждению образования «Гимназия № 22 г. Минска»</td></tr>
@@ -361,51 +320,51 @@ export const DutyPage = () => {
         `;
 
         [Shift.First, Shift.Second].forEach(shift => {
-            html += `<table>`;
+            content += `<table>`;
             // Shift Header
-            html += `<tr><th colspan="${totalColspan}" class="shift-header">${shift}</th></tr>`;
+            content += `<tr><th colspan="${totalColspan}" class="shift-header">${shift}</th></tr>`;
             
             // Floor Headers
-            html += `<tr>`;
-            html += `<th rowspan="2" class="floor-header" style="width: 100px;">День недели</th>`; // Corner cell
+            content += `<tr>`;
+            content += `<th rowspan="2" class="floor-header" style="width: 100px;">День недели</th>`; // Corner cell
             zonesByFloor.forEach(group => {
-                html += `<th colspan="${group.zones.length}" class="floor-header">${group.floor}</th>`;
+                content += `<th colspan="${group.zones.length}" class="floor-header">${group.floor}</th>`;
             });
-            html += `</tr>`;
+            content += `</tr>`;
 
             // Zone Headers
-            html += `<tr>`;
+            content += `<tr>`;
             allZonesSorted.forEach(zone => {
-                html += `<th class="zone-header">${zone.name}</th>`;
+                content += `<th class="zone-header">${zone.name}</th>`;
             });
-            html += `</tr>`;
+            content += `</tr>`;
 
             // Data Rows
             DAYS.forEach(day => {
                 const styles = dayStyles[day as string] || { label: '#ffffff', cell: '#ffffff' };
                 
-                html += `<tr>`;
-                html += `<td class="day-label" style="background-color: ${styles.label};">${day}</td>`;
+                content += `<tr>`;
+                content += `<td class="day-label" style="background-color: ${styles.label};">${day}</td>`;
                 
                 allZonesSorted.forEach(zone => {
                     const teacher = getTeacher(zone.id, day, shift);
-                    html += `<td class="content-cell" style="background-color: ${styles.cell};">${teacher ? teacher.name : ''}</td>`;
+                    content += `<td class="content-cell" style="background-color: ${styles.cell};">${teacher ? teacher.name : ''}</td>`;
                 });
                 
-                html += `</tr>`;
+                content += `</tr>`;
             });
             
             // Black separator between shifts
-            html += `<tr><td colspan="${totalColspan}" style="height: 4px; background-color: #000; border:none;"></td></tr>`;
-            html += `</table><br>`;
+            content += `<tr><td colspan="${totalColspan}" style="height: 4px; background-color: #000; border:none;"></td></tr>`;
+            content += `</table><br>`;
         });
 
-        // Footer signatures
+        // Footer
         const titleCols = Math.floor(totalColspan * 0.4);
         const nameCols = Math.floor(totalColspan * 0.3);
         const lineCols = totalColspan - titleCols - nameCols;
 
-        html += `
+        content += `
             <table>
                  <tr class="empty-row"><td colspan="${totalColspan}" style="border:none"></td></tr>
                 <tr>
@@ -416,16 +375,22 @@ export const DutyPage = () => {
             </table>
         `;
 
-        html += `</body></html>`;
-        
-        const blob = new Blob([html], { type: "application/vnd.ms-excel" });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `График_дежурств_${semester}_полугодие.xls`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        const styles = `
+            table { border-collapse: collapse; font-family: Arial, sans-serif; width: 100%; text-align: center; }
+            td, th { border: 2px solid #000000; padding: 5px; vertical-align: middle; text-align: center; }
+            .shift-header { font-size: 16pt; font-weight: bold; background-color: #e5e7eb; border: 3px solid #000; text-transform: uppercase; }
+            .floor-header { font-size: 12pt; font-weight: bold; background-color: #d1d5db; border: 2px solid #000; text-transform: uppercase; }
+            .zone-header { font-size: 10pt; font-weight: bold; background-color: #f3f4f6; border: 2px solid #000; mso-number-format: "\\@"; }
+            .day-label { font-weight: bold; font-size: 12pt; border: 2px solid #000; }
+            .content-cell { font-size: 11pt; font-weight: bold; height: 40px; border: 1px solid #000; }
+            .approval-block { text-align: left; border: none !important; font-family: "Times New Roman", serif; font-size: 12pt; }
+            .footer-block { border: none !important; font-weight: bold; text-align: left; padding-top: 20px; font-size: 12pt; font-family: "Times New Roman", serif; }
+            .empty-row { border: none !important; height: 20px; }
+            .title-main { font-size: 20pt; font-weight: bold; border: none; text-align: center; }
+            .title-sub { font-size: 14pt; border: none; text-align: center; }
+        `;
+
+        exportService.saveAsExcel(content, `График_дежурств_${semester}_полугодие.xls`, styles);
     };
 
     const handleZoneSave = async () => {

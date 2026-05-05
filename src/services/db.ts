@@ -121,7 +121,6 @@ export const dbService = {
     
     clearCache: () => {
         collectionCache.clear();
-        console.log('DB cache cleared');
     },
 
     // Оптимизированная синхронизация с использованием локального кеша
@@ -203,7 +202,6 @@ export const dbService = {
 
         // Проверяем, есть ли уже данные в кеше, чтобы не делать лишние запросы
         if (collectionCache.has(collectionName) && collectionCache.get(collectionName)!.size > 0) {
-            console.log(`Cache already exists for ${collectionName}, skipping sync`);
             return;
         }
 
@@ -217,7 +215,6 @@ export const dbService = {
             });
 
             collectionCache.set(collectionName, cachedItems);
-            console.log(`Cache synced for ${collectionName} (${cachedItems.size} items)`);
         } catch (error) {
             console.error(`Failed to sync cache for ${collectionName}:`, error);
             // Не бросаем ошибку, чтобы не ломать загрузку
@@ -290,7 +287,6 @@ export const dbService = {
 
                 if (isInitialLoad) {
                     isInitialLoad = false;
-                    console.log('Initial data load complete, all collections synced');
                 }
 
                 onNext(data);

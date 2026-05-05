@@ -6,6 +6,7 @@ import { Icon } from '../components/Icons';
 import { Modal, useToast, SearchableSelect } from '../components/UI';
 import { NutritionRecord } from '../types';
 import { formatDateISO, generateId } from '../utils/helpers';
+import { exportService } from '../services/exportService';
 
 export const NutritionPage = () => {
     const { classes } = useStaticData();
@@ -236,42 +237,12 @@ export const NutritionPage = () => {
     const exportToPDF = () => {
         if (!printRef.current) return;
         
-        // Show print dialog
-        const printWindow = window.open('', '_blank');
-        if (!printWindow) {
-            addToast({ type: 'warning', title: 'Разрешите всплывающие окна для экспорта' });
-            return;
-        }
-
         const printContent = printRef.current.innerHTML;
-        printWindow.document.write(`
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <title>Отчёт по питанию</title>
-                <style>
-                    body { font-family: Arial, sans-serif; padding: 20px; }
-                    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                    th, td { border: 1px solid #000; padding: 8px; text-align: left; }
-                    th { background-color: #f0f0f0; font-weight: bold; }
-                    .text-center { text-align: center; }
-                    h1 { text-align: center; margin-bottom: 20px; }
-                    @media print {
-                        @page { margin: 1cm; }
-                    }
-                </style>
-            </head>
-            <body>
-                ${printContent}
-            </body>
-            </html>
-        `);
-        printWindow.document.close();
-        printWindow.focus();
-        setTimeout(() => {
-            printWindow.print();
-            printWindow.close();
-        }, 250);
+        const success = exportService.printHTML(printContent, 'Отчёт по питанию');
+        
+        if (!success) {
+            addToast({ type: 'warning', title: 'Разрешите всплывающие окна для экспорта' });
+        }
     };
 
     // Get classes for teacher (classes they teach)

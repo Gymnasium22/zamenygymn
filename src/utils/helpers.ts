@@ -27,7 +27,14 @@ export const getActiveSemester = (date: Date, settings?: AppData['settings']): 1
 /**
  * Возвращает актуальное расписание для указанной даты
  */
-export const getScheduleForDate = (date: Date, data: AppData): ScheduleItem[] => {
+export const getScheduleForDate = (
+    date: Date, 
+    data: { 
+        settings?: AppData['settings']; 
+        schedule?: ScheduleItem[]; 
+        schedule2?: ScheduleItem[]; 
+    }
+): ScheduleItem[] => {
     const semester = getActiveSemester(date, data.settings);
     return semester === 2 ? (data.schedule2 || []) : (data.schedule || []);
 };

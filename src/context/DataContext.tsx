@@ -79,7 +79,6 @@ const syncQueue = {
                 const parsed = JSON.parse(stored);
                 if (Array.isArray(parsed)) {
                     syncQueue.items = parsed;
-                    console.log(`Loaded ${parsed.length} pending items from sync queue`);
                 }
             } catch (e) {
                 console.warn('Failed to parse persistent sync queue', e);
@@ -104,7 +103,6 @@ const syncQueue = {
             retryCount: 0
         });
         syncQueue.save();
-        console.log('Добавлено в очередь синхронизации:', id);
     },
 
     process: async (user: any) => {
@@ -120,7 +118,6 @@ const syncQueue = {
                 try {
                     await dbService.save(item.data, user);
                     itemsToRemove.push(item.id);
-                    console.log('Успешно синхронизировано:', item.id);
                 } catch (error: any) {
                     item.retryCount++;
                     // Если ошибка квоты, оставляем в очереди но не удаляем
@@ -133,7 +130,6 @@ const syncQueue = {
                         console.error('Не удалось синхронизировать после 10 попыток:', item.id);
                         itemsToRemove.push(item.id); // Удаляем после 10 попыток
                     } else {
-                        console.log(`Повторная попытка синхронизации ${item.retryCount}/10:`, item.id);
                     }
                 }
             }
@@ -251,7 +247,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                     // Простая валидация
                     if (parsed && parsed.teachers) {
                         setInternalData(prev => ({ ...prev, ...parsed }));
-                        console.log('Loaded from local storage backup');
                     }
                 } catch (e) {
                     handleError.log('Error parsing local backup', e);
@@ -314,7 +309,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                     // Apply pending changes on top of Firebase data
                     // This ensures that local changes are not overwritten by stale server data
                     if (syncQueue.items.length > 0) {
-                         console.log(`Applying ${syncQueue.items.length} pending changes to incoming data`);
                          syncQueue.items.forEach(item => {
                              // Shallow merge of top-level keys (e.g. absenteeismRecords)
                              // This assumes that the pending change contains the FULL array for that key
@@ -382,7 +376,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                     // НЕ откатываем интерфейс - данные остались в localStorage и будут синхронизированы позже
                 }
             } else if (isGuest) {
-                console.warn("Гости не могут сохранять изменения в базу данных.");
             }
 
             if (addToHistory) {
@@ -411,7 +404,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
     useEffect(() => {
         const handleOnline = () => {
             if (syncQueue.items.length > 0 && user && role !== 'guest' && !initialData) {
-                console.log(`Восстановлено соединение. Синхронизирую ${syncQueue.items.length} элементов...`);
                 syncQueue.process(user);
             }
         };

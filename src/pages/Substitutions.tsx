@@ -94,9 +94,14 @@ export const SubstitutionsPage = () => {
     const [mobileTab, setMobileTab] = useState<'lessons' | 'teachers'>('lessons');
 
     const activeSchedule = useMemo(() => {
-        const data = { schedule: schedule1, schedule2, settings };
-        const schedule = getScheduleForDate(new Date(selectedDate), data as any);
-        return schedule;
+        // Construct a partial AppData object that fulfills getScheduleForDate's requirements
+        const mockData = { 
+            settings, 
+            schedule: schedule1, 
+            schedule2: schedule2 
+        };
+        
+        return getScheduleForDate(new Date(selectedDate), mockData);
     }, [selectedDate, schedule1, schedule2, settings]);
 
     useEffect(() => {
@@ -1198,7 +1203,7 @@ export const SubstitutionsPage = () => {
                                      .map(s => {
                                          const orig = teachers.find(t => t.id === s.originalTeacherId);
                                          const rep = teachers.find(t => t.id === s.replacementTeacherId);
-                                         const item = activeSchedule.find(i => i.id === s.scheduleItemId) || { period: '?', classId: '?' } as any; 
+                                         const item = activeSchedule.find(i => i.id === s.scheduleItemId) || { period: '?' as unknown as number, classId: '?' }; 
                                          const cls = classes.find(c => c.id === item.classId);
 
                                          return (

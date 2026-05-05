@@ -2,8 +2,21 @@
 import { useState, useMemo } from 'react';
 import { useStaticData, useScheduleData } from '../context/DataContext';
 import { Icon } from '../components/Icons';
+import { exportService } from '../services/exportService';
 import { BarChart } from '../components/UI';
-import { DAYS } from '../types';
+import { DAYS, Teacher, Subject, ScheduleItem, Substitution } from '../types';
+
+interface TariffRow {
+    id: string;
+    name: string;
+    weeklyHours: number;
+    monthlyPlan: number;
+    subsTaken: number;
+    subsMissed: number;
+    actualHours: number;
+    subjectBreakdown: Record<string, number>;
+    subjectsList: string;
+}
 
 export const ReportsPage = () => {
     const { subjects, teachers, classes } = useStaticData();
@@ -27,7 +40,7 @@ export const ReportsPage = () => {
         return selectedSemester === 2 ? schedule2 : schedule1;
     }, [selectedSemester, schedule1, schedule2]);
     
-    const tariffData = useMemo(() => { 
+    const tariffData = useMemo<TariffRow[]>(() => { 
         const weeks = 4; 
         return teachers.map(t => { 
             // Используем activeSchedule вместо schedule
@@ -103,11 +116,11 @@ export const ReportsPage = () => {
     };
 
     const downloadReport = () => { 
-        let csv = ""; 
+        let content = ""; 
         if (reportTab === 'load') { 
-            csv = "Teacher,Planned Weekly,Subs Taken,Absences (Lessons),Est. Monthly Actual,Details\n" + tariffData.map(r => `"${r.name}",${r.weeklyHours},${r.subsTaken},${r.subsMissed},${r.actualHours},"${Object.entries(r.subjectBreakdown).map(([k,v]) => k+': '+v).join(', ')}"`).join('\n'); 
+            content = "Teacher,Planned Weekly,Subs Taken,Absences (Lessons),Est. Monthly Actual,Details\n" + tariffData.map(r => `"${r.name}",${r.weeklyHours},${r.subsTaken},${r.subsMissed},${r.actualHours},"${Object.entries(r.subjectBreakdown).map(([k,v]) => k+': '+v).join(', ')}"`).join('\n'); 
         } else if (reportTab === 'sanpin') { 
-            csv = "Day,Score\n" + sanPinData.map(r => `${r.label},${r.value}`).join('\n'); 
+            content = "Day,Score\n" + sanPinData.map(r => `${r.label},${r.value}`).join('\n'); 
         } else if (reportTab === 'builder') {
             const header = selectedColumns.map(key => reportColumns.find(c => c.key === key)?.label).join(',');
             const rows = tariffData.map(r => {
@@ -116,15 +129,10 @@ export const ReportsPage = () => {
                     return typeof val === 'string' && val.includes(',') ? `"${val}"` : val;
                 }).join(',');
             }).join('\n');
-            csv = header + '\n' + rows;
+            content = header + '\n' + rows;
         }
-        const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement("a"); 
-        link.href = URL.createObjectURL(blob);
-        link.download = `report_${reportTab}_${selectedSemester}sem.csv`; 
-        document.body.appendChild(link); 
-        link.click(); 
-        document.body.removeChild(link); 
+
+        exportService.saveAsCSV(content, `report_${reportTab}_${selectedSemester}sem.csv`);
     };
 
     return (

@@ -7,7 +7,7 @@ import { DayOfWeek, DAYS, ScheduleItem, Shift } from '../types';
 import { useNavigate, NavLink } from 'react-router-dom';
 import { Modal, useToast } from '../components/UI';
 import { getActiveSemester, getLocalDateString } from '../utils/helpers';
-// Notifications component removed
+import { weatherService, WeatherData, ForecastItem } from '../services/weatherService';
 
 // Enhanced interfaces for Live Search
 interface EntityStatus {
@@ -40,6 +40,8 @@ interface WidgetConfig {
     visible: boolean;
 }
 
+// Weather interfaces moved to weatherService.ts
+
 const DEFAULT_WIDGETS: WidgetConfig[] = [
     { id: 'search', label: 'Поиск', visible: true },
     { id: 'substitutions', label: 'Замены', visible: true },
@@ -51,8 +53,8 @@ const DEFAULT_WIDGETS: WidgetConfig[] = [
 
 const WeatherWidget = () => {
     const { settings } = useStaticData();
-    const [weatherData, setWeatherData] = useState<any>(null);
-    const [forecastData, setForecastData] = useState<any[]>([]);
+    const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
+    const [forecastData, setForecastData] = useState<ForecastItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -66,60 +68,11 @@ const WeatherWidget = () => {
                 return;
             }
 
-            const CACHE_KEY = 'gym_weather_cache';
-            const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
-
-            const cached = localStorage.getItem(CACHE_KEY);
-            if (cached) {
-                try {
-                    const parsed = JSON.parse(cached);
-                    if (Date.now() - parsed.timestamp < CACHE_DURATION) {
-                        setWeatherData(parsed.current);
-                        setForecastData(parsed.forecast);
-                        setLoading(false);
-                        return;
-                    }
-                } catch (e) {
-                    console.warn("Weather cache invalid");
-                }
-            }
-
             try {
-                // Fetch Current Weather
-                const currentRes = await fetch(`https://api.openweathermap.org/data/2.5/weather?q=${city}&units=metric&lang=ru&appid=${apiKey}`);
-                if (!currentRes.ok) throw new Error('Weather API Error');
-                const currentData = await currentRes.json();
-
-                // Fetch Forecast (5 days / 3 hour steps)
-                const forecastRes = await fetch(`https://api.openweathermap.org/data/2.5/forecast?q=${city}&units=metric&lang=ru&appid=${apiKey}`);
-                if (!forecastRes.ok) throw new Error('Forecast API Error');
-                const forecastRaw = await forecastRes.json();
-
-                // Process Forecast: Extract daily data (approx at 12:00 or closest)
-                // Filter to get one entry per day for next 3 days
-                const dailyForecast: any[] = [];
-                const seenDates = new Set();
-                const todayDate = new Date().toISOString().split('T')[0];
-
-                for (const item of forecastRaw.list) {
-                    const date = item.dt_txt.split(' ')[0];
-                    if (date !== todayDate && !seenDates.has(date)) {
-                        dailyForecast.push(item);
-                        seenDates.add(date);
-                        if (dailyForecast.length >= 3) break;
-                    }
-                }
-
-                setWeatherData(currentData);
-                setForecastData(dailyForecast);
+                const data = await weatherService.getWeather(apiKey, city);
+                setWeatherData(data.current);
+                setForecastData(data.forecast);
                 setLoading(false);
-
-                localStorage.setItem(CACHE_KEY, JSON.stringify({
-                    timestamp: Date.now(),
-                    current: currentData,
-                    forecast: dailyForecast
-                }));
-
             } catch (err) {
                 console.error(err);
                 setError('Ошибка загрузки погоды');

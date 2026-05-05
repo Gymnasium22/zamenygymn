@@ -2,7 +2,7 @@
 import React from 'react';
 import { Modal } from '../UI';
 import { Icon } from '../Icons';
-import { Teacher, Room } from '../../types';
+import { Teacher, Room, ScheduleItem, ClassEntity, Subject } from '../../types';
 
 interface AbsenceModalProps {
     isOpen: boolean;
@@ -132,7 +132,14 @@ interface ManualSearchModalProps {
     onClose: () => void;
     searchValue: string;
     onSearchChange: (val: string) => void;
-    results: any[];
+    results: Array<{
+        id: string;
+        entityName: string;
+        subInfo: string;
+        period: number;
+        subjectName: string;
+        roomId?: string;
+    }>;
     rooms: Room[];
     selectedDate: string;
     onSelect: (item: any) => void;
@@ -234,11 +241,11 @@ export const TelegramChoiceModal: React.FC<TelegramChoiceModalProps> = ({
 interface QuickViewScheduleModalProps {
     teacherId: string | null;
     onClose: () => void;
-    activeSchedule: any[];
+    activeSchedule: ScheduleItem[];
     selectedDayOfWeek: string | null;
-    classes: any[];
-    subjects: any[];
-    rooms: any[];
+    classes: ClassEntity[];
+    subjects: Subject[];
+    rooms: Room[];
 }
 
 export const QuickViewScheduleModal: React.FC<QuickViewScheduleModalProps> = ({
