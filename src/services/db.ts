@@ -378,51 +378,30 @@ export const dbService = {
         const user = auth?.currentUser;
         if (!user || user.email !== "admin@gymnasium22.com") throw new Error("Нет прав.");
 
-        // Explicitly define public-safe versions of data structures
-        const publicDataSubset = {
-            subjects: data.subjects.map(s => ({
-                id: s.id,
-                name: s.name,
-                color: s.color,
-                difficulty: s.difficulty,
-                requiredRoomType: s.requiredRoomType,
-                order: s.order
-            })),
-            teachers: data.teachers.map(t => ({
-                id: t.id,
-                name: t.name,
-                subjectIds: t.subjectIds,
-                shifts: t.shifts,
-                // Explicitly clear private fields
-                unavailableDates: [],
-                telegramChatId: '',
-                absenceReasons: undefined,
-                birthDate: undefined,
-                order: t.order // Keep order for display purposes
-            })),
-            classes: data.classes.map(c => ({
-                id: c.id,
-                name: c.name,
-                shift: c.shift,
-                studentsCount: c.studentsCount,
-                order: c.order
-            })),
-            rooms: data.rooms,
-            schedule: data.schedule,
-            schedule2: data.schedule2,
-            substitutions: data.substitutions,
-            bellSchedule: data.bellSchedule,
-            settings: {
-                telegramToken: '',
-                publicScheduleId: data.settings.publicScheduleId,
-                bellPresets: data.settings.bellPresets,
-                semesterConfig: data.settings.semesterConfig
-            },
-            // Duty Schedule is usually public too
-            dutyZones: data.dutyZones,
-            dutySchedule: data.dutySchedule
+        // Helper to pick only specific fields from an object (White-listing)
+        const pick = (obj: any, fields: string[]) => {
+            const result: any = {};
+            fields.forEach(f => {
+                if (obj && obj[f] !== undefined) result[f] = obj[f];
+            });
+            return result;
         };
-        // sanitize here too just in case
+
+        // Explicitly define public-safe versions of data structures using White-listing
+        const publicDataSubset = {
+            subjects: data.subjects.map(s => pick(s, ['id', 'name', 'color', 'difficulty', 'requiredRoomType', 'order'])),
+            teachers: data.teachers.map(t => pick(t, ['id', 'name', 'subjectIds', 'shifts', 'order'])),
+            classes: data.classes.map(c => pick(c, ['id', 'name', 'shift', 'studentsCount', 'order'])),
+            rooms: data.rooms.map(r => pick(r, ['id', 'name', 'capacity', 'type', 'order'])),
+            schedule: data.schedule.map(s => pick(s, ['id', 'classId', 'subjectId', 'teacherId', 'roomId', 'day', 'period', 'shift', 'direction'])),
+            schedule2: data.schedule2.map(s => pick(s, ['id', 'classId', 'subjectId', 'teacherId', 'roomId', 'day', 'period', 'shift', 'direction'])),
+            substitutions: data.substitutions.map(s => pick(s, ['id', 'date', 'scheduleItemId', 'originalTeacherId', 'replacementTeacherId', 'replacementRoomId', 'isMerger', 'replacementClassId', 'replacementSubjectId', 'comment', 'dayComment'])),
+            bellSchedule: data.bellSchedule.map(b => pick(b, ['shift', 'period', 'start', 'end', 'day', 'cancelled'])),
+            settings: pick(data.settings, ['publicScheduleId', 'bellPresets', 'semesterConfig', 'schoolName', 'currentYear']),
+            dutyZones: data.dutyZones.map(dz => pick(dz, ['id', 'name', 'description', 'includedRooms', 'order', 'floor'])),
+            dutySchedule: data.dutySchedule.map(ds => pick(ds, ['id', 'day', 'shift', 'zoneId', 'teacherId']))
+        };
+
         const cleanData = sanitizeForFirestore(publicDataSubset);
         await setDoc(doc(firestoreDB, COLLECTIONS.PUBLIC, id), cleanData);
     },
