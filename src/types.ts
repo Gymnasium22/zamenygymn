@@ -120,6 +120,11 @@ export interface Settings {
   substitutionDayComments?: Record<string, string>; // ISO date -> common comment for substitutions on that day
   weatherApiKey?: string; // OpenWeatherMap API Key
   weatherCity?: string; // "Minsk,BY"
+  schoolName?: string;        // "ГУО «Гимназия №22 г.Минска»"
+  directorName?: string;      // "Н.В.Кисель"
+  unionChairName?: string;    // "Ю.Г.Миханова"
+  secretaryName?: string;     // "Е.К.Шунто"
+  currentYear?: number;       // 2026
 }
 
 // --- NEW DUTY TYPES ---

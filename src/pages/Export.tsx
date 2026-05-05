@@ -208,19 +208,19 @@ export const ExportPage = () => {
                     <td colspan="10" class="doc-right">УТВЕРЖДАЮ</td>
                 </tr>
                 <tr>
-                    <td colspan="10" class="doc-left">Председатель ПК ГУО "Гимназия №22 г.Минска"</td>
+                    <td colspan="10" class="doc-left">Председатель ПК ${settings?.schoolName || 'ГУО "Гимназия №22 г.Минска"'}</td>
                     <td colspan="17"></td>
-                    <td colspan="10" class="doc-right">Директор ГУО "Гимназия №22 г.Минска"</td>
+                    <td colspan="10" class="doc-right">Директор ${settings?.schoolName || 'ГУО "Гимназия №22 г.Минска"'}</td>
                 </tr>
                 <tr>
-                    <td colspan="10" class="doc-left">____________________ Ю.Г.Миханова</td>
+                    <td colspan="10" class="doc-left">____________________ ${settings?.unionChairName || 'Ю.Г.Миханова'}</td>
                     <td colspan="17"></td>
-                    <td colspan="10" class="doc-right">____________________ Н.В.Кисель</td>
+                    <td colspan="10" class="doc-right">____________________ ${settings?.directorName || 'Н.В.Кисель'}</td>
                 </tr>
                 <tr>
-                    <td colspan="10" class="doc-left">"__"_ __________ 2025г.</td>
+                    <td colspan="10" class="doc-left">"__"_ __________ ${settings?.currentYear || new Date().getFullYear()}г.</td>
                     <td colspan="17"></td>
-                    <td colspan="10" class="doc-right">"__" __________ 2025г.</td>
+                    <td colspan="10" class="doc-right">"__" __________ ${settings?.currentYear || new Date().getFullYear()}г.</td>
                 </tr>
             </table>
             <br/>
@@ -313,7 +313,7 @@ export const ExportPage = () => {
                 <tr>
                     <td colspan="10" class="doc-left">Секретарь учебной части</td>
                     <td colspan="17"></td>
-                    <td colspan="10" class="doc-right">Е.К.Шунто</td>
+                    <td colspan="10" class="doc-right">${settings?.secretaryName || 'Е.К.Шунто'}</td>
                 </tr>
             </table>
         `;
@@ -369,19 +369,19 @@ export const ExportPage = () => {
                     <td colspan="10" class="doc-right">УТВЕРЖДАЮ</td>
                 </tr>
                 <tr>
-                    <td colspan="10" class="doc-left">Председатель ПК ГУО "Гимназия №22 г.Минска"</td>
+                    <td colspan="10" class="doc-left">Председатель ПК ${settings?.schoolName || 'ГУО "Гимназия №22 г.Минска"'}</td>
                     <td colspan="17"></td>
-                    <td colspan="10" class="doc-right">Директор ГУО "Гимназия №22 г.Минска"</td>
+                    <td colspan="10" class="doc-right">Директор ${settings?.schoolName || 'ГУО "Гимназия №22 г.Минска"'}</td>
                 </tr>
                 <tr>
-                    <td colspan="10" class="doc-left">____________________ Ю.Г.Миханова</td>
+                    <td colspan="10" class="doc-left">____________________ ${settings?.unionChairName || 'Ю.Г.Миханова'}</td>
                     <td colspan="17"></td>
-                    <td colspan="10" class="doc-right">____________________ Н.В.Кисель</td>
+                    <td colspan="10" class="doc-right">____________________ ${settings?.directorName || 'Н.В.Кисель'}</td>
                 </tr>
                 <tr>
-                    <td colspan="10" class="doc-left">"__"_ __________ 2025г.</td>
+                    <td colspan="10" class="doc-left">"__"_ __________ ${settings?.currentYear || new Date().getFullYear()}г.</td>
                     <td colspan="17"></td>
-                    <td colspan="10" class="doc-right">"__" __________ 2025г.</td>
+                    <td colspan="10" class="doc-right">"__" __________ ${settings?.currentYear || new Date().getFullYear()}г.</td>
                 </tr>
             </table>
             <br/>
@@ -478,7 +478,7 @@ export const ExportPage = () => {
                 <tr>
                     <td colspan="10" class="doc-left">Секретарь учебной части</td>
                     <td colspan="17"></td>
-                    <td colspan="10" class="doc-right">Е.К.Шунто</td>
+                    <td colspan="10" class="doc-right">${settings?.secretaryName || 'Е.К.Шунто'}</td>
                 </tr>
             </table>
         `;

@@ -25,6 +25,13 @@ export const AdminPage = () => {
     const [weatherApiKey, setWeatherApiKey] = useState('');
     const [weatherCity, setWeatherCity] = useState('');
 
+    // School Settings
+    const [schoolName, setSchoolName] = useState('');
+    const [directorName, setDirectorName] = useState('');
+    const [unionChairName, setUnionChairName] = useState('');
+    const [secretaryName, setSecretaryName] = useState('');
+    const [currentYear, setCurrentYear] = useState<number | ''>('');
+
     // Telegram Templates State
     const [templates, setTemplates] = useState<TelegramTemplates>({ summary: '', teacherNotification: '', teacherSummary: '' });
     const [isTemplatesModalOpen, setIsTemplatesModalOpen] = useState(false);
@@ -45,6 +52,11 @@ export const AdminPage = () => {
             setFeedbackChatId(settings.feedbackChatId || '');
             setWeatherApiKey(settings.weatherApiKey || '');
             setWeatherCity(settings.weatherCity || 'Minsk,BY');
+            setSchoolName(settings.schoolName || '');
+            setDirectorName(settings.directorName || '');
+            setUnionChairName(settings.unionChairName || '');
+            setSecretaryName(settings.secretaryName || '');
+            setCurrentYear(settings.currentYear || '');
             setTemplates(settings.telegramTemplates || { 
                 summary: "⚡️ **ЗАМЕНЫ НА {{date}}** ⚡️\n\n{{content}}",
                 teacherNotification: "🔔 **Вам назначена замена!**\n📅 {{date}}\n\n{{content}}\n\nПожалуйста, ознакомьтесь с деталями.",
@@ -107,6 +119,11 @@ export const AdminPage = () => {
                 feedbackChatId,
                 weatherApiKey,
                 weatherCity,
+                schoolName,
+                directorName,
+                unionChairName,
+                secretaryName,
+                currentYear: currentYear ? Number(currentYear) : undefined,
                 telegramTemplates: templates,
                 adminAnnouncement: { 
                     ...announcement, 
@@ -235,6 +252,64 @@ export const AdminPage = () => {
                                                 placeholder="Minsk,BY"
                                                 className="w-full border border-slate-200 dark:border-slate-600 p-3 rounded-xl text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500" 
                                             />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="pt-4 border-t border-slate-200 dark:border-slate-600">
+                                    <h4 className="font-bold text-sm text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-2"><Icon name="Users" size={16}/> Данные учреждения</h4>
+                                    <div className="space-y-3">
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Название школы</label>
+                                            <input 
+                                                type="text" 
+                                                value={schoolName} 
+                                                onChange={e => setSchoolName(e.target.value)} 
+                                                placeholder="ГУО «Гимназия №22 г.Минска»"
+                                                className="w-full border border-slate-200 dark:border-slate-600 p-3 rounded-xl text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500" 
+                                            />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Директор</label>
+                                                <input 
+                                                    type="text" 
+                                                    value={directorName} 
+                                                    onChange={e => setDirectorName(e.target.value)} 
+                                                    placeholder="Н.В.Кисель"
+                                                    className="w-full border border-slate-200 dark:border-slate-600 p-3 rounded-xl text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500" 
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Пред. Профкома</label>
+                                                <input 
+                                                    type="text" 
+                                                    value={unionChairName} 
+                                                    onChange={e => setUnionChairName(e.target.value)} 
+                                                    placeholder="Ю.Г.Миханова"
+                                                    className="w-full border border-slate-200 dark:border-slate-600 p-3 rounded-xl text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500" 
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Секретарь</label>
+                                                <input 
+                                                    type="text" 
+                                                    value={secretaryName} 
+                                                    onChange={e => setSecretaryName(e.target.value)} 
+                                                    placeholder="Е.К.Шунто"
+                                                    className="w-full border border-slate-200 dark:border-slate-600 p-3 rounded-xl text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500" 
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Год (для док-тов)</label>
+                                                <input 
+                                                    type="number" 
+                                                    value={currentYear} 
+                                                    onChange={e => setCurrentYear(e.target.value === '' ? '' : Number(e.target.value))} 
+                                                    placeholder="2026"
+                                                    className="w-full border border-slate-200 dark:border-slate-600 p-3 rounded-xl text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500" 
+                                                />
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
