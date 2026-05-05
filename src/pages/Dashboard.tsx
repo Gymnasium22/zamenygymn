@@ -505,8 +505,8 @@ export const DashboardPage = () => {
     }, [role, nutritionRecords, todayStr, classes]);
 
     const handleSendFeedback = async () => {
-        if (!feedbackMessage.trim()) { alert('Пожалуйста, введите ваше сообщение.'); return; }
-        if (!settings?.telegramToken || !settings?.feedbackChatId) { alert('Функция обратной связи не настроена администратором.'); return; }
+        if (!feedbackMessage.trim()) { addToast({ type: 'warning', title: 'Внимание', message: 'Пожалуйста, введите ваше сообщение.' }); return; }
+        if (!settings?.telegramToken || !settings?.feedbackChatId) { addToast({ type: 'warning', title: 'Внимание', message: 'Функция обратной связи не настроена администратором.' }); return; }
         setIsSendingFeedback(true);
         const text = `📬 *Новое сообщение обратной связи:*\n\n${feedbackMessage}`;
         try {
@@ -514,9 +514,9 @@ export const DashboardPage = () => {
                 method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ chat_id: settings.feedbackChatId, text: text, parse_mode: 'Markdown', }),
             });
             const result = await response.json();
-            if (result.ok) { alert('Спасибо! Ваше сообщение отправлено.'); setIsFeedbackModalOpen(false); setFeedbackMessage(''); } 
+            if (result.ok) { addToast({ type: 'success', title: 'Успешно', message: 'Спасибо! Ваше сообщение отправлено.' }); setIsFeedbackModalOpen(false); setFeedbackMessage(''); } 
             else { throw new Error(result.description); }
-        } catch (error) { console.error("Ошибка отправки в Telegram:", error); alert(`Не удалось отправить сообщение. Ошибка: ${error}`); } finally { setIsSendingFeedback(false); }
+        } catch (error) { console.error("Ошибка отправки в Telegram:", error); addToast({ type: 'danger', title: 'Ошибка', message: `Не удалось отправить сообщение. Ошибка: ${error}` }); } finally { setIsSendingFeedback(false); }
     };
 
     const handleWidgetToggle = (id: string) => {

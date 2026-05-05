@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useStaticData, useScheduleData } from '../context/DataContext'; 
 import { Icon } from '../components/Icons';
-import { Modal, SearchableSelect, ContextMenu } from '../components/UI';
+import { Modal, SearchableSelect, ContextMenu, useToast } from '../components/UI';
 import { Shift, DayOfWeek, DAYS, SHIFT_PERIODS, ScheduleItem } from '../types';
 import { generateId } from '../utils/helpers';
 import useMedia from 'use-media';
@@ -29,6 +29,7 @@ interface CellInfo {
 export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePageProps) => {
     const { subjects, teachers, classes, rooms } = useStaticData();
     const { schedule1, schedule2, saveSemesterSchedule, canUndo, canRedo, undo, redo } = useScheduleData();
+    const { addToast } = useToast();
     
     // Выбираем нужный массив данных в зависимости от пропса semester
     const schedule = semester === 2 ? schedule2 : schedule1;
@@ -312,7 +313,7 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
         }
 
         if (validationErrors.length > 0) {
-            alert(`❌ Ошибки валидации:\n\n${validationErrors.join('\n')}`);
+            addToast({ type: 'danger', title: 'Ошибки валидации', message: validationErrors.join('\n') });
             return;
         }
 
@@ -406,7 +407,7 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
                 }
             });
 
-            alert(`Невозможно переместить урок:\n${conflictMessages.join('\n')}`);
+            addToast({ type: 'danger', title: 'Ошибка', message: `Невозможно переместить урок:\n${conflictMessages.join('\n')}` });
             setDraggedItem(null);
             setDragOverCell(null);
             return;

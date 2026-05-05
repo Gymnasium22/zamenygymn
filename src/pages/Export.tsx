@@ -9,12 +9,13 @@ import { formatDateISO, generateId, getActiveSemester } from '../utils/helpers';
 import html2canvas from 'html2canvas';
 
 import { QRCodeSVG } from 'qrcode.react';
-import { Modal } from '../components/UI';
+import { Modal, useToast } from '../components/UI';
 import { SanitaryScheduleTab } from '../components/SanitaryScheduleTab';
 
 export const ExportPage = () => {
     const { subjects, teachers, classes, rooms, settings, bellSchedule, saveStaticData, dutyZones } = useStaticData();
     const { schedule1, schedule2, substitutions, saveScheduleData, dutySchedule, nutritionRecords, absenteeismRecords } = useScheduleData();
+    const { addToast } = useToast();
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const printRef1 = useRef<HTMLDivElement>(null);
@@ -103,10 +104,10 @@ export const ExportPage = () => {
                         };
                         await saveStaticData(mergedData as any);
                         await saveScheduleData(mergedData as any);
-                        alert("База успешно восстановлена!"); 
+                        addToast({ type: 'success', title: 'Успешно', message: "База успешно восстановлена!" }); 
                     } 
-                } else alert("Неверный формат файла."); 
-            } catch (err) { alert("Ошибка чтения файла."); } 
+                } else addToast({ type: 'danger', title: 'Ошибка', message: "Неверный формат файла." }); 
+            } catch (err) { addToast({ type: 'danger', title: 'Ошибка', message: "Ошибка чтения файла." }); } 
         }; 
         reader.readAsText(file); 
     };
@@ -632,7 +633,7 @@ export const ExportPage = () => {
         }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
         if (monthlySubs.length === 0) {
-            alert("Нет данных о заменах за выбранный месяц.");
+            addToast({ type: 'warning', title: 'Внимание', message: "Нет данных о заменах за выбранный месяц." });
             return;
         }
 
@@ -882,7 +883,7 @@ export const ExportPage = () => {
         }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
         if (refusalsData.length === 0) {
-            alert("Нет данных об отказах за выбранный месяц.");
+            addToast({ type: 'warning', title: 'Внимание', message: "Нет данных об отказах за выбранный месяц." });
             return;
         }
 
@@ -978,7 +979,7 @@ export const ExportPage = () => {
             });
         });
         navigator.clipboard.writeText(tsv).then(() => {
-            alert("Данные скопированы! Откройте Google Sheets и нажмите Ctrl+V (Cmd+V).");
+            addToast({ type: 'info', title: 'Скопировано', message: "Данные скопированы! Откройте Google Sheets и нажмите Ctrl+V (Cmd+V)." });
         });
     };
 
@@ -986,7 +987,7 @@ export const ExportPage = () => {
         setIsGenerating(true);
         try {
             if (!printRef1.current) {
-                alert('Нет замен для 1-й смены.');
+                addToast({ type: 'warning', title: 'Внимание', message: 'Нет замен для 1-й смены.' });
                 return;
             }
 
@@ -999,7 +1000,7 @@ export const ExportPage = () => {
             document.body.removeChild(link);
         } catch (e) {
             console.error(e);
-            alert("Ошибка при создании изображения");
+            addToast({ type: 'danger', title: 'Ошибка', message: "Ошибка при создании изображения" });
         } finally {
             setIsGenerating(false);
         }
@@ -1009,7 +1010,7 @@ export const ExportPage = () => {
         setIsGenerating(true);
         try {
             if (!printRef2.current) {
-                alert('Нет замен для 2-й смены.');
+                addToast({ type: 'warning', title: 'Внимание', message: 'Нет замен для 2-й смены.' });
                 return;
             }
 
@@ -1022,7 +1023,7 @@ export const ExportPage = () => {
             document.body.removeChild(link);
         } catch (e) {
             console.error(e);
-            alert("Ошибка при создании изображения");
+            addToast({ type: 'danger', title: 'Ошибка', message: "Ошибка при создании изображения" });
         } finally {
             setIsGenerating(false);
         }
@@ -1208,7 +1209,7 @@ export const ExportPage = () => {
         }
         await dbService.deletePublicData(settings.publicScheduleId);
         await saveStaticData({ settings: { ...settings, publicScheduleId: null } });
-        alert('Публичное расписание удалено.');
+        addToast({ type: 'success', title: 'Успешно', message: 'Публичное расписание удалено.' });
         setPublicScheduleUrl('');
         setPublicScheduleId('');
     };

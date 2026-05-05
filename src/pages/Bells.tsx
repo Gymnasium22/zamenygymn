@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useStaticData } from '../context/DataContext';
 import { Icon } from '../components/Icons';
-import { Modal } from '../components/UI';
+import { Modal, useToast } from '../components/UI';
 import { Shift, SHIFT_PERIODS, Bell } from '../types';
 import { DEFAULT_BELLS } from '../constants';
 import { generateId } from '../utils/helpers';
@@ -218,6 +218,7 @@ const ShiftTimeline = ({
 
 export const BellsPage = () => {
     const { bellSchedule, settings, saveStaticData } = useStaticData();
+    const { addToast } = useToast();
 
     const [selectedPresetId, setSelectedPresetId] = useState<string>('preset_normal');
     const [currentPresetBells, setCurrentPresetBells] = useState<Bell[]>([]);
@@ -322,7 +323,7 @@ export const BellsPage = () => {
         }
 
         await saveStaticData({ settings: { ...settings, bellPresets: presets } });
-        alert('Пресет сохранен!');
+        addToast({ type: 'success', title: 'Успешно', message: 'Пресет сохранен!' });
     };
 
     const createNewPreset = () => {
@@ -354,7 +355,7 @@ export const BellsPage = () => {
 
     const deletePreset = async () => {
         if (selectedPresetId === 'preset_normal') {
-            alert('Нельзя удалить базовый пресет.');
+            addToast({ type: 'danger', title: 'Ошибка', message: 'Нельзя удалить базовый пресет.' });
             return;
         }
         if (!window.confirm('Удалить этот режим звонков?')) return;
@@ -375,7 +376,7 @@ export const BellsPage = () => {
             )
         ) {
             await saveStaticData({ bellSchedule: currentPresetBells });
-            alert('Режим звонков применен!');
+            addToast({ type: 'success', title: 'Успешно', message: 'Режим звонков применен!' });
         }
     };
 

@@ -34,6 +34,19 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
         setToasts(prev => prev.filter(toast => toast.id !== id));
     };
 
+    useEffect(() => {
+        const handleAppToast = (e: Event) => {
+            const customEvent = e as CustomEvent<{type?: string, title?: string, message: string}>;
+            const { type = 'danger', title = 'Уведомление', message } = customEvent.detail;
+            
+            // Generate ID here to avoid dependency issues
+            const id = Date.now().toString() + Math.random().toString(36).substring(2, 9);
+            setToasts(prev => [...prev, { type: type as any, title, message, id }]);
+        };
+        window.addEventListener('app-toast', handleAppToast);
+        return () => window.removeEventListener('app-toast', handleAppToast);
+    }, []);
+
     return (
         <ToastContext.Provider value={{ toasts, addToast, removeToast }}>
             {children}
@@ -218,7 +231,7 @@ export const Modal = ({ isOpen, onClose, title, children, maxWidth = 'max-w-lg' 
 export const Toast = ({ id, type, title, message, duration = 5000, onClose }: ToastProps) => {
     const [isVisible, setIsVisible] = useState(true);
     const [isExiting, setIsExiting] = useState(false);
-    const timerRef = useRef<NodeJS.Timeout | null>(null);
+    const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
         // Устанавливаем таймер только один раз при монтировании
@@ -322,16 +335,7 @@ export const Toast = ({ id, type, title, message, duration = 5000, onClose }: To
     );
 };
 
-interface ToastContainerProps {
-    toasts: Array<{
-        id: string;
-        type: 'success' | 'warning' | 'danger' | 'info';
-        title: string;
-        message?: string;
-        duration?: number;
-    }>;
-    onRemoveToast: (id: string) => void;
-}
+
 
 
 interface ContextMenuAction {

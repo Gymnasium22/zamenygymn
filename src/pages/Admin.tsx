@@ -4,10 +4,11 @@ import { useStaticData, useScheduleData } from '../context/DataContext';
 import { Icon } from '../components/Icons';
 import { Shift, SHIFT_PERIODS, DAYS, TelegramTemplates, AdminAnnouncement } from '../types';
 import { formatDateISO, getScheduleForDate } from '../utils/helpers';
-import { Modal } from '../components/UI';
+import { Modal, useToast } from '../components/UI';
 
 export const AdminPage = () => {
-    const { subjects, teachers, classes, rooms, settings, saveStaticData } = useStaticData(); 
+    const { subjects, teachers, classes, rooms, settings, saveStaticData } = useStaticData();
+    const { addToast } = useToast(); 
     const { schedule1, schedule2 } = useScheduleData();
 
     const [activeTab, setActiveTab] = useState('teachers');
@@ -131,7 +132,7 @@ export const AdminPage = () => {
                 } 
             } 
         });
-        alert("Настройки сохранены!");
+        addToast({ type: 'success', title: 'Успешно', message: "Настройки сохранены!" });
         setIsTemplatesModalOpen(false);
     };
 

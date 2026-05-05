@@ -319,13 +319,13 @@ export const SubstitutionsPage = () => {
     
     const assignSubstitution = useCallback(async (replacementId: string, isMerger: boolean = false) => { 
         if (!currentSubParams) {
-            alert("Ошибка: Невозможно назначить замену. Параметры урока не определены.");
+            addToast({ type: 'danger', title: 'Ошибка', message: "Невозможно назначить замену. Параметры урока не определены." });
             return;
         }
 
         const item = activeSchedule.find(s => s.id === currentSubParams.scheduleItemId);
         if (!item) {
-            alert("Ошибка: Урок не найден в расписании.");
+            addToast({ type: 'danger', title: 'Ошибка', message: "Урок не найден в расписании." });
             return;
         }
         
@@ -358,13 +358,13 @@ export const SubstitutionsPage = () => {
             setSubstitutionComment('');
         } catch (error) {
             console.error('Failed to save substitution:', error);
-            alert('Ошибка при сохранении замены. Попробуйте еще раз.');
+            addToast({ type: 'danger', title: 'Ошибка', message: 'Ошибка при сохранении замены. Попробуйте еще раз.' });
         }
     }, [currentSubParams, selectedDate, selectedRoomId, activeSchedule, substitutions, teachers, lessonAbsenceReason, refusedTeacherIds, substitutionComment, dayComment, saveScheduleData]);
 
     const handleBatchClassMerge = useCallback(async (targetClassId: string) => {
         if (!currentSubParams || !selectedDayOfWeek || !currentSubParams.period || !currentSubParams.shift || !currentSubParams.teacherId) {
-            alert("Ошибка: Неполные параметры урока.");
+            addToast({ type: 'danger', title: 'Ошибка', message: "Неполные параметры урока." });
             return;
         }
 
@@ -376,7 +376,7 @@ export const SubstitutionsPage = () => {
         );
 
         if (targetLessons.length === 0) {
-            alert("Уроки для объединения не найдены.");
+            addToast({ type: 'warning', title: 'Внимание', message: "Уроки для объединения не найдены." });
             return;
         }
 
@@ -417,7 +417,7 @@ export const SubstitutionsPage = () => {
         const targetLesson = activeSchedule.find(s => s.id === targetLessonId);
 
         if (!sourceLesson || !targetLesson) {
-             alert("Ошибка: Не найден урок для обмена.");
+             addToast({ type: 'danger', title: 'Ошибка', message: "Не найден урок для обмена." });
              return;
         }
 
@@ -622,7 +622,7 @@ export const SubstitutionsPage = () => {
         
         const teacher = teachers.find(t => t.id === teacherId);
         if (!teacher?.telegramChatId || !settings.telegramToken) {
-            alert('У учителя не настроен Telegram ID или нет токена бота.');
+            addToast({ type: 'warning', title: 'Внимание', message: 'У учителя не настроен Telegram ID или нет токена бота.' });
             setTelegramChoiceOpen(false);
             return;
         }
@@ -654,7 +654,7 @@ export const SubstitutionsPage = () => {
             });
 
             if (allTeacherSubs.length === 0) {
-                 alert('У этого учителя нет замен на выбранную дату.');
+                 addToast({ type: 'warning', title: 'Внимание', message: 'У этого учителя нет замен на выбранную дату.' });
                  setTelegramChoiceOpen(false);
                  return;
             }
@@ -697,7 +697,7 @@ export const SubstitutionsPage = () => {
             addToast({ type: 'success', title: 'Отправлено', message: `Уведомление отправлено ${teacher.name}` });
         } catch (e) {
             console.error(e);
-            alert('Ошибка отправки в Telegram');
+            addToast({ type: 'danger', title: 'Ошибка', message: 'Ошибка отправки в Telegram' });
         } finally {
             setTelegramChoiceOpen(false);
             setTelegramTarget(null);

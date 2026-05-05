@@ -165,7 +165,9 @@ const handleError = {
 
     alert: (message: string, error?: any) => {
         console.error(message, error);
-        alert(`⚠️ ${message}`);
+        window.dispatchEvent(new CustomEvent('app-toast', { 
+            detail: { type: 'danger', title: 'Ошибка', message } 
+        }));
     },
 
     firebase: (error: any, context: string) => {
@@ -190,7 +192,9 @@ const handleError = {
         }
 
         console.error(`Firebase ${context}:`, error);
-        alert(message);
+        window.dispatchEvent(new CustomEvent('app-toast', { 
+            detail: { type: 'danger', title: 'Ошибка Firebase', message } 
+        }));
     },
 
     firebaseOffline: (error: any, context: string, data: Partial<AppData>) => {
@@ -202,12 +206,9 @@ const handleError = {
 
         console.warn(`Firebase ${context} (оффлайн):`, error);
 
-        if (isMobile) {
-            // На мобильных показываем toast вместо alert
-            // Это будет работать через ToastProvider
-        } else {
-            alert(message);
-        }
+        window.dispatchEvent(new CustomEvent('app-toast', { 
+            detail: { type: 'warning', title: 'Оффлайн режим', message } 
+        }));
 
         // Добавляем в очередь синхронизации
         syncQueue.add(data);
