@@ -51,6 +51,14 @@ const formatDigitsToTime = (raw: string, fallback: string) => {
     return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 };
 
+const escapeHtml = (value: string) =>
+    value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+
 const ShiftTimeline = ({
     shift,
     currentPresetBells,
@@ -381,6 +389,8 @@ export const BellsPage = () => {
     };
 
     const getExportContent = () => {
+        const presetName = escapeHtml(settings.bellPresets?.find(p => p.id === selectedPresetId)?.name || 'Обычный');
+        const safeExportDate = exportDate ? escapeHtml(new Date(exportDate).toLocaleDateString('ru-RU')) : '';
 
         return `
             <div style="font-family: 'Segoe UI', Arial, sans-serif; padding: 10px 40px 20px 40px; background: white; width: 1000px; max-width: 1000px; margin: 0 auto; color: #1e293b; box-sizing: border-box;">
@@ -391,7 +401,7 @@ export const BellsPage = () => {
                     ${
                         exportDate
                             ? `<p style="font-size: 20px; color: #64748b; font-weight: 600; margin: 0;">
-                                на ${new Date(exportDate).toLocaleDateString('ru-RU')}
+                                на ${safeExportDate}
                                </p>`
                             : ''
                     }
@@ -528,7 +538,7 @@ export const BellsPage = () => {
             <table>
                 <tr><td colspan="4" class="title-main">РАСПИСАНИЕ ЗВОНКОВ</td></tr>
                 ${exportDate ? `<tr><td colspan="4" class="title-sub">на ${new Date(exportDate).toLocaleDateString('ru-RU')}</td></tr>` : ''}
-                <tr><td colspan="4" class="title-sub">Режим: ${preset?.name || 'Обычный'}</td></tr>
+                <tr><td colspan="4" class="title-sub">Режим: ${escapeHtml(preset?.name || 'Обычный')}</td></tr>
                 <tr class="empty-row"><td colspan="4" style="border:none"></td></tr>
                 <tr>
                     <th class="lesson-header">Смена</th>

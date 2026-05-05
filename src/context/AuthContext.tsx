@@ -16,6 +16,8 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const ADMIN_EMAIL = 'admin@gymnasium22.com';
+const TEACHER_EMAIL = 'teacher@gymnasium22.com';
+const CANTEEN_EMAIL = 'canteen@gymnasium22.com';
 
 import { dbService } from '../services/db';
 
@@ -33,15 +35,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
             setUser(currentUser);
+            const normalizedEmail = currentUser?.email?.trim().toLowerCase();
             if (currentUser) {
-                if (currentUser.email === ADMIN_EMAIL) {
+                if (normalizedEmail === ADMIN_EMAIL) {
                     setRole('admin');
-                } else if (currentUser.email === 'canteen@gymnasium22.com') {
-                    setRole('canteen');
-                } else if (currentUser.email && currentUser.email.includes('@')) {
+                } else if (normalizedEmail === TEACHER_EMAIL) {
                     setRole('teacher');
+                } else if (normalizedEmail === CANTEEN_EMAIL) {
+                    setRole('canteen');
                 } else {
-                    setRole('guest');
+                    // Unknown authenticated email should not get privileged role.
+                    setRole(null);
                 }
             } else {
                 setRole(null);
