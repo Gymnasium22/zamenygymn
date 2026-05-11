@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import html2canvas from 'html2canvas';
 import { ClassEntity, DAYS, DayOfWeek, ScheduleItem, SHIFT_PERIODS, Shift, Subject, Room, Teacher } from '../types';
 import { Icon } from './Icons';
 import { analyzeSanitarySchedule, applySlotSwaps, generateSanitarySchedule } from '../utils/sanitarySchedule';
@@ -204,6 +203,7 @@ export function SanitaryScheduleTab(props: {
         if (!posterRef.current) return;
         setIsExporting(true);
         try {
+            const { default: html2canvas } = await import('html2canvas');
             const canvas = await html2canvas(posterRef.current, {
                 scale: 2,
                 backgroundColor: '#ffffff',

@@ -3,7 +3,7 @@ import { useStaticData, useScheduleData } from '../context/DataContext';
 import { Icon } from '../components/Icons';
 import { exportService } from '../services/exportService';
 import { BarChart } from '../components/UI';
-import { DAYS, Teacher, Subject, ScheduleItem, Substitution } from '../types';
+import { DAYS } from '../types';
 
 interface TariffRow {
     id: string;

@@ -2,9 +2,8 @@ import { useState, useRef, useMemo } from 'react';
 import { useStaticData, useScheduleData } from '../context/DataContext';
 import { Icon } from '../components/Icons';
 import { Modal, SearchableSelect } from '../components/UI';
-import { DAYS, Shift, DutyZone, DayOfWeek } from '../types';
+import { DAYS, Shift, DutyZone, DayOfWeek, DutyRecord } from '../types';
 import { generateId } from '../utils/helpers';
-import html2canvas from 'html2canvas';
 import { exportService } from '../services/exportService';
 
 export const DutyPage = () => {
@@ -172,6 +171,7 @@ export const DutyPage = () => {
 
     const exportToPng = async () => {
         if (!printRef.current) return;
+        const { default: html2canvas } = await import('html2canvas');
         const canvas = await html2canvas(printRef.current, {
             scale: 2,
             backgroundColor: '#ffffff',

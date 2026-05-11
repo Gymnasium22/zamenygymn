@@ -115,29 +115,67 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
         return [];
     }, [viewMode, filterId, classes, teachers, subjects, selectedShift]);
 
-    const getRows = () => rows;
 
+    // --- Оптимизированные Map'ы для O(1) доступа к сущностям ---
+    const subjectsById = useMemo(() => {
+        const map = new Map<string, typeof subjects[0]>();
+        subjects.forEach((s) => map.set(s.id, s));
+        return map;
+    }, [subjects]);
+
+    const teachersById = useMemo(() => {
+        const map = new Map<string, typeof teachers[0]>();
+        teachers.forEach((t) => map.set(t.id, t));
+        return map;
+    }, [teachers]);
+
+    const classesById = useMemo(() => {
+        const map = new Map<string, typeof classes[0]>();
+        classes.forEach((c) => map.set(c.id, c));
+        return map;
+    }, [classes]);
+
+    const roomsById = useMemo(() => {
+        const map = new Map<string, typeof rooms[0]>();
+        rooms.forEach((r) => map.set(r.id, r));
+        return map;
+    }, [rooms]);
+
+    // Группировка расписания по слоту для быстрого поиска конфликтов
+    const scheduleSlotMap = useMemo(() => {
+        const map = new Map<string, ScheduleItem[]>();
+        schedule.forEach((item) => {
+            const key = `${item.day}_${item.period}_${item.shift}`;
+            const arr = map.get(key) || [];
+            arr.push(item);
+            map.set(key, arr);
+        });
+        return map;
+    }, [schedule]);
+
+    // Стабильный кэш через useState (не вызывает ререндеров при мутациях,
+    // но безопасен для чтения в render — в отличие от useRef)
     const [scheduleItemsCache] = useState(() => new Map<string, ScheduleItem[]>());
 
-    // Очищаем кеш при изменении расписания, чтобы избежать утечки памяти
+    // Очищаем кеш при изменении расписания или фильтров
     useEffect(() => {
         scheduleItemsCache.clear();
-    }, [schedule, scheduleItemsCache]);
+    }, [schedule, viewMode, selectedShift, selectedDay, filterId, filterRoom, filterDirection, scheduleItemsCache]);
 
-    // Ограничиваем размер кэша для предотвращения растущей памяти
+    // Ограничиваем размер кэша
     useEffect(() => {
         if (scheduleItemsCache.size > 500) {
             scheduleItemsCache.clear();
-            console.warn('Schedule cache cleared to prevent memory leak');
         }
     }, [scheduleItemsCache]);
 
     const getScheduleItems = useCallback(
         (rowId: string, colKey: string | number): ScheduleItem[] => {
             const cacheKey = `${viewMode}-${rowId}-${colKey}-${selectedShift}-${selectedDay}-${filterId}-${filterRoom}-${filterDirection}`;
+            const cache = scheduleItemsCache;
 
-            if (scheduleItemsCache.has(cacheKey)) {
-                return scheduleItemsCache.get(cacheKey)!;
+            if (cache.has(cacheKey)) {
+                return cache.get(cacheKey)!;
             }
 
             let items: ScheduleItem[] = [];
@@ -179,7 +217,7 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
             if (filterRoom) {
                 items = items.filter((s) => {
                     if (!s.roomId) return false;
-                    const room = rooms.find((r) => r.id === s.roomId);
+                    const room = roomsById.get(s.roomId);
                     const roomName = room ? room.name : s.roomId;
                     return (roomName || '').toLowerCase().includes(filterRoom.toLowerCase());
                 });
@@ -187,82 +225,88 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
             if (filterDirection)
                 items = items.filter((s) => s.direction?.toLowerCase().includes(filterDirection.toLowerCase()));
 
-            scheduleItemsCache.set(cacheKey, items);
+            cache.set(cacheKey, items);
             return items;
         },
-        [viewMode, schedule, selectedShift, selectedDay, filterId, filterRoom, filterDirection, rooms]
+        [viewMode, schedule, selectedShift, selectedDay, filterId, filterRoom, filterDirection, roomsById, scheduleItemsCache]
     );
 
-    const checkConflicts = (item: ScheduleItem): string[] => {
-        const conflicts: string[] = [];
-        const others = schedule.filter(
-            (s) => s.id !== item.id && s.day === item.day && s.period === item.period && s.shift === item.shift
-        );
+    const checkConflicts = useCallback(
+        (item: ScheduleItem): string[] => {
+            const conflicts: string[] = [];
+            const key = `${item.day}_${item.period}_${item.shift}`;
+            const slotItems = scheduleSlotMap.get(key) || [];
+            const others = slotItems.filter((s) => s.id !== item.id);
 
-        const teacherBusy = others.find((s) => s.teacherId === item.teacherId);
-        if (teacherBusy) conflicts.push('teacher');
+            const teacherBusy = others.find((s) => s.teacherId === item.teacherId);
+            if (teacherBusy) conflicts.push('teacher');
 
-        const classBusy = others.find((s) => {
-            if (s.classId !== item.classId) return false;
-            if (s.direction && item.direction && s.direction !== item.direction) return false;
-            return true;
-        });
-        if (classBusy) conflicts.push('class');
-
-        if (item.roomId) {
-            const roomBusy = others.find((s) => s.roomId === item.roomId);
-            if (roomBusy) conflicts.push('room');
-        }
-
-        return conflicts;
-    };
-
-    const getDetailedConflicts = (item: ScheduleItem) => {
-        const detailed: Array<{ type: string; description: string }> = [];
-        const others = schedule.filter(
-            (s) => s.id !== item.id && s.day === item.day && s.period === item.period && s.shift === item.shift
-        );
-
-        // Teacher Conflict
-        const teacherBusy = others.filter((s) => s.teacherId === item.teacherId);
-        teacherBusy.forEach((t) => {
-            const cls = classes.find((c) => c.id === t.classId)?.name;
-            const rm = rooms.find((r) => r.id === t.roomId)?.name || t.roomId;
-            detailed.push({
-                type: 'Учитель',
-                description: `Ведет урок у ${cls} в каб. ${rm || '?'}`
+            const classBusy = others.find((s) => {
+                if (s.classId !== item.classId) return false;
+                if (s.direction && item.direction && s.direction !== item.direction) return false;
+                return true;
             });
-        });
+            if (classBusy) conflicts.push('class');
 
-        // Class Conflict
-        const classBusy = others.filter((s) => {
-            if (s.classId !== item.classId) return false;
-            if (s.direction && item.direction && s.direction !== item.direction) return false;
-            return true;
-        });
-        classBusy.forEach((c) => {
-            const subj = subjects.find((s) => s.id === c.subjectId)?.name;
-            detailed.push({
-                type: 'Класс',
-                description: `Уже имеет урок "${subj}"`
-            });
-        });
+            if (item.roomId) {
+                const roomBusy = others.find((s) => s.roomId === item.roomId);
+                if (roomBusy) conflicts.push('room');
+            }
 
-        // Room Conflict
-        if (item.roomId) {
-            const roomBusy = others.filter((s) => s.roomId === item.roomId);
-            roomBusy.forEach((r) => {
-                const teacher = teachers.find((t) => t.id === r.teacherId)?.name;
-                const cls = classes.find((c) => c.id === r.classId)?.name;
+            return conflicts;
+        },
+        [scheduleSlotMap]
+    );
+
+    const getDetailedConflicts = useCallback(
+        (item: ScheduleItem) => {
+            const detailed: Array<{ type: string; description: string }> = [];
+            const key = `${item.day}_${item.period}_${item.shift}`;
+            const slotItems = scheduleSlotMap.get(key) || [];
+            const others = slotItems.filter((s) => s.id !== item.id);
+
+            // Teacher Conflict
+            const teacherBusy = others.filter((s) => s.teacherId === item.teacherId);
+            teacherBusy.forEach((t) => {
+                const cls = classesById.get(t.classId)?.name;
+                const rm = roomsById.get(t.roomId || '')?.name || t.roomId;
                 detailed.push({
-                    type: 'Кабинет',
-                    description: `Занят: ${cls}, ${teacher}`
+                    type: 'Учитель',
+                    description: `Ведет урок у ${cls} в каб. ${rm || '?'}`
                 });
             });
-        }
 
-        return detailed;
-    };
+            // Class Conflict
+            const classBusy = others.filter((s) => {
+                if (s.classId !== item.classId) return false;
+                if (s.direction && item.direction && s.direction !== item.direction) return false;
+                return true;
+            });
+            classBusy.forEach((c) => {
+                const subj = subjectsById.get(c.subjectId)?.name;
+                detailed.push({
+                    type: 'Класс',
+                    description: `Уже имеет урок "${subj}"`
+                });
+            });
+
+            // Room Conflict
+            if (item.roomId) {
+                const roomBusy = others.filter((s) => s.roomId === item.roomId);
+                roomBusy.forEach((r) => {
+                    const teacher = teachersById.get(r.teacherId)?.name;
+                    const cls = classesById.get(r.classId)?.name;
+                    detailed.push({
+                        type: 'Кабинет',
+                        description: `Занят: ${cls}, ${teacher}`
+                    });
+                });
+            }
+
+            return detailed;
+        },
+        [scheduleSlotMap, classesById, roomsById, subjectsById, teachersById]
+    );
 
     const handleConflictClick = (e: React.MouseEvent, item: ScheduleItem) => {
         e.stopPropagation();
@@ -273,9 +317,9 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
 
     const validateRoom = (classId: string, subjectId: string, roomId: string) => {
         const warnings: string[] = [];
-        const cls = classes.find((c) => c.id === classId);
-        const subj = subjects.find((s) => s.id === subjectId);
-        const room = rooms.find((r) => r.id === roomId);
+        const cls = classesById.get(classId);
+        const subj = subjectsById.get(subjectId);
+        const room = roomsById.get(roomId);
 
         if (!room) return warnings;
 
@@ -319,7 +363,7 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
         if (viewMode === 'week') {
             base.period = parseInt(rowId);
             base.day = day;
-            if (filterId && classes.find((c) => c.id === filterId)) base.classId = filterId;
+            if (filterId && classesById.has(filterId)) base.classId = filterId;
         }
         setTempItem(base);
         setValidationWarnings([]);
@@ -341,17 +385,17 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
         }
 
         // Проверяем существование связанных данных
-        const teacher = teachers.find((t) => t.id === tempItem.teacherId);
+        const teacher = teachersById.get(tempItem.teacherId || '');
         if (!teacher) validationErrors.push('Выбранный учитель не найден');
 
-        const subject = subjects.find((s) => s.id === tempItem.subjectId);
+        const subject = subjectsById.get(tempItem.subjectId || '');
         if (!subject) validationErrors.push('Выбранный предмет не найден');
 
-        const classItem = classes.find((c) => c.id === tempItem.classId);
+        const classItem = classesById.get(tempItem.classId || '');
         if (!classItem) validationErrors.push('Выбранный класс не найден');
 
         if (tempItem.roomId) {
-            const room = rooms.find((r) => r.id === tempItem.roomId);
+            const room = roomsById.get(tempItem.roomId);
             if (!room) validationErrors.push('Выбранный кабинет не найден');
         }
 
@@ -476,44 +520,37 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
     const findScheduleConflicts = (scheduleItems: ScheduleItem[], newItem: ScheduleItem) => {
         const conflicts: Array<{ type: 'teacher' | 'room' | 'class'; entityName: string }> = [];
 
-        // Check for conflicts at the same time slot (day, period, shift)
         const conflictingItems = scheduleItems.filter(
             (item) =>
-                item.id !== newItem.id && // Don't conflict with itself
+                item.id !== newItem.id &&
                 item.day === newItem.day &&
                 item.period === newItem.period &&
                 item.shift === newItem.shift
         );
 
-        // Check teacher conflicts
         const teacherConflict = conflictingItems.find((item) => item.teacherId === newItem.teacherId);
         if (teacherConflict) {
-            const teacher = teachers.find((t) => t.id === newItem.teacherId);
             conflicts.push({
                 type: 'teacher',
-                entityName: teacher?.name || newItem.teacherId
+                entityName: teachersById.get(newItem.teacherId)?.name || newItem.teacherId
             });
         }
 
-        // Check room conflicts (only if both items have room assignments)
         if (newItem.roomId) {
             const roomConflict = conflictingItems.find((item) => item.roomId === newItem.roomId);
             if (roomConflict) {
-                const room = rooms.find((r) => r.id === newItem.roomId);
                 conflicts.push({
                     type: 'room',
-                    entityName: room?.name || newItem.roomId
+                    entityName: roomsById.get(newItem.roomId)?.name || newItem.roomId
                 });
             }
         }
 
-        // Check class conflicts
         const classConflict = conflictingItems.find((item) => item.classId === newItem.classId);
         if (classConflict) {
-            const cls = classes.find((c) => c.id === newItem.classId);
             conflicts.push({
                 type: 'class',
-                entityName: cls?.name || newItem.classId
+                entityName: classesById.get(newItem.classId)?.name || newItem.classId
             });
         }
 
@@ -583,24 +620,24 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
         const semesterSuffix = semester === 2 ? ' (2-е полугодие)' : '';
         if (filterId) {
             if (viewMode === 'teacher') {
-                const teacher = teachers.find((t) => t.id === filterId);
+                const teacher = teachersById.get(filterId);
                 return teacher ? teacher.name + semesterSuffix : 'Учитель' + semesterSuffix;
             }
             if (viewMode === 'class') {
-                const classItem = classes.find((c) => c.id === filterId);
+                const classItem = classesById.get(filterId);
                 return classItem ? classItem.name + semesterSuffix : 'Класс' + semesterSuffix;
             }
             if (viewMode === 'subject') {
-                const subject = subjects.find((s) => s.id === filterId);
+                const subject = subjectsById.get(filterId);
                 return subject ? subject.name + semesterSuffix : 'Предмет' + semesterSuffix;
             }
             if (viewMode === 'week') {
-                const classItem = classes.find((c) => c.id === filterId);
+                const classItem = classesById.get(filterId);
                 return classItem ? classItem.name + semesterSuffix : 'Неделя' + semesterSuffix;
             }
         }
         return `Расписание на ${selectedDay}` + semesterSuffix;
-    }, [filterId, viewMode, teachers, classes, subjects, selectedDay, semester]);
+    }, [filterId, viewMode, teachersById, classesById, subjectsById, selectedDay, semester]);
 
     // --- PRINT LOGIC START ---
     const isWeeklyPrint = !!filterId;
@@ -612,8 +649,8 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
 
     const printRows = useMemo(() => {
         if (isWeeklyPrint) return SHIFT_PERIODS[selectedShift].map((p) => ({ id: p.toString(), name: `${p} урок` }));
-        return getRows();
-    }, [isWeeklyPrint, selectedShift, getRows]);
+        return rows;
+    }, [isWeeklyPrint, selectedShift, rows]);
 
     const getPrintItems = (rowId: string, colKey: string | number): ScheduleItem[] => {
         if (isWeeklyPrint) {
@@ -658,11 +695,11 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
         return (
             <div className="h-full flex flex-col gap-1">
                 {items.map((item) => {
-                    const subj = subjects.find((s) => s.id === item.subjectId);
-                    const teacher = teachers.find((t) => t.id === item.teacherId);
-                    const cls = classes.find((c) => c.id === item.classId);
+                    const subj = subjectsById.get(item.subjectId);
+                    const teacher = teachersById.get(item.teacherId);
+                    const cls = classesById.get(item.classId);
                     const conflicts = checkConflicts(item);
-                    const room = rooms.find((r) => r.id === item.roomId);
+                    const room = roomsById.get(item.roomId || '');
                     const roomName = room ? room.name : item.roomId;
 
                     return (
@@ -775,10 +812,10 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
         return (
             <div className="p-4 space-y-4">
                 {lessonsForDay.map((item) => {
-                    const subj = subjects.find((s) => s.id === item.subjectId);
-                    const teacher = teachers.find((t) => t.id === item.teacherId);
-                    const cls = classes.find((c) => c.id === item.classId);
-                    const room = rooms.find((r) => r.id === item.roomId);
+                    const subj = subjectsById.get(item.subjectId);
+                    const teacher = teachersById.get(item.teacherId);
+                    const cls = classesById.get(item.classId);
+                    const room = roomsById.get(item.roomId || '');
                     const roomName = room ? room.name : item.roomId;
                     const conflicts = checkConflicts(item);
 
@@ -1435,10 +1472,10 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
                                                         className="border border-slate-300 p-1 align-top h-20 bg-white"
                                                     >
                                                         {items.map((item) => {
-                                                            const subj = subjects.find((s) => s.id === item.subjectId);
-                                                            const teach = teachers.find((t) => t.id === item.teacherId);
-                                                            const cls = classes.find((c) => c.id === item.classId);
-                                                            const room = rooms.find((r) => r.id === item.roomId);
+                                                            const subj = subjectsById.get(item.subjectId);
+                                                            const teach = teachersById.get(item.teacherId);
+                                                            const cls = classesById.get(item.classId);
+                                                            const room = roomsById.get(item.roomId || '');
                                                             const roomName = room ? room.name : item.roomId;
 
                                                             const isTeacherView = viewMode === 'teacher';

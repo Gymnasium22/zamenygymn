@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo, useEffect } from 'react';
+import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { useStaticData, useScheduleData } from '../context/DataContext';
 import { Icon } from '../components/Icons';
 import { dbService } from '../services/db';
@@ -12,19 +12,212 @@ import {
     ScheduleItem,
     ClassEntity,
     Subject,
-    Teacher
+    Teacher,
+    Room
 } from '../types';
 import { INITIAL_DATA } from '../constants';
 import { formatDateISO, generateId, getActiveSemester } from '../utils/helpers';
-import html2canvas from 'html2canvas';
 import { exportService } from '../services/exportService';
-
-import { QRCodeSVG } from 'qrcode.react';
 import { Modal, useToast } from '../components/UI';
 import { SanitaryScheduleTab } from '../components/SanitaryScheduleTab';
 
+// --- Вынесенные компоненты печати (не пересоздаются на каждый рендер) ---
+
+interface ReportHeaderProps {
+    exportDate: string;
+    dayComment?: string;
+}
+
+const ReportHeader = ({ exportDate, dayComment }: ReportHeaderProps) => (
+    <div className="border-b-2 border-slate-800 pb-4 mb-6">
+        <div className="flex justify-between items-end gap-4">
+            <div>
+                <h1 className="text-3xl font-black uppercase tracking-tight mb-1 text-slate-800">
+                    Замена Учителей
+                </h1>
+                <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">
+                    Гимназия №22 • Официальный документ
+                </p>
+            </div>
+            <div className="text-right">
+                <div className="text-xs text-slate-400 uppercase font-bold tracking-wider mb-1">Дата</div>
+                <div className="text-xl font-bold text-slate-800">
+                    {new Date(exportDate).toLocaleDateString('ru-RU', {
+                        day: 'numeric',
+                        month: 'long',
+                        year: 'numeric'
+                    })}
+                </div>
+            </div>
+        </div>
+        {dayComment && <div className="mt-3 text-xs text-slate-600 max-w-3xl">{dayComment}</div>}
+    </div>
+);
+
+const ReportFooter = () => (
+    <div className="mt-8 pt-4 border-t border-slate-100 flex justify-between items-end text-[10px] text-slate-400">
+        <div>Сформировано автоматически</div>
+        <div className="flex flex-col items-end gap-2">
+            <div className="h-px w-32 bg-slate-300"></div>
+            <div>Подпись администрации</div>
+        </div>
+    </div>
+);
+
+interface MatrixPrintContentProps {
+    classes: ClassEntity[];
+    matrixGrade: string;
+    currentSchedule: ScheduleItem[];
+    subjects: Subject[];
+    rooms: Room[];
+}
+
+const MatrixPrintContent = ({ classes, matrixGrade, currentSchedule, subjects, rooms }: MatrixPrintContentProps) => {
+    const targetClasses = classes
+        .filter((c) => c.name.startsWith(matrixGrade))
+        .sort((a, b) => a.name.localeCompare(b.name));
+    const shifts = (Array.from(new Set(targetClasses.map((c) => c.shift))) as string[]).sort();
+
+    const dayStyles: Record<string, { label: string; cell: string }> = {
+        [DayOfWeek.Monday]: { label: 'bg-red-200', cell: 'bg-red-100' },
+        [DayOfWeek.Tuesday]: { label: 'bg-orange-200', cell: 'bg-orange-100' },
+        [DayOfWeek.Wednesday]: { label: 'bg-yellow-200', cell: 'bg-yellow-100' },
+        [DayOfWeek.Thursday]: { label: 'bg-green-200', cell: 'bg-green-100' },
+        [DayOfWeek.Friday]: { label: 'bg-blue-200', cell: 'bg-blue-100' }
+    };
+
+    if (targetClasses.length === 0)
+        return <div className="text-center p-10">Нет классов для выбранной параллели</div>;
+
+    return (
+        <div className="font-sans text-black">
+            {shifts.map((shift: string) => {
+                const shiftClasses = targetClasses.filter((c) => c.shift === shift);
+                const periods = SHIFT_PERIODS[shift as Shift];
+                if (shiftClasses.length === 0) return null;
+
+                return (
+                    <div key={String(shift)} className="mb-10 page-break-inside-avoid">
+                        <table className="w-full border-collapse border-2 border-black text-center text-sm">
+                            <thead>
+                                <tr>
+                                    <th className="border-2 border-black w-8"></th>
+                                    <th className="border-2 border-black w-8"></th>
+                                    <th
+                                        colSpan={shiftClasses.length}
+                                        className="border-2 border-black py-2 text-xl uppercase font-black tracking-widest bg-white"
+                                    >
+                                        {shift}
+                                    </th>
+                                </tr>
+                                <tr>
+                                    <th className="border-2 border-black w-8"></th>
+                                    <th className="border-2 border-black w-8"></th>
+                                    {shiftClasses.map((c) => (
+                                        <th
+                                            key={String(c.id)}
+                                            className="border-2 border-black py-2 font-bold text-lg bg-white w-32"
+                                        >
+                                            {c.name}
+                                        </th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {DAYS.map((day: string) => {
+                                    const styles = dayStyles[day] || { label: 'bg-gray-200', cell: 'bg-gray-100' };
+                                    return (
+                                        <React.Fragment key={String(day)}>
+                                            {periods.map((period, pIndex) => (
+                                                <tr key={`${String(day)}-${period}`}>
+                                                    {pIndex === 0 && (
+                                                        <td
+                                                            rowSpan={periods.length}
+                                                            className={`border-2 border-black font-bold uppercase text-xs writing-vertical-lr rotate-180 p-1 ${styles.label}`}
+                                                            style={{
+                                                                writingMode: 'vertical-lr',
+                                                                transform: 'rotate(180deg)'
+                                                            }}
+                                                        >
+                                                            {day === DayOfWeek.Monday
+                                                                ? 'ПОНЕДЕЛЬНИК'
+                                                                : day === DayOfWeek.Tuesday
+                                                                  ? 'ВТОРНИК'
+                                                                  : day === DayOfWeek.Wednesday
+                                                                    ? 'СРЕДА'
+                                                                    : day === DayOfWeek.Thursday
+                                                                      ? 'ЧЕТВЕРГ'
+                                                                      : day === DayOfWeek.Friday
+                                                                        ? 'ПЯТНИЦА'
+                                                                        : day}
+                                                        </td>
+                                                    )}
+                                                    <td
+                                                        className={`border-2 border-black font-bold text-base ${styles.label}`}
+                                                    >
+                                                        {period}
+                                                    </td>
+                                                    {shiftClasses.map((cls) => {
+                                                        const lessons = currentSchedule.filter(
+                                                            (s) =>
+                                                                s.classId === cls.id &&
+                                                                s.day === day &&
+                                                                s.shift === shift &&
+                                                                s.period === period
+                                                        );
+
+                                                        return (
+                                                            <td
+                                                                key={String(cls.id)}
+                                                                className={`border-2 border-black p-1 h-12 ${styles.cell}`}
+                                                            >
+                                                                {lessons.map((lesson) => {
+                                                                    const subj = subjects.find(
+                                                                        (s) => s.id === lesson.subjectId
+                                                                    );
+                                                                    const room = rooms.find(
+                                                                        (r) => r.id === lesson.roomId
+                                                                    );
+                                                                    const roomName = room
+                                                                        ? room.name
+                                                                        : lesson.roomId || '';
+
+                                                                    return (
+                                                                        <div
+                                                                            key={String(lesson.id)}
+                                                                            className="flex justify-center items-center gap-1 leading-tight text-sm font-bold"
+                                                                        >
+                                                                            <span>{subj?.name}</span>
+                                                                            {roomName && (
+                                                                                <span className="font-black">
+                                                                                    {roomName}
+                                                                                </span>
+                                                                            )}
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </td>
+                                                        );
+                                                    })}
+                                                </tr>
+                                            ))}
+                                            <tr className="h-1 bg-black border-2 border-black">
+                                                <td colSpan={2 + shiftClasses.length}></td>
+                                            </tr>
+                                        </React.Fragment>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                );
+            })}
+        </div>
+    );
+};
+
 export const ExportPage = () => {
-    const { subjects, teachers, classes, rooms, settings, bellSchedule, saveStaticData, dutyZones } = useStaticData();
+    const { subjects, teachers, classes, rooms, settings, bellSchedule, saveStaticData, dutyZones, privateSettings } = useStaticData();
     const {
         schedule1,
         schedule2,
@@ -52,6 +245,14 @@ export const ExportPage = () => {
     const [publicScheduleUrl, setPublicScheduleUrl] = useState('');
     const [, setPublicScheduleId] = useState('');
 
+    // Lazy-load QRCode component for publish modal (reduces main chunk size)
+    const [QRCodeComponent, setQRCodeComponent] = useState<React.ComponentType<any> | null>(null);
+    useEffect(() => {
+        if (isPublishModalOpen && publicScheduleUrl && !QRCodeComponent) {
+            import('qrcode.react').then((mod) => setQRCodeComponent(() => mod.QRCodeSVG));
+        }
+    }, [isPublishModalOpen, publicScheduleUrl, QRCodeComponent]);
+
     // Matrix Print State
     const [isMatrixPrintOpen, setIsMatrixPrintOpen] = useState(false);
     const [matrixGrade, setMatrixGrade] = useState<string>('');
@@ -73,7 +274,8 @@ export const ExportPage = () => {
             dutyZones,
             dutySchedule,
             nutritionRecords,
-            absenteeismRecords
+            absenteeismRecords,
+            privateSettings
         }),
         [
             subjects,
@@ -88,7 +290,8 @@ export const ExportPage = () => {
             dutyZones,
             dutySchedule,
             nutritionRecords,
-            absenteeismRecords
+            absenteeismRecords,
+            privateSettings
         ]
     );
 
@@ -96,10 +299,10 @@ export const ExportPage = () => {
     const getScheduleForExport = () => (exportSemester === 2 ? schedule2 : schedule1);
 
     // Получаем расписание для PNG (Замены) на основе выбранной даты
-    const getScheduleForDate = (date: string) => {
+    const getScheduleForDate = useCallback((date: string) => {
         const month = new Date(date).getMonth();
         return month >= 0 && month <= 4 ? schedule2 : schedule1;
-    };
+    }, [schedule1, schedule2]);
 
     // Extract available grades (parallels)
     const availableGrades = useMemo<string[]>(() => {
@@ -115,7 +318,36 @@ export const ExportPage = () => {
         if (availableGrades.length > 0 && !matrixGrade) {
             setMatrixGrade(availableGrades[0]);
         }
-    }, [availableGrades]);
+    }, [availableGrades, matrixGrade]);
+
+    // --- Простая runtime-валидация импорта ---
+    const validateImportData = (data: unknown): string[] => {
+        const errors: string[] = [];
+        if (!data || typeof data !== 'object') {
+            errors.push('Файл не содержит JSON-объект');
+            return errors;
+        }
+        const d = data as Record<string, unknown>;
+
+        if (!Array.isArray(d.teachers)) errors.push('Отсутствует или неверный массив teachers');
+        else if (d.teachers.length > 0 && (!d.teachers[0] || typeof (d.teachers[0] as Record<string, unknown>).id !== 'string'))
+            errors.push('Массив teachers имеет неверную структуру');
+
+        if (!Array.isArray(d.schedule) && !Array.isArray(d.schedule2))
+            errors.push('Отсутствуют оба массива schedule и schedule2');
+
+        if (d.subjects !== undefined && !Array.isArray(d.subjects))
+            errors.push('Поле subjects должно быть массивом');
+        if (d.classes !== undefined && !Array.isArray(d.classes))
+            errors.push('Поле classes должно быть массивом');
+        if (d.rooms !== undefined && !Array.isArray(d.rooms)) errors.push('Поле rooms должно быть массивом');
+        if (d.substitutions !== undefined && !Array.isArray(d.substitutions))
+            errors.push('Поле substitutions должно быть массивом');
+        if (d.settings !== undefined && typeof d.settings !== 'object')
+            errors.push('Поле settings должно быть объектом');
+
+        return errors;
+    };
 
     const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -124,25 +356,32 @@ export const ExportPage = () => {
         reader.onload = async (ev: ProgressEvent<FileReader>) => {
             try {
                 const json = JSON.parse(ev.target?.result as string);
-                if (json.teachers && (json.schedule || json.schedule2)) {
-                    if (window.confirm('Это перезапишет текущую базу данных. Продолжить?')) {
-                        const mergedData = {
-                            ...INITIAL_DATA,
-                            ...json,
-                            rooms: json.rooms || INITIAL_DATA.rooms,
-                            classes: json.classes || [],
-                            schedule: json.schedule || [],
-                            schedule2: json.schedule2 || [],
-                            teachers: json.teachers || [],
-                            subjects: json.subjects || [],
-                            substitutions: json.substitutions || [],
-                            settings: { ...INITIAL_DATA.settings, ...json.settings }
-                        };
-                        await saveStaticData(mergedData as any);
-                        await saveScheduleData(mergedData as any);
-                        addToast({ type: 'success', title: 'Успешно', message: 'База успешно восстановлена!' });
-                    }
-                } else addToast({ type: 'danger', title: 'Ошибка', message: 'Неверный формат файла.' });
+                const validationErrors = validateImportData(json);
+                if (validationErrors.length > 0) {
+                    addToast({
+                        type: 'danger',
+                        title: 'Неверный формат файла',
+                        message: validationErrors.join('\n')
+                    });
+                    return;
+                }
+                if (window.confirm('Это перезапишет текущую базу данных. Продолжить?')) {
+                    const mergedData = {
+                        ...INITIAL_DATA,
+                        ...json,
+                        rooms: json.rooms || INITIAL_DATA.rooms,
+                        classes: json.classes || [],
+                        schedule: json.schedule || [],
+                        schedule2: json.schedule2 || [],
+                        teachers: json.teachers || [],
+                        subjects: json.subjects || [],
+                        substitutions: json.substitutions || [],
+                        settings: { ...INITIAL_DATA.settings, ...json.settings }
+                    };
+                    await saveStaticData(mergedData as any);
+                    await saveScheduleData(mergedData as any);
+                    addToast({ type: 'success', title: 'Успешно', message: 'База успешно восстановлена!' });
+                }
             } catch (err) {
                 addToast({ type: 'danger', title: 'Ошибка', message: 'Ошибка чтения файла.' });
             }
@@ -174,9 +413,9 @@ export const ExportPage = () => {
                         );
                         content += `<td style="height: 60px;">`;
                         items.forEach((item) => {
-                            const sub = subjects.find((s) => s.id === item.subjectId);
-                            const teach = teachers.find((t) => t.id === item.teacherId);
-                            const room = rooms.find((r) => r.id === item.roomId);
+                            const sub = subjectsById.get(item.subjectId);
+                            const teach = teachersById.get(item.teacherId);
+                            const room = roomsById.get(item.roomId || '');
                             const roomName = room ? room.name : item.roomId;
                             content += `<div style="background-color: ${sub?.color || '#fff'}; padding: 2px; margin-bottom: 2px; border: 1px solid #eee;">
                                 <div class="subject">${sub?.name || ''} ${item.direction || ''}</div>
@@ -310,8 +549,8 @@ export const ExportPage = () => {
                             );
 
                             if (item) {
-                                const cls = classes.find((c) => c.id === item.classId);
-                                const r = rooms.find((rm) => rm.id === item.roomId);
+                                const cls = classesById.get(item.classId);
+                                const r = roomsById.get(item.roomId || '');
                                 const roomName = r ? r.name : item.roomId;
                                 const room = roomName ? `<sub>${roomName}</sub>` : '';
                                 const dir = item.direction
@@ -671,9 +910,7 @@ export const ExportPage = () => {
         groupedSubs.forEach((subsGroup) => {
             const firstSub = subsGroup[0];
             // Ищем урок в обоих расписаниях
-            const scheduleItem =
-                schedule1.find((s) => s.id === firstSub.scheduleItemId) ||
-                schedule2.find((s) => s.id === firstSub.scheduleItemId);
+            const scheduleItem = getScheduleItemById(firstSub.scheduleItemId);
             if (!scheduleItem) return;
 
             const cls = classes.find((c) => c.id === scheduleItem.classId);
@@ -931,9 +1168,7 @@ export const ExportPage = () => {
         `;
 
         refusalsData.forEach((sub) => {
-            const scheduleItem =
-                schedule1.find((s) => s.id === sub.scheduleItemId) ||
-                schedule2.find((s) => s.id === sub.scheduleItemId);
+            const scheduleItem = getScheduleItemById(sub.scheduleItemId);
             if (!scheduleItem) return;
 
             const dateStr = new Date(sub.date).toLocaleDateString('ru-RU');
@@ -1019,6 +1254,7 @@ export const ExportPage = () => {
                 return;
             }
 
+            const { default: html2canvas } = await import('html2canvas');
             const canvas1 = await html2canvas(printRef1.current, {
                 scale: 2,
                 backgroundColor: '#ffffff',
@@ -1046,6 +1282,7 @@ export const ExportPage = () => {
                 return;
             }
 
+            const { default: html2canvas } = await import('html2canvas');
             const canvas2 = await html2canvas(printRef2.current, {
                 scale: 2,
                 backgroundColor: '#ffffff',
@@ -1149,16 +1386,16 @@ export const ExportPage = () => {
                         {uniqueLessonIds.map((lessonId) => {
                             const lessonSubs = shiftSubs.filter((s) => s.scheduleItemId === lessonId);
                             const sub = lessonSubs[0];
-                            const s = currentSchedule.find((x) => x.id === lessonId);
+                            const s = getScheduleItemById(lessonId);
                             if (!s) return null;
-                            const cls = classes.find((c) => c.id === s.classId);
-                            const subj = subjects.find((x) => x.id === s.subjectId);
-                            const t1 = teachers.find((t) => t.id === sub.originalTeacherId);
+                            const cls = classesById.get(s.classId);
+                            const subj = subjectsById.get(s.subjectId);
+                            const t1 = teachersById.get(sub.originalTeacherId);
 
                             const newRoomId = sub.replacementRoomId;
-                            const oldRoomObj = s.roomId ? rooms.find((r) => r.id === s.roomId) : null;
+                            const oldRoomObj = s.roomId ? roomsById.get(s.roomId) : null;
                             const oldRoomName = oldRoomObj ? oldRoomObj.name : s.roomId || '—';
-                            const newRoomObj = newRoomId ? rooms.find((r) => r.id === newRoomId) : null;
+                            const newRoomObj = newRoomId ? roomsById.get(newRoomId) : null;
                             const newRoomName = newRoomObj ? newRoomObj.name : newRoomId || '—';
 
                             const isCancelled = sub.replacementTeacherId === 'cancelled';
@@ -1173,10 +1410,10 @@ export const ExportPage = () => {
                                       : '';
 
                             const swappedClass = sub.replacementClassId
-                                ? classes.find((c) => c.id === sub.replacementClassId)
+                                ? classesById.get(sub.replacementClassId)
                                 : null;
                             const swappedSubj = sub.replacementSubjectId
-                                ? subjects.find((s) => s.id === sub.replacementSubjectId)
+                                ? subjectsById.get(sub.replacementSubjectId)
                                 : null;
 
                             const isRoomChangeOnly =
@@ -1242,9 +1479,7 @@ export const ExportPage = () => {
                                                         <span className="text-slate-800 text-xs">
                                                             {lessonSubs
                                                                 .map((ls) => {
-                                                                    const tr = teachers.find(
-                                                                        (x) => x.id === ls.replacementTeacherId
-                                                                    );
+                                                                    const tr = teachersById.get(ls.replacementTeacherId);
                                                                     return tr ? tr.name : 'Неизвестно';
                                                                 })
                                                                 .join(', ')}
@@ -1252,13 +1487,13 @@ export const ExportPage = () => {
                                                         <span className="text-[9px] font-black text-purple-600 uppercase tracking-widest mt-0.5">
                                                             ОБЪЕДИНЕНИЕ{' '}
                                                             {sub.replacementClassId
-                                                                ? `(${classes.find((c) => c.id === sub.replacementClassId)?.name})`
+                                                                ? `(${classesById.get(sub.replacementClassId)?.name})`
                                                                 : ''}
                                                         </span>
                                                     </>
                                                 ) : (
                                                     <span>
-                                                        {teachers.find((t) => t.id === sub.replacementTeacherId)?.name}
+                                                        {teachersById.get(sub.replacementTeacherId)?.name}
                                                     </span>
                                                 )}
                                             </div>
@@ -1323,194 +1558,47 @@ export const ExportPage = () => {
         setPublicScheduleId('');
     };
 
-    const ReportHeader = () => (
-        <div className="border-b-2 border-slate-800 pb-4 mb-6">
-            <div className="flex justify-between items-end gap-4">
-                <div>
-                    <h1 className="text-3xl font-black uppercase tracking-tight mb-1 text-slate-800">
-                        Замена Учителей
-                    </h1>
-                    <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">
-                        Гимназия №22 • Официальный документ
-                    </p>
-                </div>
-                <div className="text-right">
-                    <div className="text-xs text-slate-400 uppercase font-bold tracking-wider mb-1">Дата</div>
-                    <div className="text-xl font-bold text-slate-800">
-                        {new Date(exportDate).toLocaleDateString('ru-RU', {
-                            day: 'numeric',
-                            month: 'long',
-                            year: 'numeric'
-                        })}
-                    </div>
-                </div>
-            </div>
-            {dayComment && <div className="mt-3 text-xs text-slate-600 max-w-3xl">{dayComment}</div>}
-        </div>
+    // --- Оптимизированные Map'ы для O(1) доступа ---
+    const schedule1ById = useMemo(() => {
+        const map = new Map<string, ScheduleItem>();
+        schedule1.forEach((s) => map.set(s.id, s));
+        return map;
+    }, [schedule1]);
+
+    const schedule2ById = useMemo(() => {
+        const map = new Map<string, ScheduleItem>();
+        schedule2.forEach((s) => map.set(s.id, s));
+        return map;
+    }, [schedule2]);
+
+    const getScheduleItemById = useCallback(
+        (id: string) => schedule1ById.get(id) || schedule2ById.get(id),
+        [schedule1ById, schedule2ById]
     );
 
-    const ReportFooter = () => (
-        <div className="mt-8 pt-4 border-t border-slate-100 flex justify-between items-end text-[10px] text-slate-400">
-            <div>Сформировано автоматически</div>
-            <div className="flex flex-col items-end gap-2">
-                <div className="h-px w-32 bg-slate-300"></div>
-                <div>Подпись администрации</div>
-            </div>
-        </div>
-    );
+    const subjectsById = useMemo(() => {
+        const map = new Map<string, Subject>();
+        subjects.forEach((s) => map.set(s.id, s));
+        return map;
+    }, [subjects]);
 
-    // --- Matrix Print Content Component ---
-    const MatrixPrintContent = () => {
-        const currentSchedule = getScheduleForExport();
-        const targetClasses = classes
-            .filter((c) => c.name.startsWith(matrixGrade))
-            .sort((a, b) => a.name.localeCompare(b.name));
-        const shifts = (Array.from(new Set(targetClasses.map((c) => c.shift))) as string[]).sort();
+    const teachersById = useMemo(() => {
+        const map = new Map<string, Teacher>();
+        teachers.forEach((t) => map.set(t.id, t));
+        return map;
+    }, [teachers]);
 
-        // New distinct colors for each day rows matching the Excel export colors
-        const dayStyles: Record<string, { label: string; cell: string }> = {
-            [DayOfWeek.Monday]: { label: 'bg-red-200', cell: 'bg-red-100' },
-            [DayOfWeek.Tuesday]: { label: 'bg-orange-200', cell: 'bg-orange-100' },
-            [DayOfWeek.Wednesday]: { label: 'bg-yellow-200', cell: 'bg-yellow-100' },
-            [DayOfWeek.Thursday]: { label: 'bg-green-200', cell: 'bg-green-100' },
-            [DayOfWeek.Friday]: { label: 'bg-blue-200', cell: 'bg-blue-100' }
-        };
+    const classesById = useMemo(() => {
+        const map = new Map<string, ClassEntity>();
+        classes.forEach((c) => map.set(c.id, c));
+        return map;
+    }, [classes]);
 
-        if (targetClasses.length === 0)
-            return <div className="text-center p-10">Нет классов для выбранной параллели</div>;
-
-        return (
-            <div className="font-sans text-black">
-                {shifts.map((shift: string) => {
-                    const shiftClasses = targetClasses.filter((c) => c.shift === shift);
-                    const periods = SHIFT_PERIODS[shift as Shift];
-                    if (shiftClasses.length === 0) return null;
-
-                    return (
-                        <div key={String(shift)} className="mb-10 page-break-inside-avoid">
-                            <table className="w-full border-collapse border-2 border-black text-center text-sm">
-                                <thead>
-                                    <tr>
-                                        <th className="border-2 border-black w-8"></th>
-                                        <th className="border-2 border-black w-8"></th>
-                                        <th
-                                            colSpan={shiftClasses.length}
-                                            className="border-2 border-black py-2 text-xl uppercase font-black tracking-widest bg-white"
-                                        >
-                                            {shift}
-                                        </th>
-                                    </tr>
-                                    <tr>
-                                        <th className="border-2 border-black w-8"></th>
-                                        <th className="border-2 border-black w-8"></th>
-                                        {shiftClasses.map((c) => (
-                                            <th
-                                                key={String(c.id)}
-                                                className="border-2 border-black py-2 font-bold text-lg bg-white w-32"
-                                            >
-                                                {c.name}
-                                            </th>
-                                        ))}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {DAYS.map((day: string) => {
-                                        const styles = dayStyles[day] || { label: 'bg-gray-200', cell: 'bg-gray-100' };
-                                        return (
-                                            <React.Fragment key={String(day)}>
-                                                {periods.map((period, pIndex) => (
-                                                    <tr key={`${String(day)}-${period}`}>
-                                                        {/* Day Name Merged Cell */}
-                                                        {pIndex === 0 && (
-                                                            <td
-                                                                rowSpan={periods.length}
-                                                                className={`border-2 border-black font-bold uppercase text-xs writing-vertical-lr rotate-180 p-1 ${styles.label}`}
-                                                                style={{
-                                                                    writingMode: 'vertical-lr',
-                                                                    transform: 'rotate(180deg)'
-                                                                }}
-                                                            >
-                                                                {day === DayOfWeek.Monday
-                                                                    ? 'ПОНЕДЕЛЬНИК'
-                                                                    : day === DayOfWeek.Tuesday
-                                                                      ? 'ВТОРНИК'
-                                                                      : day === DayOfWeek.Wednesday
-                                                                        ? 'СРЕДА'
-                                                                        : day === DayOfWeek.Thursday
-                                                                          ? 'ЧЕТВЕРГ'
-                                                                          : day === DayOfWeek.Friday
-                                                                            ? 'ПЯТНИЦА'
-                                                                            : day}
-                                                            </td>
-                                                        )}
-
-                                                        {/* Period Number */}
-                                                        <td
-                                                            className={`border-2 border-black font-bold text-base ${styles.label}`}
-                                                        >
-                                                            {period}
-                                                        </td>
-
-                                                        {/* Classes Cells */}
-                                                        {shiftClasses.map((cls) => {
-                                                            const lessons = currentSchedule.filter(
-                                                                (s) =>
-                                                                    s.classId === cls.id &&
-                                                                    s.day === day &&
-                                                                    s.shift === shift &&
-                                                                    s.period === period
-                                                            );
-
-                                                            return (
-                                                                <td
-                                                                    key={String(cls.id)}
-                                                                    className={`border-2 border-black p-1 h-12 ${styles.cell}`}
-                                                                >
-                                                                    {lessons.map((lesson) => {
-                                                                        const subj = subjects.find(
-                                                                            (s) => s.id === lesson.subjectId
-                                                                        );
-                                                                        const room = rooms.find(
-                                                                            (r) => r.id === lesson.roomId
-                                                                        );
-                                                                        const roomName = room
-                                                                            ? room.name
-                                                                            : lesson.roomId || '';
-
-                                                                        return (
-                                                                            <div
-                                                                                key={String(lesson.id)}
-                                                                                className="flex justify-center items-center gap-1 leading-tight text-sm font-bold"
-                                                                            >
-                                                                                <span>{subj?.name}</span>
-                                                                                {roomName && (
-                                                                                    <span className="font-black">
-                                                                                        {roomName}
-                                                                                    </span>
-                                                                                )}
-                                                                            </div>
-                                                                        );
-                                                                    })}
-                                                                </td>
-                                                            );
-                                                        })}
-                                                    </tr>
-                                                ))}
-                                                {/* Thick separator row between days */}
-                                                <tr className="h-1 bg-black border-2 border-black">
-                                                    <td colSpan={2 + shiftClasses.length}></td>
-                                                </tr>
-                                            </React.Fragment>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-                    );
-                })}
-            </div>
-        );
-    };
+    const roomsById = useMemo(() => {
+        const map = new Map<string, Room>();
+        rooms.forEach((r) => map.set(r.id, r));
+        return map;
+    }, [rooms]);
 
     return (
         <div className="max-w-5xl mx-auto space-y-8 pb-20">
@@ -1643,7 +1731,7 @@ export const ExportPage = () => {
                         <div className="overflow-auto bg-slate-100 dark:bg-slate-900 p-8 rounded-xl border border-slate-200 dark:border-slate-700 flex justify-start">
                             {subsForDate.length === 0 ? (
                                 <div className="bg-white p-8 min-w-[800px] max-w-[1000px] shadow-xl text-slate-900">
-                                    <ReportHeader />
+                                    <ReportHeader exportDate={exportDate} dayComment={dayComment} />
                                     <div className="py-12 text-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50">
                                         <p className="text-slate-400 font-medium italic">Замен на этот день нет</p>
                                     </div>
@@ -1656,7 +1744,7 @@ export const ExportPage = () => {
                                             ref={printRef1}
                                             className="bg-white p-8 min-w-[800px] max-w-[1000px] shadow-xl text-slate-900"
                                         >
-                                            <ReportHeader />
+                                            <ReportHeader exportDate={exportDate} dayComment={dayComment} />
                                             {renderTableForShift(Shift.First)}
                                             <ReportFooter />
                                         </div>
@@ -1666,7 +1754,7 @@ export const ExportPage = () => {
                                             ref={printRef2}
                                             className="bg-white p-8 min-w-[800px] max-w-[1000px] shadow-xl text-slate-900"
                                         >
-                                            <ReportHeader />
+                                            <ReportHeader exportDate={exportDate} dayComment={dayComment} />
                                             {renderTableForShift(Shift.Second)}
                                             <ReportFooter />
                                         </div>
@@ -1834,9 +1922,9 @@ export const ExportPage = () => {
                     <p className="text-sm text-slate-600 dark:text-slate-300">
                         Отсканируйте QR-код или перейдите по ссылке, чтобы увидеть публичное расписание.
                     </p>
-                    {publicScheduleUrl && (
+                    {publicScheduleUrl && QRCodeComponent && (
                         <>
-                            <QRCodeSVG
+                            <QRCodeComponent
                                 value={publicScheduleUrl}
                                 size={256}
                                 level="H"
@@ -1884,7 +1972,7 @@ export const ExportPage = () => {
                     </div>
                     {/* Printable Area */}
                     <div className="flex-1 overflow-auto p-8 custom-scrollbar bg-white">
-                        <MatrixPrintContent />
+                        <MatrixPrintContent classes={classes} matrixGrade={matrixGrade} currentSchedule={getScheduleForExport()} subjects={subjects} rooms={rooms} />
                     </div>
                 </div>
             )}

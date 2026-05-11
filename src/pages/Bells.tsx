@@ -6,8 +6,7 @@ import { Shift, SHIFT_PERIODS, Bell } from '../types';
 import { exportService } from '../services/exportService';
 import { DEFAULT_BELLS } from '../constants';
 import { generateId } from '../utils/helpers';
-import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
+
 
 // Helper functions for time manipulation
 const timeToMin = (t: string) => {
@@ -426,7 +425,6 @@ export const BellsPage = () => {
     };
 
     const getExportContent = () => {
-        const presetName = escapeHtml(settings.bellPresets?.find((p) => p.id === selectedPresetId)?.name || 'Обычный');
         const safeExportDate = exportDate ? escapeHtml(new Date(exportDate).toLocaleDateString('ru-RU')) : '';
 
         return `
@@ -511,6 +509,7 @@ export const BellsPage = () => {
 
     const exportBellsToPng = async () => {
         if (!exportRef.current) return;
+        const { default: html2canvas } = await import('html2canvas');
         const canvas = await html2canvas(exportRef.current, { scale: 2, backgroundColor: '#ffffff' });
         const link = document.createElement('a');
         link.href = canvas.toDataURL('image/png');
@@ -521,6 +520,10 @@ export const BellsPage = () => {
 
     const exportBellsToPdf = async () => {
         if (!exportRef.current) return;
+        const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+            import('html2canvas'),
+            import('jspdf')
+        ]);
         const canvas = await html2canvas(exportRef.current, { scale: 2, backgroundColor: '#ffffff' });
         const imgData = canvas.toDataURL('image/png');
         const pdf = new jsPDF('p', 'mm', 'a4');
@@ -555,7 +558,7 @@ export const BellsPage = () => {
             SHIFT_PERIODS[shift].forEach((period, index) => {
                 const bell =
                     currentPresetBells.find((b) => b.shift === shift && b.period === period && b.day === 'default') ||
-                    ({ start: '00:00', end: '00:00', cancelled: false } as BellItem);
+                    ({ start: '00:00', end: '00:00', cancelled: false } as Bell);
 
                 content += `
                     <tr>

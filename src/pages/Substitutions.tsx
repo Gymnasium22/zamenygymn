@@ -179,7 +179,7 @@ export const SubstitutionsPage = () => {
 
         return () => window.clearTimeout(timer);
          
-    }, [dayComment, selectedDate]);
+    }, [dayComment, selectedDate, saveStaticData, settings]);
 
     const selectedDayOfWeek = useMemo(() => {
         const idx = new Date(selectedDate).getDay();
@@ -273,8 +273,7 @@ export const SubstitutionsPage = () => {
         if (!teacher.unavailableDates.includes(selectedDate)) {
             teacher.unavailableDates = [...teacher.unavailableDates, selectedDate];
         }
-        if (!teacher.absenceReasons) teacher.absenceReasons = {};
-        teacher.absenceReasons[selectedDate] = absenceReason;
+        teacher.absenceReasons = { ...teacher.absenceReasons, [selectedDate]: absenceReason };
 
         updatedTeachers[tIndex] = teacher;
         await saveStaticData({ teachers: updatedTeachers });
@@ -295,8 +294,7 @@ export const SubstitutionsPage = () => {
             if (!teacher.unavailableDates.includes(selectedDate)) {
                 teacher.unavailableDates = [...teacher.unavailableDates, selectedDate];
             }
-            if (!teacher.absenceReasons) teacher.absenceReasons = {};
-            teacher.absenceReasons[selectedDate] = batchAbsenceReason;
+            teacher.absenceReasons = { ...teacher.absenceReasons, [selectedDate]: batchAbsenceReason };
             updatedTeachers[tIndex] = teacher;
             await saveStaticData({ teachers: updatedTeachers });
         }
@@ -351,7 +349,10 @@ export const SubstitutionsPage = () => {
 
             const teacher = { ...updatedTeachers[tIndex] };
             teacher.unavailableDates = teacher.unavailableDates.filter((d: string) => d !== selectedDate);
-            if (teacher.absenceReasons) delete teacher.absenceReasons[selectedDate];
+            if (teacher.absenceReasons) {
+                const { [selectedDate]: _, ...rest } = teacher.absenceReasons;
+                teacher.absenceReasons = rest;
+            }
             updatedTeachers[tIndex] = teacher;
             await saveStaticData({ teachers: updatedTeachers });
         },
@@ -422,12 +423,12 @@ export const SubstitutionsPage = () => {
             selectedRoomId,
             activeSchedule,
             substitutions,
-            teachers,
             lessonAbsenceReason,
             refusedTeacherIds,
             substitutionComment,
             dayComment,
-            saveScheduleData
+            saveScheduleData,
+            addToast
         ]
     );
 
@@ -493,7 +494,9 @@ export const SubstitutionsPage = () => {
             activeSchedule,
             substitutions,
             lessonAbsenceReason,
-            saveScheduleData
+            saveScheduleData,
+            addToast,
+            dayComment
         ]
     );
 
@@ -576,7 +579,8 @@ export const SubstitutionsPage = () => {
             saveScheduleData,
             selectedRoomId,
             swapKeepRooms,
-            dayComment
+            dayComment,
+            addToast
         ]
     );
 
@@ -994,8 +998,8 @@ export const SubstitutionsPage = () => {
         const foundClasses = classes.filter((c) => c.name.toLowerCase().includes(searchLower));
         interface ManualSearchResult extends ScheduleItem {
             entityName: string;
-            subInfo?: string;
-            subjectName?: string;
+            subInfo: string;
+            subjectName: string;
         }
         const results: ManualSearchResult[] = [];
         foundTeachers.forEach((t) => {
@@ -1003,7 +1007,7 @@ export const SubstitutionsPage = () => {
             lessons.forEach((l) => {
                 const c = classes.find((cls) => cls.id === l.classId);
                 const subj = subjects.find((s) => s.id === l.subjectId);
-                results.push({ ...l, entityName: t.name, subInfo: c?.name, subjectName: subj?.name });
+                results.push({ ...l, entityName: t.name, subInfo: c?.name || '', subjectName: subj?.name || '' });
             });
         });
         foundClasses.forEach((c) => {
@@ -1012,7 +1016,7 @@ export const SubstitutionsPage = () => {
                 if (results.find((r) => r.id === l.id)) return;
                 const t = teachers.find((tch) => tch.id === l.teacherId);
                 const subj = subjects.find((s) => s.id === l.subjectId);
-                results.push({ ...l, entityName: c.name, subInfo: t?.name, subjectName: subj?.name });
+                results.push({ ...l, entityName: c.name, subInfo: t?.name || '', subjectName: subj?.name || '' });
             });
         });
         return results.sort((a, b) => a.period - b.period);
