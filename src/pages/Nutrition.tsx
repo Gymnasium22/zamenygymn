@@ -82,7 +82,7 @@ export const NutritionPage = () => {
                 total: acc.total + day.total,
                 benefit: acc.benefit + day.benefit,
                 regular: acc.regular + day.regular,
-                classCount: Math.max(acc.classCount, day.classCount)
+                classCount: acc.classCount + day.classCount
             }),
             { total: 0, benefit: 0, regular: 0, classCount: 0 }
         );

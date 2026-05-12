@@ -75,7 +75,7 @@ export const AdminPage = () => {
             );
             setAnnouncement(settings.adminAnnouncement || { message: '', active: false, lastUpdated: '' });
         }
-    }, [settings]);
+    }, [settings, privateSettings]);
 
     useEffect(() => {
         setAfterPeriod(teacherShift === Shift.First ? 1 : 0);

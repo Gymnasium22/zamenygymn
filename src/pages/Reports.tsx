@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useStaticData, useScheduleData } from '../context/DataContext';
 import { Icon } from '../components/Icons';
 import { exportService } from '../services/exportService';
@@ -23,7 +23,13 @@ export const ReportsPage = () => {
     const { schedule1, schedule2, substitutions } = useScheduleData();
 
     const [reportTab, setReportTab] = useState('load');
-    const [selectedClassId, setSelectedClassId] = useState(classes[0]?.id || '');
+    const [selectedClassId, setSelectedClassId] = useState(() => classes[0]?.id || '');
+
+    useEffect(() => {
+        if (classes.length > 0 && !selectedClassId) {
+            setSelectedClassId(classes[0].id);
+        }
+    }, [classes, selectedClassId]);
 
     // Состояние для выбора полугодия (по умолчанию текущее)
     const [selectedSemester, setSelectedSemester] = useState<1 | 2>(() => {
@@ -48,7 +54,9 @@ export const ReportsPage = () => {
                 const weeklyHours = weeklyLessons.length;
                 const monthlyPlan = weeklyHours * weeks;
                 const subsTaken = substitutions.filter((s) => s.replacementTeacherId === t.id).length;
-                const subsMissed = substitutions.filter((s) => s.originalTeacherId === t.id).length;
+                const subsMissed = substitutions.filter(
+                    (s) => s.originalTeacherId === t.id && s.replacementTeacherId !== 'conducted'
+                ).length;
                 const actualHours = monthlyPlan + subsTaken - subsMissed;
                 const subjectBreakdown: Record<string, number> = {};
                 weeklyLessons.forEach((s) => {

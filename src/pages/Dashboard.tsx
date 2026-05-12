@@ -51,13 +51,13 @@ const DEFAULT_WIDGETS: WidgetConfig[] = [
 ];
 
 const WeatherWidget = () => {
-    const { settings } = useStaticData();
+    const { settings, privateSettings } = useStaticData();
     const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
     const [forecastData, setForecastData] = useState<ForecastItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    const apiKey = settings.weatherApiKey;
+    const apiKey = privateSettings.weatherApiKey;
     const city = settings.weatherCity || 'Minsk,BY';
 
     useEffect(() => {
@@ -144,7 +144,7 @@ const WeatherWidget = () => {
 };
 
 export const DashboardPage = () => {
-    const { subjects, teachers, classes, rooms, bellSchedule, settings } = useStaticData();
+    const { subjects, teachers, classes, rooms, bellSchedule, settings, privateSettings } = useStaticData();
     const { schedule, substitutions } = useScheduleData();
     const { role } = useAuth();
     const navigate = useNavigate();
@@ -620,7 +620,7 @@ export const DashboardPage = () => {
             addToast({ type: 'warning', title: 'Внимание', message: 'Пожалуйста, введите ваше сообщение.' });
             return;
         }
-        if (!settings?.telegramToken || !settings?.feedbackChatId) {
+        if (!privateSettings?.telegramToken || !settings?.feedbackChatId) {
             addToast({
                 type: 'warning',
                 title: 'Внимание',
@@ -631,7 +631,7 @@ export const DashboardPage = () => {
         setIsSendingFeedback(true);
         const text = `📬 *Новое сообщение обратной связи:*\n\n${feedbackMessage}`;
         try {
-            const response = await fetch(`https://api.telegram.org/bot${settings.telegramToken}/sendMessage`, {
+            const response = await fetch(`https://api.telegram.org/bot${privateSettings.telegramToken}/sendMessage`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ chat_id: settings.feedbackChatId, text: text, parse_mode: 'Markdown' })

@@ -21,6 +21,16 @@ import { exportService } from '../services/exportService';
 import { Modal, useToast } from '../components/UI';
 import { SanitaryScheduleTab } from '../components/SanitaryScheduleTab';
 
+// --- Хелперы ---
+
+const escapeHtml = (unsafe: string): string =>
+    unsafe
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+
 // --- Вынесенные компоненты печати (не пересоздаются на каждый рендер) ---
 
 interface ReportHeaderProps {
@@ -275,7 +285,7 @@ export const ExportPage = () => {
             dutySchedule,
             nutritionRecords,
             absenteeismRecords,
-            privateSettings
+            privateSettings,
         }),
         [
             subjects,
@@ -291,7 +301,7 @@ export const ExportPage = () => {
             dutySchedule,
             nutritionRecords,
             absenteeismRecords,
-            privateSettings
+            privateSettings,
         ]
     );
 
@@ -299,7 +309,7 @@ export const ExportPage = () => {
     const getScheduleForExport = () => (exportSemester === 2 ? schedule2 : schedule1);
 
     // Получаем расписание для PNG (Замены) на основе выбранной даты
-    const getScheduleForDate = useCallback((date: string) => {
+    const resolveScheduleByDate = useCallback((date: string) => {
         const month = new Date(date).getMonth();
         return month >= 0 && month <= 4 ? schedule2 : schedule1;
     }, [schedule1, schedule2]);
@@ -406,7 +416,7 @@ export const ExportPage = () => {
                 content += `</tr>`;
 
                 filteredClasses.forEach((c) => {
-                    content += `<tr><td class="class-cell">${c.name}</td>`;
+                    content += `<tr><td class="class-cell">${escapeHtml(c.name)}</td>`;
                     SHIFT_PERIODS[shift].forEach((p) => {
                         const items = currentSchedule.filter(
                             (s) => s.classId === c.id && s.day === day && s.shift === shift && s.period === p
@@ -418,8 +428,8 @@ export const ExportPage = () => {
                             const room = roomsById.get(item.roomId || '');
                             const roomName = room ? room.name : item.roomId;
                             content += `<div style="background-color: ${sub?.color || '#fff'}; padding: 2px; margin-bottom: 2px; border: 1px solid #eee;">
-                                <div class="subject">${sub?.name || ''} ${item.direction || ''}</div>
-                                <div class="meta">${teach?.name || ''} ${roomName ? `(Каб. ${roomName})` : ''}</div>
+                                <div class="subject">${escapeHtml(sub?.name || '')} ${escapeHtml(item.direction || '')}</div>
+                                <div class="meta">${escapeHtml(teach?.name || '')} ${roomName ? `(Каб. ${escapeHtml(roomName)})` : ''}</div>
                             </div>`;
                         });
                         content += `</td>`;
@@ -464,14 +474,14 @@ export const ExportPage = () => {
                     <td colspan="10" class="doc-right">УТВЕРЖДАЮ</td>
                 </tr>
                 <tr>
-                    <td colspan="10" class="doc-left">Председатель ПК ${settings?.schoolName || 'ГУО "Гимназия №22 г.Минска"'}</td>
+                    <td colspan="10" class="doc-left">Председатель ПК ${escapeHtml(settings?.schoolName || 'ГУО "Гимназия №22 г.Минска"')}</td>
                     <td colspan="17"></td>
-                    <td colspan="10" class="doc-right">Директор ${settings?.schoolName || 'ГУО "Гимназия №22 г.Минска"'}</td>
+                    <td colspan="10" class="doc-right">Директор ${escapeHtml(settings?.schoolName || 'ГУО "Гимназия №22 г.Минска"')}</td>
                 </tr>
                 <tr>
-                    <td colspan="10" class="doc-left">____________________ ${settings?.unionChairName || 'Ю.Г.Миханова'}</td>
+                    <td colspan="10" class="doc-left">____________________ ${escapeHtml(settings?.unionChairName || 'Ю.Г.Миханова')}</td>
                     <td colspan="17"></td>
-                    <td colspan="10" class="doc-right">____________________ ${settings?.directorName || 'Н.В.Кисель'}</td>
+                    <td colspan="10" class="doc-right">____________________ ${escapeHtml(settings?.directorName || 'Н.В.Кисель')}</td>
                 </tr>
                 <tr>
                     <td colspan="10" class="doc-left">"__"_ __________ ${settings?.currentYear || new Date().getFullYear()}г.</td>
@@ -532,9 +542,9 @@ export const ExportPage = () => {
                 filteredTeachers.forEach((teacher, tIndex) => {
                     content += `<tr>`;
                     if (tIndex === 0) {
-                        content += `<td rowspan="${filteredTeachers.length}" class="subject-cell" style="border: 2px solid #000; background-color: #e9d5ff;">${subject.name}</td>`;
+                        content += `<td rowspan="${filteredTeachers.length}" class="subject-cell" style="border: 2px solid #000; background-color: #e9d5ff;">${escapeHtml(subject.name)}</td>`;
                     }
-                    content += `<td class="teacher-cell" style="border-right: 2px solid #000; background-color: #e9d5ff;">${teacher.name}</td>`;
+                    content += `<td class="teacher-cell" style="border-right: 2px solid #000; background-color: #e9d5ff;">${escapeHtml(teacher.name)}</td>`;
 
                     DAYS.forEach((day) => {
                         const cellBg = dayColors[day]?.cell || '#fff';
@@ -552,13 +562,13 @@ export const ExportPage = () => {
                                 const cls = classesById.get(item.classId);
                                 const r = roomsById.get(item.roomId || '');
                                 const roomName = r ? r.name : item.roomId;
-                                const room = roomName ? `<sub>${roomName}</sub>` : '';
+                                const room = roomName ? `<sub>${escapeHtml(roomName)}</sub>` : '';
                                 const dir = item.direction
-                                    ? ` <span style="font-size:10px">(${item.direction})</span>`
+                                    ? ` <span style="font-size:10px">(${escapeHtml(item.direction)})</span>`
                                     : '';
                                 // Убрали индивидуальный цвет предмета, используем цвет дня
                                 const bgColor = cellBg;
-                                content += `<td style="border: 1px solid #000; font-weight: bold; background-color: ${bgColor};">${cls ? cls.name : ''}${dir}${room}</td>`;
+                                content += `<td style="border: 1px solid #000; font-weight: bold; background-color: ${bgColor};">${escapeHtml(cls ? cls.name : '')}${dir}${room}</td>`;
                             } else {
                                 // Пустые ячейки красим в цвет дня
                                 content += `<td style="border: 1px solid #000; background-color: ${cellBg};"></td>`;
@@ -694,9 +704,9 @@ export const ExportPage = () => {
                 filteredTeachers.forEach((teacher, tIndex) => {
                     content += `<tr>`;
                     if (tIndex === 0) {
-                        content += `<td rowspan="${filteredTeachers.length}" class="subject-cell" style="border: 3px solid #000; background-color: #e9d5ff;">${subject.name}</td>`;
+                        content += `<td rowspan="${filteredTeachers.length}" class="subject-cell" style="border: 3px solid #000; background-color: #e9d5ff;">${escapeHtml(subject.name)}</td>`;
                     }
-                    content += `<td class="teacher-cell" style="border-right: 3px solid #000; background-color: #e9d5ff;">${teacher.name}</td>`;
+                    content += `<td class="teacher-cell" style="border-right: 3px solid #000; background-color: #e9d5ff;">${escapeHtml(teacher.name)}</td>`;
 
                     DAYS.forEach((day) => {
                         const cellBg = dayColors[day]?.cell || '#fff';
@@ -714,12 +724,12 @@ export const ExportPage = () => {
                                 const cls = classes.find((c) => c.id === item.classId);
                                 const r = rooms.find((rm) => rm.id === item.roomId);
                                 const roomName = r ? r.name : item.roomId;
-                                const room = roomName ? `<sub>${roomName}</sub>` : '';
+                                const room = roomName ? `<sub>${escapeHtml(roomName)}</sub>` : '';
                                 const dir = item.direction
-                                    ? ` <span style="font-size:14px">(${item.direction})</span>`
+                                    ? ` <span style="font-size:14px">(${escapeHtml(item.direction)})</span>`
                                     : '';
 
-                                content += `<td style="border: 1px solid #000; font-weight: bold; background-color: ${cellBg}; height: 60px;">${cls ? cls.name : ''}${dir}${room}</td>`;
+                                content += `<td style="border: 1px solid #000; font-weight: bold; background-color: ${cellBg}; height: 60px;">${escapeHtml(cls ? cls.name : '')}${dir}${room}</td>`;
                             } else {
                                 content += `<td style="border: 1px solid #000; background-color: ${cellBg};"></td>`;
                             }
@@ -795,7 +805,7 @@ export const ExportPage = () => {
             content += `<td style="border:none"></td>`;
             content += `<td style="border:none"></td>`;
             shiftClasses.forEach((c) => {
-                content += `<td class="class-header">${c.name}</td>`;
+                content += `<td class="class-header">${escapeHtml(c.name)}</td>`;
             });
             content += `</tr>`;
 
@@ -828,8 +838,8 @@ export const ExportPage = () => {
                             const room = rooms.find((r) => r.id === lesson.roomId);
                             const roomName = room ? room.name : lesson.roomId || '';
 
-                            content += `<span class="subject">${sub?.name || ''}</span>`;
-                            if (roomName) content += ` <span class="room">${roomName}</span>`;
+                            content += `<span class="subject">${escapeHtml(sub?.name || '')}</span>`;
+                            if (roomName) content += ` <span class="room">${escapeHtml(roomName)}</span>`;
                         });
 
                         content += `</td>`;
@@ -1312,7 +1322,7 @@ export const ExportPage = () => {
     }, [settings.substitutionDayComments, exportDate, subsForDate]);
 
     const subsForShift1 = useMemo(() => {
-        const currentSchedule = getScheduleForDate(exportDate);
+        const currentSchedule = resolveScheduleByDate(exportDate);
         return (
             subsForDate
                 .filter((sub) => {
@@ -1321,10 +1331,10 @@ export const ExportPage = () => {
                 })
                 .filter((sub) => sub.replacementTeacherId !== 'conducted').length > 0
         );
-    }, [subsForDate, getScheduleForDate, exportDate]);
+    }, [subsForDate, resolveScheduleByDate, exportDate]);
 
     const subsForShift2 = useMemo(() => {
-        const currentSchedule = getScheduleForDate(exportDate);
+        const currentSchedule = resolveScheduleByDate(exportDate);
         return (
             subsForDate
                 .filter((sub) => {
@@ -1333,10 +1343,10 @@ export const ExportPage = () => {
                 })
                 .filter((sub) => sub.replacementTeacherId !== 'conducted').length > 0
         );
-    }, [subsForDate, getScheduleForDate, exportDate]);
+    }, [subsForDate, resolveScheduleByDate, exportDate]);
 
     const renderTableForShift = (shift: string) => {
-        const currentSchedule = getScheduleForDate(exportDate);
+        const currentSchedule = resolveScheduleByDate(exportDate);
 
         // Group subs by scheduleItemId to handle merges
         const shiftSubs = subsForDate
@@ -1608,7 +1618,10 @@ export const ExportPage = () => {
                 </h2>
                 <div className="flex flex-wrap gap-4">
                     <button
-                        onClick={() => dbService.exportJson(fullAppData)}
+                        onClick={() => {
+                            const { privateSettings: _, ...exportData } = fullAppData;
+                            dbService.exportJson(exportData as AppData);
+                        }}
                         className="btn-primary btn-ripple flex items-center gap-2"
                     >
                         <Icon name="Download" size={20} /> Скачать JSON

@@ -460,7 +460,7 @@ export const AbsenteeismPage = () => {
                                                 <div className="flex flex-wrap gap-2">
                                                     {record.absences.slice(0, 3).map((abs, idx) => (
                                                         <span
-                                                            key={idx}
+                                                            key={`${abs.studentName}-${abs.reason}-${idx}`}
                                                             className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 border border-rose-100 dark:border-rose-900/30"
                                                         >
                                                             {abs.studentName}
@@ -618,7 +618,7 @@ export const AbsenteeismPage = () => {
                                 <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
                                     {absences.map((abs, idx) => (
                                         <div
-                                            key={idx}
+                                            key={`${abs.studentName}-${abs.reason}-${idx}`}
                                             className="flex items-center justify-between p-3 bg-slate-50 dark:bg-dark-700/50 rounded-lg border border-slate-100 dark:border-slate-700"
                                         >
                                             <div>

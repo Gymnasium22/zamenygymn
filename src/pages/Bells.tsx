@@ -478,9 +478,9 @@ export const BellsPage = () => {
                                             <div style="display: flex; align-items: center; margin-bottom: 10px; padding: 8px 12px; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px;">
                                                 <div style="width: 40px; height: 40px; line-height: 40px; text-align: center; border-radius: 50%; background: #e2e8f0; color: #475569; font-weight: bold; margin-right: 15px; font-size: 20px; flex-shrink: 0;">${period}</div>
                                                 <div style="flex: 1; display: flex; justify-content: space-between; align-items: center; font-weight: bold; font-size: 28px; color: #0f172a; font-variant-numeric: tabular-nums;">
-                                                    <span>${bell.start}</span>
+                                                    <span>${escapeHtml(bell.start)}</span>
                                                     <span style="color: #cbd5e1; font-weight: normal; margin: 0 10px;">&mdash;</span>
-                                                    <span>${bell.end}</span>
+                                                    <span>${escapeHtml(bell.end)}</span>
                                                 </div>
                                             </div>
                                         `;
@@ -567,7 +567,7 @@ export const BellsPage = () => {
                         ${
                             bell.cancelled
                                 ? `<td colspan="2" style="background-color: #fef2f2; color: #dc2626; text-align: center; font-weight: bold;">УРОК СНЯТ</td>`
-                                : `<td class="text-center">${bell.start}</td><td class="text-center">${bell.end}</td>`
+                                : `<td class="text-center">${escapeHtml(bell.start)}</td><td class="text-center">${escapeHtml(bell.end)}</td>`
                         }
                     </tr>
                 `;

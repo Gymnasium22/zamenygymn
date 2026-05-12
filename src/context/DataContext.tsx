@@ -498,7 +498,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
             canUndo: historyPointer > 0,
             canRedo: historyPointer < history.length - 1
         }),
-        [data, isLoading, isSaving, saveData, resetData, undo, redo, historyPointer]
+        [data, isLoading, isSaving, saveData, resetData, undo, redo, historyPointer, history.length]
     );
 
     return <FullDataContext.Provider value={contextValue}>{children}</FullDataContext.Provider>;
@@ -571,7 +571,10 @@ export const ScheduleDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
     // Определяем текущий семестр на основе унифицированной функции
     const now = new Date();
     const currentSemester = getActiveSemester(now, data.settings);
-    const activeSchedule = currentSemester === 2 ? data.schedule2 || [] : data.schedule || [];
+    const activeSchedule = useMemo(
+        () => (currentSemester === 2 ? data.schedule2 || [] : data.schedule || []),
+        [currentSemester, data.schedule, data.schedule2]
+    );
 
     const saveSemesterSchedule = useCallback(
         async (semester: 1 | 2, newData: ScheduleItem[]) => {

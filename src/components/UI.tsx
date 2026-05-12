@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useMemo, createContext, useContext, ReactNode } from 'react';
+import React, { useEffect, useState, useRef, useMemo, useCallback, createContext, useContext, ReactNode } from 'react';
 import { Icon } from './Icons';
 import { useStaticData } from '../context/DataContext';
 import { DayOfWeek, Shift } from '../types';
@@ -235,20 +235,7 @@ export const Toast = ({ id, type, title, message, duration = 5000, onClose }: To
     const [isExiting, setIsExiting] = useState(false);
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    useEffect(() => {
-        // Устанавливаем таймер только один раз при монтировании
-        timerRef.current = setTimeout(() => {
-            handleClose();
-        }, duration);
-
-        return () => {
-            if (timerRef.current) {
-                clearTimeout(timerRef.current);
-            }
-        };
-    }, []); // Пустой массив зависимостей
-
-    const handleClose = () => {
+    const handleClose = useCallback(() => {
         // Очищаем таймер при ручном закрытии
         if (timerRef.current) {
             clearTimeout(timerRef.current);
@@ -260,7 +247,20 @@ export const Toast = ({ id, type, title, message, duration = 5000, onClose }: To
             setIsVisible(false);
             onClose(id);
         }, 300);
-    };
+    }, [onClose, id]);
+
+    useEffect(() => {
+        // Устанавливаем таймер только один раз при монтировании
+        timerRef.current = setTimeout(() => {
+            handleClose();
+        }, duration);
+
+        return () => {
+            if (timerRef.current) {
+                clearTimeout(timerRef.current);
+            }
+        };
+    }, [duration, handleClose]);
 
     if (!isVisible) return null;
 

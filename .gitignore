@@ -28,3 +28,6 @@ dist-ssr
 
 repomix-output.xml
 repomix-output*.xml
+
+# Audit reports
+AUDIT-REPORT.md

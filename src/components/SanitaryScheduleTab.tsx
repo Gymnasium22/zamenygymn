@@ -101,7 +101,6 @@ export function SanitaryScheduleTab(props: {
     const [isOptimizing, setIsOptimizing] = useState(false);
     const [lastOptimizedAt, setLastOptimizedAt] = useState<string>('');
     const [modeLabel, setModeLabel] = useState<'auto' | 'base'>('auto');
-    const allowTeacherConflicts = true; // Учителя не учитываются для санстанции
 
     const periods = useMemo(() => {
         if (!selectedClass) return [];
@@ -134,7 +133,7 @@ export function SanitaryScheduleTab(props: {
         setManualSwaps([]);
         setViewMode('overview');
          
-    }, [semester]);
+    }, [semester, baseSchedule, eligibleClasses, subjects]);
 
     const allClassesStats = useMemo(() => {
         const rows = eligibleClasses.map((c) => {
@@ -534,47 +533,6 @@ export function SanitaryScheduleTab(props: {
             setActivePick(null);
             return;
         }
-        if (!allowTeacherConflicts) {
-            // Teacher conflict validation (like in your sample)
-            const scheduleNow = applySlotSwaps({
-                schedule: sanitaryBase.schedule,
-                swaps: manualSwaps.filter((s) => s.classId === selectedClass.id && s.shift === selectedClass.shift)
-            });
-            const slotLessons = (s: Slot) =>
-                scheduleNow.filter(
-                    (it) =>
-                        it.classId === selectedClass.id &&
-                        it.shift === selectedClass.shift &&
-                        it.day === s.day &&
-                        it.period === s.period
-                );
-            const aLessons = slotLessons(activePick);
-            const bLessons = slotLessons(slot);
-            const aIds = new Set(aLessons.map((x) => x.id));
-            const bIds = new Set(bLessons.map((x) => x.id));
-            const ignore = new Set([...aIds, ...bIds]);
-
-            const isTeacherFree = (teacherId: string, day: string, period: number) => {
-                return !scheduleNow.some(
-                    (it) =>
-                        !ignore.has(it.id) &&
-                        it.teacherId === teacherId &&
-                        it.shift === selectedClass.shift &&
-                        it.day === day &&
-                        it.period === period
-                );
-            };
-
-            const okA = aLessons.every((it) => isTeacherFree(it.teacherId, slot.day, slot.period));
-            const okB = bLessons.every((it) => isTeacherFree(it.teacherId, activePick.day, activePick.period));
-
-            if (!okA || !okB) {
-                setSwapError('Один из учителей занят в выбранное время. Обмен невозможен.');
-                setActivePick(null);
-                return;
-            }
-        }
-
         setManualSwaps((prev) => [
             ...prev,
             { classId: selectedClass.id, shift: selectedClass.shift, from: activePick, to: slot }
