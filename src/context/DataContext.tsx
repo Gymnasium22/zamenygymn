@@ -636,28 +636,43 @@ export const useStaticData = () => {
     const fullContext = useFullData();
 
     // Гарантируем, что массивы всегда определены
-    const safeContext = {
-        ...context,
-        subjects: context.subjects || [],
-        teachers: context.teachers || [],
-        classes: context.classes || [],
-        rooms: context.rooms || [],
-        bellSchedule: context.bellSchedule || [],
-        settings: context.settings || INITIAL_DATA.settings,
-        privateSettings: context.privateSettings || INITIAL_DATA.privateSettings,
-        dutyZones: context.dutyZones || []
-    };
+    const safeContext = useMemo(
+        () => ({
+            ...context,
+            subjects: context.subjects || [],
+            teachers: context.teachers || [],
+            classes: context.classes || [],
+            rooms: context.rooms || [],
+            bellSchedule: context.bellSchedule || [],
+            settings: context.settings || INITIAL_DATA.settings,
+            privateSettings: context.privateSettings || INITIAL_DATA.privateSettings,
+            dutyZones: context.dutyZones || []
+        }),
+        [context]
+    );
 
-    return {
-        ...safeContext,
-        isLoading: fullContext.isLoading,
-        isSaving: fullContext.isSaving,
-        undo: fullContext.undo,
-        redo: fullContext.redo,
-        canUndo: fullContext.canUndo,
-        canRedo: fullContext.canRedo,
-        resetData: fullContext.resetData
-    };
+    return useMemo(
+        () => ({
+            ...safeContext,
+            isLoading: fullContext.isLoading,
+            isSaving: fullContext.isSaving,
+            undo: fullContext.undo,
+            redo: fullContext.redo,
+            canUndo: fullContext.canUndo,
+            canRedo: fullContext.canRedo,
+            resetData: fullContext.resetData
+        }),
+        [
+            safeContext,
+            fullContext.isLoading,
+            fullContext.isSaving,
+            fullContext.undo,
+            fullContext.redo,
+            fullContext.canUndo,
+            fullContext.canRedo,
+            fullContext.resetData
+        ]
+    );
 };
 
 export const useScheduleData = () => {
@@ -666,27 +681,42 @@ export const useScheduleData = () => {
     const fullContext = useFullData();
 
     // Гарантируем, что массивы всегда определены
-    const safeContext = {
-        ...context,
-        schedule: context.schedule || [],
-        schedule1: context.schedule1 || [],
-        schedule2: context.schedule2 || [],
-        substitutions: context.substitutions || [],
-        dutySchedule: context.dutySchedule || [],
-        nutritionRecords: context.nutritionRecords || [],
-        absenteeismRecords: context.absenteeismRecords || []
-    };
+    const safeContext = useMemo(
+        () => ({
+            ...context,
+            schedule: context.schedule || [],
+            schedule1: context.schedule1 || [],
+            schedule2: context.schedule2 || [],
+            substitutions: context.substitutions || [],
+            dutySchedule: context.dutySchedule || [],
+            nutritionRecords: context.nutritionRecords || [],
+            absenteeismRecords: context.absenteeismRecords || []
+        }),
+        [context]
+    );
 
-    return {
-        ...safeContext,
-        isLoading: fullContext.isLoading,
-        isSaving: fullContext.isSaving,
-        undo: fullContext.undo,
-        redo: fullContext.redo,
-        canUndo: fullContext.canUndo,
-        canRedo: fullContext.canRedo,
-        resetData: fullContext.resetData
-    };
+    return useMemo(
+        () => ({
+            ...safeContext,
+            isLoading: fullContext.isLoading,
+            isSaving: fullContext.isSaving,
+            undo: fullContext.undo,
+            redo: fullContext.redo,
+            canUndo: fullContext.canUndo,
+            canRedo: fullContext.canRedo,
+            resetData: fullContext.resetData
+        }),
+        [
+            safeContext,
+            fullContext.isLoading,
+            fullContext.isSaving,
+            fullContext.undo,
+            fullContext.redo,
+            fullContext.canUndo,
+            fullContext.canRedo,
+            fullContext.resetData
+        ]
+    );
 };
 
 export const useData = () => {

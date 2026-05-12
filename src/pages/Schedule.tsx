@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useStaticData, useScheduleData } from '../context/DataContext';
 import { Icon } from '../components/Icons';
 import { Modal, SearchableSelect, ContextMenu, useToast } from '../components/UI';
@@ -256,6 +256,24 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
             return conflicts;
         },
         [scheduleSlotMap]
+    );
+
+    // Ленивый кэш конфликтов (сбрасывается при изменении расписания)
+    const conflictCacheRef = useRef(new Map<string, string[]>());
+    useEffect(() => {
+        conflictCacheRef.current.clear();
+    }, [scheduleSlotMap]);
+
+    const getConflicts = useCallback(
+        (item: ScheduleItem) => {
+            let cached = conflictCacheRef.current.get(item.id);
+            if (!cached) {
+                cached = checkConflicts(item);
+                conflictCacheRef.current.set(item.id, cached);
+            }
+            return cached;
+        },
+        [checkConflicts]
     );
 
     const getDetailedConflicts = useCallback(
@@ -698,7 +716,7 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
                     const subj = subjectsById.get(item.subjectId);
                     const teacher = teachersById.get(item.teacherId);
                     const cls = classesById.get(item.classId);
-                    const conflicts = checkConflicts(item);
+                    const conflicts = getConflicts(item);
                     const room = roomsById.get(item.roomId || '');
                     const roomName = room ? room.name : item.roomId;
 
@@ -817,7 +835,7 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
                     const cls = classesById.get(item.classId);
                     const room = roomsById.get(item.roomId || '');
                     const roomName = room ? room.name : item.roomId;
-                    const conflicts = checkConflicts(item);
+                    const conflicts = getConflicts(item);
 
                     return (
                         <div

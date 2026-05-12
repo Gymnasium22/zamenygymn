@@ -161,7 +161,12 @@ export const DashboardPage = () => {
     // Using v4 key to force layout reset for weather widget move
     const [widgets, setWidgets] = useState<WidgetConfig[]>(() => {
         const saved = localStorage.getItem('gym_dashboard_widgets_v4');
-        return saved ? JSON.parse(saved) : DEFAULT_WIDGETS;
+        if (!saved) return DEFAULT_WIDGETS;
+        try {
+            return JSON.parse(saved);
+        } catch {
+            return DEFAULT_WIDGETS;
+        }
     });
     const [isWidgetModalOpen, setIsWidgetModalOpen] = useState(false);
 

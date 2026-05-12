@@ -308,11 +308,23 @@ export const ExportPage = () => {
     // Получаем расписание для экспорта (Excel, Матрица) на основе селектора
     const getScheduleForExport = () => (exportSemester === 2 ? schedule2 : schedule1);
 
-    // Получаем расписание для PNG (Замены) на основе выбранной даты
-    const resolveScheduleByDate = useCallback((date: string) => {
-        const month = new Date(date).getMonth();
-        return month >= 0 && month <= 4 ? schedule2 : schedule1;
-    }, [schedule1, schedule2]);
+    // --- Оптимизированные Map'ы для O(1) доступа ---
+    const schedule1ById = useMemo(() => {
+        const map = new Map<string, ScheduleItem>();
+        schedule1.forEach((s) => map.set(s.id, s));
+        return map;
+    }, [schedule1]);
+
+    const schedule2ById = useMemo(() => {
+        const map = new Map<string, ScheduleItem>();
+        schedule2.forEach((s) => map.set(s.id, s));
+        return map;
+    }, [schedule2]);
+
+    const getScheduleItemById = useCallback(
+        (id: string) => schedule1ById.get(id) || schedule2ById.get(id),
+        [schedule1ById, schedule2ById]
+    );
 
     // Extract available grades (parallels)
     const availableGrades = useMemo<string[]>(() => {
@@ -402,6 +414,14 @@ export const ExportPage = () => {
     const exportStyledExcel = () => {
         const currentSchedule = getScheduleForExport();
 
+        // Группировка schedule по ключу "day|shift|classId|period" для O(1) доступа
+        const scheduleMap = new Map<string, ScheduleItem[]>();
+        currentSchedule.forEach((s) => {
+            const key = `${s.day}|${s.shift}|${s.classId}|${s.period}`;
+            if (!scheduleMap.has(key)) scheduleMap.set(key, []);
+            scheduleMap.get(key)!.push(s);
+        });
+
         let content = `<table>`;
 
         DAYS.forEach((day) => {
@@ -418,9 +438,7 @@ export const ExportPage = () => {
                 filteredClasses.forEach((c) => {
                     content += `<tr><td class="class-cell">${escapeHtml(c.name)}</td>`;
                     SHIFT_PERIODS[shift].forEach((p) => {
-                        const items = currentSchedule.filter(
-                            (s) => s.classId === c.id && s.day === day && s.shift === shift && s.period === p
-                        );
+                        const items = scheduleMap.get(`${day}|${shift}|${c.id}|${p}`) || [];
                         content += `<td style="height: 60px;">`;
                         items.forEach((item) => {
                             const sub = subjectsById.get(item.subjectId);
@@ -453,6 +471,13 @@ export const ExportPage = () => {
 
     const exportMatrixExcel = () => {
         const currentSchedule = getScheduleForExport();
+
+        // Группировка schedule по ключу "teacherId|subjectId|day|period|shift" для O(1) доступа
+        const scheduleMap = new Map<string, ScheduleItem>();
+        currentSchedule.forEach((s) => {
+            const key = `${s.teacherId}|${s.subjectId}|${s.day}|${s.period}|${s.shift}`;
+            scheduleMap.set(key, s);
+        });
 
         // Цвета для дней недели (Header - потемнее, Cell - посветлее)
         const dayColors: Record<string, { header: string; cell: string }> = {
@@ -549,14 +574,7 @@ export const ExportPage = () => {
                     DAYS.forEach((day) => {
                         const cellBg = dayColors[day]?.cell || '#fff';
                         periods.forEach((p) => {
-                            const item = currentSchedule.find(
-                                (s) =>
-                                    s.teacherId === teacher.id &&
-                                    s.subjectId === subject.id &&
-                                    s.day === day &&
-                                    s.period === p &&
-                                    s.shift === shift
-                            );
+                            const item = scheduleMap.get(`${teacher.id}|${subject.id}|${day}|${p}|${shift}`);
 
                             if (item) {
                                 const cls = classesById.get(item.classId);
@@ -610,6 +628,13 @@ export const ExportPage = () => {
 
     const exportPosterMatrixExcel = () => {
         const currentSchedule = getScheduleForExport();
+
+        // Группировка schedule по ключу "teacherId|subjectId|day|period|shift" для O(1) доступа
+        const scheduleMap = new Map<string, ScheduleItem>();
+        currentSchedule.forEach((s) => {
+            const key = `${s.teacherId}|${s.subjectId}|${s.day}|${s.period}|${s.shift}`;
+            scheduleMap.set(key, s);
+        });
 
         // Цвета для дней недели (как в обычной матрице)
         const dayColors: Record<string, { header: string; cell: string }> = {
@@ -711,14 +736,7 @@ export const ExportPage = () => {
                     DAYS.forEach((day) => {
                         const cellBg = dayColors[day]?.cell || '#fff';
                         periods.forEach((p) => {
-                            const item = currentSchedule.find(
-                                (s) =>
-                                    s.teacherId === teacher.id &&
-                                    s.subjectId === subject.id &&
-                                    s.day === day &&
-                                    s.period === p &&
-                                    s.shift === shift
-                            );
+                            const item = scheduleMap.get(`${teacher.id}|${subject.id}|${day}|${p}|${shift}`);
 
                             if (item) {
                                 const cls = classes.find((c) => c.id === item.classId);
@@ -770,6 +788,15 @@ export const ExportPage = () => {
 
     const downloadGradeMatrixExcel = () => {
         const currentSchedule = getScheduleForExport();
+
+        // Группировка schedule по ключу "day|shift|classId|period" для O(1) доступа
+        const scheduleMap = new Map<string, ScheduleItem[]>();
+        currentSchedule.forEach((s) => {
+            const key = `${s.day}|${s.shift}|${s.classId}|${s.period}`;
+            if (!scheduleMap.has(key)) scheduleMap.set(key, []);
+            scheduleMap.get(key)!.push(s);
+        });
+
         const targetClasses = classes
             .filter((c) => c.name.startsWith(matrixGrade))
             .sort((a, b) => a.name.localeCompare(b.name));
@@ -826,9 +853,7 @@ export const ExportPage = () => {
 
                     // Class Columns
                     shiftClasses.forEach((cls) => {
-                        const lessons = currentSchedule.filter(
-                            (s) => s.classId === cls.id && s.day === day && s.shift === shift && s.period === period
-                        );
+                        const lessons = scheduleMap.get(`${day}|${shift}|${cls.id}|${period}`) || [];
 
                         content += `<td class="content-cell" style="background-color: ${colors.cell};">`;
 
@@ -1223,15 +1248,22 @@ export const ExportPage = () => {
 
     const copyForGoogleSheets = async () => {
         const currentSchedule = getScheduleForExport();
+
+        // Группировка schedule по ключу "day|shift|classId|period" для O(1) доступа
+        const scheduleMap = new Map<string, ScheduleItem[]>();
+        currentSchedule.forEach((s) => {
+            const key = `${s.day}|${s.shift}|${s.classId}|${s.period}`;
+            if (!scheduleMap.has(key)) scheduleMap.set(key, []);
+            scheduleMap.get(key)!.push(s);
+        });
+
         let tsv = 'День\tСмена\tКласс\tУрок\tПредмет\tУчитель\tКабинет\tГруппа\n';
         DAYS.forEach((day) => {
             [Shift.First, Shift.Second].forEach((shift) => {
                 const filteredClasses = classes.filter((c) => c.shift === shift);
                 filteredClasses.forEach((cls) => {
                     SHIFT_PERIODS[shift].forEach((period) => {
-                        const items = currentSchedule.filter(
-                            (s) => s.classId === cls.id && s.day === day && s.shift === shift && s.period === period
-                        );
+                        const items = scheduleMap.get(`${day}|${shift}|${cls.id}|${period}`) || [];
                         items.forEach((item) => {
                             const sub = subjects.find((s) => s.id === item.subjectId);
                             const teach = teachers.find((t) => t.id === item.teacherId);
@@ -1322,36 +1354,32 @@ export const ExportPage = () => {
     }, [settings.substitutionDayComments, exportDate, subsForDate]);
 
     const subsForShift1 = useMemo(() => {
-        const currentSchedule = resolveScheduleByDate(exportDate);
         return (
             subsForDate
                 .filter((sub) => {
-                    const s = currentSchedule.find((x) => x.id === sub.scheduleItemId);
+                    const s = getScheduleItemById(sub.scheduleItemId);
                     return s && s.shift === Shift.First;
                 })
                 .filter((sub) => sub.replacementTeacherId !== 'conducted').length > 0
         );
-    }, [subsForDate, resolveScheduleByDate, exportDate]);
+    }, [subsForDate, getScheduleItemById]);
 
     const subsForShift2 = useMemo(() => {
-        const currentSchedule = resolveScheduleByDate(exportDate);
         return (
             subsForDate
                 .filter((sub) => {
-                    const s = currentSchedule.find((x) => x.id === sub.scheduleItemId);
+                    const s = getScheduleItemById(sub.scheduleItemId);
                     return s && s.shift === Shift.Second;
                 })
                 .filter((sub) => sub.replacementTeacherId !== 'conducted').length > 0
         );
-    }, [subsForDate, resolveScheduleByDate, exportDate]);
+    }, [subsForDate, getScheduleItemById]);
 
     const renderTableForShift = (shift: string) => {
-        const currentSchedule = resolveScheduleByDate(exportDate);
-
         // Group subs by scheduleItemId to handle merges
         const shiftSubs = subsForDate
             .filter((sub) => {
-                const s = currentSchedule.find((x) => x.id === sub.scheduleItemId);
+                const s = getScheduleItemById(sub.scheduleItemId);
                 return s && s.shift === shift;
             })
             .filter((sub) => sub.replacementTeacherId !== 'conducted');
@@ -1359,8 +1387,8 @@ export const ExportPage = () => {
         if (shiftSubs.length === 0) return null;
 
         const uniqueLessonIds = Array.from(new Set(shiftSubs.map((s) => s.scheduleItemId))).sort((idA, idB) => {
-            const itemA = currentSchedule.find((x) => x.id === idA);
-            const itemB = currentSchedule.find((x) => x.id === idB);
+            const itemA = getScheduleItemById(idA);
+            const itemB = getScheduleItemById(idB);
             return (itemA?.period ?? 0) - (itemB?.period ?? 0);
         });
 
@@ -1567,24 +1595,6 @@ export const ExportPage = () => {
         setPublicScheduleUrl('');
         setPublicScheduleId('');
     };
-
-    // --- Оптимизированные Map'ы для O(1) доступа ---
-    const schedule1ById = useMemo(() => {
-        const map = new Map<string, ScheduleItem>();
-        schedule1.forEach((s) => map.set(s.id, s));
-        return map;
-    }, [schedule1]);
-
-    const schedule2ById = useMemo(() => {
-        const map = new Map<string, ScheduleItem>();
-        schedule2.forEach((s) => map.set(s.id, s));
-        return map;
-    }, [schedule2]);
-
-    const getScheduleItemById = useCallback(
-        (id: string) => schedule1ById.get(id) || schedule2ById.get(id),
-        [schedule1ById, schedule2ById]
-    );
 
     const subjectsById = useMemo(() => {
         const map = new Map<string, Subject>();

@@ -640,7 +640,7 @@ export const SubstitutionsPage = () => {
         if (subs.length === 0) return 'На эту дату замен нет.';
 
         // Sort by period
-        subs.sort((a, b) => {
+        const sortedSubs = [...subs].sort((a, b) => {
             const itemA = activeSchedule.find((i) => i.id === a.scheduleItemId);
             const itemB = activeSchedule.find((i) => i.id === b.scheduleItemId);
             return (itemA?.period || 0) - (itemB?.period || 0);
@@ -649,7 +649,7 @@ export const SubstitutionsPage = () => {
         let text = '';
         const processedIds = new Set();
 
-        subs.forEach((sub) => {
+        sortedSubs.forEach((sub) => {
             if (processedIds.has(sub.scheduleItemId)) return;
             processedIds.add(sub.scheduleItemId);
 
@@ -773,7 +773,7 @@ export const SubstitutionsPage = () => {
             );
 
             // Sort by period
-            allTeacherSubs.sort((a, b) => {
+            const sortedAllTeacherSubs = [...allTeacherSubs].sort((a, b) => {
                 const itemA = activeSchedule.find((i) => i.id === a.scheduleItemId);
                 const itemB = activeSchedule.find((i) => i.id === b.scheduleItemId);
                 return (itemA?.period || 0) - (itemB?.period || 0);
@@ -790,7 +790,7 @@ export const SubstitutionsPage = () => {
             }
 
             let messageBody = '';
-            allTeacherSubs.forEach((sub) => {
+            sortedAllTeacherSubs.forEach((sub) => {
                 const item = activeSchedule.find((s) => s.id === sub.scheduleItemId);
                 if (!item) return;
 
@@ -1080,11 +1080,9 @@ export const SubstitutionsPage = () => {
 
     const toggleRefusal = (teacherId: string, e: React.MouseEvent) => {
         e.stopPropagation();
-        if (refusedTeacherIds.includes(teacherId)) {
-            setRefusedTeacherIds(refusedTeacherIds.filter((id) => id !== teacherId));
-        } else {
-            setRefusedTeacherIds([...refusedTeacherIds, teacherId]);
-        }
+        setRefusedTeacherIds((prev) =>
+            prev.includes(teacherId) ? prev.filter((id) => id !== teacherId) : [...prev, teacherId]
+        );
     };
 
     return (
