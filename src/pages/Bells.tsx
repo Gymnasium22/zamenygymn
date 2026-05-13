@@ -610,77 +610,85 @@ export const BellsPage = () => {
             <div className="flex-1 overflow-y-auto pb-20 custom-scrollbar pr-2">
                 <div className="flex flex-col gap-6">
                     {/* Presets & Main Actions */}
-                    <div className="bg-white dark:bg-dark-800 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between sticky top-0 z-20">
-                        <div className="flex flex-col gap-2 w-full md:w-auto">
-                            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">
-                                Режим звонков
-                            </span>
-                            <div className="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0 custom-scrollbar">
-                                {(settings.bellPresets || []).map((p) => (
-                                    <div
-                                        key={p.id}
-                                        onClick={() => setSelectedPresetId(p.id)}
-                                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all cursor-pointer whitespace-nowrap group ${
-                                            selectedPresetId === p.id
-                                                ? 'bg-indigo-600 border-indigo-600 text-white shadow-md'
-                                                : 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-indigo-300 hover:bg-slate-50 dark:hover:bg-slate-600'
-                                        }`}
-                                    >
-                                        <span className="text-sm font-bold">{p.name}</span>
-                                        {selectedPresetId === p.id && (
-                                            <div className="flex items-center gap-1 ml-2 border-l border-indigo-400 pl-2">
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        duplicatePreset();
-                                                    }}
-                                                    className="text-indigo-100 hover:text-white p-1 rounded hover:bg-indigo-500/50 transition-colors"
-                                                    title="Дублировать"
-                                                >
-                                                    <Icon name="Copy" size={14} />
-                                                </button>
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        deletePreset();
-                                                    }}
-                                                    className="text-indigo-200 hover:text-red-200 p-1 rounded hover:bg-red-500/20 transition-colors"
-                                                    title="Удалить"
-                                                >
-                                                    <Icon name="Trash2" size={14} />
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
+                    <div className="bg-white dark:bg-dark-800 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col gap-4 sticky top-0 z-20">
+                        {/* Header row with preset count and action buttons */}
+                        <div className="flex flex-col sm:flex-row gap-3 sm:items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">
+                                    Режим звонков
+                                </span>
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400">
+                                    {(settings.bellPresets || []).length}
+                                </span>
+                            </div>
+                            <div className="flex gap-2 flex-wrap items-center justify-start sm:justify-end">
                                 <button
-                                    onClick={createNewPreset}
-                                    className="p-2 bg-slate-100 dark:bg-slate-700 text-slate-500 hover:bg-slate-200 rounded-xl"
-                                    title="Создать"
+                                    onClick={savePreset}
+                                    className="px-3 py-2 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border border-blue-100 dark:border-blue-900 rounded-xl font-bold hover:bg-blue-100 dark:hover:bg-blue-900/50 transition text-sm flex items-center gap-1.5"
                                 >
-                                    <Icon name="Plus" size={20} />
+                                    <Icon name="Save" size={16} /> Сохранить
+                                </button>
+                                <button
+                                    onClick={applyPreset}
+                                    className="px-3 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition shadow-lg shadow-emerald-200 dark:shadow-none text-sm flex items-center gap-1.5"
+                                >
+                                    <Icon name="CheckCircle" size={16} /> Применить
+                                </button>
+                                <button
+                                    onClick={() => setIsExportModalOpen(true)}
+                                    className="px-3 py-2 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition shadow-lg shadow-indigo-200 dark:shadow-none text-sm flex items-center gap-1.5"
+                                >
+                                    <Icon name="Printer" size={16} /> Экспорт
                                 </button>
                             </div>
                         </div>
 
-                        <div className="flex gap-3 flex-wrap items-end w-full md:w-auto justify-end">
+                        {/* Preset pills with wrap */}
+                        <div className="flex flex-wrap gap-2">
+                            {(settings.bellPresets || []).map((p) => (
+                                <div
+                                    key={p.id}
+                                    onClick={() => setSelectedPresetId(p.id)}
+                                    className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border transition-all cursor-pointer group select-none ${
+                                        selectedPresetId === p.id
+                                            ? 'bg-indigo-600 border-indigo-600 text-white shadow-md'
+                                            : 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:border-indigo-300 hover:bg-slate-50 dark:hover:bg-slate-600'
+                                    }`}
+                                    title={p.name}
+                                >
+                                    <span className="text-sm font-bold truncate max-w-[140px]">{p.name}</span>
+                                    {selectedPresetId === p.id && (
+                                        <div className="flex items-center gap-0.5 border-l border-indigo-400 pl-1.5 ml-0.5">
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    duplicatePreset();
+                                                }}
+                                                className="text-indigo-100 hover:text-white p-1 rounded hover:bg-indigo-500/50 transition-colors"
+                                                title="Дублировать"
+                                            >
+                                                <Icon name="Copy" size={13} />
+                                            </button>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    deletePreset();
+                                                }}
+                                                className="text-indigo-200 hover:text-red-200 p-1 rounded hover:bg-red-500/20 transition-colors"
+                                                title="Удалить"
+                                            >
+                                                <Icon name="Trash2" size={13} />
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
                             <button
-                                onClick={savePreset}
-                                className="px-4 py-2 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border border-blue-100 dark:border-blue-900 rounded-xl font-bold hover:bg-blue-100 dark:hover:bg-blue-900/50 transition text-sm flex items-center gap-2"
+                                onClick={createNewPreset}
+                                className="flex items-center gap-1 px-3 py-2 bg-slate-100 dark:bg-slate-700 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-xl border border-transparent hover:border-slate-300 dark:hover:border-slate-500 transition text-sm font-bold"
+                                title="Создать новый"
                             >
-                                <Icon name="Save" size={18} /> Сохранить
-                            </button>
-                            <button
-                                onClick={applyPreset}
-                                className="px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition shadow-lg shadow-emerald-200 dark:shadow-none text-sm flex items-center gap-2"
-                            >
-                                <Icon name="CheckCircle" size={18} /> Применить
-                            </button>
-                            <button
-                                onClick={() => setIsExportModalOpen(true)}
-                                className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition shadow-lg shadow-indigo-200 dark:shadow-none text-sm flex items-center gap-2"
-                            >
-                                <Icon name="Printer" size={18} /> Экспорт / Печать
+                                <Icon name="Plus" size={16} /> Новый
                             </button>
                         </div>
                     </div>
