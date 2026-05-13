@@ -119,7 +119,10 @@ export const INITIAL_DATA: AppData = {
             active: false,
             lastUpdated: ''
         },
-        substitutionDayComments: {}
+        substitutionDayComments: {},
+        isScheduleLocked: false,
+        autoBackup: false,
+        backupTime: '02:00'
     },
     privateSettings: {
         telegramToken: '',

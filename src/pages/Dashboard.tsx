@@ -42,6 +42,7 @@ interface WidgetConfig {
 // Weather interfaces moved to weatherService.ts
 
 const DEFAULT_WIDGETS: WidgetConfig[] = [
+    { id: 'kpi', label: 'KPI', visible: true },
     { id: 'search', label: 'Поиск', visible: true },
     { id: 'substitutions', label: 'Замены', visible: true },
     { id: 'occupancy', label: 'Штат', visible: true },
@@ -145,7 +146,7 @@ const WeatherWidget = () => {
 
 export const DashboardPage = () => {
     const { subjects, teachers, classes, rooms, bellSchedule, settings, privateSettings } = useStaticData();
-    const { schedule, substitutions } = useScheduleData();
+    const { schedule, substitutions, absenteeismRecords } = useScheduleData();
     const { role } = useAuth();
     const navigate = useNavigate();
     const { addToast } = useToast();
@@ -226,11 +227,27 @@ export const DashboardPage = () => {
     }, [currentDate]);
 
     const todayStr = useMemo(() => getLocalDateString(currentDate), [currentDate]);
+    const tomorrowStr = useMemo(() => {
+        const d = new Date(currentDate);
+        d.setDate(d.getDate() + 1);
+        return getLocalDateString(d);
+    }, [currentDate]);
     const todayDayOfWeek = useMemo(() => {
         const idx = currentDate.getDay();
         if (idx === 0 || idx === 6) return null;
         return DAYS[idx - 1];
     }, [currentDate]);
+
+    // --- KPI Metrics ---
+    const kpiMetrics = useMemo(() => {
+        const absenteeismToday = (absenteeismRecords || []).filter((r) => r.date === todayStr);
+        const totalAbsences = absenteeismToday.reduce((sum, r) => sum + (r.absences?.length || 0), 0);
+        const substitutionsTomorrow = (substitutions || []).filter((s) => s.date === tomorrowStr).length;
+        const avgLoad = teachers.length > 0 ? Math.round((schedule?.length || 0) / teachers.length) : 0;
+        const occupiedRooms = new Set((schedule || []).filter((s) => s.day === todayDayOfWeek).map((s) => s.roomId).filter(Boolean)).size;
+        const freeRooms = Math.max(0, rooms.length - occupiedRooms);
+        return { totalAbsences, substitutionsTomorrow, avgLoad, freeRooms };
+    }, [absenteeismRecords, todayStr, tomorrowStr, substitutions, teachers.length, schedule, todayDayOfWeek, rooms.length]);
 
     // --- Live Search Logic ---
 
@@ -1080,6 +1097,38 @@ export const DashboardPage = () => {
                                     Нет дней рождения в ближайший месяц
                                 </div>
                             )}
+                        </div>
+                    </div>
+                );
+            case 'kpi':
+                return (
+                    <div
+                        key={widget.id}
+                        className="p-6 rounded-3xl h-full card-hover bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700"
+                    >
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 p-2 rounded-xl">
+                                <Icon name="BarChart2" size={20} />
+                            </div>
+                            <h3 className="font-bold text-lg dark:text-white">Ключевые показатели</h3>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-100 dark:border-slate-600">
+                                <div className="text-2xl font-black text-slate-800 dark:text-white">{kpiMetrics.totalAbsences}</div>
+                                <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Пропусков сегодня</div>
+                            </div>
+                            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-100 dark:border-slate-600">
+                                <div className="text-2xl font-black text-slate-800 dark:text-white">{kpiMetrics.substitutionsTomorrow}</div>
+                                <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Замен на завтра</div>
+                            </div>
+                            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-100 dark:border-slate-600">
+                                <div className="text-2xl font-black text-slate-800 dark:text-white">{kpiMetrics.avgLoad}</div>
+                                <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Уроков на учителя</div>
+                            </div>
+                            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-100 dark:border-slate-600">
+                                <div className="text-2xl font-black text-emerald-600">{kpiMetrics.freeRooms}</div>
+                                <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Свободных кабинетов</div>
+                            </div>
                         </div>
                     </div>
                 );

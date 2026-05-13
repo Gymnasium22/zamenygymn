@@ -25,8 +25,9 @@ interface CellInfo {
     colKey: string | number;
 }
 
-export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePageProps) => {
-    const { subjects, teachers, classes, rooms } = useStaticData();
+export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: SchedulePageProps) => {
+    const { subjects, teachers, classes, rooms, settings } = useStaticData();
+    const readOnly = readOnlyProp || settings.isScheduleLocked;
     const { schedule1, schedule2, saveSemesterSchedule, canUndo, canRedo, undo, redo } = useScheduleData();
     const { addToast } = useToast();
 

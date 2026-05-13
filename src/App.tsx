@@ -3,7 +3,7 @@ import { HashRouter, Routes, Route, Navigate, NavLink, Outlet, useSearchParams }
 import { DataProvider, useStaticData, StaticDataProvider, ScheduleDataProvider } from './context/DataContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Icon } from './components/Icons';
-import { StatusWidget, BottomNavigation, ToastProvider } from './components/UI';
+import { StatusWidget, BottomNavigation, ToastProvider, CommandPalette } from './components/UI';
 import { DashboardPage } from './pages/Dashboard';
 import { SchedulePage } from './pages/Schedule';
 import { DirectoryPage } from './pages/Directory';
@@ -20,6 +20,7 @@ import { LoginPage } from './pages/Login';
 import { dbService } from './services/db';
 import { AppData } from './types';
 import { INITIAL_DATA } from './constants';
+import { useAutoBackup } from './hooks/useAutoBackup';
 
 // Вспомогательные функции для localStorage (упрощенная версия для App.tsx)
 const safeLocalStorageGet = (key: string): string | null => {
@@ -69,9 +70,22 @@ const HomeRedirect = () => {
 
 const Layout = () => {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [isCommandOpen, setIsCommandOpen] = useState(false);
     const [theme, setTheme] = useState(safeLocalStorageGet('theme') || 'light');
     const { isLoading } = useStaticData();
     const { logout, role, user } = useAuth();
+    useAutoBackup();
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+                e.preventDefault();
+                setIsCommandOpen((open) => !open);
+            }
+        };
+        document.addEventListener('keydown', handleKeyDown);
+        return () => document.removeEventListener('keydown', handleKeyDown);
+    }, []);
 
     // Закрываем мобильное меню при изменении размера экрана
     useEffect(() => {
@@ -204,6 +218,7 @@ const Layout = () => {
 
                 <BottomNavigation onMenuClick={() => setIsMobileMenuOpen(true)} role={role} />
             </main>
+            <CommandPalette isOpen={isCommandOpen} onClose={() => setIsCommandOpen(false)} />
         </div>
     );
 };

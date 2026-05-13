@@ -5,12 +5,14 @@ import {
     StaticAppData,
     ScheduleAndSubstitutionData,
     ScheduleItem,
-    ScheduleAndSubstitutionDataFields
+    ScheduleAndSubstitutionDataFields,
+    AuditLogEntry
 } from '../types';
 import { INITIAL_DATA, DEFAULT_BELLS, DEFAULT_DUTY_ZONES } from '../constants';
 import { dbService } from '../services/db';
 import { useAuth } from './AuthContext';
 import { getActiveSemester, generateId } from '../utils/helpers';
+import { auditLog } from '../services/auditLog';
 
 interface FullDataContextType {
     data: AppData;
@@ -398,6 +400,29 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                         // НЕ откатываем интерфейс - данные остались в localStorage и будут синхронизированы позже
                     }
                 } else if (isGuest) {
+                }
+
+                // 4. Audit log
+                if (user && !isGuest) {
+                    const entityMap: Record<string, AuditLogEntry['entityType']> = {
+                        schedule: 'schedule', schedule2: 'schedule', subjects: 'subject',
+                        teachers: 'teacher', classes: 'class', rooms: 'room',
+                        substitutions: 'substitution', dutySchedule: 'duty',
+                        nutritionRecords: 'nutrition', absenteeismRecords: 'absenteeism',
+                        settings: 'settings', bellSchedule: 'bells'
+                    };
+                    Object.keys(newData).forEach((key) => {
+                        if (entityMap[key]) {
+                            auditLog.log(
+                                user.email || user.uid || 'unknown',
+                                role || 'unknown',
+                                'update',
+                                entityMap[key],
+                                key,
+                                `Изменено ${key}`
+                            );
+                        }
+                    });
                 }
 
                 if (addToHistory) {

@@ -137,6 +137,9 @@ export interface Settings {
     unionChairName?: string; // "Ю.Г.Миханова"
     secretaryName?: string; // "Е.К.Шунто"
     currentYear?: number; // 2026
+    isScheduleLocked?: boolean; // Блокировка редактирования расписания
+    autoBackup?: boolean; // Автоматический бекап по расписанию
+    backupTime?: string; // Время бекапа в формате HH:MM
 }
 
 export interface PrivateSettings {
@@ -236,6 +239,17 @@ export interface AppData extends StaticAppData {
     nutritionRecords: NutritionRecord[]; // New
     absenteeismRecords: AbsenteeismRecord[]; // New
     privateSettings: PrivateSettings; // New
+}
+
+export interface AuditLogEntry {
+    id: string;
+    timestamp: string; // ISO Date
+    userEmail: string;
+    userRole: string;
+    action: 'create' | 'update' | 'delete' | 'import' | 'export' | 'apply';
+    entityType: 'schedule' | 'substitution' | 'teacher' | 'class' | 'room' | 'subject' | 'settings' | 'bells' | 'duty' | 'nutrition' | 'absenteeism';
+    entityName?: string;
+    details?: string;
 }
 
 export const DAYS = [DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday];

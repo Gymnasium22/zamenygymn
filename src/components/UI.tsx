@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useMemo, useCallback, createContext, useContext, ReactNode } from 'react';
 import { Icon } from './Icons';
-import { useStaticData } from '../context/DataContext';
+import { useStaticData, useScheduleData } from '../context/DataContext';
 import { DayOfWeek, Shift } from '../types';
 import { generateId, getActiveSemester } from '../utils/helpers';
 import { NavLink, useNavigate } from 'react-router-dom';
@@ -861,7 +861,8 @@ interface CommandPaletteProps {
 
 export const CommandPalette = ({ isOpen, onClose }: CommandPaletteProps) => {
     const navigate = useNavigate();
-    const { teachers, classes, subjects } = useStaticData();
+    const { teachers, classes, subjects, rooms } = useStaticData();
+    const { substitutions } = useScheduleData();
     const [query, setQuery] = useState('');
     const [activeIndex, setActiveIndex] = useState(0);
     const inputRef = useRef<HTMLInputElement>(null);
@@ -871,17 +872,29 @@ export const CommandPalette = ({ isOpen, onClose }: CommandPaletteProps) => {
         if (!isOpen) return [];
         const q = query.toLowerCase().trim();
 
-        const actions = [];
+        const actions: any[] = [];
 
         // Navigation Actions
-        if (!q || 'рабочий стол'.includes(q))
-            actions.push({ type: 'nav', label: 'Рабочий стол', icon: 'Home', path: '/dashboard' });
-        if (!q || 'расписание'.includes(q))
-            actions.push({ type: 'nav', label: 'Расписание', icon: 'Calendar', path: '/schedule' });
-        if (!q || 'замены'.includes(q))
-            actions.push({ type: 'nav', label: 'Замены', icon: 'Repeat', path: '/substitutions' });
-        if (!q || 'администрация'.includes(q))
-            actions.push({ type: 'nav', label: 'Администрация', icon: 'Settings', path: '/admin' });
+        const navItems = [
+            { label: 'Рабочий стол', icon: 'Home', path: '/dashboard' },
+            { label: 'Расписание 1 пол.', icon: 'Calendar', path: '/schedule' },
+            { label: 'Расписание 2 пол.', icon: 'Calendar', path: '/schedule2' },
+            { label: 'Замены', icon: 'Repeat', path: '/substitutions' },
+            { label: 'Дежурство', icon: 'Shield', path: '/duty' },
+            { label: 'Питание', icon: 'Coffee', path: '/nutrition' },
+            { label: 'Пропуски', icon: 'UserX', path: '/absenteeism' },
+            { label: 'Звонки', icon: 'Bell', path: '/bells' },
+            { label: 'Справочники', icon: 'BookOpen', path: '/directory' },
+            { label: 'Отчёты', icon: 'BarChart2', path: '/reports' },
+            { label: 'Экспорт', icon: 'Download', path: '/export' },
+            { label: 'Администрация', icon: 'Users', path: '/admin' },
+            { label: 'Настройки', icon: 'Settings', path: '/settings' }
+        ];
+        navItems.forEach((item) => {
+            if (!q || item.label.toLowerCase().includes(q)) {
+                actions.push({ type: 'nav', label: item.label, icon: item.icon, path: item.path });
+            }
+        });
 
         if (q) {
             // Teachers
@@ -902,10 +915,26 @@ export const CommandPalette = ({ isOpen, onClose }: CommandPaletteProps) => {
                     actions.push({ type: 'subject', label: s.name, icon: 'BookOpen', id: s.id });
                 }
             });
+            // Rooms
+            rooms.forEach((r) => {
+                if (r.name.toLowerCase().includes(q)) {
+                    actions.push({ type: 'room', label: `Кабинет ${r.name}`, icon: 'MapPin', id: r.id });
+                }
+            });
+            // Substitutions by date
+            const today = new Date().toISOString().split('T')[0];
+            substitutions.forEach((s) => {
+                if (s.date.includes(q) || s.date === today) {
+                    const t = teachers.find((x) => x.id === s.originalTeacherId);
+                    if (t && actions.filter((a) => a.type === 'sub').length < 3) {
+                        actions.push({ type: 'sub', label: `Замена ${s.date}`, icon: 'Repeat', id: s.date });
+                    }
+                }
+            });
         }
 
-        return actions.slice(0, 10); // Limit results
-    }, [query, teachers, classes, subjects, isOpen]);
+        return actions.slice(0, 15);
+    }, [query, teachers, classes, subjects, rooms, substitutions, isOpen]);
 
     useEffect(() => {
         if (isOpen) {
@@ -948,6 +977,10 @@ export const CommandPalette = ({ isOpen, onClose }: CommandPaletteProps) => {
             navigate(`/schedule?view=class&id=${action.id}`);
         } else if (action.type === 'subject') {
             navigate(`/schedule?view=subject&id=${action.id}`);
+        } else if (action.type === 'room') {
+            navigate(`/schedule?view=room&id=${action.id}`);
+        } else if (action.type === 'sub') {
+            navigate(`/substitutions?date=${action.id}`);
         }
         onClose();
     };

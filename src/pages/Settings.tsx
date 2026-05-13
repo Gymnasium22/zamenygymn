@@ -5,10 +5,12 @@ import { useToast } from '../components/UI';
 import {
     TelegramTemplates,
     AdminAnnouncement,
-    BellPreset
+    BellPreset,
+    AuditLogEntry
 } from '../types';
 import { INITIAL_DATA } from '../constants';
-import { formatDateEuropean } from '../utils/helpers';
+import { formatDateEuropean, formatDateISO } from '../utils/helpers';
+import { auditLog } from '../services/auditLog';
 import { SemesterConfig } from '../components/settings/SemesterConfig';
 import { TelegramTemplateEditor } from '../components/settings/TelegramTemplateEditor';
 
@@ -180,6 +182,9 @@ export const SettingsPage = () => {
         secondSemesterMonths: number[];
     }>({ firstSemesterMonths: [], secondSemesterMonths: [] });
     const [bellPresets, setBellPresets] = useState<BellPreset[]>([]);
+    const [isScheduleLocked, setIsScheduleLocked] = useState(false);
+    const [autoBackup, setAutoBackup] = useState(false);
+    const [backupTime, setBackupTime] = useState('02:00');
 
     // Notifications
     const [templates, setTemplates] = useState<TelegramTemplates>({
@@ -213,6 +218,9 @@ export const SettingsPage = () => {
             }
         );
         setBellPresets(settings.bellPresets || []);
+        setIsScheduleLocked(settings.isScheduleLocked || false);
+        setAutoBackup(settings.autoBackup || false);
+        setBackupTime(settings.backupTime || '02:00');
         setTemplates(
             settings.telegramTemplates || {
                 summary: '⚡️ **ЗАМЕНЫ НА {{date}}** ⚡️\n\n{{content}}',
@@ -261,8 +269,9 @@ export const SettingsPage = () => {
                 JSON.stringify([...origSem.firstSemesterMonths].sort()) ||
             JSON.stringify([...semesterConfig.secondSemesterMonths].sort()) !==
                 JSON.stringify([...origSem.secondSemesterMonths].sort());
-        return semChanged;
-    }, [semesterConfig, settings]);
+        const lockChanged = (settings.isScheduleLocked || false) !== isScheduleLocked;
+        return semChanged || lockChanged;
+    }, [semesterConfig, settings, isScheduleLocked]);
 
     const notificationsDirty = useMemo(() => {
         if (!settings) return false;
@@ -339,7 +348,8 @@ export const SettingsPage = () => {
             await saveStaticData({
                 settings: {
                     ...settings,
-                    semesterConfig
+                    semesterConfig,
+                    isScheduleLocked
                 }
             });
             addToast({ type: 'success', title: 'Сохранено', message: 'Настройки расписания обновлены' });
@@ -348,7 +358,7 @@ export const SettingsPage = () => {
         } finally {
             setIsSavingSection(null);
         }
-    }, [settings, semesterConfig, saveStaticData, addToast]);
+    }, [settings, semesterConfig, isScheduleLocked, saveStaticData, addToast]);
 
     const saveNotifications = useCallback(async () => {
         setIsSavingSection('notifications');
@@ -400,6 +410,24 @@ export const SettingsPage = () => {
             addToast({ type: 'success', title: 'Импорт', message: 'Настройки восстановлены из файла' });
         } catch (e) {
             addToast({ type: 'danger', title: 'Ошибка импорта', message: 'Файл повреждён или имеет неверный формат' });
+        }
+    };
+
+    const handleSaveBackupSettings = async () => {
+        setIsSavingSection('system');
+        try {
+            await saveStaticData({
+                settings: {
+                    ...settings,
+                    autoBackup,
+                    backupTime
+                }
+            });
+            addToast({ type: 'success', title: 'Сохранено', message: 'Настройки бекапа обновлены' });
+        } catch (e) {
+            addToast({ type: 'danger', title: 'Ошибка', message: 'Не удалось сохранить' });
+        } finally {
+            setIsSavingSection(null);
         }
     };
 
@@ -720,6 +748,35 @@ export const SettingsPage = () => {
                                         .
                                     </p>
                                 </div>
+
+                                <div className="pt-4 border-t border-slate-100 dark:border-slate-700">
+                                    <h4 className="font-bold text-sm text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2">
+                                        <Icon name="Lock" size={16} />
+                                        Безопасность
+                                    </h4>
+                                    <label className="flex items-center gap-3 cursor-pointer group">
+                                        <div
+                                            className={`relative w-11 h-6 rounded-full transition-colors ${
+                                                isScheduleLocked ? 'bg-indigo-600' : 'bg-slate-200 dark:bg-slate-600'
+                                            }`}
+                                            onClick={() => setIsScheduleLocked(!isScheduleLocked)}
+                                        >
+                                            <div
+                                                className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                                                    isScheduleLocked ? 'translate-x-5' : 'translate-x-0'
+                                                }`}
+                                            />
+                                        </div>
+                                        <div>
+                                            <div className="text-sm font-bold text-slate-700 dark:text-slate-300">
+                                                Заблокировать редактирование расписания
+                                            </div>
+                                            <div className="text-xs text-slate-400">
+                                                При включении никто не сможет менять уроки, пока админ не разблокирует
+                                            </div>
+                                        </div>
+                                    </label>
+                                </div>
                             </div>
                         </SectionCard>
                     )}
@@ -801,6 +858,32 @@ export const SettingsPage = () => {
                         <div className="space-y-6">
                             <div className="bg-white dark:bg-dark-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm p-6">
                                 <div className="flex items-center gap-3 mb-4">
+                                    <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
+                                        <Icon name="Shield" size={20} />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-slate-800 dark:text-white text-base">
+                                            Автоматический бекап
+                                        </h3>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                                            Отправка резервной копии в Telegram
+                                        </p>
+                                    </div>
+                                </div>
+                                <BackupControls
+                                    settings={settings}
+                                    privateSettings={privateSettings}
+                                    autoBackup={autoBackup}
+                                    backupTime={backupTime}
+                                    onAutoBackupChange={setAutoBackup}
+                                    onBackupTimeChange={setBackupTime}
+                                    onSave={handleSaveBackupSettings}
+                                    isSaving={isSavingSection === 'system'}
+                                />
+                            </div>
+
+                            <div className="bg-white dark:bg-dark-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm p-6">
+                                <div className="flex items-center gap-3 mb-4">
                                     <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
                                         <Icon name="Download" size={20} />
                                     </div>
@@ -840,6 +923,23 @@ export const SettingsPage = () => {
 
                             <div className="bg-white dark:bg-dark-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm p-6">
                                 <div className="flex items-center gap-3 mb-4">
+                                    <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                                        <Icon name="FileText" size={20} />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-slate-800 dark:text-white text-base">
+                                            Журнал действий
+                                        </h3>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                                            Кто и когда изменял данные
+                                        </p>
+                                    </div>
+                                </div>
+                                <AuditLogViewer />
+                            </div>
+
+                            <div className="bg-white dark:bg-dark-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm p-6">
+                                <div className="flex items-center gap-3 mb-4">
                                     <div className="w-10 h-10 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 flex items-center justify-center shrink-0">
                                         <Icon name="AlertTriangle" size={20} />
                                     </div>
@@ -874,6 +974,233 @@ export const SettingsPage = () => {
                 onConfirm={handleReset}
                 onCancel={() => setConfirmResetOpen(false)}
             />
+        </div>
+    );
+};
+
+// Backup Controls Component
+const BackupControls: React.FC<{
+    settings: any;
+    privateSettings: any;
+    autoBackup: boolean;
+    backupTime: string;
+    onAutoBackupChange: (v: boolean) => void;
+    onBackupTimeChange: (v: string) => void;
+    onSave: () => void;
+    isSaving: boolean;
+}> = ({ settings, privateSettings, autoBackup, backupTime, onAutoBackupChange, onBackupTimeChange, onSave, isSaving }) => {
+    const { addToast } = useToast();
+    const [isBackingUp, setIsBackingUp] = useState(false);
+
+    const handleBackupNow = async () => {
+        setIsBackingUp(true);
+        try {
+            const data = localStorage.getItem('gym_data_local_backup_v2');
+            if (!data) {
+                addToast({ type: 'warning', title: 'Бекап', message: 'Нет данных для бекапа' });
+                return;
+            }
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `gymnasium_backup_${formatDateISO()}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+            // Send to Telegram if configured
+            if (privateSettings.telegramToken && settings.feedbackChatId) {
+                const formData = new FormData();
+                formData.append('chat_id', settings.feedbackChatId);
+                formData.append('caption', `Автобекап ${formatDateEuropean(new Date())}`);
+                formData.append('document', new File([blob], `backup_${formatDateISO()}.json`, { type: 'application/json' }));
+                await fetch(
+                    `https://api.telegram.org/bot${privateSettings.telegramToken}/sendDocument`,
+                    { method: 'POST', body: formData }
+                );
+                addToast({ type: 'success', title: 'Бекап', message: 'Файл сохранён и отправлен в Telegram' });
+            } else {
+                addToast({ type: 'success', title: 'Бекап', message: 'Файл сохранён' });
+            }
+        } catch (e) {
+            addToast({ type: 'danger', title: 'Ошибка', message: 'Не удалось создать бекап' });
+        } finally {
+            setIsBackingUp(false);
+        }
+    };
+
+    const dirty = (settings.autoBackup || false) !== autoBackup || (settings.backupTime || '02:00') !== backupTime;
+
+    return (
+        <div className="space-y-4">
+            <div className="flex items-center gap-3">
+                <div
+                    className={`relative w-11 h-6 rounded-full transition-colors cursor-pointer ${
+                        autoBackup ? 'bg-indigo-600' : 'bg-slate-200 dark:bg-slate-600'
+                    }`}
+                    onClick={() => onAutoBackupChange(!autoBackup)}
+                >
+                    <div
+                        className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                            autoBackup ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                    />
+                </div>
+                <div>
+                    <div className="text-sm font-bold text-slate-700 dark:text-slate-300">Автоматический бекап</div>
+                    <div className="text-xs text-slate-400">Каждый день в указанное время</div>
+                </div>
+            </div>
+
+            {autoBackup && (
+                <div className="flex items-center gap-3">
+                    <label className="text-sm font-bold text-slate-700 dark:text-slate-300">Время:</label>
+                    <input
+                        type="time"
+                        value={backupTime}
+                        onChange={(e) => onBackupTimeChange(e.target.value)}
+                        className="border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500"
+                    />
+                </div>
+            )}
+
+            <div className="flex flex-wrap items-center gap-3 pt-2">
+                <button
+                    onClick={handleBackupNow}
+                    disabled={isBackingUp}
+                    className="px-4 py-2.5 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 rounded-xl font-bold text-sm hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition flex items-center gap-2 disabled:opacity-50"
+                >
+                    <Icon name={isBackingUp ? 'Loader' : 'Download'} size={16} className={isBackingUp ? 'animate-spin' : ''} />
+                    {isBackingUp ? 'Создание...' : 'Создать бекап сейчас'}
+                </button>
+                <button
+                    onClick={onSave}
+                    disabled={!dirty || isSaving}
+                    className={`px-4 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 transition ${
+                        dirty && !isSaving
+                            ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                            : 'bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed'
+                    }`}
+                >
+                    <Icon name={isSaving ? 'Loader' : 'Save'} size={16} className={isSaving ? 'animate-spin' : ''} />
+                    {isSaving ? 'Сохранение...' : 'Сохранить настройки'}
+                </button>
+            </div>
+            <p className="text-[11px] text-slate-400">
+                Автобэкап отправляется только в Telegram без сохранения на устройство.
+                Ручной бэкап — скачивает файл и отправляет в Telegram (если настроен).
+            </p>
+        </div>
+    );
+};
+
+// Audit Log Viewer Component
+const AuditLogViewer: React.FC = () => {
+    const [entries, setEntries] = useState<AuditLogEntry[]>([]);
+    const { addToast } = useToast();
+
+    useEffect(() => {
+        setEntries(auditLog.getEntries(100));
+    }, []);
+
+    const handleRefresh = () => {
+        setEntries(auditLog.getEntries(100));
+    };
+
+    const handleExport = () => {
+        const blob = new Blob([auditLog.exportJson()], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `audit_log_${formatDateISO()}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        addToast({ type: 'success', title: 'Экспорт', message: 'Журнал действий сохранён' });
+    };
+
+    const actionLabels: Record<string, string> = {
+        create: 'Создание',
+        update: 'Изменение',
+        delete: 'Удаление',
+        import: 'Импорт',
+        export: 'Экспорт',
+        apply: 'Применение'
+    };
+
+    const entityLabels: Record<string, string> = {
+        schedule: 'Расписание',
+        substitution: 'Замена',
+        teacher: 'Учитель',
+        class: 'Класс',
+        room: 'Кабинет',
+        subject: 'Предмет',
+        settings: 'Настройки',
+        bells: 'Звонки',
+        duty: 'Дежурство',
+        nutrition: 'Питание',
+        absenteeism: 'Пропуски'
+    };
+
+    return (
+        <div>
+            <div className="flex gap-2 mb-3">
+                <button
+                    onClick={handleRefresh}
+                    className="px-3 py-1.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg text-xs font-bold hover:bg-slate-200 transition"
+                >
+                    Обновить
+                </button>
+                <button
+                    onClick={handleExport}
+                    className="px-3 py-1.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg text-xs font-bold hover:bg-slate-200 transition"
+                >
+                    Скачать JSON
+                </button>
+            </div>
+            <div className="max-h-60 overflow-y-auto custom-scrollbar border border-slate-100 dark:border-slate-700 rounded-xl">
+                {entries.length === 0 ? (
+                    <div className="p-4 text-center text-sm text-slate-400">Журнал пуст</div>
+                ) : (
+                    <table className="w-full text-sm">
+                        <thead className="bg-slate-50 dark:bg-slate-800 sticky top-0">
+                            <tr>
+                                <th className="text-left px-3 py-2 text-xs font-bold text-slate-500 dark:text-slate-400">Время</th>
+                                <th className="text-left px-3 py-2 text-xs font-bold text-slate-500 dark:text-slate-400">Пользователь</th>
+                                <th className="text-left px-3 py-2 text-xs font-bold text-slate-500 dark:text-slate-400">Действие</th>
+                                <th className="text-left px-3 py-2 text-xs font-bold text-slate-500 dark:text-slate-400">Объект</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                            {entries.map((entry) => (
+                                <tr key={entry.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                                    <td className="px-3 py-2 text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                                        {new Date(entry.timestamp).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                                    </td>
+                                    <td className="px-3 py-2 text-slate-600 dark:text-slate-300 truncate max-w-[120px]" title={entry.userEmail}>
+                                        {entry.userEmail}
+                                    </td>
+                                    <td className="px-3 py-2">
+                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                                            entry.action === 'delete' ? 'bg-red-100 text-red-700' :
+                                            entry.action === 'create' ? 'bg-emerald-100 text-emerald-700' :
+                                            'bg-blue-100 text-blue-700'
+                                        }`}>
+                                            {actionLabels[entry.action] || entry.action}
+                                        </span>
+                                    </td>
+                                    <td className="px-3 py-2 text-slate-600 dark:text-slate-300">
+                                        {entityLabels[entry.entityType] || entry.entityType}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                )}
+            </div>
         </div>
     );
 };
