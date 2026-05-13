@@ -33,7 +33,7 @@ if (!firebaseConfig.apiKey) {
     console.error(
         'CRITICAL ERROR: Firebase API Key is missing. Ensure your .env file exists and VITE_ variables are set.'
     );
-} else {
+} else if (import.meta.env.DEV) {
     console.log('Firebase initialized successfully (Modular SDK)');
 }
 

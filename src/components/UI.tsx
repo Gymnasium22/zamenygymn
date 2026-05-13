@@ -40,7 +40,7 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
 
             // Generate ID here to avoid dependency issues
             const id = Date.now().toString() + Math.random().toString(36).substring(2, 9);
-            setToasts((prev) => [...prev, { type: type as any, title, message, id }]);
+            setToasts((prev) => [...prev, { type: type as ToastProps['type'], title, message, id }]);
         };
         window.addEventListener('app-toast', handleAppToast);
         return () => window.removeEventListener('app-toast', handleAppToast);

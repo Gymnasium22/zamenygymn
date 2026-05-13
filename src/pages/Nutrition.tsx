@@ -213,7 +213,7 @@ export const NutritionPage = () => {
             }
         }
 
-        await saveScheduleData({ nutritionRecords: updatedRecords } as any);
+        await saveScheduleData({ nutritionRecords: updatedRecords });
         addToast({ type: 'success', title: 'Данные сохранены' });
         closeModal();
     }, [
@@ -243,7 +243,7 @@ export const NutritionPage = () => {
             if (!window.confirm('Удалить запись?')) return;
 
             const updatedRecords = nutritionRecords.filter((r) => r.id !== recordId);
-            await saveScheduleData({ nutritionRecords: updatedRecords } as any);
+            await saveScheduleData({ nutritionRecords: updatedRecords });
             addToast({ type: 'success', title: 'Запись удалена' });
         },
         [nutritionRecords, saveScheduleData, isAdmin, user, addToast]

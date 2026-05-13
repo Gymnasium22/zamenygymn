@@ -39,14 +39,14 @@ class WeatherService {
         try {
             // Fetch Current Weather
             const currentRes = await fetch(
-                `https://api.openweathermap.org/data/2.5/weather?q=${city}&units=metric&lang=ru&appid=${apiKey}`
+                `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&units=metric&lang=ru&appid=${apiKey}`
             );
             if (!currentRes.ok) throw new Error('Weather API Error');
             const currentData = await currentRes.json();
 
             // Fetch Forecast (5 days / 3 hour steps)
             const forecastRes = await fetch(
-                `https://api.openweathermap.org/data/2.5/forecast?q=${city}&units=metric&lang=ru&appid=${apiKey}`
+                `https://api.openweathermap.org/data/2.5/forecast?q=${encodeURIComponent(city)}&units=metric&lang=ru&appid=${apiKey}`
             );
             if (!forecastRes.ok) throw new Error('Forecast API Error');
             const forecastRaw = await forecastRes.json();

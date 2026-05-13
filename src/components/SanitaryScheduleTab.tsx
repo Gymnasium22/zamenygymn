@@ -112,7 +112,7 @@ export function SanitaryScheduleTab(props: {
             schedule: baseSchedule.map((x) => ({ ...x })),
             subjects,
             classes: eligibleClasses.map((c) => ({ id: c.id, name: c.name, shift: c.shift })),
-            periodsByShift: SHIFT_PERIODS as any
+            periodsByShift: SHIFT_PERIODS
         });
         return { schedule: baseSchedule.map((x) => ({ ...x })), analysisByClassId, swapsApplied: 0 };
     });
@@ -123,7 +123,7 @@ export function SanitaryScheduleTab(props: {
             schedule: baseSchedule.map((x) => ({ ...x })),
             subjects,
             classes: eligibleClasses.map((c) => ({ id: c.id, name: c.name, shift: c.shift })),
-            periodsByShift: SHIFT_PERIODS as any
+            periodsByShift: SHIFT_PERIODS
         });
         setSanitaryBase({ schedule: baseSchedule.map((x) => ({ ...x })), analysisByClassId, swapsApplied: 0 });
         setModeLabel('base');
@@ -492,7 +492,7 @@ export function SanitaryScheduleTab(props: {
             baseSchedule,
             subjects,
             classes: eligibleClasses.map((c) => ({ id: c.id, name: c.name, shift: c.shift })),
-            periodsByShift: SHIFT_PERIODS as any,
+            periodsByShift: SHIFT_PERIODS,
             maxIterations: 100000, // Увеличено для лучшей оптимизации
             maxSwaps: 1500, // Увеличено для большей свободы перемещений
             enforceTeacherConflicts: false // Учителя не учитываются
@@ -512,7 +512,7 @@ export function SanitaryScheduleTab(props: {
             schedule: baseSchedule.map((x) => ({ ...x })),
             subjects,
             classes: eligibleClasses.map((c) => ({ id: c.id, name: c.name, shift: c.shift })),
-            periodsByShift: SHIFT_PERIODS as any
+            periodsByShift: SHIFT_PERIODS
         });
         setSanitaryBase({ schedule: baseSchedule.map((x) => ({ ...x })), analysisByClassId, swapsApplied: 0 });
         setLastOptimizedAt(new Date().toLocaleString('ru-RU'));

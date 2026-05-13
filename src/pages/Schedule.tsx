@@ -74,6 +74,10 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
     const [isMassOperationsModalOpen, setIsMassOperationsModalOpen] = useState(false);
     const [massOpConfirm, setMassOpConfirm] = useState({ isOpen: false, type: '', day: '', classId: '' });
 
+    // Conflict save confirmation modal
+    const [saveConflictModalOpen, setSaveConflictModalOpen] = useState(false);
+    const [saveConflictMessage, setSaveConflictMessage] = useState('');
+
     // State for Mass Ops Modal Selections
     const [massOpSelectedDay, setMassOpSelectedDay] = useState<string>(DayOfWeek.Monday);
     const [massOpSelectedClass, setMassOpSelectedClass] = useState<string>('');
@@ -88,7 +92,7 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
         const shift = searchParams.get('shift');
 
         if (view && ['class', 'teacher', 'subject', 'week'].includes(view)) {
-            setViewMode(view as any);
+            setViewMode(view as typeof viewMode);
             if (id) setFilterId(id);
             if (day && DAYS.includes(day as DayOfWeek)) {
                 setSelectedDay(day as DayOfWeek);
@@ -387,6 +391,16 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
         setValidationWarnings([]);
         setIsEditorOpen(true);
     };
+    const executeSaveItem = async () => {
+        const newSchedule = [...schedule];
+        const idx = newSchedule.findIndex((s) => s.id === tempItem.id);
+        if (idx >= 0) newSchedule[idx] = tempItem as ScheduleItem;
+        else newSchedule.push(tempItem as ScheduleItem);
+        await saveCurrentSchedule(newSchedule);
+        setIsEditorOpen(false);
+        setSaveConflictModalOpen(false);
+    };
+
     const handleSaveItem = async () => {
         if (!tempItem.subjectId || !tempItem.teacherId || !tempItem.classId) return;
 
@@ -434,21 +448,12 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
                 .map((type) => conflictNames[type as keyof typeof conflictNames])
                 .join(', ');
 
-            if (
-                !confirm(
-                    `⚠️ Обнаружены конфликты: ${conflictMessages} уже заняты в это время.\n\nВсе равно сохранить урок?`
-                )
-            ) {
-                return;
-            }
+            setSaveConflictMessage(conflictMessages);
+            setSaveConflictModalOpen(true);
+            return;
         }
 
-        const newSchedule = [...schedule];
-        const idx = newSchedule.findIndex((s) => s.id === tempItem.id);
-        if (idx >= 0) newSchedule[idx] = tempItem as ScheduleItem;
-        else newSchedule.push(tempItem as ScheduleItem);
-        await saveCurrentSchedule(newSchedule);
-        setIsEditorOpen(false);
+        await executeSaveItem();
     };
     const handleDeleteItem = async (id?: string) => {
         const newSchedule = schedule.filter((s) => s.id !== (id || tempItem.id));
@@ -1377,6 +1382,32 @@ export const SchedulePage = ({ readOnly = false, semester = 1 }: SchedulePagePro
                     <button onClick={confirmMassClear} className="px-4 py-2 bg-red-600 text-white rounded-lg font-bold">
                         Подтвердить
                     </button>
+                </div>
+            </Modal>
+
+            {/* Save Conflict Confirmation Modal */}
+            <Modal isOpen={saveConflictModalOpen} onClose={() => setSaveConflictModalOpen(false)} title="Обнаружены конфликты">
+                <div className="space-y-4">
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                        ⚠️ Обнаружены конфликты: <span className="font-bold text-red-600">{saveConflictMessage}</span> уже заняты в это время.
+                    </p>
+                    <p className="text-sm text-slate-600 dark:text-slate-300">
+                        Все равно сохранить урок?
+                    </p>
+                    <div className="flex justify-end gap-3">
+                        <button
+                            onClick={() => setSaveConflictModalOpen(false)}
+                            className="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg font-bold hover:bg-slate-300 transition text-sm"
+                        >
+                            Отмена
+                        </button>
+                        <button
+                            onClick={executeSaveItem}
+                            className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition text-sm"
+                        >
+                            Сохранить
+                        </button>
+                    </div>
                 </div>
             </Modal>
 

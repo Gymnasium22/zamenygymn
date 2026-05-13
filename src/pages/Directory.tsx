@@ -74,7 +74,7 @@ export const DirectoryPage = () => {
                 return Math.max(max, itemWithOrder.order || 0);
             }, 0);
             const newItem = { ...form, id: generateId(), order: maxOrder + 1 };
-            newList.push(newItem as any);
+            newList.push(newItem as (typeof newList)[number]);
         }
 
         await saveStaticData({ [key]: newList });

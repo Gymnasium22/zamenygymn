@@ -400,8 +400,8 @@ export const ExportPage = () => {
                         substitutions: json.substitutions || [],
                         settings: { ...INITIAL_DATA.settings, ...json.settings }
                     };
-                    await saveStaticData(mergedData as any);
-                    await saveScheduleData(mergedData as any);
+                    await saveStaticData(mergedData);
+                    await saveScheduleData(mergedData);
                     addToast({ type: 'success', title: 'Успешно', message: 'База успешно восстановлена!' });
                 }
             } catch (err) {

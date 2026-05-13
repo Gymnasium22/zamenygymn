@@ -337,7 +337,7 @@ export const dbService = {
                         const orderB = typeof b.order === 'number' ? b.order : 999999;
                         return orderA - orderB;
                     });
-                    (localData as any)[key] = items;
+                    (localData as Record<string, unknown>)[key] = items;
                     triggerUpdate(key as string);
                 },
                 (err) => {
@@ -451,6 +451,7 @@ export const dbService = {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        URL.revokeObjectURL(url);
     },
 
     setPublicData: async (id: string, data: AppData) => {

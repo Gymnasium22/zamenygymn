@@ -579,7 +579,7 @@ export const AbsenteeismPage = () => {
                                 />
                                 <select
                                     value={newAbsenceReason}
-                                    onChange={(e) => setNewAbsenceReason(e.target.value as any)}
+                                    onChange={(e) => setNewAbsenceReason(e.target.value as StudentAbsence['reason'])}
                                     className="px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-dark-800 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                 >
                                     <option value="illness">Болезнь</option>
