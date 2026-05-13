@@ -10,6 +10,7 @@ import { DirectoryPage } from './pages/Directory';
 import { BellsPage } from './pages/Bells';
 import { SubstitutionsPage } from './pages/Substitutions';
 import { AdminPage } from './pages/Admin';
+import { SettingsPage } from './pages/Settings';
 import { ExportPage } from './pages/Export';
 import { ReportsPage } from './pages/Reports';
 import { DutyPage } from './pages/Duty';
@@ -111,7 +112,8 @@ const Layout = () => {
         { to: '/directory', label: 'Справочники', icon: 'BookOpen', roles: ['admin'] },
         { to: '/reports', label: 'Отчеты', icon: 'BarChart2', roles: ['admin'] },
         { to: '/export', label: 'Экспорт', icon: 'Download', roles: ['admin'] },
-        { to: '/admin', label: 'Администрация', icon: 'Settings', roles: ['admin'] }
+        { to: '/admin', label: 'Администрация', icon: 'Users', roles: ['admin'] },
+        { to: '/settings', label: 'Настройки', icon: 'Settings', roles: ['admin'] }
     ];
 
     const filteredMenuItems = menuItems.filter((item) => item.roles.includes(role || ''));
@@ -130,7 +132,7 @@ const Layout = () => {
                 className={`fixed lg:static inset-y-0 left-0 z-50 w-64 lg:w-64 bg-white/80 dark:bg-dark-800/90 backdrop-blur-xl border-r border-slate-200/50 dark:border-slate-700/50 transform transition-transform duration-300 ease-in-out ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} no-print shadow-2xl lg:shadow-none overflow-hidden`}
             >
                 <div className="h-full flex flex-col relative">
-                    <div className="p-6 flex items-center gap-3 border-b border-slate-100 dark:border-slate-700 pt-8">
+                    <div className="p-5 flex items-center gap-3 border-b border-slate-100 dark:border-slate-700 pt-6">
                         <div className="bg-indigo-600 p-2.5 rounded-xl text-white relative shadow-lg shadow-indigo-200 dark:shadow-none transition-colors duration-500">
                             <Icon name="GraduationCap" size={24} />
                         </div>
@@ -140,14 +142,14 @@ const Layout = () => {
                         </div>
                     </div>
 
-                    <nav className="flex-1 p-4 space-y-1 overflow-y-auto custom-scrollbar">
+                    <nav className="flex-1 p-4 space-y-0.5 overflow-y-auto no-scrollbar">
                         {filteredMenuItems.map((item) => (
                             <NavLink
                                 key={item.to}
                                 to={item.to}
                                 onClick={() => setIsMobileMenuOpen(false)}
                                 className={({ isActive }) => `
-                                    group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold transition-all relative
+                                    group flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-semibold transition-all relative
                                     ${
                                         isActive
                                             ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 shadow-sm'
@@ -166,7 +168,7 @@ const Layout = () => {
                         <StatusWidget />
                     </div>
 
-                    <div className="p-4 border-t border-slate-100 dark:border-slate-700 space-y-3">
+                    <div className="p-3 border-t border-slate-100 dark:border-slate-700 space-y-2">
                         <div className="flex items-center justify-between px-2">
                             <div className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase truncate max-w-[120px]">
                                 {user ? user.email || 'Гость' : 'Гость'}
@@ -381,6 +383,14 @@ export default function App() {
                                             element={
                                                 <ProtectedRoute allowedRoles={['admin']}>
                                                     <ExportPage />
+                                                </ProtectedRoute>
+                                            }
+                                        />
+                                        <Route
+                                            path="settings"
+                                            element={
+                                                <ProtectedRoute allowedRoles={['admin']}>
+                                                    <SettingsPage />
                                                 </ProtectedRoute>
                                             }
                                         />

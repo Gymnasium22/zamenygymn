@@ -1,13 +1,12 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useStaticData, useScheduleData } from '../context/DataContext';
 import { Icon } from '../components/Icons';
-import { Shift, SHIFT_PERIODS, DAYS, TelegramTemplates, AdminAnnouncement } from '../types';
+import { Shift, SHIFT_PERIODS, DAYS } from '../types';
 import { formatDateISO, getScheduleForDate } from '../utils/helpers';
-import { Modal, useToast } from '../components/UI';
+
 
 export const AdminPage = () => {
-    const { subjects, teachers, rooms, settings, privateSettings, saveStaticData } = useStaticData();
-    const { addToast } = useToast();
+    const { subjects, teachers, rooms, settings } = useStaticData();
     const { schedule1, schedule2 } = useScheduleData();
 
     const [activeTab, setActiveTab] = useState('teachers');
@@ -18,64 +17,12 @@ export const AdminPage = () => {
     const [roomShift, setRoomShift] = useState(Shift.First);
     const [roomPeriod, setRoomPeriod] = useState(1);
 
-    const [telegramToken, setTelegramToken] = useState('');
-    const [feedbackChatId, setFeedbackChatId] = useState('');
-
-    // Weather Settings
-    const [weatherApiKey, setWeatherApiKey] = useState('');
-    const [weatherCity, setWeatherCity] = useState('');
-
-    // School Settings
-    const [schoolName, setSchoolName] = useState('');
-    const [directorName, setDirectorName] = useState('');
-    const [unionChairName, setUnionChairName] = useState('');
-    const [secretaryName, setSecretaryName] = useState('');
-    const [currentYear, setCurrentYear] = useState<number | ''>('');
-
-    // Telegram Templates State
-    const [templates, setTemplates] = useState<TelegramTemplates>({
-        summary: '',
-        teacherNotification: '',
-        teacherSummary: ''
-    });
-    const [isTemplatesModalOpen, setIsTemplatesModalOpen] = useState(false);
-
-    // Admin Announcement State
-    const [announcement, setAnnouncement] = useState<AdminAnnouncement>({
-        message: '',
-        active: false,
-        lastUpdated: ''
-    });
-
     // Определяем актуальное расписание на основе выбранной даты
     const activeSchedule = useMemo(() => {
         const data = { schedule: schedule1, schedule2, settings };
         const schedule = getScheduleForDate(new Date(selectedDate), data);
         return schedule;
     }, [selectedDate, schedule1, schedule2, settings]);
-
-    useEffect(() => {
-        if (settings) {
-            setTelegramToken(privateSettings.telegramToken || '');
-            setFeedbackChatId(settings.feedbackChatId || '');
-            setWeatherApiKey(privateSettings.weatherApiKey || '');
-            setWeatherCity(settings.weatherCity || 'Minsk,BY');
-            setSchoolName(settings.schoolName || '');
-            setDirectorName(settings.directorName || '');
-            setUnionChairName(settings.unionChairName || '');
-            setSecretaryName(settings.secretaryName || '');
-            setCurrentYear(settings.currentYear || '');
-            setTemplates(
-                settings.telegramTemplates || {
-                    summary: '⚡️ **ЗАМЕНЫ НА {{date}}** ⚡️\n\n{{content}}',
-                    teacherNotification:
-                        '🔔 **Вам назначена замена!**\n📅 {{date}}\n\n{{content}}\n\nПожалуйста, ознакомьтесь с деталями.',
-                    teacherSummary: '🔔 **Ваши замены на {{date}}**\n\n{{content}}Пожалуйста, ознакомьтесь с деталями.'
-                }
-            );
-            setAnnouncement(settings.adminAnnouncement || { message: '', active: false, lastUpdated: '' });
-        }
-    }, [settings, privateSettings]);
 
     useEffect(() => {
         setAfterPeriod(teacherShift === Shift.First ? 1 : 0);
@@ -125,43 +72,12 @@ export const AdminPage = () => {
         return availableDictRooms;
     }, [activeSchedule, rooms, selectedDayOfWeek, roomPeriod, roomShift]);
 
-    const saveSettings = async () => {
-        await saveStaticData({
-            settings: {
-                ...settings,
-                feedbackChatId,
-                weatherCity,
-                schoolName,
-                directorName,
-                unionChairName,
-                secretaryName,
-                currentYear: currentYear ? Number(currentYear) : undefined,
-                telegramTemplates: templates,
-                adminAnnouncement: {
-                    ...announcement,
-                    lastUpdated: new Date().toISOString()
-                }
-            },
-            privateSettings: {
-                ...privateSettings,
-                telegramToken,
-                weatherApiKey
-            }
-        });
-        addToast({ type: 'success', title: 'Успешно', message: 'Настройки сохранены!' });
-        setIsTemplatesModalOpen(false);
-    };
-
-    const toggleAnnouncement = () => {
-        setAnnouncement((prev) => ({ ...prev, active: !prev.active }));
-    };
-
     return (
         <div className="max-w-7xl mx-auto w-full pb-20">
             <div className="bg-white dark:bg-dark-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 mb-8">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-6">
                     <h1 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
-                        <Icon name="Settings" className="text-indigo-600 dark:text-indigo-400" />
+                        <Icon name="Users" className="text-indigo-600 dark:text-indigo-400" />
                         Администрация и Поиск
                     </h1>
                     <div className="flex gap-2 bg-slate-100 dark:bg-slate-700 p-1 rounded-xl">
@@ -177,28 +93,20 @@ export const AdminPage = () => {
                         >
                             Кабинеты
                         </button>
-                        <button
-                            onClick={() => setActiveTab('settings')}
-                            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'settings' ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'}`}
-                        >
-                            Настройки
-                        </button>
                     </div>
                 </div>
 
-                {activeTab !== 'settings' && (
-                    <div className="mb-6">
-                        <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-2 tracking-wider">
-                            Дата
-                        </label>
-                        <input
-                            type="date"
-                            value={selectedDate}
-                            onChange={(e) => setSelectedDate(e.target.value)}
-                            className="border border-slate-200 dark:border-slate-600 p-3 rounded-xl font-bold outline-none focus:border-indigo-500 bg-transparent dark:text-white w-full md:w-auto min-w-[200px]"
-                        />
-                    </div>
-                )}
+                <div className="mb-6">
+                    <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-2 tracking-wider">
+                        Дата
+                    </label>
+                    <input
+                        type="date"
+                        value={selectedDate}
+                        onChange={(e) => setSelectedDate(e.target.value)}
+                        className="border border-slate-200 dark:border-slate-600 p-3 rounded-xl font-bold outline-none focus:border-indigo-500 bg-transparent dark:text-white w-full md:w-auto min-w-[200px]"
+                    />
+                </div>
 
                 {activeTab === 'teachers' && (
                     <div className="flex flex-wrap gap-8 items-end">
@@ -279,212 +187,6 @@ export const AdminPage = () => {
                         </div>
                     </div>
                 )}
-
-                {activeTab === 'settings' && (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-                        <div className="bg-slate-50 dark:bg-slate-700/30 p-6 rounded-2xl border border-slate-100 dark:border-slate-700 space-y-6">
-                            <h3 className="font-bold text-lg text-slate-800 dark:text-white flex items-center gap-2">
-                                <Icon name="Zap" size={20} /> Основные настройки
-                            </h3>
-
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">
-                                        Bot Token
-                                    </label>
-                                    <input
-                                        type="password"
-                                        value={telegramToken}
-                                        onChange={(e) => setTelegramToken(e.target.value)}
-                                        placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
-                                        className="w-full border border-slate-200 dark:border-slate-600 p-3 rounded-xl text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500"
-                                    />
-                                    <p className="text-[10px] text-slate-400 mt-1">Токен от @BotFather</p>
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">
-                                        Chat ID для обратной связи
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={feedbackChatId}
-                                        onChange={(e) => setFeedbackChatId(e.target.value)}
-                                        placeholder="-100123456789"
-                                        className="w-full border border-slate-200 dark:border-slate-600 p-3 rounded-xl text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500"
-                                    />
-                                    <p className="text-[10px] text-slate-400 mt-1">ID чата или администратора</p>
-                                </div>
-
-                                <div className="pt-4 border-t border-slate-200 dark:border-slate-600">
-                                    <h4 className="font-bold text-sm text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-2">
-                                        <Icon name="Cloud" size={16} /> Погода (OpenWeatherMap)
-                                    </h4>
-                                    <div className="space-y-3">
-                                        <div>
-                                            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">
-                                                API Key
-                                            </label>
-                                            <input
-                                                type="password"
-                                                value={weatherApiKey}
-                                                onChange={(e) => setWeatherApiKey(e.target.value)}
-                                                placeholder="b6907d28..."
-                                                className="w-full border border-slate-200 dark:border-slate-600 p-3 rounded-xl text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">
-                                                Город
-                                            </label>
-                                            <input
-                                                type="text"
-                                                value={weatherCity}
-                                                onChange={(e) => setWeatherCity(e.target.value)}
-                                                placeholder="Minsk,BY"
-                                                className="w-full border border-slate-200 dark:border-slate-600 p-3 rounded-xl text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="pt-4 border-t border-slate-200 dark:border-slate-600">
-                                    <h4 className="font-bold text-sm text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-2">
-                                        <Icon name="Users" size={16} /> Данные учреждения
-                                    </h4>
-                                    <div className="space-y-3">
-                                        <div>
-                                            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">
-                                                Название школы
-                                            </label>
-                                            <input
-                                                type="text"
-                                                value={schoolName}
-                                                onChange={(e) => setSchoolName(e.target.value)}
-                                                placeholder="ГУО «Гимназия №22 г.Минска»"
-                                                className="w-full border border-slate-200 dark:border-slate-600 p-3 rounded-xl text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500"
-                                            />
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <div>
-                                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">
-                                                    Директор
-                                                </label>
-                                                <input
-                                                    type="text"
-                                                    value={directorName}
-                                                    onChange={(e) => setDirectorName(e.target.value)}
-                                                    placeholder="Н.В.Кисель"
-                                                    className="w-full border border-slate-200 dark:border-slate-600 p-3 rounded-xl text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">
-                                                    Пред. Профкома
-                                                </label>
-                                                <input
-                                                    type="text"
-                                                    value={unionChairName}
-                                                    onChange={(e) => setUnionChairName(e.target.value)}
-                                                    placeholder="Ю.Г.Миханова"
-                                                    className="w-full border border-slate-200 dark:border-slate-600 p-3 rounded-xl text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">
-                                                    Секретарь
-                                                </label>
-                                                <input
-                                                    type="text"
-                                                    value={secretaryName}
-                                                    onChange={(e) => setSecretaryName(e.target.value)}
-                                                    placeholder="Е.К.Шунто"
-                                                    className="w-full border border-slate-200 dark:border-slate-600 p-3 rounded-xl text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">
-                                                    Год (для док-тов)
-                                                </label>
-                                                <input
-                                                    type="number"
-                                                    value={currentYear}
-                                                    onChange={(e) =>
-                                                        setCurrentYear(
-                                                            e.target.value === '' ? '' : Number(e.target.value)
-                                                        )
-                                                    }
-                                                    placeholder="2026"
-                                                    className="w-full border border-slate-200 dark:border-slate-600 p-3 rounded-xl text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500"
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <button
-                                    onClick={() => setIsTemplatesModalOpen(true)}
-                                    className="w-full px-4 py-3 bg-white dark:bg-slate-700 border border-indigo-200 dark:border-slate-600 text-indigo-600 dark:text-indigo-400 rounded-xl font-bold hover:bg-indigo-50 dark:hover:bg-slate-600 transition flex items-center justify-center gap-2"
-                                >
-                                    <Icon name="Edit" size={18} /> Редактировать шаблоны сообщений
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="bg-amber-50 dark:bg-amber-900/20 p-6 rounded-2xl border border-amber-100 dark:border-amber-900 space-y-6">
-                            <h3 className="font-bold text-lg text-amber-900 dark:text-amber-100 flex items-center gap-2">
-                                <Icon name="Bell" size={20} /> Доска объявлений
-                            </h3>
-                            <p className="text-sm text-amber-800 dark:text-amber-200">
-                                Сообщение, которое увидят все учителя на главной странице (Рабочий стол).
-                            </p>
-
-                            <div>
-                                <textarea
-                                    value={announcement.message}
-                                    onChange={(e) => setAnnouncement({ ...announcement, message: e.target.value })}
-                                    rows={4}
-                                    className="w-full border border-amber-200 dark:border-amber-800 rounded-xl p-3 text-sm bg-white dark:bg-slate-800 dark:text-white outline-none focus:border-amber-500 focus:ring-2 ring-amber-500/20 resize-none"
-                                    placeholder="Например: Срочный педсовет сегодня в 14:00..."
-                                />
-                            </div>
-
-                            <div className="flex items-center justify-between">
-                                <label className="flex items-center gap-3 cursor-pointer">
-                                    <div
-                                        className={`w-12 h-6 rounded-full p-1 transition-colors ${announcement.active ? 'bg-amber-500' : 'bg-slate-300 dark:bg-slate-600'}`}
-                                    >
-                                        <div
-                                            className={`w-4 h-4 bg-white rounded-full shadow-sm transform transition-transform ${announcement.active ? 'translate-x-6' : 'translate-x-0'}`}
-                                        ></div>
-                                    </div>
-                                    <input
-                                        type="checkbox"
-                                        className="hidden"
-                                        checked={announcement.active}
-                                        onChange={toggleAnnouncement}
-                                    />
-                                    <span className="text-sm font-bold text-slate-700 dark:text-slate-300">
-                                        Активно
-                                    </span>
-                                </label>
-                                <div className="text-xs text-slate-400">
-                                    {announcement.lastUpdated
-                                        ? `Обновлено: ${new Date(announcement.lastUpdated).toLocaleDateString()}`
-                                        : ''}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="lg:col-span-2">
-                            <button
-                                onClick={saveSettings}
-                                className="w-full px-6 py-4 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition shadow-lg shadow-indigo-200 dark:shadow-none flex items-center justify-center gap-2 text-lg"
-                            >
-                                <Icon name="Save" size={22} /> Сохранить все настройки
-                            </button>
-                        </div>
-                    </div>
-                )}
             </div>
 
             {activeTab === 'teachers' && (
@@ -553,72 +255,6 @@ export const AdminPage = () => {
                     )}
                 </div>
             )}
-
-            <Modal
-                isOpen={isTemplatesModalOpen}
-                onClose={() => setIsTemplatesModalOpen(false)}
-                title="Шаблоны сообщений"
-                maxWidth="max-w-3xl"
-            >
-                <div className="space-y-6">
-                    <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl border border-blue-100 dark:border-blue-900 text-sm text-blue-800 dark:text-blue-300">
-                        <p className="font-bold mb-1">Доступные переменные:</p>
-                        <ul className="list-disc list-inside space-y-1">
-                            <li>
-                                <code>{`{{date}}`}</code> — Текущая дата (напр. "01.09.2023")
-                            </li>
-                            <li>
-                                <code>{`{{content}}`}</code> — Сгенерированный список замен
-                            </li>
-                        </ul>
-                    </div>
-
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">
-                            Общая сводка (Канал/Группа)
-                        </label>
-                        <textarea
-                            value={templates.summary}
-                            onChange={(e) => setTemplates({ ...templates, summary: e.target.value })}
-                            rows={4}
-                            className="w-full border border-slate-200 dark:border-slate-600 rounded-xl p-3 text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500 font-mono"
-                        />
-                    </div>
-
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">
-                            Личное уведомление (Один урок)
-                        </label>
-                        <textarea
-                            value={templates.teacherNotification}
-                            onChange={(e) => setTemplates({ ...templates, teacherNotification: e.target.value })}
-                            rows={4}
-                            className="w-full border border-slate-200 dark:border-slate-600 rounded-xl p-3 text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500 font-mono"
-                        />
-                    </div>
-
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">
-                            Личная сводка (Все замены учителю)
-                        </label>
-                        <textarea
-                            value={templates.teacherSummary}
-                            onChange={(e) => setTemplates({ ...templates, teacherSummary: e.target.value })}
-                            rows={4}
-                            className="w-full border border-slate-200 dark:border-slate-600 rounded-xl p-3 text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500 font-mono"
-                        />
-                    </div>
-
-                    <div className="flex justify-end pt-4">
-                        <button
-                            onClick={saveSettings}
-                            className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition"
-                        >
-                            Сохранить шаблоны
-                        </button>
-                    </div>
-                </div>
-            </Modal>
         </div>
     );
 };

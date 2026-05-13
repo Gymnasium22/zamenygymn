@@ -121,6 +121,7 @@ export interface Settings {
     telegramToken: string;
     publicScheduleId?: string | null; // ID for publicly published schedule
     feedbackChatId?: string;
+    adminTelegramChatId?: string; // ID администратора для системных уведомлений
     bellPresets?: BellPreset[];
     semesterConfig?: {
         firstSemesterMonths: number[]; // Массив месяцев для 1 семестра (0-11)

@@ -98,6 +98,7 @@ export const INITIAL_DATA: AppData = {
         telegramToken: '',
         publicScheduleId: null,
         feedbackChatId: '',
+        adminTelegramChatId: '',
         weatherCity: 'Minsk,BY',
         bellPresets: [
             { id: 'preset_normal', name: 'Обычный (45 мин)', bells: DEFAULT_BELLS },
