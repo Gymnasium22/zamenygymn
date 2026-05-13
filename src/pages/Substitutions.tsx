@@ -4,7 +4,7 @@ import { useStaticData, useScheduleData } from '../context/DataContext';
 import { Icon } from '../components/Icons';
 import { Modal, useToast } from '../components/UI';
 import { DAYS, ScheduleItem, ClassEntity, Substitution, SubstitutionParams } from '../types';
-import { formatDateISO, getScheduleForDate, generateId } from '../utils/helpers';
+import { formatDateISO, formatDateEuropean, getScheduleForDate, generateId } from '../utils/helpers';
 import useMedia from 'use-media';
 
 // Subcomponents
@@ -682,7 +682,7 @@ export const SubstitutionsPage = () => {
 
     const generateSubstitutionText = () => {
         const content = generateSubstitutionContent();
-        const dateStr = new Date(selectedDate).toLocaleDateString('ru-RU');
+        const dateStr = formatDateEuropean(selectedDate);
 
         // Use template if available
         let template = settings.telegramTemplates?.summary;
@@ -754,7 +754,7 @@ export const SubstitutionsPage = () => {
             return;
         }
 
-        const dateStr = new Date(selectedDate).toLocaleDateString('ru-RU');
+        const dateStr = formatDateEuropean(selectedDate);
         let message = '';
 
         if (mode === 'single') {
@@ -1513,7 +1513,7 @@ export const SubstitutionsPage = () => {
                                                 className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors group"
                                             >
                                                 <td className="p-4 text-sm font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap">
-                                                    {new Date(s.date).toLocaleDateString('ru-RU')}
+                                                    {formatDateEuropean(s.date)}
                                                 </td>
                                                 <td className="p-4">
                                                     <div className="flex flex-col">

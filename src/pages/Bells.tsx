@@ -3,6 +3,7 @@ import { useStaticData } from '../context/DataContext';
 import { Icon } from '../components/Icons';
 import { Modal, useToast } from '../components/UI';
 import { Shift, SHIFT_PERIODS, Bell } from '../types';
+import { formatDateEuropean } from '../utils/helpers';
 import { exportService } from '../services/exportService';
 import { DEFAULT_BELLS } from '../constants';
 import { generateId } from '../utils/helpers';
@@ -425,7 +426,7 @@ export const BellsPage = () => {
     };
 
     const getExportContent = () => {
-        const safeExportDate = exportDate ? escapeHtml(new Date(exportDate).toLocaleDateString('ru-RU')) : '';
+        const safeExportDate = exportDate ? escapeHtml(formatDateEuropean(exportDate)) : '';
 
         return `
             <div style="font-family: 'Segoe UI', Arial, sans-serif; padding: 10px 40px 20px 40px; background: white; width: 1000px; max-width: 1000px; margin: 0 auto; color: #1e293b; box-sizing: border-box;">
@@ -541,7 +542,7 @@ export const BellsPage = () => {
         content += `
             <table>
                 <tr><td colspan="4" class="title-main">РАСПИСАНИЕ ЗВОНКОВ</td></tr>
-                ${exportDate ? `<tr><td colspan="4" class="title-sub">на ${new Date(exportDate).toLocaleDateString('ru-RU')}</td></tr>` : ''}
+                ${exportDate ? `<tr><td colspan="4" class="title-sub">на ${formatDateEuropean(exportDate)}</td></tr>` : ''}
                 <tr><td colspan="4" class="title-sub">Режим: ${escapeHtml(preset?.name || 'Обычный')}</td></tr>
                 <tr class="empty-row"><td colspan="4" style="border:none"></td></tr>
                 <tr class="header">
@@ -580,13 +581,13 @@ export const BellsPage = () => {
                 <tr class="empty-row"><td colspan="4" style="border:none"></td></tr>
                 <tr>
                     <td colspan="4" class="footer-block">
-                        Экспортировано: ${new Date().toLocaleDateString('ru-RU')} в ${new Date().toLocaleTimeString('ru-RU')}
+                        Экспортировано: ${formatDateEuropean(new Date())} в ${new Date().toLocaleTimeString('ru-RU')}
                     </td>
                 </tr>
             </table>
         `;
 
-        const dateStr = exportDate ? `_${new Date(exportDate).toLocaleDateString('ru-RU').replace(/\./g, '-')}` : '';
+        const dateStr = exportDate ? `_${formatDateEuropean(exportDate).replace(/\./g, '-')}` : '';
         exportService.saveAsExcel(content, `Расписание_звонков_${preset?.name || 'Обычное'}${dateStr}`);
     };
 

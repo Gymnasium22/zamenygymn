@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { Icon } from '../components/Icons';
 import { Modal, useToast, SearchableSelect } from '../components/UI';
 import { NutritionRecord } from '../types';
-import { formatDateISO, generateId } from '../utils/helpers';
+import { formatDateISO, formatDateEuropean, generateId } from '../utils/helpers';
 import { exportService } from '../services/exportService';
 
 export const NutritionPage = () => {
@@ -447,7 +447,7 @@ export const NutritionPage = () => {
                 <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
                     <h2 className="text-lg font-bold text-slate-800 dark:text-white">
                         {viewMode === 'day'
-                            ? `Данные за ${new Date(selectedDate).toLocaleDateString('ru-RU')}`
+                            ? `Данные за ${formatDateEuropean(selectedDate)}`
                             : `Данные за ${new Date(selectedMonth + '-01').toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}`}
                     </h2>
                     {(isTeacher || isAdmin) && viewMode === 'day' && (
@@ -705,7 +705,7 @@ export const NutritionPage = () => {
                                     {monthStats.statsByDate.map(([date, stats]) => (
                                         <tr key={date}>
                                             <td className="border border-slate-300 px-4 py-2">
-                                                {new Date(date).toLocaleDateString('ru-RU')}
+                                                {formatDateEuropean(date)}
                                             </td>
                                             <td className="border border-slate-300 px-4 py-2 text-center">
                                                 {stats.total}

@@ -2,6 +2,7 @@ import React from 'react';
 import { Modal } from '../UI';
 import { Icon } from '../Icons';
 import { Teacher, Room, ScheduleItem, ClassEntity, Subject } from '../../types';
+import { formatDateEuropean } from '../../utils/helpers';
 
 interface AbsenceModalProps {
     isOpen: boolean;
@@ -82,7 +83,7 @@ export const BatchActionModal: React.FC<BatchActionModalProps> = ({
         <div className="space-y-6">
             <p className="text-slate-600 dark:text-slate-300">
                 Выберите действие для <strong>всех уроков</strong> выбранного учителя на{' '}
-                {new Date(selectedDate).toLocaleDateString('ru-RU')}.
+                {formatDateEuropean(selectedDate)}.
             </p>
 
             <div className="grid grid-cols-1 gap-3">

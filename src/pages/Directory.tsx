@@ -3,6 +3,7 @@ import { useStaticData } from '../context/DataContext';
 import { Icon } from '../components/Icons';
 import { Modal, StaggerContainer } from '../components/UI';
 import { Shift, ROOM_TYPES, Teacher, Subject, ClassEntity, Room } from '../types';
+import { formatDateEuropean } from '../utils/helpers';
 import { generateId } from '../utils/helpers';
 
 type DirectoryTabId = 'teachers' | 'subjects' | 'classes' | 'rooms';
@@ -212,7 +213,7 @@ export const DirectoryPage = () => {
                                     </div>
                                 </div>
                                 <div className="text-xs text-slate-500 mb-2">
-                                    {t.birthDate ? `ДР: ${new Date(t.birthDate).toLocaleDateString('ru-RU')}` : ''}
+                                    {t.birthDate ? `ДР: ${formatDateEuropean(t.birthDate)}` : ''}
                                 </div>
                                 <div className="flex gap-2 mb-3">
                                     {t.shifts.includes(Shift.First) && (

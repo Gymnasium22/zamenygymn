@@ -8,6 +8,7 @@ import {
     BellPreset
 } from '../types';
 import { INITIAL_DATA } from '../constants';
+import { formatDateEuropean } from '../utils/helpers';
 import { SemesterConfig } from '../components/settings/SemesterConfig';
 import { TelegramTemplateEditor } from '../components/settings/TelegramTemplateEditor';
 
@@ -787,7 +788,7 @@ export const SettingsPage = () => {
                                         </label>
                                         {announcement.lastUpdated && (
                                             <span className="text-xs text-slate-400">
-                                                Обновлено: {new Date(announcement.lastUpdated).toLocaleDateString()}
+                                                Обновлено: {formatDateEuropean(announcement.lastUpdated)}
                                             </span>
                                         )}
                                     </div>

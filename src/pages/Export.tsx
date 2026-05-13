@@ -16,7 +16,7 @@ import {
     Room
 } from '../types';
 import { INITIAL_DATA } from '../constants';
-import { formatDateISO, generateId, getActiveSemester } from '../utils/helpers';
+import { formatDateISO, formatDateEuropean, generateId, getActiveSemester } from '../utils/helpers';
 import { exportService } from '../services/exportService';
 import { Modal, useToast } from '../components/UI';
 import { SanitaryScheduleTab } from '../components/SanitaryScheduleTab';
@@ -980,7 +980,7 @@ export const ExportPage = () => {
                 .map((item) => {
                     const { subs, scheduleItem, cls, subj, origTeacher, reason } = item;
                     const firstSub = subs[0];
-                    const dateStr = new Date(firstSub.date).toLocaleDateString('ru-RU');
+                    const dateStr = formatDateEuropean(firstSub.date);
 
                     let repTeacherName = '';
 
@@ -1206,7 +1206,7 @@ export const ExportPage = () => {
             const scheduleItem = getScheduleItemById(sub.scheduleItemId);
             if (!scheduleItem) return;
 
-            const dateStr = new Date(sub.date).toLocaleDateString('ru-RU');
+            const dateStr = formatDateEuropean(sub.date);
             const cls = classes.find((c) => c.id === scheduleItem.classId);
             const subj = subjects.find((s) => s.id === scheduleItem.subjectId);
             const origTeacher = teachers.find((t) => t.id === sub.originalTeacherId);

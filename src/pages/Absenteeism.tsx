@@ -5,7 +5,7 @@ import { dbService } from '../services/db';
 import { Icon } from '../components/Icons';
 import { Modal, useToast } from '../components/UI';
 import { AbsenteeismRecord, StudentAbsence } from '../types';
-import { formatDateISO, generateId } from '../utils/helpers';
+import { formatDateISO, formatDateEuropean, generateId } from '../utils/helpers';
 
 export const AbsenteeismPage = () => {
     const { classes } = useStaticData();
@@ -431,7 +431,7 @@ export const AbsenteeismPage = () => {
                         <div className="bg-white dark:bg-dark-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden">
                             <div className="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-dark-700/30 flex justify-between items-center">
                                 <h3 className="font-medium text-slate-700 dark:text-slate-200">
-                                    Сводка пропусков за {new Date(selectedDate).toLocaleDateString('ru-RU')}
+                                    Сводка пропусков за {formatDateEuropean(selectedDate)}
                                 </h3>
                             </div>
 
@@ -675,7 +675,7 @@ export const AbsenteeismPage = () => {
                 <div className="p-8">
                     <h1 className="text-2xl font-black mb-4 text-center">
                         {viewMode === 'day'
-                            ? `Отчёт по пропускам за ${new Date(selectedDate).toLocaleDateString('ru-RU')}`
+                            ? `Отчёт по пропускам за ${formatDateEuropean(selectedDate)}`
                             : `Отчёт по пропускам за ${new Date(selectedMonth).toLocaleString('ru-RU', { month: 'long', year: 'numeric' })}`}
                     </h1>
 
