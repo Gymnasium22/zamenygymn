@@ -12,8 +12,8 @@ if (import.meta.env.VITE_SENTRY_DSN) {
         integrations: [
             Sentry.browserTracingIntegration(),
             Sentry.replayIntegration({
-                maskAllText: false,
-                blockAllMedia: false,
+                maskAllText: true,      // скрываем текст, чтобы не записывать ФИО и персональные данные
+                blockAllMedia: true,    // блокируем медиа для защиты приватности
             }),
         ],
         tracesSampleRate: import.meta.env.PROD ? 0.1 : 1.0,

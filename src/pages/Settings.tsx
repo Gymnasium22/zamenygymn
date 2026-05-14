@@ -6,7 +6,8 @@ import {
     TelegramTemplates,
     AdminAnnouncement,
     BellPreset,
-    AuditLogEntry
+    AuditLogEntry,
+    AppData
 } from '../types';
 import { INITIAL_DATA } from '../constants';
 import { formatDateEuropean, formatDateISO } from '../utils/helpers';
@@ -314,7 +315,7 @@ export const SettingsPage = () => {
                 }
             });
             addToast({ type: 'success', title: 'Сохранено', message: 'Настройки интеграций обновлены' });
-        } catch (e) {
+        } catch {
             addToast({ type: 'danger', title: 'Ошибка', message: 'Не удалось сохранить' });
         } finally {
             setIsSavingSection(null);
@@ -335,7 +336,7 @@ export const SettingsPage = () => {
                 }
             });
             addToast({ type: 'success', title: 'Сохранено', message: 'Данные учреждения обновлены' });
-        } catch (e) {
+        } catch {
             addToast({ type: 'danger', title: 'Ошибка', message: 'Не удалось сохранить' });
         } finally {
             setIsSavingSection(null);
@@ -353,7 +354,7 @@ export const SettingsPage = () => {
                 }
             });
             addToast({ type: 'success', title: 'Сохранено', message: 'Настройки расписания обновлены' });
-        } catch (e) {
+        } catch {
             addToast({ type: 'danger', title: 'Ошибка', message: 'Не удалось сохранить' });
         } finally {
             setIsSavingSection(null);
@@ -374,7 +375,7 @@ export const SettingsPage = () => {
                 }
             });
             addToast({ type: 'success', title: 'Сохранено', message: 'Шаблоны и объявление обновлены' });
-        } catch (e) {
+        } catch {
             addToast({ type: 'danger', title: 'Ошибка', message: 'Не удалось сохранить' });
         } finally {
             setIsSavingSection(null);
@@ -408,7 +409,7 @@ export const SettingsPage = () => {
                 privateSettings: { ...privateSettings, ...data.privateSettings }
             });
             addToast({ type: 'success', title: 'Импорт', message: 'Настройки восстановлены из файла' });
-        } catch (e) {
+        } catch {
             addToast({ type: 'danger', title: 'Ошибка импорта', message: 'Файл повреждён или имеет неверный формат' });
         }
     };
@@ -424,7 +425,7 @@ export const SettingsPage = () => {
                 }
             });
             addToast({ type: 'success', title: 'Сохранено', message: 'Настройки бекапа обновлены' });
-        } catch (e) {
+        } catch {
             addToast({ type: 'danger', title: 'Ошибка', message: 'Не удалось сохранить' });
         } finally {
             setIsSavingSection(null);
@@ -457,7 +458,7 @@ export const SettingsPage = () => {
                 privateSettings: defaultPrivate
             });
             addToast({ type: 'success', title: 'Сброс', message: 'Настройки сброшены к значениям по умолчанию' });
-        } catch (e) {
+        } catch {
             addToast({ type: 'danger', title: 'Ошибка', message: 'Не удалось сбросить настройки' });
         }
     };
@@ -980,8 +981,8 @@ export const SettingsPage = () => {
 
 // Backup Controls Component
 const BackupControls: React.FC<{
-    settings: any;
-    privateSettings: any;
+    settings: AppData['settings'];
+    privateSettings: AppData['privateSettings'];
     autoBackup: boolean;
     backupTime: string;
     onAutoBackupChange: (v: boolean) => void;
@@ -1024,7 +1025,7 @@ const BackupControls: React.FC<{
             } else {
                 addToast({ type: 'success', title: 'Бекап', message: 'Файл сохранён' });
             }
-        } catch (e) {
+        } catch {
             addToast({ type: 'danger', title: 'Ошибка', message: 'Не удалось создать бекап' });
         } finally {
             setIsBackingUp(false);

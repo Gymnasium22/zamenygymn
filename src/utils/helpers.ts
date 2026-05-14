@@ -2,9 +2,18 @@ import { AppData, ScheduleItem } from '../types';
 
 /**
  * Генерирует уникальный идентификатор (UUID v4)
+ * Работает и на HTTPS, и на HTTP (fallback через Math.random)
  */
 export const generateId = (): string => {
-    return crypto.randomUUID();
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+        return crypto.randomUUID();
+    }
+    // Fallback для HTTP-сайтов или старых браузеров
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const r = (Math.random() * 16) | 0;
+        const v = c === 'x' ? r : (r & 0x3) | 0x8;
+        return v.toString(16);
+    });
 };
 
 /**

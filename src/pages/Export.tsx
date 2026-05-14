@@ -15,7 +15,7 @@ import {
     Teacher,
     Room
 } from '../types';
-import { INITIAL_DATA } from '../constants';
+import { INITIAL_DATA, getInitialData } from '../constants';
 import { formatDateISO, formatDateEuropean, generateId, getActiveSemester } from '../utils/helpers';
 import { exportService } from '../services/exportService';
 import { Modal, useToast } from '../components/UI';
@@ -256,6 +256,7 @@ export const ExportPage = () => {
     const [, setPublicScheduleId] = useState('');
 
     // Lazy-load QRCode component for publish modal (reduces main chunk size)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const [QRCodeComponent, setQRCodeComponent] = useState<React.ComponentType<any> | null>(null);
     useEffect(() => {
         if (isPublishModalOpen && publicScheduleUrl && !QRCodeComponent) {
@@ -389,7 +390,7 @@ export const ExportPage = () => {
                 }
                 if (window.confirm('Это перезапишет текущую базу данных. Продолжить?')) {
                     const mergedData = {
-                        ...INITIAL_DATA,
+                        ...getInitialData(),
                         ...json,
                         rooms: json.rooms || INITIAL_DATA.rooms,
                         classes: json.classes || [],
@@ -404,7 +405,7 @@ export const ExportPage = () => {
                     await saveScheduleData(mergedData);
                     addToast({ type: 'success', title: 'Успешно', message: 'База успешно восстановлена!' });
                 }
-            } catch (err) {
+            } catch {
                 addToast({ type: 'danger', title: 'Ошибка', message: 'Ошибка чтения файла.' });
             }
         };
@@ -538,7 +539,7 @@ export const ExportPage = () => {
             DAYS.forEach((day) => {
                 const bg = dayColors[day]?.header || '#f3f4f6';
                 periods.forEach(
-                    (p) =>
+                    (_p) =>
                         (content += `<th class="header" style="border-bottom: 2px solid #000; background-color: ${bg};">Урок</th>`)
                 );
             });

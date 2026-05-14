@@ -494,7 +494,7 @@ export const NutritionPage = () => {
                                 {recordsForDate.length === 0 ? (
                                     <tr>
                                         <td
-                                            colSpan={isAdmin ? 5 : 4}
+                                            colSpan={isAdmin || isTeacher ? 5 : 4}
                                             className="px-4 py-8 text-center text-slate-500 dark:text-slate-400"
                                         >
                                             Нет данных за выбранную дату

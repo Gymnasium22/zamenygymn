@@ -75,6 +75,8 @@ export const DEFAULT_DUTY_ZONES = [
     }
 ];
 
+export const getInitialData = (): AppData => JSON.parse(JSON.stringify(INITIAL_DATA));
+
 export const INITIAL_DATA: AppData = {
     subjects: [
         { id: 's1', name: 'Математика', color: '#e0e7ff', difficulty: 11, requiredRoomType: 'Обычный' },

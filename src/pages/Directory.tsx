@@ -114,7 +114,7 @@ export const DirectoryPage = () => {
     const onDrop = async (e: React.DragEvent, index: number) => {
         if (draggedIdx === null || draggedIdx === index) return;
 
-        const reorderWithUpdate = (items: any[]) => {
+        const reorderWithUpdate = <T extends { order?: number }>(items: T[]) => {
             const newList = [...items];
             const [movedItem] = newList.splice(draggedIdx, 1);
             newList.splice(index, 0, movedItem);

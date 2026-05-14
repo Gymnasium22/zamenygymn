@@ -146,22 +146,21 @@ export const BatchActionModal: React.FC<BatchActionModalProps> = ({
     </Modal>
 );
 
+interface ManualSearchResult extends ScheduleItem {
+    entityName: string;
+    subInfo: string;
+    subjectName: string;
+}
+
 interface ManualSearchModalProps {
     isOpen: boolean;
     onClose: () => void;
     searchValue: string;
     onSearchChange: (val: string) => void;
-    results: Array<{
-        id: string;
-        entityName: string;
-        subInfo: string;
-        period: number;
-        subjectName: string;
-        roomId?: string;
-    }>;
+    results: ManualSearchResult[];
     rooms: Room[];
     selectedDate: string;
-    onSelect: (item: any) => void;
+    onSelect: (item: ManualSearchResult) => void;
 }
 
 export const ManualSearchModal: React.FC<ManualSearchModalProps> = ({

@@ -31,7 +31,7 @@ class WeatherService {
                         forecast: parsed.forecast
                     };
                 }
-            } catch (e) {
+            } catch {
                 console.warn('Weather cache invalid');
             }
         }

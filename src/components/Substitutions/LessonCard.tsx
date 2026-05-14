@@ -1,6 +1,6 @@
 import React from 'react';
 import { Icon } from '../Icons';
-import { ScheduleItem, Substitution, Teacher, Subject, ClassEntity, Room, Shift } from '../../types';
+import { ScheduleItem, Substitution, SubstitutionParams, Teacher, Subject, ClassEntity, Room, Shift } from '../../types';
 
 interface LessonCardProps {
     lesson: ScheduleItem;
@@ -18,9 +18,19 @@ interface LessonCardProps {
     onDragLeave: () => void;
     onDrop: (e: React.DragEvent, lesson: ScheduleItem) => void;
     onEdit: (lesson: ScheduleItem, sub: Substitution) => void;
-    onAssign: (params: any) => void;
+    onAssign: (params: SubstitutionParams) => void;
     onRemove: (id: string) => void;
-    onTelegramClick: (params: any) => void;
+    onTelegramClick: (params: TelegramClickParams) => void;
+}
+
+interface TelegramClickParams {
+    teacherId: string;
+    lessonId: string;
+    roomName: string;
+    className: string;
+    subjectName: string;
+    period: number;
+    roomChanged: boolean;
 }
 
 export const LessonCard: React.FC<LessonCardProps> = ({

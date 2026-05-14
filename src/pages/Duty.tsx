@@ -708,7 +708,7 @@ export const DutyPage = () => {
                             </h3>
                         </div>
 
-                        {[Shift.First, Shift.Second].map((shift, idx) => (
+                        {[Shift.First, Shift.Second].map((shift) => (
                             <div key={shift} className="mb-8">
                                 <div
                                     className="text-center font-bold text-lg mb-2 underline"

@@ -23,6 +23,10 @@ import { AssignmentModal } from '../components/Substitutions/AssignmentModal';
 export const SubstitutionsPage = () => {
     const { subjects, teachers, classes, rooms, settings, privateSettings, saveStaticData } = useStaticData();
     const { schedule1, schedule2, substitutions, saveScheduleData } = useScheduleData();
+    const substitutionsRef = useRef(substitutions);
+    substitutionsRef.current = substitutions;
+    const settingsRef = useRef(settings);
+    settingsRef.current = settings;
     const { addToast } = useToast();
 
     const location = useLocation();
@@ -163,7 +167,8 @@ export const SubstitutionsPage = () => {
     // Persist day-level comment to settings (debounced)
     useEffect(() => {
         const timer = window.setTimeout(() => {
-            const map = settings.substitutionDayComments || {};
+            const currentSettings = settingsRef.current;
+            const map = currentSettings.substitutionDayComments || {};
             const current = map[selectedDate] || '';
             if (current === dayComment) return;
 
@@ -172,14 +177,13 @@ export const SubstitutionsPage = () => {
             if (trimmed) next[selectedDate] = trimmed;
             else delete next[selectedDate];
 
-            saveStaticData({ settings: { ...settings, substitutionDayComments: next } }, false).catch(() => {
+            saveStaticData({ settings: { ...currentSettings, substitutionDayComments: next } }, false).catch(() => {
                 // No toast spam; user will notice if it doesn't persist
             });
         }, 500);
 
         return () => window.clearTimeout(timer);
-         
-    }, [dayComment, selectedDate, saveStaticData, settings]);
+    }, [dayComment, selectedDate, saveStaticData]);
 
     const selectedDayOfWeek = useMemo(() => {
         const idx = new Date(selectedDate).getDay();
@@ -304,7 +308,7 @@ export const SubstitutionsPage = () => {
             const lessonsToProcess = activeSchedule.filter(
                 (s) => s.teacherId === selectedTeacherId && s.day === selectedDayOfWeek
             );
-            const newSubs = substitutions.filter(
+            const newSubs = substitutionsRef.current.filter(
                 (s) => !(s.originalTeacherId === selectedTeacherId && s.date === selectedDate)
             );
 
@@ -334,7 +338,6 @@ export const SubstitutionsPage = () => {
         saveStaticData,
         selectedDayOfWeek,
         activeSchedule,
-        substitutions,
         saveScheduleData,
         batchActionType,
         batchReplacementId,
@@ -376,7 +379,7 @@ export const SubstitutionsPage = () => {
                 return;
             }
 
-            const filteredSubs = substitutions.filter(
+            const filteredSubs = substitutionsRef.current.filter(
                 (s) => !(s.scheduleItemId === currentSubParams.scheduleItemId && s.date === selectedDate)
             );
 
@@ -422,7 +425,6 @@ export const SubstitutionsPage = () => {
             selectedDate,
             selectedRoomId,
             activeSchedule,
-            substitutions,
             lessonAbsenceReason,
             refusedTeacherIds,
             substitutionComment,
@@ -458,7 +460,7 @@ export const SubstitutionsPage = () => {
                 return;
             }
 
-            const newSubs = substitutions.filter(
+            const newSubs = substitutionsRef.current.filter(
                 (s) => !(s.scheduleItemId === currentSubParams.scheduleItemId && s.date === selectedDate)
             );
 
@@ -492,7 +494,6 @@ export const SubstitutionsPage = () => {
             selectedDate,
             selectedDayOfWeek,
             activeSchedule,
-            substitutions,
             lessonAbsenceReason,
             saveScheduleData,
             addToast,
@@ -512,7 +513,7 @@ export const SubstitutionsPage = () => {
                 return;
             }
 
-            const newSubs = [...substitutions];
+            const newSubs = [...substitutionsRef.current];
 
             let effectiveRoomForSource: string | undefined;
             let effectiveRoomForTarget: string | undefined;
@@ -574,7 +575,6 @@ export const SubstitutionsPage = () => {
         [
             currentSubParams,
             activeSchedule,
-            substitutions,
             selectedDate,
             saveScheduleData,
             selectedRoomId,
@@ -586,10 +586,10 @@ export const SubstitutionsPage = () => {
 
     const removeSubstitution = useCallback(
         async (id: string) => {
-            const newSubs = substitutions.filter((s) => !(s.scheduleItemId === id && s.date === selectedDate));
+            const newSubs = substitutionsRef.current.filter((s) => !(s.scheduleItemId === id && s.date === selectedDate));
             await saveScheduleData({ substitutions: newSubs });
         },
-        [substitutions, selectedDate, saveScheduleData]
+        [selectedDate, saveScheduleData]
     );
 
     const handleEditSubstitution = (lesson: ScheduleItem, sub: Substitution) => {

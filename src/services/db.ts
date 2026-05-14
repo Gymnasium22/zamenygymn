@@ -1,7 +1,7 @@
 import { AppData } from '../types';
 import { INITIAL_DATA } from '../constants';
 import { firestoreDB, auth } from './firebase';
-import { collection, doc, setDoc, writeBatch, onSnapshot, getDocs, query, deleteDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, writeBatch, onSnapshot, getDocs, query, deleteDoc, getDoc } from 'firebase/firestore';
 
 // Конфигурация коллекций
 const COLLECTIONS = {
@@ -342,6 +342,9 @@ export const dbService = {
                 },
                 (err) => {
                     console.warn(`Error reading ${colName}:`, err);
+                    loadedCollections.add(key as string);
+                    triggerUpdate();
+                    onError?.(err);
                 }
             );
         };
@@ -520,9 +523,7 @@ export const dbService = {
     getPublicData: async (id: string): Promise<AppData | null> => {
         if (!firestoreDB) return null;
         try {
-            const d = await import('firebase/firestore').then((m) =>
-                m.getDoc(doc(firestoreDB, COLLECTIONS.PUBLIC, id))
-            );
+            const d = await getDoc(doc(firestoreDB, COLLECTIONS.PUBLIC, id));
             if (d.exists()) return d.data() as AppData;
             return null;
         } catch (error) {

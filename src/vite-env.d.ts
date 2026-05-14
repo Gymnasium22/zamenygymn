@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // Fix: Manually define types for Vite environment variables (`import.meta.env`).
 // The default `/// <reference types="vite/client" />` was causing a "Cannot find type definition" error.
 // This workaround provides the necessary types directly, resolving errors when accessing `import.meta.env`.

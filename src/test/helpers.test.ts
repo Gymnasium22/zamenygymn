@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { getActiveSemester, getScheduleForDate, formatDateISO } from '../utils/helpers';
+import { AppData, ScheduleItem } from '../types';
 
 describe('getActiveSemester', () => {
     it('возвращает 2 семестр для января (0)', () => {
@@ -24,7 +25,7 @@ describe('getActiveSemester', () => {
                 firstSemesterMonths: [6, 7, 8],
                 secondSemesterMonths: [0, 1, 2]
             }
-        } as any;
+        } as AppData['settings'];
         expect(getActiveSemester(date, settings)).toBe(1);
     });
 });
@@ -44,15 +45,15 @@ describe('formatDateISO', () => {
 describe('getScheduleForDate', () => {
     it('возвращает schedule2 для 2-го семестра', () => {
         const date = new Date(2026, 0, 15); // январь
-        const schedule = [{ id: '1' }] as any;
-        const schedule2 = [{ id: '2' }] as any;
+        const schedule = [{ id: '1' }] as ScheduleItem[];
+        const schedule2 = [{ id: '2' }] as ScheduleItem[];
         expect(getScheduleForDate(date, { schedule, schedule2 })).toEqual(schedule2);
     });
 
     it('возвращает schedule для 1-го семестра', () => {
         const date = new Date(2026, 8, 1); // сентябрь
-        const schedule = [{ id: '1' }] as any;
-        const schedule2 = [{ id: '2' }] as any;
+        const schedule = [{ id: '1' }] as ScheduleItem[];
+        const schedule2 = [{ id: '2' }] as ScheduleItem[];
         expect(getScheduleForDate(date, { schedule, schedule2 })).toEqual(schedule);
     });
 });

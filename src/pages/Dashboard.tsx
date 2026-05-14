@@ -304,7 +304,7 @@ export const DashboardPage = () => {
         }
 
         return { type: 'unknown', label: 'Нет расписания звонков' };
-    }, [bellSchedule, currentDate]);
+    }, [bellSchedule]);
 
     // 2. Perform Live Search
     useEffect(() => {
@@ -619,7 +619,7 @@ export const DashboardPage = () => {
             });
         });
         return problems.filter((v, i, a) => a.findIndex((t) => t.class === v.class && t.issue === v.issue) === i);
-    }, [schedule, classes, teachers, rooms, currentDate]);
+    }, [schedule, classes, rooms, currentDate]);
 
     const unresolvedSubstitutions = useMemo(() => {
         if (!todayDayOfWeek) return 0;

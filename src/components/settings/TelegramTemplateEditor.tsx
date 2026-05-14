@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { TelegramTemplates } from '../../types';
 
 interface TelegramTemplateEditorProps {
@@ -39,6 +39,7 @@ export const TelegramTemplateEditor: React.FC<TelegramTemplateEditorProps> = ({
     onChange
 }) => {
     const [activeTab, setActiveTab] = useState<keyof TelegramTemplates>('summary');
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
 
     const update = (key: keyof TelegramTemplates, value: string) => {
         onChange({ ...templates, [key]: value });
@@ -76,6 +77,7 @@ export const TelegramTemplateEditor: React.FC<TelegramTemplateEditorProps> = ({
                         Шаблон Markdown
                     </label>
                     <textarea
+                        ref={textareaRef}
                         value={currentValue}
                         onChange={(e) => update(activeTab, e.target.value)}
                         rows={8}
@@ -88,8 +90,8 @@ export const TelegramTemplateEditor: React.FC<TelegramTemplateEditorProps> = ({
                                 key={v}
                                 type="button"
                                 onClick={() => {
-                                    const textarea = document.activeElement as HTMLTextAreaElement;
-                                    if (textarea && textarea.tagName === 'TEXTAREA') {
+                                    const textarea = textareaRef.current;
+                                    if (textarea) {
                                         const start = textarea.selectionStart;
                                         const end = textarea.selectionEnd;
                                         const newText =

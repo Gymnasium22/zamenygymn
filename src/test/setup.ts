@@ -6,7 +6,7 @@ expect.extend(matchers);
 
 // Polyfill crypto.randomUUID for jsdom
 if (!globalThis.crypto) {
-    (globalThis as any).crypto = {} as Crypto;
+    (globalThis as unknown as { crypto: Crypto }).crypto = {} as Crypto;
 }
 if (!globalThis.crypto.randomUUID) {
     Object.defineProperty(globalThis.crypto, 'randomUUID', {

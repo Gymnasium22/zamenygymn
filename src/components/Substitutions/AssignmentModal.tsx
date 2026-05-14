@@ -1,15 +1,43 @@
 import React from 'react';
 import { Modal } from '../UI';
 import { Icon } from '../Icons';
-import { Room, ClassEntity } from '../../types';
+import { Room, ClassEntity, Teacher, ScheduleItem } from '../../types';
+
+interface ModalContext {
+    className?: string;
+    subjectName?: string;
+    teacherName?: string;
+    teacherId?: string;
+    period: number;
+    roomId?: string;
+    isTeacherAbsent: boolean;
+}
+
+interface RecommendedCandidate {
+    teacher: Teacher;
+    isSpecialist: boolean;
+}
+
+interface OtherCandidate {
+    teacher: Teacher;
+    isBusy: boolean;
+    busyReason: { type: 'regular' | 'sub'; details: string } | null;
+    isAbsent: boolean;
+}
+
+interface MergeCandidate {
+    classEntity: ClassEntity;
+    teachers: string[];
+    subjects: string[];
+}
 
 interface AssignmentModalProps {
     isOpen: boolean;
     onClose: () => void;
-    modalContext: any;
+    modalContext: ModalContext | null;
     subMode: 'teacher' | 'cancel' | 'advanced';
     setSubMode: (mode: 'teacher' | 'cancel' | 'advanced') => void;
-    candidates: { recommended: any[]; others: any[] };
+    candidates: { recommended: RecommendedCandidate[]; others: OtherCandidate[] };
     candidateSearch: string;
     setCandidateSearch: (val: string) => void;
     onViewSchedule: (id: string) => void;
@@ -17,9 +45,9 @@ interface AssignmentModalProps {
     onToggleRefusal: (id: string, e: React.MouseEvent) => void;
     refusedTeacherIds: string[];
     handleCandidateClick: (id: string, isBusy: boolean, isAbsent: boolean) => void;
-    mergeCandidates: any[];
+    mergeCandidates: MergeCandidate[];
     onBatchClassMerge: (id: string) => void;
-    otherLessonsForTeacher: any[];
+    otherLessonsForTeacher: ScheduleItem[];
     onSwapLessons: (id: string) => void;
     selectedRoomId: string;
     setSelectedRoomId: (id: string) => void;

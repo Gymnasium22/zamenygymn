@@ -19,7 +19,7 @@ import { AbsenteeismPage } from './pages/Absenteeism';
 import { LoginPage } from './pages/Login';
 import { dbService } from './services/db';
 import { AppData } from './types';
-import { INITIAL_DATA } from './constants';
+import { INITIAL_DATA, getInitialData } from './constants';
 import { useAutoBackup } from './hooks/useAutoBackup';
 
 // Вспомогательные функции для localStorage (упрощенная версия для App.tsx)
@@ -236,7 +236,7 @@ const PublicLayout = () => {
                 .getPublicData(publicId)
                 .then((data) => {
                     const mergedData: AppData = {
-                        ...INITIAL_DATA,
+                        ...getInitialData(),
                         ...data,
                         settings: { ...INITIAL_DATA.settings, ...data?.settings }
                     };

@@ -34,6 +34,10 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
     // Выбираем нужный массив данных в зависимости от пропса semester
     const schedule = semester === 2 ? schedule2 : schedule1;
 
+    // Ref для предотвращения race condition при быстрых drag-and-drop / удалениях
+    const scheduleRef = useRef(schedule);
+    scheduleRef.current = schedule;
+
     // Вспомогательная функция для сохранения, которая знает о текущем семестре
     const saveCurrentSchedule = async (newScheduleData: ScheduleItem[]) => {
         await saveSemesterSchedule(semester, newScheduleData);
@@ -393,7 +397,8 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
         setIsEditorOpen(true);
     };
     const executeSaveItem = async () => {
-        const newSchedule = [...schedule];
+        const currentSchedule = scheduleRef.current;
+        const newSchedule = [...currentSchedule];
         const idx = newSchedule.findIndex((s) => s.id === tempItem.id);
         if (idx >= 0) newSchedule[idx] = tempItem as ScheduleItem;
         else newSchedule.push(tempItem as ScheduleItem);
@@ -457,7 +462,8 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
         await executeSaveItem();
     };
     const handleDeleteItem = async (id?: string) => {
-        const newSchedule = schedule.filter((s) => s.id !== (id || tempItem.id));
+        const currentSchedule = scheduleRef.current;
+        const newSchedule = currentSchedule.filter((s) => s.id !== (id || tempItem.id));
         await saveCurrentSchedule(newSchedule);
         setIsEditorOpen(false);
     };
@@ -508,7 +514,8 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
         }
 
         // Check for conflicts before saving
-        const potentialSchedule = schedule.map((s) => (s.id === newItem.id ? newItem : s));
+        const currentSchedule = scheduleRef.current;
+        const potentialSchedule = currentSchedule.map((s) => (s.id === newItem.id ? newItem : s));
         const conflicts = findScheduleConflicts(potentialSchedule, newItem);
 
         if (conflicts.length > 0) {

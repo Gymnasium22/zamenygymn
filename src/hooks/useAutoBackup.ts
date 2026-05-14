@@ -1,10 +1,11 @@
 import { useEffect, useRef } from 'react';
 import { useStaticData } from '../context/DataContext';
 import { formatDateISO, formatDateEuropean } from '../utils/helpers';
+import { AppData } from '../types';
 
 const LAST_BACKUP_KEY = 'gym_last_auto_backup_date';
 
-const performBackup = async (settings: any, privateSettings: any) => {
+const performBackup = async (settings: AppData['settings'], privateSettings: AppData['privateSettings']) => {
     const data = localStorage.getItem('gym_data_local_backup_v2');
     if (!data) return;
 
@@ -56,5 +57,5 @@ export const useAutoBackup = () => {
         }, 30000); // Check every 30 seconds
 
         return () => clearInterval(interval);
-    }, [settings?.autoBackup, settings?.backupTime, privateSettings.telegramToken, settings?.feedbackChatId]);
+    }, [settings, privateSettings]);
 };

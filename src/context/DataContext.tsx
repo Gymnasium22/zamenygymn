@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
     AppData,
     Shift,
@@ -8,9 +8,10 @@ import {
     ScheduleAndSubstitutionDataFields,
     AuditLogEntry
 } from '../types';
-import { INITIAL_DATA, DEFAULT_BELLS, DEFAULT_DUTY_ZONES } from '../constants';
+import { INITIAL_DATA, DEFAULT_BELLS, DEFAULT_DUTY_ZONES, getInitialData } from '../constants';
 import { dbService } from '../services/db';
 import { useAuth } from './AuthContext';
+import { User } from 'firebase/auth';
 import { getActiveSemester, generateId } from '../utils/helpers';
 import { auditLog } from '../services/auditLog';
 
@@ -114,7 +115,7 @@ const syncQueue = {
         syncQueue.save();
     },
 
-    process: async (user: any) => {
+    process: async (user: User) => {
         if (syncQueue.isProcessing || !navigator.onLine) return;
 
         syncQueue.isProcessing = true;
@@ -127,10 +128,11 @@ const syncQueue = {
                 try {
                     await dbService.save(item.data, user);
                     itemsToRemove.push(item.id);
-                } catch (error: any) {
+                } catch (error: unknown) {
                     item.retryCount++;
                     // Если ошибка квоты, оставляем в очереди но не удаляем
-                    if (error?.code === 'resource-exhausted') {
+                    const err = error as { code?: string; message?: string };
+                    if (err.code === 'resource-exhausted') {
                         console.warn('Quota exhausted, keeping item in queue:', item.id);
                         break; // Stop processing to avoid spamming
                     }
@@ -139,7 +141,6 @@ const syncQueue = {
                         // Increased from 3 to 10 for better resilience
                         console.error('Не удалось синхронизировать после 10 попыток:', item.id);
                         itemsToRemove.push(item.id); // Удаляем после 10 попыток
-                    } else {
                     }
                 }
             }
@@ -160,15 +161,15 @@ const syncQueue = {
 
 // Единообразная обработка ошибок
 const handleError = {
-    log: (message: string, error?: any) => {
+    log: (message: string, error?: unknown) => {
         console.error(message, error);
     },
 
-    warn: (message: string, error?: any) => {
+    warn: (message: string, error?: unknown) => {
         console.warn(message, error);
     },
 
-    alert: (message: string, error?: any) => {
+    alert: (message: string, error?: unknown) => {
         console.error(message, error);
         window.dispatchEvent(
             new CustomEvent('app-toast', {
@@ -177,8 +178,9 @@ const handleError = {
         );
     },
 
-    firebase: (error: any, context: string) => {
-        const code = error?.code;
+    firebase: (error: unknown, context: string) => {
+        const err = error as { code?: string; message?: string };
+        const code = err.code;
         let message = 'Произошла неизвестная ошибка.';
 
         switch (code) {
@@ -195,7 +197,7 @@ const handleError = {
                 message = 'Превышено время ожидания ответа.';
                 break;
             default:
-                message = `Ошибка ${context}: ${error?.message || 'Неизвестная ошибка'}`;
+                message = `Ошибка ${context}: ${err.message || 'Неизвестная ошибка'}`;
         }
 
         console.error(`Firebase ${context}:`, error);
@@ -206,7 +208,7 @@ const handleError = {
         );
     },
 
-    firebaseOffline: (error: any, context: string, data: Partial<AppData>) => {
+    firebaseOffline: (error: unknown, context: string, data: Partial<AppData>) => {
         // Для мобильных устройств показываем более мягкое сообщение
         const isMobile = window.innerWidth < 768;
         const message = isMobile
@@ -230,11 +232,19 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
     children,
     initialData
 }) => {
-    const [data, setInternalData] = useState<AppData>(INITIAL_DATA);
+    const [data, setInternalData] = useState<AppData>(getInitialData());
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [history, setHistory] = useState<AppData[]>([]);
     const [historyPointer, setHistoryPointer] = useState(-1);
+
+    // Refs для предотвращения race condition при быстрых последовательных сохранениях
+    const dataRef = useRef(data);
+    const historyRef = useRef(history);
+    const historyPointerRef = useRef(historyPointer);
+    dataRef.current = data;
+    historyRef.current = history;
+    historyPointerRef.current = historyPointer;
 
     // Получаем user и role для проверки прав
     const { user, role, loading: authLoading } = useAuth();
@@ -277,14 +287,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
         const canUseLocalData = user || role === 'guest';
 
         if (!canUseLocalData) {
-            setInternalData(INITIAL_DATA);
+            setInternalData(getInitialData());
             setIsLoading(false);
             return;
         }
 
         // Для авторизованных пользователей подписываемся на Firebase
         if (!canLoadFromFirebase) {
-            if (!localBackup) setInternalData(INITIAL_DATA);
+            if (!localBackup) setInternalData(getInitialData());
             setIsLoading(false);
             return;
         }
@@ -381,9 +391,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
             setIsSaving(true);
 
             try {
+                // Используем refs для получения актуального состояния
+                // и предотвращения race condition при быстрых последовательных вызовах
+                const currentData = dataRef.current;
+                const currentHistory = historyRef.current;
+                const currentPointer = historyPointerRef.current;
+
                 // 1. Оптимистичное обновление интерфейса (сразу меняем стейт)
-                const mergedData = { ...data, ...newData };
+                const mergedData = { ...currentData, ...newData };
                 setInternalData(mergedData);
+                dataRef.current = mergedData;
 
                 // 2. Всегда сохраняем в LocalStorage как резерв
                 if (isLocalStorageAvailable()) {
@@ -394,12 +411,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                 if (!initialData && user && !isGuest) {
                     try {
                         await dbService.save(newData, user);
-                    } catch (dbError: any) {
+                    } catch (dbError: unknown) {
                         // При ошибке Firestore добавляем в очередь синхронизации вместо отката
                         handleError.firebaseOffline(dbError, 'сохранения данных', newData);
                         // НЕ откатываем интерфейс - данные остались в localStorage и будут синхронизированы позже
                     }
                 } else if (isGuest) {
+                    // Гость не сохраняет данные в облако
                 }
 
                 // 4. Audit log
@@ -426,27 +444,34 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                 }
 
                 if (addToHistory) {
-                    const newHistory = history.slice(0, historyPointer + 1);
+                    const newHistory = currentHistory.slice(0, currentPointer + 1);
                     newHistory.push(mergedData);
 
                     // History management: keep reasonable limit to prevent memory bloat
                     const MAX_HISTORY = 50;
+                    let newPointer: number;
                     if (newHistory.length > MAX_HISTORY) {
                         // Remove oldest items, keep the most recent MAX_HISTORY
                         const itemsToRemove = newHistory.length - MAX_HISTORY;
                         newHistory.splice(0, itemsToRemove);
-                        setHistoryPointer(MAX_HISTORY - 1);
+                        // Корректируем указатель с учётом удалённых элементов:
+                        // новый элемент находился на индексе currentPointer + 1,
+                        // после удаления itemsToRemove элементов с начала его индекс сдвигается
+                        newPointer = Math.max(0, currentPointer + 1 - itemsToRemove);
                     } else {
-                        setHistoryPointer(newHistory.length - 1);
+                        newPointer = newHistory.length - 1;
                     }
 
                     setHistory(newHistory);
+                    historyRef.current = newHistory;
+                    setHistoryPointer(newPointer);
+                    historyPointerRef.current = newPointer;
                 }
             } finally {
                 setIsSaving(false);
             }
         },
-        [data, history, historyPointer, user, role, initialData]
+        [user, role, initialData]
     );
 
     // Автоматическая синхронизация при восстановлении сети
@@ -464,8 +489,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
     const undo = useCallback(async () => {
         setHistoryPointer((prev) => {
             if (prev > 0) {
-                const prevData = history[prev - 1];
+                const prevData = historyRef.current[prev - 1];
                 setInternalData(prevData);
+                dataRef.current = prevData;
                 // Сохраняем локально
                 if (isLocalStorageAvailable()) {
                     safeLocalStorageSet(LOCAL_STORAGE_KEY, JSON.stringify(prevData));
@@ -482,13 +508,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
             }
             return prev;
         });
-    }, [history, initialData, user]);
+    }, [initialData, user]);
 
     const redo = useCallback(async () => {
         setHistoryPointer((prev) => {
-            if (prev < history.length - 1) {
-                const nextData = history[prev + 1];
+            if (prev < historyRef.current.length - 1) {
+                const nextData = historyRef.current[prev + 1];
                 setInternalData(nextData);
+                dataRef.current = nextData;
                 // Сохраняем локально
                 if (isLocalStorageAvailable()) {
                     safeLocalStorageSet(LOCAL_STORAGE_KEY, JSON.stringify(nextData));
@@ -505,10 +532,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
             }
             return prev;
         });
-    }, [history, initialData, user]);
+    }, [initialData, user]);
 
     const resetData = useCallback(async () => {
-        await saveData(INITIAL_DATA);
+        await saveData(getInitialData());
     }, [saveData]);
 
     const contextValue = useMemo(

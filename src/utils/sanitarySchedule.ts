@@ -1035,7 +1035,6 @@ export function generateSanitarySchedule(params: {
         for (let iter = 0; iter < maxIters && swapsThisClass < maxSwaps; iter++) {
             // Умный выбор ячеек: предпочитаем ячейки с тяжёлыми предметами
             let keyA: SlotKey;
-            let keyB: SlotKey;
 
             // С вероятностью 30% выбираем ячейку с тяжёлым предметом
             if (Math.random() < 0.3) {
@@ -1050,7 +1049,7 @@ export function generateSanitarySchedule(params: {
             }
 
             const idxB = Math.floor(Math.random() * allKeys.length);
-            keyB = allKeys[idxB];
+            const keyB = allKeys[idxB];
 
             if (keyA === keyB) continue;
 

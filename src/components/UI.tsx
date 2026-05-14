@@ -188,19 +188,63 @@ interface ToastProps {
 }
 
 export const Modal = ({ isOpen, onClose, title, children, maxWidth = 'max-w-lg' }: ModalProps) => {
+    const modalRef = useRef<HTMLDivElement>(null);
+    const previousActiveElement = useRef<HTMLElement | null>(null);
+
     useEffect(() => {
         if (!isOpen) return;
 
-        const handleEscape = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') onClose();
+        // Сохраняем элемент, который был в фокусе до открытия модалки
+        previousActiveElement.current = document.activeElement as HTMLElement;
+
+        // Переносим фокус на первый интерактивный элемент внутри модалки
+        const modal = modalRef.current;
+        if (modal) {
+            const focusable = modal.querySelector<HTMLElement>(
+                'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+            );
+            focusable?.focus();
+        }
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                onClose();
+                return;
+            }
+            if (e.key !== 'Tab' || !modal) return;
+
+            const focusableElements = Array.from(
+                modal.querySelectorAll<HTMLElement>(
+                    'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+                )
+            ).filter((el) => !el.hasAttribute('disabled') && el.offsetParent !== null);
+
+            if (focusableElements.length === 0) return;
+
+            const first = focusableElements[0];
+            const last = focusableElements[focusableElements.length - 1];
+
+            if (e.shiftKey) {
+                if (document.activeElement === first) {
+                    last.focus();
+                    e.preventDefault();
+                }
+            } else {
+                if (document.activeElement === last) {
+                    first.focus();
+                    e.preventDefault();
+                }
+            }
         };
 
-        document.addEventListener('keydown', handleEscape);
+        document.addEventListener('keydown', handleKeyDown);
         document.body.style.overflow = 'hidden';
 
         return () => {
-            document.removeEventListener('keydown', handleEscape);
+            document.removeEventListener('keydown', handleKeyDown);
             document.body.style.overflow = '';
+            // Возвращаем фокус на элемент, который был активен до открытия
+            previousActiveElement.current?.focus();
         };
     }, [isOpen, onClose]);
 
@@ -208,6 +252,10 @@ export const Modal = ({ isOpen, onClose, title, children, maxWidth = 'max-w-lg' 
 
     return (
         <div
+            ref={modalRef}
+            role="dialog"
+            aria-modal="true"
+            tabIndex={-1}
             className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-fade-in no-print"
             onClick={(e) => e.target === e.currentTarget && onClose()}
         >
@@ -854,6 +902,17 @@ export const BottomNavigation = ({ onMenuClick, role }: BottomNavProps) => {
     );
 };
 
+interface Action {
+    type: 'nav' | 'teacher' | 'class' | 'subject' | 'room' | 'sub';
+    label: string;
+    icon: string;
+    path?: string;
+    id?: string;
+    subId?: string;
+    shortcut?: string;
+    keywords?: string[];
+}
+
 interface CommandPaletteProps {
     isOpen: boolean;
     onClose: () => void;
@@ -872,7 +931,7 @@ export const CommandPalette = ({ isOpen, onClose }: CommandPaletteProps) => {
         if (!isOpen) return [];
         const q = query.toLowerCase().trim();
 
-        const actions: any[] = [];
+        const actions: Action[] = [];
 
         // Navigation Actions
         const navItems = [
@@ -968,9 +1027,9 @@ export const CommandPalette = ({ isOpen, onClose }: CommandPaletteProps) => {
         }
     };
 
-    const executeAction = (action: any) => {
+    const executeAction = (action: Action) => {
         if (action.type === 'nav') {
-            navigate(action.path);
+            if (action.path) navigate(action.path);
         } else if (action.type === 'teacher') {
             navigate(`/schedule?view=teacher&id=${action.id}`);
         } else if (action.type === 'class') {
