@@ -1,0 +1,1 @@
+const s=new Set(["__proto__","constructor","prototype"]);function n(t){if(Array.isArray(t))return t.map(n);if(t!==null&&typeof t=="object"){const e={};for(const r of Object.keys(t))s.has(r)||(e[r]=n(t[r]));return e}return t}export{n as s};
