@@ -13,7 +13,9 @@ import { dbService } from '../services/db';
 import { useAuth } from './AuthContext';
 import { User } from 'firebase/auth';
 import { getActiveSemester, generateId } from '../utils/helpers';
+import { produce } from 'immer';
 import { auditLog } from '../services/auditLog';
+import { safeLocalStorageGet, safeLocalStorageSet } from '../utils/localStorage';
 
 interface FullDataContextType {
     data: AppData;
@@ -27,7 +29,18 @@ interface FullDataContextType {
     canRedo: boolean;
 }
 
+interface DataMetaContextType {
+    isLoading: boolean;
+    isSaving: boolean;
+    undo: () => void;
+    redo: () => void;
+    canUndo: boolean;
+    canRedo: boolean;
+    resetData: () => Promise<void>;
+}
+
 const FullDataContext = createContext<FullDataContextType | undefined>(undefined);
+const DataMetaContext = createContext<DataMetaContextType | undefined>(undefined);
 
 const LOCAL_STORAGE_KEY = 'gym_data_local_backup_v2';
 const PERSISTENT_QUEUE_KEY = 'gym_sync_queue_backup';
@@ -41,34 +54,6 @@ const isLocalStorageAvailable = (): boolean => {
         return true;
     } catch {
         return false;
-    }
-};
-
-const safeLocalStorageSet = (key: string, value: string): boolean => {
-    try {
-        // Проверяем размер данных (localStorage обычно имеет лимит 5-10MB)
-        const sizeInBytes = new Blob([value]).size;
-        const maxSize = 4 * 1024 * 1024; // 4MB лимит для безопасности
-
-        if (sizeInBytes > maxSize) {
-            console.warn('Data too large for localStorage, skipping backup');
-            return false;
-        }
-
-        localStorage.setItem(key, value);
-        return true;
-    } catch (e) {
-        console.warn('Failed to save to localStorage:', e);
-        return false;
-    }
-};
-
-const safeLocalStorageGet = (key: string): string | null => {
-    try {
-        return localStorage.getItem(key);
-    } catch (e) {
-        console.warn('Failed to read from localStorage:', e);
-        return null;
     }
 };
 
@@ -105,6 +90,12 @@ const syncQueue = {
     },
 
     add: (data: Partial<AppData>) => {
+        const MAX_QUEUE_SIZE = 50;
+        if (syncQueue.items.length >= MAX_QUEUE_SIZE) {
+            const dropped = syncQueue.items.length - MAX_QUEUE_SIZE + 1;
+            syncQueue.items = syncQueue.items.slice(-(MAX_QUEUE_SIZE - 1));
+            console.warn(`Sync queue exceeded ${MAX_QUEUE_SIZE} items. Dropped ${dropped} oldest item(s).`);
+        }
         const id = generateId();
         syncQueue.items.push({
             id,
@@ -398,7 +389,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                 const currentPointer = historyPointerRef.current;
 
                 // 1. Оптимистичное обновление интерфейса (сразу меняем стейт)
-                const mergedData = { ...currentData, ...newData };
+                // Используем Immer для structural sharing — экономим память в истории
+                const mergedData = produce(currentData, (draft) => {
+                    Object.assign(draft, newData);
+                });
                 setInternalData(mergedData);
                 dataRef.current = mergedData;
 
@@ -487,51 +481,49 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
     }, [user, role, initialData]);
 
     const undo = useCallback(async () => {
-        setHistoryPointer((prev) => {
-            if (prev > 0) {
-                const prevData = historyRef.current[prev - 1];
-                setInternalData(prevData);
-                dataRef.current = prevData;
-                // Сохраняем локально
-                if (isLocalStorageAvailable()) {
-                    safeLocalStorageSet(LOCAL_STORAGE_KEY, JSON.stringify(prevData));
-                }
-
-                if (!initialData && user) {
-                    try {
-                        dbService.save(prevData, user).catch((e) => handleError.firebase(e, 'отмены изменений'));
-                    } catch (e) {
-                        handleError.firebase(e, 'отмены изменений');
-                    }
-                }
-                return prev - 1;
+        const prev = historyPointerRef.current;
+        if (prev > 0) {
+            const prevData = historyRef.current[prev - 1];
+            setInternalData(prevData);
+            dataRef.current = prevData;
+            setHistoryPointer(prev - 1);
+            historyPointerRef.current = prev - 1;
+            // Сохраняем локально
+            if (isLocalStorageAvailable()) {
+                safeLocalStorageSet(LOCAL_STORAGE_KEY, JSON.stringify(prevData));
             }
-            return prev;
-        });
+
+            if (!initialData && user) {
+                try {
+                    dbService.save(prevData, user).catch((e) => handleError.firebase(e, 'отмены изменений'));
+                } catch (e) {
+                    handleError.firebase(e, 'отмены изменений');
+                }
+            }
+        }
     }, [initialData, user]);
 
     const redo = useCallback(async () => {
-        setHistoryPointer((prev) => {
-            if (prev < historyRef.current.length - 1) {
-                const nextData = historyRef.current[prev + 1];
-                setInternalData(nextData);
-                dataRef.current = nextData;
-                // Сохраняем локально
-                if (isLocalStorageAvailable()) {
-                    safeLocalStorageSet(LOCAL_STORAGE_KEY, JSON.stringify(nextData));
-                }
-
-                if (!initialData && user) {
-                    try {
-                        dbService.save(nextData, user).catch((e) => handleError.firebase(e, 'повтора изменений'));
-                    } catch (e) {
-                        handleError.firebase(e, 'повтора изменений');
-                    }
-                }
-                return prev + 1;
+        const prev = historyPointerRef.current;
+        if (prev < historyRef.current.length - 1) {
+            const nextData = historyRef.current[prev + 1];
+            setInternalData(nextData);
+            dataRef.current = nextData;
+            setHistoryPointer(prev + 1);
+            historyPointerRef.current = prev + 1;
+            // Сохраняем локально
+            if (isLocalStorageAvailable()) {
+                safeLocalStorageSet(LOCAL_STORAGE_KEY, JSON.stringify(nextData));
             }
-            return prev;
-        });
+
+            if (!initialData && user) {
+                try {
+                    dbService.save(nextData, user).catch((e) => handleError.firebase(e, 'повтора изменений'));
+                } catch (e) {
+                    handleError.firebase(e, 'повтора изменений');
+                }
+            }
+        }
     }, [initialData, user]);
 
     const resetData = useCallback(async () => {
@@ -553,7 +545,24 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
         [data, isLoading, isSaving, saveData, resetData, undo, redo, historyPointer, history.length]
     );
 
-    return <FullDataContext.Provider value={contextValue}>{children}</FullDataContext.Provider>;
+    const metaContextValue = useMemo(
+        () => ({
+            isLoading,
+            isSaving,
+            undo,
+            redo,
+            canUndo: historyPointer > 0,
+            canRedo: historyPointer < history.length - 1,
+            resetData
+        }),
+        [isLoading, isSaving, undo, redo, historyPointer, history.length, resetData]
+    );
+
+    return (
+        <FullDataContext.Provider value={contextValue}>
+            <DataMetaContext.Provider value={metaContextValue}>{children}</DataMetaContext.Provider>
+        </FullDataContext.Provider>
+    );
 };
 
 const useFullData = () => {
@@ -685,7 +694,8 @@ export const ScheduleDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
 export const useStaticData = () => {
     const context = useContext(StaticDataContext);
     if (!context) throw new Error('useStaticData must be used within StaticDataProvider');
-    const fullContext = useFullData();
+    const metaContext = useContext(DataMetaContext);
+    if (!metaContext) throw new Error('useStaticData must be used within DataProvider');
 
     // Гарантируем, что массивы всегда определены
     const safeContext = useMemo(
@@ -706,23 +716,23 @@ export const useStaticData = () => {
     return useMemo(
         () => ({
             ...safeContext,
-            isLoading: fullContext.isLoading,
-            isSaving: fullContext.isSaving,
-            undo: fullContext.undo,
-            redo: fullContext.redo,
-            canUndo: fullContext.canUndo,
-            canRedo: fullContext.canRedo,
-            resetData: fullContext.resetData
+            isLoading: metaContext.isLoading,
+            isSaving: metaContext.isSaving,
+            undo: metaContext.undo,
+            redo: metaContext.redo,
+            canUndo: metaContext.canUndo,
+            canRedo: metaContext.canRedo,
+            resetData: metaContext.resetData
         }),
         [
             safeContext,
-            fullContext.isLoading,
-            fullContext.isSaving,
-            fullContext.undo,
-            fullContext.redo,
-            fullContext.canUndo,
-            fullContext.canRedo,
-            fullContext.resetData
+            metaContext.isLoading,
+            metaContext.isSaving,
+            metaContext.undo,
+            metaContext.redo,
+            metaContext.canUndo,
+            metaContext.canRedo,
+            metaContext.resetData
         ]
     );
 };
@@ -730,7 +740,8 @@ export const useStaticData = () => {
 export const useScheduleData = () => {
     const context = useContext(ScheduleDataContext);
     if (!context) throw new Error('useScheduleData must be used within ScheduleDataProvider');
-    const fullContext = useFullData();
+    const metaContext = useContext(DataMetaContext);
+    if (!metaContext) throw new Error('useScheduleData must be used within DataProvider');
 
     // Гарантируем, что массивы всегда определены
     const safeContext = useMemo(
@@ -750,23 +761,23 @@ export const useScheduleData = () => {
     return useMemo(
         () => ({
             ...safeContext,
-            isLoading: fullContext.isLoading,
-            isSaving: fullContext.isSaving,
-            undo: fullContext.undo,
-            redo: fullContext.redo,
-            canUndo: fullContext.canUndo,
-            canRedo: fullContext.canRedo,
-            resetData: fullContext.resetData
+            isLoading: metaContext.isLoading,
+            isSaving: metaContext.isSaving,
+            undo: metaContext.undo,
+            redo: metaContext.redo,
+            canUndo: metaContext.canUndo,
+            canRedo: metaContext.canRedo,
+            resetData: metaContext.resetData
         }),
         [
             safeContext,
-            fullContext.isLoading,
-            fullContext.isSaving,
-            fullContext.undo,
-            fullContext.redo,
-            fullContext.canUndo,
-            fullContext.canRedo,
-            fullContext.resetData
+            metaContext.isLoading,
+            metaContext.isSaving,
+            metaContext.undo,
+            metaContext.redo,
+            metaContext.canUndo,
+            metaContext.canRedo,
+            metaContext.resetData
         ]
     );
 };

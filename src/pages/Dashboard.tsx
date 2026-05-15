@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { useStaticData, useScheduleData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { Icon } from '../components/Icons';
@@ -7,6 +7,8 @@ import { useNavigate, NavLink } from 'react-router-dom';
 import { Modal, useToast } from '../components/UI';
 import { getActiveSemester, getLocalDateString } from '../utils/helpers';
 import { weatherService, WeatherData, ForecastItem } from '../services/weatherService';
+import { escapeMarkdown } from '../utils/escapeHtml';
+import { safeLocalStorageGet, safeLocalStorageSet } from '../utils/localStorage';
 
 // Enhanced interfaces for Live Search
 interface EntityStatus {
@@ -36,19 +38,21 @@ interface WidgetConfig {
     id: string;
     label: string;
     fullWidth?: boolean;
+    colSpan?: number;
     visible: boolean;
 }
 
 // Weather interfaces moved to weatherService.ts
 
 const DEFAULT_WIDGETS: WidgetConfig[] = [
-    { id: 'kpi', label: 'KPI', visible: true },
-    { id: 'search', label: 'Поиск', visible: true },
-    { id: 'substitutions', label: 'Замены', visible: true },
-    { id: 'occupancy', label: 'Штат', visible: true },
-    { id: 'conflicts', label: 'Конфликты', visible: true },
-    { id: 'birthdays', label: 'Праздники', visible: true },
-    { id: 'notes', label: 'Заметки', visible: true }
+    { id: 'kpi', label: 'KPI', visible: true, colSpan: 1 },
+    { id: 'search', label: 'Поиск', visible: true, colSpan: 1 },
+    { id: 'substitutions', label: 'Замены', visible: true, colSpan: 1 },
+    { id: 'occupancy', label: 'Штат', visible: true, colSpan: 1 },
+    { id: 'radar', label: 'Радар Окон', visible: true, colSpan: 1 },
+    { id: 'conflicts', label: 'Конфликты', visible: true, colSpan: 1 },
+    { id: 'birthdays', label: 'Праздники', visible: true, colSpan: 1 },
+    { id: 'notes', label: 'Заметки', visible: true, colSpan: 2 }
 ];
 
 const WeatherWidget = () => {
@@ -62,6 +66,7 @@ const WeatherWidget = () => {
     const city = settings.weatherCity || 'Minsk,BY';
 
     useEffect(() => {
+        const controller = new AbortController();
         const fetchWeather = async () => {
             if (!apiKey) {
                 setLoading(false);
@@ -69,11 +74,12 @@ const WeatherWidget = () => {
             }
 
             try {
-                const data = await weatherService.getWeather(apiKey, city);
+                const data = await weatherService.getWeather(apiKey, city, controller.signal);
                 setWeatherData(data.current);
                 setForecastData(data.forecast);
                 setLoading(false);
             } catch (err) {
+                if ((err as Error).name === 'AbortError') return;
                 console.error(err);
                 setError('Ошибка загрузки погоды');
                 setLoading(false);
@@ -81,6 +87,7 @@ const WeatherWidget = () => {
         };
 
         fetchWeather();
+        return () => controller.abort();
     }, [apiKey, city]);
 
     if (!apiKey) {
@@ -146,12 +153,12 @@ const WeatherWidget = () => {
 
 export const DashboardPage = () => {
     const { subjects, teachers, classes, rooms, bellSchedule, settings, privateSettings } = useStaticData();
-    const { schedule, substitutions, absenteeismRecords } = useScheduleData();
+    const { schedule, substitutions } = useScheduleData();
     const { role } = useAuth();
     const navigate = useNavigate();
     const { addToast } = useToast();
 
-    const [notes, setNotes] = useState(localStorage.getItem('gym_notes') || '');
+    const [notes, setNotes] = useState(safeLocalStorageGet('gym_notes') || '');
     const [currentDate] = useState(new Date());
     const [searchQuery, setSearchQuery] = useState('');
     const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
@@ -159,9 +166,8 @@ export const DashboardPage = () => {
     const [showAbsentList, setShowAbsentList] = useState(false);
     const [notesChanged, setNotesChanged] = useState(false);
 
-    // Using v4 key to force layout reset for weather widget move
     const [widgets, setWidgets] = useState<WidgetConfig[]>(() => {
-        const saved = localStorage.getItem('gym_dashboard_widgets_v4');
+        const saved = safeLocalStorageGet('gym_dashboard_widgets_v4');
         if (!saved) return DEFAULT_WIDGETS;
         try {
             return JSON.parse(saved);
@@ -170,6 +176,44 @@ export const DashboardPage = () => {
         }
     });
     const [isWidgetModalOpen, setIsWidgetModalOpen] = useState(false);
+    const [draggedWidgetId, setDraggedWidgetId] = useState<string | null>(null);
+
+    const handleDragStart = (e: React.DragEvent<HTMLDivElement>, id: string) => {
+        setDraggedWidgetId(id);
+        e.dataTransfer.effectAllowed = 'move';
+        setTimeout(() => {
+            if (e.target instanceof HTMLElement) {
+                e.target.style.opacity = '0.5';
+            }
+        }, 0);
+    };
+
+    const handleDragEnd = (e: React.DragEvent<HTMLDivElement>) => {
+        setDraggedWidgetId(null);
+        if (e.target instanceof HTMLElement) {
+            e.target.style.opacity = '1';
+            safeLocalStorageSet('gym_dashboard_widgets_v4', JSON.stringify(widgets));
+        }
+    };
+
+    const handleDragOver = (e: React.DragEvent<HTMLDivElement>, id: string) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        
+        if (!draggedWidgetId || draggedWidgetId === id) return;
+
+        setWidgets((prev) => {
+            const newWidgets = [...prev];
+            const draggedIndex = newWidgets.findIndex(w => w.id === draggedWidgetId);
+            const dropIndex = newWidgets.findIndex(w => w.id === id);
+            
+            if (draggedIndex === -1 || dropIndex === -1) return prev;
+            
+            const [removed] = newWidgets.splice(draggedIndex, 1);
+            newWidgets.splice(dropIndex, 0, removed);
+            return newWidgets;
+        });
+    };
 
     const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
     const [feedbackMessage, setFeedbackMessage] = useState('');
@@ -183,12 +227,10 @@ export const DashboardPage = () => {
         return () => clearTimeout(timer);
     }, [searchQuery]);
 
-    // Базовая санитизация заметок
+    // Базовая санитизация заметок — извлекаем только текст, удаляя всю HTML-разметку
     const sanitizeNotes = (text: string): string => {
-        return text
-            .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-            .replace(/<[^>]*>/g, '')
-            .slice(0, 10000);
+        const doc = new DOMParser().parseFromString(text, 'text/html');
+        return (doc.body.textContent || '').slice(0, 10000);
     };
 
     const handleNotesChange = (value: string) => {
@@ -198,7 +240,7 @@ export const DashboardPage = () => {
     };
 
     const saveNotes = () => {
-        localStorage.setItem('gym_notes', notes);
+        safeLocalStorageSet('gym_notes', notes);
         setNotesChanged(false);
         addToast({
             type: 'success',
@@ -211,7 +253,7 @@ export const DashboardPage = () => {
     useEffect(() => {
         if (!notesChanged) return;
         const timeoutId = setTimeout(() => {
-            localStorage.setItem('gym_notes', notes);
+            safeLocalStorageSet('gym_notes', notes);
             setNotesChanged(false);
         }, 3000);
         return () => clearTimeout(timeoutId);
@@ -238,16 +280,7 @@ export const DashboardPage = () => {
         return DAYS[idx - 1];
     }, [currentDate]);
 
-    // --- KPI Metrics ---
-    const kpiMetrics = useMemo(() => {
-        const absenteeismToday = (absenteeismRecords || []).filter((r) => r.date === todayStr);
-        const totalAbsences = absenteeismToday.reduce((sum, r) => sum + (r.absences?.length || 0), 0);
-        const substitutionsTomorrow = (substitutions || []).filter((s) => s.date === tomorrowStr).length;
-        const avgLoad = teachers.length > 0 ? Math.round((schedule?.length || 0) / teachers.length) : 0;
-        const occupiedRooms = new Set((schedule || []).filter((s) => s.day === todayDayOfWeek).map((s) => s.roomId).filter(Boolean)).size;
-        const freeRooms = Math.max(0, rooms.length - occupiedRooms);
-        return { totalAbsences, substitutionsTomorrow, avgLoad, freeRooms };
-    }, [absenteeismRecords, todayStr, tomorrowStr, substitutions, teachers.length, schedule, todayDayOfWeek, rooms.length]);
+    // kpiData is defined after occupancyStats (see below) to avoid reference-before-initialization
 
     // --- Live Search Logic ---
 
@@ -588,6 +621,29 @@ export const DashboardPage = () => {
         return { presentPercent, absentCount, totalTeachers, absentTeachersList: combinedList };
     }, [teachers, todayStr, substitutions, schedule]);
 
+    // --- KPI Metrics --- (must be after occupancyStats)
+    const kpiData = useMemo(() => {
+        const todayLessons = todayDayOfWeek ? (schedule || []).filter((s) => s.day === todayDayOfWeek).length : 0;
+        const occupiedRooms = new Set(
+            (schedule || [])
+                .filter((s) => s.day === todayDayOfWeek)
+                .map((s) => s.roomId)
+                .filter(Boolean)
+        ).size;
+        const totalRooms = Math.max(1, rooms.length);
+        const roomUtilization = Math.round((occupiedRooms / totalRooms) * 100);
+        const substitutionsTomorrow = (substitutions || []).filter((s) => s.date === tomorrowStr).length;
+        return {
+            absentTeachers: occupancyStats.absentCount,
+            totalTeachers: occupancyStats.totalTeachers,
+            substitutionsTomorrow,
+            todayLessons,
+            roomUtilization,
+            occupiedRooms,
+            totalRooms
+        };
+    }, [schedule, todayDayOfWeek, rooms.length, substitutions, tomorrowStr, occupancyStats]);
+
     const problemZones = useMemo(() => {
         const nextDay = new Date(currentDate);
         nextDay.setDate(currentDate.getDate() + 1);
@@ -637,6 +693,14 @@ export const DashboardPage = () => {
         return count;
     }, [schedule, teachers, substitutions, todayStr, todayDayOfWeek]);
 
+    const feedbackAbortRef = useRef<AbortController | null>(null);
+
+    useEffect(() => {
+        return () => {
+            feedbackAbortRef.current?.abort();
+        };
+    }, []);
+
     const handleSendFeedback = async () => {
         if (!feedbackMessage.trim()) {
             addToast({ type: 'warning', title: 'Внимание', message: 'Пожалуйста, введите ваше сообщение.' });
@@ -650,13 +714,17 @@ export const DashboardPage = () => {
             });
             return;
         }
+        feedbackAbortRef.current?.abort();
+        const controller = new AbortController();
+        feedbackAbortRef.current = controller;
         setIsSendingFeedback(true);
-        const text = `📬 *Новое сообщение обратной связи:*\n\n${feedbackMessage}`;
+        const text = `📬 *Новое сообщение обратной связи:*\n\n${escapeMarkdown(feedbackMessage)}`;
         try {
             const response = await fetch(`https://api.telegram.org/bot${privateSettings.telegramToken}/sendMessage`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ chat_id: settings.feedbackChatId, text: text, parse_mode: 'Markdown' })
+                body: JSON.stringify({ chat_id: settings.feedbackChatId, text: text, parse_mode: 'Markdown' }),
+                signal: controller.signal
             });
             const result = await response.json();
             if (result.ok) {
@@ -667,6 +735,7 @@ export const DashboardPage = () => {
                 throw new Error(result.description);
             }
         } catch (error) {
+            if ((error as Error).name === 'AbortError') return;
             console.error('Ошибка отправки в Telegram:', error);
             addToast({ type: 'danger', title: 'Ошибка', message: `Не удалось отправить сообщение. Ошибка: ${error}` });
         } finally {
@@ -691,8 +760,30 @@ export const DashboardPage = () => {
         setWidgets(newWidgets);
     };
 
+    const handleWidgetResize = (id: string) => {
+        setWidgets((prev) => prev.map(w => {
+            if (w.id === id) {
+                const currentSpan = w.colSpan || 1;
+                // Cycle through 1, 2, 3, 4
+                const nextSpan = currentSpan >= 4 ? 1 : currentSpan + 1;
+                return { ...w, colSpan: nextSpan };
+            }
+            return w;
+        }));
+    };
+
+    const getColSpanClass = (span: number = 1) => {
+        switch(span) {
+            case 4: return 'md:col-span-2 lg:col-span-4';
+            case 3: return 'md:col-span-2 lg:col-span-3';
+            case 2: return 'md:col-span-2 lg:col-span-2';
+            case 1: 
+            default: return 'col-span-1';
+        }
+    };
+
     const saveWidgets = () => {
-        localStorage.setItem('gym_dashboard_widgets_v4', JSON.stringify(widgets));
+        safeLocalStorageSet('gym_dashboard_widgets_v4', JSON.stringify(widgets));
         setIsWidgetModalOpen(false);
     };
 
@@ -777,22 +868,21 @@ export const DashboardPage = () => {
                                                     {item.type === 'room'
                                                         ? 'Кабинет'
                                                         : item.type === 'class'
-                                                          ? 'Класс'
-                                                          : 'Учитель'}
+                                                            ? 'Класс'
+                                                            : 'Учитель'}
                                                 </div>
                                             </div>
                                         </div>
                                         <div className="text-right shrink-0">
                                             <div
-                                                className={`text-xs font-bold px-2 py-1 rounded-lg inline-block ${
-                                                    item.statusColor === 'green'
+                                                className={`text-xs font-bold px-2 py-1 rounded-lg inline-block ${item.statusColor === 'green'
                                                         ? 'bg-emerald-100 text-emerald-700'
                                                         : item.statusColor === 'red'
-                                                          ? 'bg-red-100 text-red-700'
-                                                          : item.statusColor === 'blue'
-                                                            ? 'bg-blue-100 text-blue-700'
-                                                            : 'bg-slate-100 text-slate-600'
-                                                }`}
+                                                            ? 'bg-red-100 text-red-700'
+                                                            : item.statusColor === 'blue'
+                                                                ? 'bg-blue-100 text-blue-700'
+                                                                : 'bg-slate-100 text-slate-600'
+                                                    }`}
                                             >
                                                 {item.statusText}
                                             </div>
@@ -975,11 +1065,10 @@ export const DashboardPage = () => {
                                 <button
                                     onClick={saveNotes}
                                     disabled={!notesChanged}
-                                    className={`p-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${
-                                        notesChanged
+                                    className={`p-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${notesChanged
                                             ? 'text-amber-500 hover:text-emerald-600 hover:bg-slate-100 dark:hover:bg-slate-700 animate-pulse'
                                             : 'text-slate-400 hover:text-emerald-600 hover:bg-slate-100 dark:hover:bg-slate-700'
-                                    }`}
+                                        }`}
                                     title={notesChanged ? 'Сохранить изменения' : 'Заметки сохранены'}
                                 >
                                     <Icon name="Save" size={16} />
@@ -1002,7 +1091,7 @@ export const DashboardPage = () => {
                                     onClick={() => {
                                         if (confirm('Очистить заметки?')) {
                                             setNotes('');
-                                            localStorage.setItem('gym_notes', '');
+                                            safeLocalStorageSet('gym_notes', '');
                                             setNotesChanged(false);
                                             addToast({ type: 'success', title: 'Заметки очищены', duration: 2000 });
                                         }
@@ -1114,20 +1203,32 @@ export const DashboardPage = () => {
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                             <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-100 dark:border-slate-600">
-                                <div className="text-2xl font-black text-slate-800 dark:text-white">{kpiMetrics.totalAbsences}</div>
-                                <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Пропусков сегодня</div>
+                                <div className="text-2xl font-black text-slate-800 dark:text-white">
+                                    {kpiData.absentTeachers}
+                                    <span className="text-sm font-medium text-slate-400 dark:text-slate-500">/{kpiData.totalTeachers}</span>
+                                </div>
+                                <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Отсутствуют учителей</div>
                             </div>
                             <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-100 dark:border-slate-600">
-                                <div className="text-2xl font-black text-slate-800 dark:text-white">{kpiMetrics.substitutionsTomorrow}</div>
+                                <div className="text-2xl font-black text-slate-800 dark:text-white">{kpiData.substitutionsTomorrow}</div>
                                 <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Замен на завтра</div>
                             </div>
                             <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-100 dark:border-slate-600">
-                                <div className="text-2xl font-black text-slate-800 dark:text-white">{kpiMetrics.avgLoad}</div>
-                                <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Уроков на учителя</div>
+                                <div className="text-2xl font-black text-slate-800 dark:text-white">{kpiData.todayLessons}</div>
+                                <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Уроков сегодня</div>
                             </div>
                             <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-100 dark:border-slate-600">
-                                <div className="text-2xl font-black text-emerald-600">{kpiMetrics.freeRooms}</div>
-                                <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Свободных кабинетов</div>
+                                <div className="text-2xl font-black text-slate-800 dark:text-white">{kpiData.roomUtilization}%</div>
+                                <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Кабинеты занято</div>
+                                <div className="mt-2 h-1.5 w-full bg-slate-200 dark:bg-slate-600 rounded-full overflow-hidden">
+                                    <div
+                                        className="h-full bg-emerald-500 rounded-full transition-all"
+                                        style={{ width: `${kpiData.roomUtilization}%` }}
+                                    />
+                                </div>
+                                <div className="text-[10px] text-slate-400 mt-1 text-right">
+                                    {kpiData.occupiedRooms} из {kpiData.totalRooms}
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1216,14 +1317,29 @@ export const DashboardPage = () => {
                 </div>
             )}
 
-            {/* Dashboard widgets - Grid Layout */}
+            {/* Dashboard widgets - Drag and Drop Grid Layout */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {widgets.slice(0, 4).map((widget) => renderWidget(widget))}
-            </div>
-
-            {/* Additional Info Row - Remaining Widgets */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {widgets.slice(4).map((widget) => renderWidget(widget))}
+                {widgets.filter((w) => w.visible).map((widget) => (
+                    <div
+                        key={widget.id}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, widget.id)}
+                        onDragEnd={handleDragEnd}
+                        onDragOver={(e) => handleDragOver(e, widget.id)}
+                        className={`cursor-grab active:cursor-grabbing transition-all relative group ${draggedWidgetId === widget.id ? 'scale-95 z-50' : ''} ${getColSpanClass(widget.colSpan)}`}
+                    >
+                        <div className="absolute top-4 right-4 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                                onClick={(e) => { e.stopPropagation(); handleWidgetResize(widget.id); }}
+                                className="p-1.5 bg-slate-100 dark:bg-slate-700/80 backdrop-blur rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900 text-slate-500 hover:text-indigo-600 transition-colors shadow-sm"
+                                title="Изменить размер виджета"
+                            >
+                                <Icon name="Maximize2" size={14} />
+                            </button>
+                        </div>
+                        {renderWidget(widget)}
+                    </div>
+                ))}
             </div>
 
             <Modal isOpen={isFeedbackModalOpen} onClose={() => setIsFeedbackModalOpen(false)} title="Обратная связь">

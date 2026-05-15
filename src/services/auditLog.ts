@@ -1,5 +1,6 @@
 import { AuditLogEntry } from '../types';
 import { generateId } from '../utils/helpers';
+import { safeLocalStorageGet, safeLocalStorageSet, safeLocalStorageRemove } from '../utils/localStorage';
 
 const STORAGE_KEY = 'gym_audit_log';
 const MAX_ENTRIES = 200;
@@ -7,7 +8,7 @@ const MAX_ENTRIES = 200;
 class AuditLogService {
     private readEntries(): AuditLogEntry[] {
         try {
-            const raw = localStorage.getItem(STORAGE_KEY);
+            const raw = safeLocalStorageGet(STORAGE_KEY);
             return raw ? JSON.parse(raw) : [];
         } catch {
             return [];
@@ -16,7 +17,7 @@ class AuditLogService {
 
     private writeEntries(entries: AuditLogEntry[]) {
         try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(entries.slice(-MAX_ENTRIES)));
+            safeLocalStorageSet(STORAGE_KEY, JSON.stringify(entries.slice(-MAX_ENTRIES)));
         } catch {
             // Ignore storage errors
         }
@@ -50,7 +51,7 @@ class AuditLogService {
     }
 
     clear() {
-        localStorage.removeItem(STORAGE_KEY);
+        safeLocalStorageRemove(STORAGE_KEY);
     }
 
     exportJson(): string {

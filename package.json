@@ -20,13 +20,17 @@
     "@sentry/react": "^10.53.1",
     "firebase": "^11.6.0",
     "html2canvas": "^1.4.1",
+    "immer": "^11.1.8",
     "jspdf": "^4.1.0",
     "jspdf-autotable": "^5.0.7",
+    "lru-cache": "^11.3.6",
     "qrcode.react": "^3.1.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.22.0",
-    "use-media": "^1.4.0"
+    "use-media": "^1.4.0",
+    "xlsx": "^0.18.5",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",

@@ -16,12 +16,14 @@ export interface WeatherResponse {
     forecast: ForecastItem[];
 }
 
+import { safeLocalStorageGet, safeLocalStorageSet } from '../utils/localStorage';
+
 const CACHE_KEY = 'gym_weather_cache';
 const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
 
 class WeatherService {
-    async getWeather(apiKey: string, city: string): Promise<WeatherResponse> {
-        const cached = localStorage.getItem(CACHE_KEY);
+    async getWeather(apiKey: string, city: string, signal?: AbortSignal): Promise<WeatherResponse> {
+        const cached = safeLocalStorageGet(CACHE_KEY);
         if (cached) {
             try {
                 const parsed = JSON.parse(cached);
@@ -39,17 +41,25 @@ class WeatherService {
         try {
             // Fetch Current Weather
             const currentRes = await fetch(
-                `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&units=metric&lang=ru&appid=${apiKey}`
+                `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&units=metric&lang=ru&appid=${apiKey}`,
+                { signal }
             );
             if (!currentRes.ok) throw new Error('Weather API Error');
             const currentData = await currentRes.json();
+            if (!currentData?.name || typeof currentData?.main?.temp !== 'number' || !Array.isArray(currentData?.weather)) {
+                throw new Error('Invalid weather API response structure');
+            }
 
             // Fetch Forecast (5 days / 3 hour steps)
             const forecastRes = await fetch(
-                `https://api.openweathermap.org/data/2.5/forecast?q=${encodeURIComponent(city)}&units=metric&lang=ru&appid=${apiKey}`
+                `https://api.openweathermap.org/data/2.5/forecast?q=${encodeURIComponent(city)}&units=metric&lang=ru&appid=${apiKey}`,
+                { signal }
             );
             if (!forecastRes.ok) throw new Error('Forecast API Error');
             const forecastRaw = await forecastRes.json();
+            if (!Array.isArray(forecastRaw?.list)) {
+                throw new Error('Invalid forecast API response structure');
+            }
 
             // Process Forecast: Extract daily data (approx at 12:00 or closest)
             const dailyForecast: ForecastItem[] = [];
@@ -70,7 +80,7 @@ class WeatherService {
                 forecast: dailyForecast
             };
 
-            localStorage.setItem(
+            safeLocalStorageSet(
                 CACHE_KEY,
                 JSON.stringify({
                     timestamp: Date.now(),

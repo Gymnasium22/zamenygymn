@@ -5,6 +5,7 @@ import { Icon } from '../components/Icons';
 import { Modal, useToast } from '../components/UI';
 import { DAYS, ScheduleItem, ClassEntity, Substitution, SubstitutionParams } from '../types';
 import { formatDateISO, formatDateEuropean, getScheduleForDate, generateId } from '../utils/helpers';
+import { escapeMarkdown } from '../utils/escapeHtml';
 import useMedia from 'use-media';
 
 // Subcomponents
@@ -663,18 +664,18 @@ export const SubstitutionsPage = () => {
             const roomObj = rooms.find((r) => r.id === (sub.replacementRoomId || item.roomId));
             const roomName = roomObj ? roomObj.name : sub.replacementRoomId || item.roomId || '—';
 
-            text += `🔹 **${item.period} урок** | ${cls?.name} | ${subj?.name}\n`;
-            text += `❌ ${origT?.name}\n`;
+            text += `🔹 **${item.period} урок** | ${escapeMarkdown(cls?.name)} | ${escapeMarkdown(subj?.name)}\n`;
+            text += `❌ ${escapeMarkdown(origT?.name)}\n`;
 
             if (sub.isMerger) {
-                text += `✅ ОБЪЕДИНЕНИЕ: ${repT?.name}\n`;
+                text += `✅ ОБЪЕДИНЕНИЕ: ${escapeMarkdown(repT?.name)}\n`;
             } else if (sub.replacementClassId) {
                 const swapCls = classes.find((c) => c.id === sub.replacementClassId);
-                text += `✅ ОБМЕН УРОКАМИ: ${swapCls?.name}\n`;
+                text += `✅ ОБМЕН УРОКАМИ: ${escapeMarkdown(swapCls?.name)}\n`;
             } else {
-                text += `✅ ${repT?.name}\n`;
+                text += `✅ ${escapeMarkdown(repT?.name)}\n`;
             }
-            text += `🚪 Каб. ${roomName}\n\n`;
+            text += `🚪 Каб. ${escapeMarkdown(roomName)}\n\n`;
         });
 
         return text;
@@ -708,7 +709,7 @@ export const SubstitutionsPage = () => {
         const text = generateSubstitutionText();
         setIsSendingSummary(true);
         try {
-            await fetch(`https://api.telegram.org/bot${privateSettings.telegramToken}/sendMessage`, {
+            const response = await fetch(`https://api.telegram.org/bot${privateSettings.telegramToken}/sendMessage`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -717,10 +718,17 @@ export const SubstitutionsPage = () => {
                     parse_mode: 'Markdown'
                 })
             });
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            const result = await response.json();
+            if (!result.ok) {
+                throw new Error(result.description || 'Telegram API error');
+            }
             addToast({ type: 'success', title: 'Отправлено', message: 'Сводка отправлена в Telegram' });
         } catch (e) {
             console.error(e);
-            addToast({ type: 'danger', title: 'Ошибка', message: 'Не удалось отправить сообщение' });
+            addToast({ type: 'danger', title: 'Ошибка', message: `Не удалось отправить: ${e}` });
         } finally {
             setIsSendingSummary(false);
         }
@@ -758,7 +766,7 @@ export const SubstitutionsPage = () => {
         let message = '';
 
         if (mode === 'single') {
-            const content = `🔹 *${period} урок* | ${className}\n📖 ${subjectName}\n🚪 Каб. ${roomName}`;
+            const content = `🔹 *${period} урок* | ${escapeMarkdown(className)}\n📖 ${escapeMarkdown(subjectName)}\n🚪 Каб. ${escapeMarkdown(roomName)}`;
 
             let template = settings.telegramTemplates?.teacherNotification;
             if (!template) {
@@ -805,7 +813,7 @@ export const SubstitutionsPage = () => {
                 const roomChangeIndicator =
                     replacementRoomId && replacementRoomId !== originalRoomId ? ' (Смена каб.)' : '';
 
-                messageBody += `🔹 *${item.period} урок* | ${cls}\n📖 ${subj}\n🚪 Каб. ${finalRoomName}${roomChangeIndicator}\n\n`;
+                messageBody += `🔹 *${item.period} урок* | ${escapeMarkdown(cls)}\n📖 ${escapeMarkdown(subj)}\n🚪 Каб. ${escapeMarkdown(finalRoomName)}${roomChangeIndicator}\n\n`;
             });
 
             let template = settings.telegramTemplates?.teacherSummary;
@@ -816,7 +824,7 @@ export const SubstitutionsPage = () => {
         }
 
         try {
-            await fetch(`https://api.telegram.org/bot${privateSettings.telegramToken}/sendMessage`, {
+            const response = await fetch(`https://api.telegram.org/bot${privateSettings.telegramToken}/sendMessage`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -825,10 +833,17 @@ export const SubstitutionsPage = () => {
                     parse_mode: 'Markdown'
                 })
             });
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            const result = await response.json();
+            if (!result.ok) {
+                throw new Error(result.description || 'Telegram API error');
+            }
             addToast({ type: 'success', title: 'Отправлено', message: `Уведомление отправлено ${teacher.name}` });
         } catch (e) {
             console.error(e);
-            addToast({ type: 'danger', title: 'Ошибка', message: 'Ошибка отправки в Telegram' });
+            addToast({ type: 'danger', title: 'Ошибка', message: `Ошибка отправки: ${e}` });
         } finally {
             setTelegramChoiceOpen(false);
             setTelegramTarget(null);
@@ -1487,11 +1502,11 @@ export const SubstitutionsPage = () => {
                                             const dateMatch = s.date.includes(searchLower);
                                             const orig = teachers
                                                 .find((t) => t.id === s.originalTeacherId)
-                                                ?.name.toLowerCase()
+                                                ?.name?.toLowerCase()
                                                 .includes(searchLower);
                                             const rep = teachers
                                                 .find((t) => t.id === s.replacementTeacherId)
-                                                ?.name.toLowerCase()
+                                                ?.name?.toLowerCase()
                                                 .includes(searchLower);
                                             return dateMatch || orig || rep;
                                         }

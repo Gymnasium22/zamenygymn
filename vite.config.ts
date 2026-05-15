@@ -95,7 +95,7 @@ export default defineConfig({
         ]
       },
       devOptions: {
-        enabled: true, // Включаем PWA в режиме разработки
+        enabled: false, // Отключаем PWA в режиме разработки, чтобы избежать кэширования
         type: 'module'
       }
     })

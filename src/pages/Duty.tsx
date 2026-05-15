@@ -5,6 +5,7 @@ import { Modal, SearchableSelect } from '../components/UI';
 import { DAYS, Shift, DutyZone, DayOfWeek, DutyRecord } from '../types';
 import { generateId } from '../utils/helpers';
 import { exportService } from '../services/exportService';
+import { escapeHtml } from '../utils/escapeHtml';
 
 export const DutyPage = () => {
     const { teachers, dutyZones, rooms, saveStaticData } = useStaticData();
@@ -213,7 +214,7 @@ export const DutyPage = () => {
                         учреждения образования<br>
                         «Гимназия № 22 г. Минска»<br><br>
                         __________ Н.В.Кисель<br>
-                        "__" ______ 2025г.
+                        "__" ______ ${new Date().getFullYear()}г.
                     </td>
                 </tr>
                 <tr class="empty-row"><td colspan="${totalColspan}" style="border:none"></td></tr>
@@ -232,32 +233,32 @@ export const DutyPage = () => {
         [Shift.First, Shift.Second].forEach((shift) => {
             content += `<table>`;
             // Shift Header
-            content += `<tr><th colspan="${totalColspan}" class="shift-header">${shift}</th></tr>`;
+            content += `<tr><th colspan="${totalColspan}" class="shift-header">${escapeHtml(shift)}</th></tr>`;
 
             // Header Row (Zone Name + Days)
             content += `<tr>`;
             content += `<th class="day-header" style="background-color: #f3f4f6;">Пост дежурства</th>`;
             DAYS.forEach((day) => {
                 const styles = dayStyles[day as string] || { label: '#ffffff', cell: '#ffffff' };
-                content += `<th class="day-header" style="background-color: ${styles.label};">${day}</th>`;
+                content += `<th class="day-header" style="background-color: ${styles.label};">${escapeHtml(day)}</th>`;
             });
             content += `</tr>`;
 
             // Data Rows (Grouped by Floor)
             zonesByFloor.forEach((group) => {
                 // Floor Sub-Header
-                content += `<tr><td colspan="${totalColspan}" class="floor-header">${group.floor}</td></tr>`;
+                content += `<tr><td colspan="${totalColspan}" class="floor-header">${escapeHtml(group.floor)}</td></tr>`;
 
                 group.zones.forEach((zone) => {
                     content += `<tr>`;
                     // Zone Name ONLY
-                    content += `<td class="zone-cell">${zone.name}</td>`;
+                    content += `<td class="zone-cell">${escapeHtml(zone.name)}</td>`;
 
                     // Teacher cells for each day
                     DAYS.forEach((day) => {
                         const styles = dayStyles[day as string] || { label: '#ffffff', cell: '#ffffff' };
                         const teacher = getTeacher(zone.id, day, shift);
-                        content += `<td class="content-cell" style="background-color: ${styles.cell};">${teacher ? teacher.name : ''}</td>`;
+                        content += `<td class="content-cell" style="background-color: ${styles.cell};">${teacher ? escapeHtml(teacher.name) : ''}</td>`;
                     });
                     content += `</tr>`;
                 });
@@ -307,7 +308,7 @@ export const DutyPage = () => {
                         учреждения образования<br>
                         «Гимназия № 22 г. Минска»<br><br>
                         ____________________ Н.В.Кисель<br>
-                        "____" __________ 2025г.
+                        "____" __________ ${new Date().getFullYear()}г.
                     </td>
                 </tr>
                 <tr class="empty-row"><td colspan="${totalColspan}" style="border:none"></td></tr>
@@ -327,20 +328,20 @@ export const DutyPage = () => {
         [Shift.First, Shift.Second].forEach((shift) => {
             content += `<table>`;
             // Shift Header
-            content += `<tr><th colspan="${totalColspan}" class="shift-header">${shift}</th></tr>`;
+            content += `<tr><th colspan="${totalColspan}" class="shift-header">${escapeHtml(shift)}</th></tr>`;
 
             // Floor Headers
             content += `<tr>`;
             content += `<th rowspan="2" class="floor-header" style="width: 100px;">День недели</th>`; // Corner cell
             zonesByFloor.forEach((group) => {
-                content += `<th colspan="${group.zones.length}" class="floor-header">${group.floor}</th>`;
+                content += `<th colspan="${group.zones.length}" class="floor-header">${escapeHtml(group.floor)}</th>`;
             });
             content += `</tr>`;
 
             // Zone Headers
             content += `<tr>`;
             allZonesSorted.forEach((zone) => {
-                content += `<th class="zone-header">${zone.name}</th>`;
+                content += `<th class="zone-header">${escapeHtml(zone.name)}</th>`;
             });
             content += `</tr>`;
 
@@ -349,11 +350,11 @@ export const DutyPage = () => {
                 const styles = dayStyles[day as string] || { label: '#ffffff', cell: '#ffffff' };
 
                 content += `<tr>`;
-                content += `<td class="day-label" style="background-color: ${styles.label};">${day}</td>`;
+                content += `<td class="day-label" style="background-color: ${styles.label};">${escapeHtml(day)}</td>`;
 
                 allZonesSorted.forEach((zone) => {
                     const teacher = getTeacher(zone.id, day, shift);
-                    content += `<td class="content-cell" style="background-color: ${styles.cell};">${teacher ? teacher.name : ''}</td>`;
+                    content += `<td class="content-cell" style="background-color: ${styles.cell};">${teacher ? escapeHtml(teacher.name) : ''}</td>`;
                 });
 
                 content += `</tr>`;

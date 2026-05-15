@@ -12,6 +12,8 @@ import {
 import { INITIAL_DATA } from '../constants';
 import { formatDateEuropean, formatDateISO } from '../utils/helpers';
 import { auditLog } from '../services/auditLog';
+import { safeLocalStorageGet } from '../utils/localStorage';
+import { stripDangerousKeys } from '../utils/safeMerge';
 import { SemesterConfig } from '../components/settings/SemesterConfig';
 import { TelegramTemplateEditor } from '../components/settings/TelegramTemplateEditor';
 
@@ -402,11 +404,12 @@ export const SettingsPage = () => {
     const handleImport = async (file: File) => {
         try {
             const text = await file.text();
-            const data = JSON.parse(text);
+            const rawData = JSON.parse(text);
+            const data = stripDangerousKeys(rawData) as Record<string, unknown>;
             if (!data.settings) throw new Error('Неверный формат файла');
             await saveStaticData({
-                settings: { ...settings, ...data.settings },
-                privateSettings: { ...privateSettings, ...data.privateSettings }
+                settings: { ...settings, ...(data.settings as Record<string, unknown> || {}) },
+                privateSettings: { ...privateSettings, ...(data.privateSettings as Record<string, unknown> || {}) }
             });
             addToast({ type: 'success', title: 'Импорт', message: 'Настройки восстановлены из файла' });
         } catch {
@@ -996,7 +999,7 @@ const BackupControls: React.FC<{
     const handleBackupNow = async () => {
         setIsBackingUp(true);
         try {
-            const data = localStorage.getItem('gym_data_local_backup_v2');
+            const data = safeLocalStorageGet('gym_data_local_backup_v2');
             if (!data) {
                 addToast({ type: 'warning', title: 'Бекап', message: 'Нет данных для бекапа' });
                 return;
@@ -1106,23 +1109,6 @@ const AuditLogViewer: React.FC = () => {
         setEntries(auditLog.getEntries(100));
     }, []);
 
-    const handleRefresh = () => {
-        setEntries(auditLog.getEntries(100));
-    };
-
-    const handleExport = () => {
-        const blob = new Blob([auditLog.exportJson()], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `audit_log_${formatDateISO()}.json`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-        addToast({ type: 'success', title: 'Экспорт', message: 'Журнал действий сохранён' });
-    };
-
     const actionLabels: Record<string, string> = {
         create: 'Создание',
         update: 'Изменение',
@@ -1146,55 +1132,151 @@ const AuditLogViewer: React.FC = () => {
         absenteeism: 'Пропуски'
     };
 
+    const actionDescriptions: Record<string, string> = {
+        create: 'Создан новый объект',
+        update: 'Объект изменён',
+        delete: 'Объект удалён',
+        import: 'Выполнен импорт данных',
+        export: 'Выполнен экспорт данных',
+        apply: 'Настройки применены'
+    };
+
+    const handleRefresh = () => setEntries(auditLog.getEntries(100));
+
+    const handleExportJson = () => {
+        const blob = new Blob([auditLog.exportJson()], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `audit_log_${formatDateISO()}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        addToast({ type: 'success', title: 'Экспорт', message: 'Журнал действий сохранён в JSON' });
+    };
+
+    const handleExportExcel = () => {
+        const all = auditLog.getEntries(200);
+        if (all.length === 0) {
+            addToast({ type: 'warning', title: 'Журнал пуст', message: 'Нет данных для экспорта' });
+            return;
+        }
+        const BOM = '\uFEFF';
+        const headers = ['Дата', 'Время', 'Пользователь', 'Роль', 'Действие', 'Тип объекта', 'Название объекта', 'Подробное описание'];
+        const rows = all.map((e) => {
+            const dt = new Date(e.timestamp);
+            const date = dt.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            const time = dt.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            const action = actionLabels[e.action] || e.action;
+            const entity = entityLabels[e.entityType] || e.entityType;
+            const baseDesc = actionDescriptions[e.action] || e.action;
+            const fullDesc = [
+                baseDesc,
+                e.entityName ? `Объект: «${e.entityName}»` : '',
+                e.details ? `Детали: ${e.details}` : ''
+            ].filter(Boolean).join('. ');
+            return [date, time, e.userEmail, e.userRole, action, entity, e.entityName || '', fullDesc]
+                .map((v) => `"${String(v).replace(/"/g, '""')}"`).join(';');
+        });
+        const csv = BOM + [headers.map((h) => `"${h}"`).join(';'), ...rows].join('\r\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `audit_log_${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        addToast({ type: 'success', title: 'Экспорт в Excel', message: `Выгружено ${all.length} записей` });
+    };
+
+    const handleClear = () => {
+        if (!window.confirm('Очистить весь журнал действий? Это действие необратимо.')) return;
+        auditLog.clear();
+        setEntries([]);
+        addToast({ type: 'success', title: 'Журнал очищен', message: 'Все записи удалены' });
+    };
+
     return (
         <div>
-            <div className="flex gap-2 mb-3">
+            <div className="flex flex-wrap gap-2 mb-3">
                 <button
                     onClick={handleRefresh}
-                    className="px-3 py-1.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg text-xs font-bold hover:bg-slate-200 transition"
+                    className="px-3 py-1.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition flex items-center gap-1.5"
                 >
-                    Обновить
+                    <Icon name="RefreshCw" size={12} /> Обновить
                 </button>
                 <button
-                    onClick={handleExport}
-                    className="px-3 py-1.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg text-xs font-bold hover:bg-slate-200 transition"
+                    onClick={handleExportJson}
+                    className="px-3 py-1.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition flex items-center gap-1.5"
                 >
-                    Скачать JSON
+                    <Icon name="Download" size={12} /> Скачать JSON
+                </button>
+                <button
+                    onClick={handleExportExcel}
+                    className="px-3 py-1.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded-lg text-xs font-bold hover:bg-emerald-200 dark:hover:bg-emerald-900/50 transition flex items-center gap-1.5"
+                >
+                    <Icon name="FileSpreadsheet" size={12} /> Экспорт в Excel
+                </button>
+                <button
+                    onClick={handleClear}
+                    className="px-3 py-1.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-lg text-xs font-bold hover:bg-red-200 dark:hover:bg-red-900/50 transition flex items-center gap-1.5 ml-auto"
+                >
+                    <Icon name="Trash2" size={12} /> Очистить журнал
                 </button>
             </div>
-            <div className="max-h-60 overflow-y-auto custom-scrollbar border border-slate-100 dark:border-slate-700 rounded-xl">
+            <div className="max-h-64 overflow-y-auto custom-scrollbar border border-slate-100 dark:border-slate-700 rounded-xl">
                 {entries.length === 0 ? (
-                    <div className="p-4 text-center text-sm text-slate-400">Журнал пуст</div>
+                    <div className="p-6 text-center text-sm text-slate-400">
+                        <Icon name="FileText" size={32} className="mx-auto mb-2 opacity-30" />
+                        Журнал пуст
+                    </div>
                 ) : (
                     <table className="w-full text-sm">
-                        <thead className="bg-slate-50 dark:bg-slate-800 sticky top-0">
+                        <thead className="bg-slate-50 dark:bg-slate-800 sticky top-0 z-10">
                             <tr>
-                                <th className="text-left px-3 py-2 text-xs font-bold text-slate-500 dark:text-slate-400">Время</th>
+                                <th className="text-left px-3 py-2 text-xs font-bold text-slate-500 dark:text-slate-400 whitespace-nowrap">Дата/Время</th>
                                 <th className="text-left px-3 py-2 text-xs font-bold text-slate-500 dark:text-slate-400">Пользователь</th>
                                 <th className="text-left px-3 py-2 text-xs font-bold text-slate-500 dark:text-slate-400">Действие</th>
                                 <th className="text-left px-3 py-2 text-xs font-bold text-slate-500 dark:text-slate-400">Объект</th>
+                                <th className="text-left px-3 py-2 text-xs font-bold text-slate-500 dark:text-slate-400">Подробности</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                             {entries.map((entry) => (
                                 <tr key={entry.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                                    <td className="px-3 py-2 text-slate-600 dark:text-slate-300 whitespace-nowrap">
-                                        {new Date(entry.timestamp).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                                    <td className="px-3 py-2 text-slate-500 dark:text-slate-400 whitespace-nowrap text-xs">
+                                        {new Date(entry.timestamp).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })}{' '}
+                                        <span className="font-mono">
+                                            {new Date(entry.timestamp).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                                        </span>
                                     </td>
-                                    <td className="px-3 py-2 text-slate-600 dark:text-slate-300 truncate max-w-[120px]" title={entry.userEmail}>
+                                    <td className="px-3 py-2 text-slate-600 dark:text-slate-300 truncate max-w-[120px] text-xs" title={entry.userEmail}>
                                         {entry.userEmail}
                                     </td>
                                     <td className="px-3 py-2">
-                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                                            entry.action === 'delete' ? 'bg-red-100 text-red-700' :
-                                            entry.action === 'create' ? 'bg-emerald-100 text-emerald-700' :
-                                            'bg-blue-100 text-blue-700'
+                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap ${
+                                            entry.action === 'delete'
+                                                ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                                                : entry.action === 'create'
+                                                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                                                  : entry.action === 'import'
+                                                    ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
+                                                    : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
                                         }`}>
                                             {actionLabels[entry.action] || entry.action}
                                         </span>
                                     </td>
-                                    <td className="px-3 py-2 text-slate-600 dark:text-slate-300">
+                                    <td className="px-3 py-2 text-slate-600 dark:text-slate-300 text-xs">
                                         {entityLabels[entry.entityType] || entry.entityType}
+                                        {entry.entityName && (
+                                            <span className="text-slate-400 ml-1">«{entry.entityName}»</span>
+                                        )}
+                                    </td>
+                                    <td className="px-3 py-2 text-slate-400 dark:text-slate-500 text-xs max-w-[180px]" title={entry.details}>
+                                        <span className="line-clamp-1">{entry.details || '—'}</span>
                                     </td>
                                 </tr>
                             ))}

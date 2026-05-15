@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef, useMemo, useCallback, createContext, useContext, ReactNode } from 'react';
+import React, { useEffect, useState, useRef, useMemo, useCallback, createContext, useContext, ReactNode, useId } from 'react';
 import { Icon } from './Icons';
 import { useStaticData, useScheduleData } from '../context/DataContext';
 import { DayOfWeek, Shift } from '../types';
@@ -190,6 +190,7 @@ interface ToastProps {
 export const Modal = ({ isOpen, onClose, title, children, maxWidth = 'max-w-lg' }: ModalProps) => {
     const modalRef = useRef<HTMLDivElement>(null);
     const previousActiveElement = useRef<HTMLElement | null>(null);
+    const modalId = useId();
 
     useEffect(() => {
         if (!isOpen) return;
@@ -238,15 +239,19 @@ export const Modal = ({ isOpen, onClose, title, children, maxWidth = 'max-w-lg' 
         };
 
         document.addEventListener('keydown', handleKeyDown);
+        activeModals.add(modalId);
         document.body.style.overflow = 'hidden';
 
         return () => {
             document.removeEventListener('keydown', handleKeyDown);
-            document.body.style.overflow = '';
+            activeModals.delete(modalId);
+            if (activeModals.size === 0) {
+                document.body.style.overflow = '';
+            }
             // Возвращаем фокус на элемент, который был активен до открытия
             previousActiveElement.current?.focus();
         };
-    }, [isOpen, onClose]);
+    }, [isOpen, onClose, modalId]);
 
     if (!isOpen) return null;
 
@@ -255,6 +260,7 @@ export const Modal = ({ isOpen, onClose, title, children, maxWidth = 'max-w-lg' 
             ref={modalRef}
             role="dialog"
             aria-modal="true"
+            aria-labelledby="modal-title"
             tabIndex={-1}
             className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-fade-in no-print"
             onClick={(e) => e.target === e.currentTarget && onClose()}
@@ -263,7 +269,7 @@ export const Modal = ({ isOpen, onClose, title, children, maxWidth = 'max-w-lg' 
                 className={`bg-white/90 dark:bg-dark-800/90 rounded-3xl shadow-2xl w-full ${maxWidth} flex flex-col max-h-[90vh] transition-colors duration-300`}
             >
                 <div className="flex items-center justify-between px-6 py-5 border-b border-slate-200/50 dark:border-slate-700/50">
-                    <h2 className="text-xl font-bold text-slate-800 dark:text-white tracking-tight">{title}</h2>
+                    <h2 id="modal-title" className="text-xl font-bold text-slate-800 dark:text-white tracking-tight">{title}</h2>
                     <button
                         onClick={onClose}
                         className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700"
@@ -278,10 +284,14 @@ export const Modal = ({ isOpen, onClose, title, children, maxWidth = 'max-w-lg' 
     );
 };
 
+// Глобальный Set открытых модалок для корректной блокировки скролла
+const activeModals = new Set<string>();
+
 export const Toast = ({ id, type, title, message, duration = 5000, onClose }: ToastProps) => {
     const [isVisible, setIsVisible] = useState(true);
     const [isExiting, setIsExiting] = useState(false);
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const handleCloseRef = useRef<() => void>(() => {});
 
     const handleClose = useCallback(() => {
         // Очищаем таймер при ручном закрытии
@@ -297,10 +307,13 @@ export const Toast = ({ id, type, title, message, duration = 5000, onClose }: To
         }, 300);
     }, [onClose, id]);
 
+    handleCloseRef.current = handleClose;
+
     useEffect(() => {
         // Устанавливаем таймер только один раз при монтировании
+        // Используем ref, чтобы не сбрасывать таймер при смене onClose
         timerRef.current = setTimeout(() => {
-            handleClose();
+            handleCloseRef.current();
         }, duration);
 
         return () => {
@@ -308,7 +321,7 @@ export const Toast = ({ id, type, title, message, duration = 5000, onClose }: To
                 clearTimeout(timerRef.current);
             }
         };
-    }, [duration, handleClose]);
+    }, [duration]);
 
     if (!isVisible) return null;
 
@@ -397,9 +410,12 @@ interface ContextMenuProps {
 
 export const ContextMenu = ({ x, y, onClose, actions }: ContextMenuProps) => {
     const ref = useRef<HTMLDivElement>(null);
+    const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
+    const [activeIndex, setActiveIndex] = useState(0);
 
     useEffect(() => {
         if (x === null || y === null) return;
+        setActiveIndex(0);
 
         const handleClick = (e: MouseEvent) => {
             if (ref.current && !ref.current.contains(e.target as Node)) {
@@ -407,18 +423,36 @@ export const ContextMenu = ({ x, y, onClose, actions }: ContextMenuProps) => {
             }
         };
 
-        const handleEscape = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') onClose();
+        const handleKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                onClose();
+                return;
+            }
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                setActiveIndex((i) => Math.min(i + 1, actions.length - 1));
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setActiveIndex((i) => Math.max(i - 1, 0));
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                actions[activeIndex]?.onClick();
+                onClose();
+            }
         };
 
         window.addEventListener('click', handleClick, true);
-        document.addEventListener('keydown', handleEscape);
+        document.addEventListener('keydown', handleKey);
 
         return () => {
             window.removeEventListener('click', handleClick, true);
-            document.removeEventListener('keydown', handleEscape);
+            document.removeEventListener('keydown', handleKey);
         };
-    }, [x, y, onClose]);
+    }, [x, y, onClose, actions, activeIndex]);
+
+    useEffect(() => {
+        buttonRefs.current[activeIndex]?.focus();
+    }, [activeIndex]);
 
     if (x === null || y === null) return null;
 
@@ -428,18 +462,22 @@ export const ContextMenu = ({ x, y, onClose, actions }: ContextMenuProps) => {
     return (
         <div
             ref={ref}
+            role="menu"
             className="fixed z-[100] bg-white/90 dark:bg-slate-800/90 backdrop-blur-md shadow-xl rounded-2xl border border-slate-100 dark:border-slate-700 py-2 w-56 context-menu no-print"
             style={style}
         >
-            {actions.map((action) => (
+            {actions.map((action, index) => (
                 <button
                     key={action.id || action.label}
+                    ref={(el) => { buttonRefs.current[index] = el; }}
+                    role="menuitem"
+                    tabIndex={index === activeIndex ? 0 : -1}
                     onClick={(e) => {
                         e.stopPropagation();
                         action.onClick();
                         onClose();
                     }}
-                    className={`w-full text-left px-4 py-2.5 text-sm font-bold flex items-center gap-3 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors ${action.color || 'text-slate-700 dark:text-slate-200'}`}
+                    className={`w-full text-left px-4 py-2.5 text-sm font-bold flex items-center gap-3 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors ${action.color || 'text-slate-700 dark:text-slate-200'} ${index === activeIndex ? 'bg-slate-50 dark:bg-slate-700' : ''}`}
                 >
                     {action.icon && <Icon name={action.icon} size={16} />}
                     {action.label}
@@ -695,6 +733,9 @@ export const SearchableSelect = ({
     return (
         <div className="relative w-full" ref={ref}>
             <div
+                role="combobox"
+                aria-expanded={isOpen}
+                aria-haspopup="listbox"
                 onClick={() => setIsOpen(!isOpen)}
                 className="w-full border border-slate-200 dark:border-slate-600 rounded-xl p-3 text-sm bg-white dark:bg-slate-700 dark:text-white cursor-pointer flex justify-between items-center"
             >
@@ -702,7 +743,7 @@ export const SearchableSelect = ({
                 <Icon name="Filter" size={14} className="text-slate-400" />
             </div>
             {isOpen && (
-                <div className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-600 rounded-xl shadow-xl max-h-96 overflow-auto custom-scrollbar">
+                <div role="listbox" className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-600 rounded-xl shadow-xl max-h-96 overflow-auto custom-scrollbar">
                     <div className="p-2 sticky top-0 bg-white dark:bg-slate-800 z-10">
                         <input
                             autoFocus
@@ -720,6 +761,8 @@ export const SearchableSelect = ({
                                   </div>
                                   {g.options.map((opt) => (
                                       <div
+                                          role="option"
+                                          aria-selected={value === opt.value}
                                           key={opt.value}
                                           onClick={() => {
                                               onChange(opt.value);
@@ -736,6 +779,8 @@ export const SearchableSelect = ({
                         : filteredOptionsSimple
                           ? filteredOptionsSimple.map((opt) => (
                                 <div
+                                    role="option"
+                                    aria-selected={value === opt.value}
                                     key={opt.value}
                                     onClick={() => {
                                         onChange(opt.value);
@@ -903,8 +948,9 @@ export const BottomNavigation = ({ onMenuClick, role }: BottomNavProps) => {
 };
 
 interface Action {
-    type: 'nav' | 'teacher' | 'class' | 'subject' | 'room' | 'sub';
+    type: 'nav' | 'teacher' | 'class' | 'subject' | 'room' | 'sub' | 'quick_action';
     label: string;
+    subtitle?: string;
     icon: string;
     path?: string;
     id?: string;
@@ -956,28 +1002,42 @@ export const CommandPalette = ({ isOpen, onClose }: CommandPaletteProps) => {
         });
 
         if (q) {
+            // Smart quick actions
+            if (['замена', 'заменить', 'поменять'].some(k => k.includes(q) || q.includes(k))) {
+                actions.push({ type: 'nav', label: 'Создать новую замену', subtitle: 'Перейти в редактор замен', icon: 'PlusCircle', path: '/substitutions' });
+            }
+            if (['болеет', 'пропуск', 'отсутствует'].some(k => k.includes(q) || q.includes(k))) {
+                actions.push({ type: 'nav', label: 'Отметить отсутствие', subtitle: 'Перейти в журнал пропусков', icon: 'UserX', path: '/absenteeism' });
+            }
+
             // Teachers
             teachers.forEach((t) => {
-                if (t.name.toLowerCase().includes(q)) {
-                    actions.push({ type: 'teacher', label: t.name, icon: 'User', id: t.id });
+                const nameMatch = t.name.toLowerCase().includes(q);
+                if (nameMatch) {
+                    actions.push({ type: 'teacher', label: t.name, subtitle: 'Открыть расписание учителя', icon: 'User', id: t.id });
+                    
+                    // Generate smart context actions for the teacher if query is highly specific
+                    if (q.length > 3) {
+                        actions.push({ type: 'quick_action', label: `Отметить отсутствие: ${t.name}`, subtitle: 'Быстрый переход в пропуски', icon: 'UserMinus', path: `/absenteeism?teacherId=${t.id}` });
+                    }
                 }
             });
             // Classes
             classes.forEach((c) => {
                 if (c.name.toLowerCase().includes(q)) {
-                    actions.push({ type: 'class', label: c.name, icon: 'GraduationCap', id: c.id });
+                    actions.push({ type: 'class', label: c.name, subtitle: `${c.shift} смена`, icon: 'GraduationCap', id: c.id });
                 }
             });
             // Subjects
             subjects.forEach((s) => {
                 if (s.name.toLowerCase().includes(q)) {
-                    actions.push({ type: 'subject', label: s.name, icon: 'BookOpen', id: s.id });
+                    actions.push({ type: 'subject', label: s.name, subtitle: 'Предмет', icon: 'BookOpen', id: s.id });
                 }
             });
             // Rooms
             rooms.forEach((r) => {
-                if (r.name.toLowerCase().includes(q)) {
-                    actions.push({ type: 'room', label: `Кабинет ${r.name}`, icon: 'MapPin', id: r.id });
+                if (r.name.toLowerCase().includes(q) || r.type?.toLowerCase().includes(q)) {
+                    actions.push({ type: 'room', label: `Кабинет ${r.name}`, subtitle: r.type || 'Учебный класс', icon: 'MapPin', id: r.id });
                 }
             });
             // Substitutions by date
@@ -986,7 +1046,7 @@ export const CommandPalette = ({ isOpen, onClose }: CommandPaletteProps) => {
                 if (s.date.includes(q) || s.date === today) {
                     const t = teachers.find((x) => x.id === s.originalTeacherId);
                     if (t && actions.filter((a) => a.type === 'sub').length < 3) {
-                        actions.push({ type: 'sub', label: `Замена ${s.date}`, icon: 'Repeat', id: s.date });
+                        actions.push({ type: 'sub', label: `Замена ${s.date}`, subtitle: `Вместо: ${t.name}`, icon: 'Repeat', id: s.date });
                     }
                 }
             });
@@ -1040,6 +1100,8 @@ export const CommandPalette = ({ isOpen, onClose }: CommandPaletteProps) => {
             navigate(`/schedule?view=room&id=${action.id}`);
         } else if (action.type === 'sub') {
             navigate(`/substitutions?date=${action.id}`);
+        } else if (action.type === 'quick_action') {
+            if (action.path) navigate(action.path);
         }
         onClose();
     };
@@ -1084,10 +1146,20 @@ export const CommandPalette = ({ isOpen, onClose }: CommandPaletteProps) => {
                                         idx === activeIndex ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400'
                                     }
                                 />
-                                <div className="flex-1 font-medium">{action.label}</div>
-                                {action.type !== 'nav' && (
-                                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                                <div className="flex-1 min-w-0">
+                                    <div className="font-medium text-slate-800 dark:text-slate-200 truncate">{action.label}</div>
+                                    {action.subtitle && (
+                                        <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium truncate">{action.subtitle}</div>
+                                    )}
+                                </div>
+                                {action.type !== 'nav' && action.type !== 'quick_action' && (
+                                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider shrink-0 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">
                                         {action.type}
+                                    </span>
+                                )}
+                                {action.type === 'quick_action' && (
+                                    <span className="text-[10px] uppercase font-bold text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-1 rounded border border-indigo-200 dark:border-indigo-800">
+                                        Действие
                                     </span>
                                 )}
                             </button>

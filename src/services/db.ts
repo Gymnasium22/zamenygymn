@@ -2,6 +2,7 @@ import { AppData } from '../types';
 import { INITIAL_DATA } from '../constants';
 import { firestoreDB, auth } from './firebase';
 import { collection, doc, setDoc, writeBatch, onSnapshot, getDocs, query, deleteDoc, getDoc } from 'firebase/firestore';
+import { User } from 'firebase/auth';
 
 // Конфигурация коллекций
 const COLLECTIONS = {
@@ -22,7 +23,26 @@ const COLLECTIONS = {
 };
 
 // Кеш предыдущих состояний коллекций для оптимизации
-const collectionCache = new Map<string, Map<string, any>>();
+const collectionCache = new Map<string, Map<string, Record<string, unknown>>>();
+
+// Сериализация syncCollection по коллекциям (предотвращает race conditions)
+const syncLocks = new Map<string, Promise<void>>();
+
+const withSyncLock = async (collectionName: string, fn: () => Promise<void>): Promise<void> => {
+    const previous = syncLocks.get(collectionName) || Promise.resolve();
+    const next = previous.then(fn).catch((err) => {
+        // Не ломаем цепочку — следующий вызов может продолжить
+        throw err;
+    });
+    syncLocks.set(collectionName, next);
+    // Очищаем завершенные промисы, чтобы не накапливать память
+    next.finally(() => {
+        if (syncLocks.get(collectionName) === next) {
+            syncLocks.delete(collectionName);
+        }
+    });
+    return next;
+};
 
 const chunkArray = <T>(array: T[], size: number): T[][] => {
     const chunked = [];
@@ -33,44 +53,47 @@ const chunkArray = <T>(array: T[], size: number): T[][] => {
 };
 
 // Helper to remove undefined values which Firebase doesn't support
-const sanitizeForFirestore = (data: any): any => {
+const sanitizeForFirestore = <T>(data: T): T | null => {
     if (data === null || data === undefined) {
         return null; // Convert undefined to null for Firestore compatibility
     }
 
     if (typeof data === 'object') {
         if (Array.isArray(data)) {
-            return data.map((item) => sanitizeForFirestore(item)).filter((item) => item !== undefined);
+            return data.map((item) => sanitizeForFirestore(item)).filter((item) => item !== undefined) as unknown as T;
         }
 
-        const sanitized: any = {};
-        for (const [key, value] of Object.entries(data)) {
+        const sanitized: Record<string, unknown> = {};
+        for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
             const sanitizedValue = sanitizeForFirestore(value);
             if (sanitizedValue !== undefined) {
                 sanitized[key] = sanitizedValue;
             }
         }
-        return sanitized;
+        return sanitized as unknown as T;
     }
 
     return data;
 };
 
 // Глубокое сравнение объектов
-const deepEqual = (a: any, b: any): boolean => {
+const deepEqual = (a: unknown, b: unknown): boolean => {
     if (a === b) return true;
     if (a == null || b == null) return a === b;
     if (typeof a !== typeof b) return false;
 
-    if (typeof a === 'object') {
-        const keysA = Object.keys(a);
-        const keysB = Object.keys(b);
+    if (typeof a === 'object' && typeof b === 'object' && a !== null && b !== null) {
+        const aRecord = a as Record<string, unknown>;
+        const bRecord = b as Record<string, unknown>;
+
+        const keysA = Object.keys(aRecord);
+        const keysB = Object.keys(bRecord);
 
         if (keysA.length !== keysB.length) return false;
 
         for (const key of keysA) {
             if (!keysB.includes(key)) return false;
-            if (!deepEqual(a[key], b[key])) return false;
+            if (!deepEqual(aRecord[key], bRecord[key])) return false;
         }
         return true;
     }
@@ -82,7 +105,7 @@ const deepEqual = (a: any, b: any): boolean => {
 async function awaitHZ<T>(
     fn: () => Promise<T>,
     options: { throwOnError?: boolean } = {}
-): Promise<T | { docs: any[] }> {
+): Promise<T | { docs: Array<Record<string, unknown>> }> {
     try {
         return await fn();
     } catch (e) {
@@ -117,76 +140,77 @@ export const dbService = {
     },
 
     // Оптимизированная синхронизация с использованием локального кеша
-    syncCollection: async (collectionName: string, items: any[]) => {
+    syncCollection: async <T extends { id: string }>(collectionName: string, items: T[]) => {
         if (!firestoreDB) return;
+        await withSyncLock(collectionName, async () => {
+            // Читаем кеш один раз в начале, чтобы избежать гонки с onSnapshot
+            const existingCache = collectionCache.get(collectionName);
+            const cachedItems = existingCache ? new Map(existingCache) : new Map();
 
-        // Получаем кеш для этой коллекции
-        let cachedItems = collectionCache.get(collectionName);
-        if (!cachedItems) {
-            cachedItems = new Map();
-            collectionCache.set(collectionName, cachedItems);
-        }
+            // Создаем Map из новых элементов
+            const newItemsMap = new Map<string, Record<string, unknown>>();
+            items.forEach((item) => {
+                if (item && item.id) {
+                    newItemsMap.set(item.id, sanitizeForFirestore(item) as Record<string, unknown>);
+                }
+            });
 
-        // Создаем Map из новых элементов
-        const newItemsMap = new Map<string, any>();
-        items.forEach((item) => {
-            if (item && item.id) {
-                newItemsMap.set(item.id, sanitizeForFirestore(item));
+            // Вычисляем операции только на основе локальной копии кеша
+            const operations: { type: 'create' | 'update' | 'delete'; item?: Record<string, unknown>; id: string }[] = [];
+
+            // Удаление элементов, которые есть в кеше, но нет в новых данных
+            cachedItems.forEach((_, id) => {
+                if (!newItemsMap.has(id)) {
+                    operations.push({ type: 'delete', id });
+                }
+            });
+
+            // Создание/обновление элементов
+            newItemsMap.forEach((item, id) => {
+                const cachedItem = cachedItems.get(id);
+
+                // Сравниваем с кешем
+                if (!cachedItem || !deepEqual(cachedItem, item)) {
+                    operations.push({
+                        type: cachedItem ? 'update' : 'create',
+                        item,
+                        id
+                    });
+                }
+            });
+
+            if (operations.length === 0) return;
+
+            try {
+                // Запись пачками
+                const chunks = chunkArray(operations, 450);
+
+                for (const chunk of chunks) {
+                    const batch = writeBatch(firestoreDB);
+
+                    chunk.forEach((op) => {
+                        const docRef = doc(firestoreDB, collectionName, op.id);
+
+                        if (op.type === 'delete') {
+                            batch.delete(docRef);
+                            cachedItems.delete(op.id);
+                        } else {
+                            // Используем setDoc с merge: true для надежности
+                            batch.set(docRef, op.item, { merge: true });
+                            cachedItems.set(op.id, op.item);
+                        }
+                    });
+
+                    await batch.commit();
+                }
+
+                // Атомарно заменяем кеш только после успешной записи
+                collectionCache.set(collectionName, cachedItems);
+            } catch (error) {
+                console.error(`Failed to sync ${collectionName}:`, error);
+                throw error;
             }
         });
-
-        // Вычисляем операции только на основе кеша
-        const operations: { type: 'create' | 'update' | 'delete'; item?: any; id: string }[] = [];
-
-        // Удаление элементов, которые есть в кеше, но нет в новых данных
-        cachedItems.forEach((_, id) => {
-            if (!newItemsMap.has(id)) {
-                operations.push({ type: 'delete', id });
-            }
-        });
-
-        // Создание/обновление элементов
-        newItemsMap.forEach((item, id) => {
-            const cachedItem = cachedItems!.get(id);
-
-            // Сравниваем с кешем
-            if (!cachedItem || !deepEqual(cachedItem, item)) {
-                operations.push({
-                    type: cachedItem ? 'update' : 'create',
-                    item,
-                    id
-                });
-            }
-        });
-
-        if (operations.length === 0) return;
-
-        try {
-            // Запись пачками
-            const chunks = chunkArray(operations, 450);
-
-            for (const chunk of chunks) {
-                const batch = writeBatch(firestoreDB);
-
-                chunk.forEach((op) => {
-                    const docRef = doc(firestoreDB, collectionName, op.id);
-
-                    if (op.type === 'delete') {
-                        batch.delete(docRef);
-                        cachedItems!.delete(op.id);
-                    } else {
-                        // Используем setDoc с merge: true для надежности
-                        batch.set(docRef, op.item, { merge: true });
-                        cachedItems!.set(op.id, op.item);
-                    }
-                });
-
-                await batch.commit();
-            }
-        } catch (error) {
-            console.error(`Failed to sync ${collectionName}:`, error);
-            throw error;
-        }
     },
 
     // Метод для принудительной синхронизации кеша с базой данных (при первой загрузке)
@@ -200,11 +224,13 @@ export const dbService = {
 
         try {
             const q = query(collection(firestoreDB, collectionName));
-            const querySnapshot = await awaitHZ(async () => await getDocs(q), { throwOnError: true });
+            const querySnapshot = (await awaitHZ(async () => await getDocs(q), { throwOnError: true })) as {
+                docs: Array<{ id: string; data: () => Record<string, unknown> }>;
+            };
 
-            const cachedItems = new Map<string, any>();
-            querySnapshot.docs.forEach((doc: any) => {
-                cachedItems.set(doc.id, doc.data());
+            const cachedItems = new Map<string, Record<string, unknown>>();
+            querySnapshot.docs.forEach((doc) => {
+                cachedItems.set(doc.id, doc.data() as Record<string, unknown>);
             });
 
             collectionCache.set(collectionName, cachedItems);
@@ -214,7 +240,7 @@ export const dbService = {
         }
     },
 
-    save: async (data: Partial<AppData>, currentUser?: any) => {
+    save: async (data: Partial<AppData>, currentUser?: User | null) => {
         if (!firestoreDB) return;
 
         const user = currentUser || auth?.currentUser;
@@ -236,26 +262,34 @@ export const dbService = {
         if (data.absenteeismRecords)
             promises.push(dbService.syncCollection(COLLECTIONS.ABSENTEEISM, data.absenteeismRecords));
 
-        if (data.settings) {
+        // Атомарно записываем config-документы одним batch
+        const hasConfigDocs = data.settings || (data.privateSettings && user.email === 'admin@gymnasium22.com') || data.bellSchedule;
+        if (hasConfigDocs) {
             promises.push(
-                setDoc(doc(firestoreDB, COLLECTIONS.CONFIG, 'settings'), sanitizeForFirestore(data.settings), {
-                    merge: true
-                })
-            );
-        }
-        if (data.privateSettings && user.email === 'admin@gymnasium22.com') {
-            promises.push(
-                setDoc(doc(firestoreDB, COLLECTIONS.CONFIG, 'secrets'), sanitizeForFirestore(data.privateSettings), {
-                    merge: true
-                })
-            );
-        }
-        if (data.bellSchedule) {
-            promises.push(
-                setDoc(
-                    doc(firestoreDB, COLLECTIONS.CONFIG, 'bells'),
-                    sanitizeForFirestore({ items: data.bellSchedule })
-                )
+                (async () => {
+                    const batch = writeBatch(firestoreDB);
+                    if (data.settings) {
+                        batch.set(
+                            doc(firestoreDB, COLLECTIONS.CONFIG, 'settings'),
+                            sanitizeForFirestore(data.settings),
+                            { merge: true }
+                        );
+                    }
+                    if (data.privateSettings && user.email === 'admin@gymnasium22.com') {
+                        batch.set(
+                            doc(firestoreDB, COLLECTIONS.CONFIG, 'secrets'),
+                            sanitizeForFirestore(data.privateSettings),
+                            { merge: true }
+                        );
+                    }
+                    if (data.bellSchedule) {
+                        batch.set(
+                            doc(firestoreDB, COLLECTIONS.CONFIG, 'bells'),
+                            sanitizeForFirestore({ items: data.bellSchedule })
+                        );
+                    }
+                    await batch.commit();
+                })()
             );
         }
 
@@ -287,7 +321,7 @@ export const dbService = {
         ];
         const loadedCollections = new Set<string>();
 
-        let updateTimeout: any;
+        let updateTimeout: ReturnType<typeof setTimeout> | undefined;
         const triggerUpdate = (collectionKey?: string) => {
             if (collectionKey) loadedCollections.add(collectionKey);
 
@@ -323,16 +357,16 @@ export const dbService = {
                     // IMPORTANT: Populate the internal cache with data from Firestore
                     // This ensures that when syncCollection runs (e.g. on delete),
                     // it knows what currently exists in the DB to calculate deletions correctly.
-                    const cachedItems = new Map<string, any>();
-                    items.forEach((item: any) => {
+                    const cachedItems = new Map<string, Record<string, unknown>>();
+                    items.forEach((item: Record<string, unknown>) => {
                         if (item && item.id) {
-                            cachedItems.set(item.id, item);
+                            cachedItems.set(item.id as string, item);
                         }
                     });
                     collectionCache.set(colName, cachedItems);
 
                     // Sort items based on 'order' property client-side
-                    items.sort((a: any, b: any) => {
+                    items.sort((a: Record<string, unknown>, b: Record<string, unknown>) => {
                         const orderA = typeof a.order === 'number' ? a.order : 999999;
                         const orderB = typeof b.order === 'number' ? b.order : 999999;
                         return orderA - orderB;
@@ -361,7 +395,7 @@ export const dbService = {
         unsubs.push(subColl(COLLECTIONS.NUTRITION, 'nutritionRecords'));
         unsubs.push(subColl(COLLECTIONS.ABSENTEEISM, 'absenteeismRecords'));
 
-        // Listen to settings
+        // Listen to settings (individual document — avoids permission issues with collection-wide queries)
         unsubs.push(
             onSnapshot(
                 doc(firestoreDB, COLLECTIONS.CONFIG, 'settings'),
@@ -376,7 +410,7 @@ export const dbService = {
                 },
                 (err) => {
                     console.warn('Error reading settings:', err);
-                    loadedCollections.add('settings'); // Mark as loaded even if failed
+                    loadedCollections.add('settings');
                     triggerUpdate();
                 }
             )
@@ -427,7 +461,6 @@ export const dbService = {
                 )
             );
         } else {
-            // Not an admin or not logged in, mark as "loaded" with empty defaults
             localData.privateSettings = INITIAL_DATA.privateSettings;
             loadedCollections.add('privateSettings');
             triggerUpdate();
@@ -463,10 +496,13 @@ export const dbService = {
         if (!user || user.email !== 'admin@gymnasium22.com') throw new Error('Нет прав.');
 
         // Helper to pick only specific fields from an object (White-listing)
-        const pick = (obj: any, fields: string[]) => {
-            const result: any = {};
+        const pick = <T extends object>(obj: T, fields: string[]) => {
+            const result: Record<string, unknown> = {};
+            const source = obj as Record<string, unknown>;
             fields.forEach((f) => {
-                if (obj && obj[f] !== undefined) result[f] = obj[f];
+                if (Object.prototype.hasOwnProperty.call(source, f) && source[f] !== undefined) {
+                    result[f] = source[f];
+                }
             });
             return result;
         };

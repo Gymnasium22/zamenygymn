@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useStaticData } from '../context/DataContext';
+import DOMPurify from 'dompurify';
 import { Icon } from '../components/Icons';
 import { Modal, useToast } from '../components/UI';
 import { Shift, SHIFT_PERIODS, Bell } from '../types';
@@ -817,7 +818,7 @@ export const BellsPage = () => {
                     </div>
 
                     <div className="overflow-auto bg-slate-200 dark:bg-slate-900/50 p-6 rounded-2xl border border-slate-300 dark:border-slate-700 flex justify-center">
-                        <div ref={exportRef} dangerouslySetInnerHTML={{ __html: getExportContent() }} />
+                        <div ref={exportRef} dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(getExportContent(), { USE_PROFILES: { html: true } }) }} />
                     </div>
                 </div>
             </Modal>

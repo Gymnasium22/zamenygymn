@@ -1,7 +1,7 @@
-import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
+import { useState, useMemo, useRef, useCallback } from 'react';
 import { useStaticData, useScheduleData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
-import { dbService } from '../services/db';
+// import { dbService } from '../services/db';
 import { Icon } from '../components/Icons';
 import { Modal, useToast } from '../components/UI';
 import { AbsenteeismRecord, StudentAbsence } from '../types';
@@ -12,11 +12,6 @@ export const AbsenteeismPage = () => {
     const { absenteeismRecords, saveScheduleData } = useScheduleData();
     const { role, user } = useAuth();
     const { addToast } = useToast();
-
-    // Force sync cache on mount to ensure fresh data
-    useEffect(() => {
-        dbService.syncCacheWithDatabase('absenteeism_records');
-    }, []);
 
     // Check permissions - only teacher and admin can access
     const isAdmin = role === 'admin';

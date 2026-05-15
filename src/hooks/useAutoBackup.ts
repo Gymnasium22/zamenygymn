@@ -2,11 +2,16 @@ import { useEffect, useRef } from 'react';
 import { useStaticData } from '../context/DataContext';
 import { formatDateISO, formatDateEuropean } from '../utils/helpers';
 import { AppData } from '../types';
+import { safeLocalStorageGet, safeLocalStorageSet } from '../utils/localStorage';
 
 const LAST_BACKUP_KEY = 'gym_last_auto_backup_date';
 
-const performBackup = async (settings: AppData['settings'], privateSettings: AppData['privateSettings']) => {
-    const data = localStorage.getItem('gym_data_local_backup_v2');
+const performBackup = async (
+    settings: AppData['settings'],
+    privateSettings: AppData['privateSettings'],
+    signal: AbortSignal
+) => {
+    const data = safeLocalStorageGet('gym_data_local_backup_v2');
     if (!data) return;
 
     const blob = new Blob([data], { type: 'application/json' });
@@ -18,12 +23,19 @@ const performBackup = async (settings: AppData['settings'], privateSettings: App
             formData.append('chat_id', settings.feedbackChatId);
             formData.append('caption', `📦 Автобекап ${formatDateEuropean(new Date())}`);
             formData.append('document', new File([blob], `backup_${formatDateISO()}.json`, { type: 'application/json' }));
-            await fetch(
+            const response = await fetch(
                 `https://api.telegram.org/bot${privateSettings.telegramToken}/sendDocument`,
-                { method: 'POST', body: formData }
+                { method: 'POST', body: formData, signal }
             );
-        } catch {
-            // Silently fail — nothing to do if Telegram is unreachable
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            const result = await response.json();
+            if (!result.ok) {
+                throw new Error(result.description || 'Telegram API error');
+            }
+        } catch (err) {
+            console.warn('Auto-backup failed:', err);
         }
     }
 };
@@ -31,10 +43,12 @@ const performBackup = async (settings: AppData['settings'], privateSettings: App
 export const useAutoBackup = () => {
     const { settings, privateSettings } = useStaticData();
     const lastCheckRef = useRef<number>(-1);
+    const abortRef = useRef<AbortController | null>(null);
 
     useEffect(() => {
         if (!settings?.autoBackup || !settings?.backupTime) return;
 
+        abortRef.current?.abort();
         const interval = setInterval(() => {
             const now = new Date();
             const nowMinutes = now.getHours() * 60 + now.getMinutes();
@@ -48,14 +62,19 @@ export const useAutoBackup = () => {
 
             if (nowMinutes === backupMinutes) {
                 const todayStr = formatDateISO();
-                const lastBackup = localStorage.getItem(LAST_BACKUP_KEY);
+                const lastBackup = safeLocalStorageGet(LAST_BACKUP_KEY);
                 if (lastBackup !== todayStr) {
-                    localStorage.setItem(LAST_BACKUP_KEY, todayStr);
-                    performBackup(settings, privateSettings);
+                    safeLocalStorageSet(LAST_BACKUP_KEY, todayStr);
+                    abortRef.current?.abort();
+                    abortRef.current = new AbortController();
+                    performBackup(settings, privateSettings, abortRef.current.signal);
                 }
             }
         }, 30000); // Check every 30 seconds
 
-        return () => clearInterval(interval);
+        return () => {
+            clearInterval(interval);
+            abortRef.current?.abort();
+        };
     }, [settings, privateSettings]);
 };

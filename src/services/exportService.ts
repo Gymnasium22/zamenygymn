@@ -1,3 +1,5 @@
+import DOMPurify from 'dompurify';
+
 /**
  * Service for handling data exports to various formats (Excel, PNG, CSV).
  * Centralizes the logic for generating downloadable files.
@@ -31,7 +33,8 @@ export const exportService = {
             </html>
         `;
 
-        const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
+        // Use text/html with UTF-8 BOM so Excel can correctly open the HTML table
+        const blob = new Blob(['\uFEFF' + html], { type: 'text/html;charset=utf-8' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
@@ -97,6 +100,10 @@ export const exportService = {
         const printWindow = window.open('', '_blank');
         if (!printWindow) return false;
 
+        const sanitizedContent = DOMPurify.sanitize(content, {
+            USE_PROFILES: { html: true }
+        });
+
         printWindow.document.write(`
             <!DOCTYPE html>
             <html>
@@ -115,7 +122,7 @@ export const exportService = {
                 </style>
             </head>
             <body>
-                ${content}
+                ${sanitizedContent}
             </body>
             </html>
         `);

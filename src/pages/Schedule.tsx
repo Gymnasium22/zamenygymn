@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { LRUCache } from 'lru-cache';
 import { useStaticData, useScheduleData } from '../context/DataContext';
 import { Icon } from '../components/Icons';
 import { Modal, SearchableSelect, ContextMenu, useToast } from '../components/UI';
@@ -162,26 +163,20 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
         return map;
     }, [schedule]);
 
-    // Стабильный кэш через useState (не вызывает ререндеров при мутациях,
-    // но безопасен для чтения в render — в отличие от useRef)
-    const [scheduleItemsCache] = useState(() => new Map<string, ScheduleItem[]>());
+    // Стабильный кэш через useRef (не вызывает ререндеров при мутациях)
+    const scheduleItemsCache = useRef(
+        new LRUCache<string, ScheduleItem[]>({ max: 500 })
+    );
 
     // Очищаем кеш при изменении расписания или фильтров
     useEffect(() => {
-        scheduleItemsCache.clear();
-    }, [schedule, viewMode, selectedShift, selectedDay, filterId, filterRoom, filterDirection, scheduleItemsCache]);
-
-    // Ограничиваем размер кэша
-    useEffect(() => {
-        if (scheduleItemsCache.size > 500) {
-            scheduleItemsCache.clear();
-        }
-    }, [scheduleItemsCache]);
+        scheduleItemsCache.current.clear();
+    }, [schedule, viewMode, selectedShift, selectedDay, filterId, filterRoom, filterDirection]);
 
     const getScheduleItems = useCallback(
         (rowId: string, colKey: string | number): ScheduleItem[] => {
             const cacheKey = `${viewMode}-${rowId}-${colKey}-${selectedShift}-${selectedDay}-${filterId}-${filterRoom}-${filterDirection}`;
-            const cache = scheduleItemsCache;
+            const cache = scheduleItemsCache.current;
 
             if (cache.has(cacheKey)) {
                 return cache.get(cacheKey)!;
@@ -237,7 +232,7 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
             cache.set(cacheKey, items);
             return items;
         },
-        [viewMode, schedule, selectedShift, selectedDay, filterId, filterRoom, filterDirection, roomsById, scheduleItemsCache]
+        [viewMode, schedule, selectedShift, selectedDay, filterId, filterRoom, filterDirection, roomsById]
     );
 
     const checkConflicts = useCallback(
@@ -1007,10 +1002,10 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
                                 {viewMode === 'class'
                                     ? 'классы'
                                     : viewMode === 'teacher'
-                                      ? 'учителя'
-                                      : viewMode === 'week'
-                                        ? 'классы (неделя)'
-                                        : 'предметы'}
+                                        ? 'учителя'
+                                        : viewMode === 'week'
+                                            ? 'классы (неделя)'
+                                            : 'предметы'}
                             </option>
                             {(viewMode === 'class' || viewMode === 'week') &&
                                 classes
@@ -1100,10 +1095,10 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
                                         {viewMode === 'week'
                                             ? 'Урок'
                                             : viewMode === 'class'
-                                              ? 'Класс'
-                                              : viewMode === 'teacher'
-                                                ? 'Учитель'
-                                                : 'Предмет'}
+                                                ? 'Класс'
+                                                : viewMode === 'teacher'
+                                                    ? 'Учитель'
+                                                    : 'Предмет'}
                                     </th>
                                     {cols.map((col) => (
                                         <th
@@ -1498,12 +1493,12 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
                                             {isWeeklyPrint
                                                 ? 'Урок'
                                                 : viewMode === 'week'
-                                                  ? 'Урок'
-                                                  : viewMode === 'class'
-                                                    ? 'Класс'
-                                                    : viewMode === 'teacher'
-                                                      ? 'Учитель'
-                                                      : 'Предмет'}
+                                                    ? 'Урок'
+                                                    : viewMode === 'class'
+                                                        ? 'Класс'
+                                                        : viewMode === 'teacher'
+                                                            ? 'Учитель'
+                                                            : 'Предмет'}
                                         </th>
                                         {printCols.map((c) => (
                                             <th

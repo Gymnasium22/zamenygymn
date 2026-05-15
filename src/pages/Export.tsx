@@ -8,6 +8,8 @@ import {
     Shift,
     SHIFT_PERIODS,
     AppData,
+    StaticAppData,
+    ScheduleAndSubstitutionData,
     Substitution,
     ScheduleItem,
     ClassEntity,
@@ -23,13 +25,9 @@ import { SanitaryScheduleTab } from '../components/SanitaryScheduleTab';
 
 // --- Хелперы ---
 
-const escapeHtml = (unsafe: string): string =>
-    unsafe
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
+import { escapeHtml, sanitizeColor } from '../utils/escapeHtml';
+import { stripDangerousKeys } from '../utils/safeMerge';
+import { AppDataImportSchema, AppDataImport } from '../utils/importSchema';
 
 // --- Вынесенные компоненты печати (не пересоздаются на каждый рендер) ---
 
@@ -345,30 +343,15 @@ export const ExportPage = () => {
 
     // --- Простая runtime-валидация импорта ---
     const validateImportData = (data: unknown): string[] => {
-        const errors: string[] = [];
-        if (!data || typeof data !== 'object') {
-            errors.push('Файл не содержит JSON-объект');
-            return errors;
+        const result = AppDataImportSchema.safeParse(data);
+        if (!result.success) {
+            return result.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`);
         }
-        const d = data as Record<string, unknown>;
-
-        if (!Array.isArray(d.teachers)) errors.push('Отсутствует или неверный массив teachers');
-        else if (d.teachers.length > 0 && (!d.teachers[0] || typeof (d.teachers[0] as Record<string, unknown>).id !== 'string'))
-            errors.push('Массив teachers имеет неверную структуру');
-
-        if (!Array.isArray(d.schedule) && !Array.isArray(d.schedule2))
-            errors.push('Отсутствуют оба массива schedule и schedule2');
-
-        if (d.subjects !== undefined && !Array.isArray(d.subjects))
-            errors.push('Поле subjects должно быть массивом');
-        if (d.classes !== undefined && !Array.isArray(d.classes))
-            errors.push('Поле classes должно быть массивом');
-        if (d.rooms !== undefined && !Array.isArray(d.rooms)) errors.push('Поле rooms должно быть массивом');
-        if (d.substitutions !== undefined && !Array.isArray(d.substitutions))
-            errors.push('Поле substitutions должно быть массивом');
-        if (d.settings !== undefined && typeof d.settings !== 'object')
-            errors.push('Поле settings должно быть объектом');
-
+        const d = result.data;
+        const errors: string[] = [];
+        if (!d.teachers?.length && !d.schedule?.length && !d.schedule2?.length) {
+            errors.push('Файл не содержит распознаваемых данных (teachers/schedule/schedule2)');
+        }
         return errors;
     };
 
@@ -378,7 +361,8 @@ export const ExportPage = () => {
         const reader = new FileReader();
         reader.onload = async (ev: ProgressEvent<FileReader>) => {
             try {
-                const json = JSON.parse(ev.target?.result as string);
+                const rawJson = JSON.parse(ev.target?.result as string);
+                const json = stripDangerousKeys(rawJson) as AppDataImport;
                 const validationErrors = validateImportData(json);
                 if (validationErrors.length > 0) {
                     addToast({
@@ -400,9 +384,9 @@ export const ExportPage = () => {
                         subjects: json.subjects || [],
                         substitutions: json.substitutions || [],
                         settings: { ...INITIAL_DATA.settings, ...json.settings }
-                    };
-                    await saveStaticData(mergedData);
-                    await saveScheduleData(mergedData);
+                    } as unknown as AppData;
+                    await saveStaticData(mergedData as Partial<StaticAppData>);
+                    await saveScheduleData(mergedData as Partial<ScheduleAndSubstitutionData>);
                     addToast({ type: 'success', title: 'Успешно', message: 'База успешно восстановлена!' });
                 }
             } catch {
@@ -446,7 +430,7 @@ export const ExportPage = () => {
                             const teach = teachersById.get(item.teacherId);
                             const room = roomsById.get(item.roomId || '');
                             const roomName = room ? room.name : item.roomId;
-                            content += `<div style="background-color: ${sub?.color || '#fff'}; padding: 2px; margin-bottom: 2px; border: 1px solid #eee;">
+                            content += `<div style="background-color: ${sanitizeColor(sub?.color) || '#fff'}; padding: 2px; margin-bottom: 2px; border: 1px solid #eee;">
                                 <div class="subject">${escapeHtml(sub?.name || '')} ${escapeHtml(item.direction || '')}</div>
                                 <div class="meta">${escapeHtml(teach?.name || '')} ${roomName ? `(Каб. ${escapeHtml(roomName)})` : ''}</div>
                             </div>`;
