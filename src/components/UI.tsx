@@ -191,6 +191,11 @@ export const Modal = ({ isOpen, onClose, title, children, maxWidth = 'max-w-lg' 
     const modalRef = useRef<HTMLDivElement>(null);
     const previousActiveElement = useRef<HTMLElement | null>(null);
     const modalId = useId();
+    const onCloseRef = useRef(onClose);
+
+    useEffect(() => {
+        onCloseRef.current = onClose;
+    }, [onClose]);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -202,14 +207,14 @@ export const Modal = ({ isOpen, onClose, title, children, maxWidth = 'max-w-lg' 
         const modal = modalRef.current;
         if (modal) {
             const focusable = modal.querySelector<HTMLElement>(
-                'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+                'input, select, textarea, button, [href], [tabindex]:not([tabindex="-1"])'
             );
             focusable?.focus();
         }
 
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'Escape') {
-                onClose();
+                onCloseRef.current();
                 return;
             }
             if (e.key !== 'Tab' || !modal) return;
@@ -251,7 +256,7 @@ export const Modal = ({ isOpen, onClose, title, children, maxWidth = 'max-w-lg' 
             // Возвращаем фокус на элемент, который был активен до открытия
             previousActiveElement.current?.focus();
         };
-    }, [isOpen, onClose, modalId]);
+    }, [isOpen, modalId]);
 
     if (!isOpen) return null;
 
