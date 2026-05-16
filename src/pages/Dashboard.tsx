@@ -49,7 +49,6 @@ const DEFAULT_WIDGETS: WidgetConfig[] = [
     { id: 'search', label: 'Поиск', visible: true, colSpan: 1 },
     { id: 'substitutions', label: 'Замены', visible: true, colSpan: 1 },
     { id: 'occupancy', label: 'Штат', visible: true, colSpan: 1 },
-    { id: 'radar', label: 'Радар Окон', visible: true, colSpan: 1 },
     { id: 'conflicts', label: 'Конфликты', visible: true, colSpan: 1 },
     { id: 'birthdays', label: 'Праздники', visible: true, colSpan: 1 },
     { id: 'notes', label: 'Заметки', visible: true, colSpan: 2 }
