@@ -91,12 +91,12 @@ const WeatherWidget = () => {
     }, [apiKey, city]);
 
     if (!apiKey) {
-        return null; // Don't show if not configured to save space
+        return <div className="h-full min-h-[140px] rounded-3xl bg-slate-100 dark:bg-slate-700/50 flex items-center justify-center text-slate-400 dark:text-slate-500 text-sm font-medium gap-2"><Icon name="Settings" size={16} /> API ключ погоды не настроен</div>;
     }
 
     if (loading) return <div className="h-32 w-full bg-slate-100 dark:bg-slate-800 rounded-3xl animate-pulse"></div>;
-    if (error) return null;
-    if (!weatherData) return null;
+    if (error) return <div className="h-full min-h-[140px] rounded-3xl bg-slate-200 dark:bg-slate-700/50 flex items-center justify-center text-red-500 text-sm font-medium gap-2"><Icon name="AlertTriangle" size={18} /> Не удалось загрузить погоду</div>;
+    if (!weatherData) return <div className="h-full min-h-[140px] rounded-3xl bg-slate-100 dark:bg-slate-800 rounded-3xl animate-pulse"></div>;
 
     const getWeatherIcon = (code: string) => {
         if (code.startsWith('01')) return 'Sun';
