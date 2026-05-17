@@ -8,7 +8,9 @@ import {
     AdminAnnouncement,
     BellPreset,
     AuditLogEntry,
-    AppData
+    AppData,
+    DashboardWidgetId,
+    DashboardWidgetRole
 } from '../types';
 import { INITIAL_DATA } from '../constants';
 import { formatDateEuropean, formatDateISO } from '../utils/helpers';
@@ -23,6 +25,7 @@ type SettingsSection =
     | 'institution'
     | 'schedule'
     | 'notifications'
+    | 'widgets'
     | 'system';
 
 const SECTIONS: { id: SettingsSection; label: string; icon: string }[] = [
@@ -30,6 +33,7 @@ const SECTIONS: { id: SettingsSection; label: string; icon: string }[] = [
     { id: 'institution', label: 'Учреждение', icon: 'Building' },
     { id: 'schedule', label: 'Расписание', icon: 'Calendar' },
     { id: 'notifications', label: 'Уведомления', icon: 'MessageSquare' },
+    { id: 'widgets', label: 'Виджеты', icon: 'Layout' },
     { id: 'system', label: 'Система', icon: 'Database' }
 ];
 
@@ -156,6 +160,25 @@ const ConfirmModal: React.FC<{
 
 // --- Main Component ---
 
+const DASHBOARD_WIDGET_ROLES: DashboardWidgetRole[] = ['admin', 'teacher', 'canteen'];
+
+const DEFAULT_DASHBOARD_WIDGET_ACCESS: Record<DashboardWidgetRole, DashboardWidgetId[]> = {
+    admin: ['weather', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes'],
+    teacher: ['weather', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes'],
+    canteen: ['weather', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes']
+};
+
+const DASHBOARD_WIDGETS: { id: DashboardWidgetId; label: string }[] = [
+    { id: 'weather', label: 'Погода' },
+    { id: 'kpi', label: 'KPI' },
+    { id: 'search', label: 'Поиск' },
+    { id: 'substitutions', label: 'Замены' },
+    { id: 'occupancy', label: 'Штат' },
+    { id: 'conflicts', label: 'Конфликты' },
+    { id: 'birthdays', label: 'Праздники' },
+    { id: 'notes', label: 'Заметки' }
+];
+
 export const SettingsPage = () => {
     const { settings, privateSettings, saveStaticData } = useStaticData();
     const { addToast } = useToast();
@@ -201,6 +224,8 @@ export const SettingsPage = () => {
         active: false,
         lastUpdated: ''
     });
+    const [dashboardWidgetAccess, setDashboardWidgetAccess] = useState<Record<DashboardWidgetRole, DashboardWidgetId[]>>(DEFAULT_DASHBOARD_WIDGET_ACCESS);
+    const [widgetAccessDirty, setWidgetAccessDirty] = useState(false);
 
     // Init from context
     useEffect(() => {
@@ -237,7 +262,16 @@ export const SettingsPage = () => {
         setAnnouncement(
             settings.adminAnnouncement || { message: '', active: false, lastUpdated: '' }
         );
+        setDashboardWidgetAccess(settings.dashboardWidgetAccess || DEFAULT_DASHBOARD_WIDGET_ACCESS);
     }, [settings, privateSettings]);
+
+    useEffect(() => {
+        if (!settings) return;
+        setWidgetAccessDirty(
+            JSON.stringify(dashboardWidgetAccess) !==
+                JSON.stringify(settings.dashboardWidgetAccess || DEFAULT_DASHBOARD_WIDGET_ACCESS)
+        );
+    }, [dashboardWidgetAccess, settings]);
 
     // --- Dirty checks ---
     const integrationsDirty = useMemo(() => {
@@ -309,7 +343,8 @@ export const SettingsPage = () => {
                     ...settings,
                     feedbackChatId,
                     adminTelegramChatId,
-                    weatherCity
+                    weatherCity,
+                    weatherApiKey
                 },
                 privateSettings: {
                     ...privateSettings,
@@ -384,6 +419,39 @@ export const SettingsPage = () => {
             setIsSavingSection(null);
         }
     }, [settings, templates, announcement, saveStaticData, addToast]);
+
+    const saveWidgetAccess = useCallback(async () => {
+        setIsSavingSection('widgets');
+        try {
+            await saveStaticData({
+                settings: {
+                    ...settings,
+                    dashboardWidgetAccess
+                }
+            });
+            addToast({ type: 'success', title: 'Сохранено', message: 'Права доступа к виджетам обновлены' });
+        } catch {
+            addToast({ type: 'danger', title: 'Ошибка', message: 'Не удалось сохранить' });
+        } finally {
+            setIsSavingSection(null);
+        }
+    }, [settings, dashboardWidgetAccess, saveStaticData, addToast]);
+
+    const handleWidgetAccessToggle = useCallback(
+        (role: DashboardWidgetRole, widgetId: DashboardWidgetId) => {
+            setDashboardWidgetAccess((prev) => {
+                const allowed = prev[role] || [];
+                const next = allowed.includes(widgetId)
+                    ? allowed.filter((id) => id !== widgetId)
+                    : [...allowed, widgetId];
+                return {
+                    ...prev,
+                    [role]: next
+                };
+            });
+        },
+        []
+    );
 
     // --- System actions ---
     const handleExport = () => {
@@ -852,6 +920,56 @@ export const SettingsPage = () => {
                                     </div>
                                 </div>
                             </div>
+                        </SectionCard>
+                    )}
+
+                    {activeSection === 'widgets' && (
+                        <SectionCard
+                            title="Доступ к виджетам"
+                            icon="Layout"
+                            description="Выберите, какие виджеты доступны пользователям каждой роли"
+                            isDirty={widgetAccessDirty}
+                            onSave={saveWidgetAccess}
+                            isSaving={isSavingSection === 'widgets'}
+                        >
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full text-sm text-slate-700 dark:text-slate-300 border-separate border-spacing-0 w-full">
+                                    <thead>
+                                        <tr className="bg-slate-100 dark:bg-slate-800">
+                                            <th className="p-3 text-left font-bold">Виджет</th>
+                                            {DASHBOARD_WIDGET_ROLES.map((role) => (
+                                                <th key={role} className="p-3 text-center font-bold capitalize">
+                                                    {role}
+                                                </th>
+                                            ))}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {DASHBOARD_WIDGETS.map((widget) => (
+                                            <tr key={widget.id} className="border-t border-slate-200 dark:border-slate-700">
+                                                <td className="p-3 font-medium text-slate-700 dark:text-slate-200">
+                                                    {widget.label}
+                                                </td>
+                                                {DASHBOARD_WIDGET_ROLES.map((role) => (
+                                                    <td key={`${role}-${widget.id}`} className="p-3 text-center">
+                                                        <label className="inline-flex items-center justify-center">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={dashboardWidgetAccess[role].includes(widget.id)}
+                                                                onChange={() => handleWidgetAccessToggle(role, widget.id)}
+                                                                className="h-4 w-4 rounded text-indigo-600 focus:ring-indigo-500"
+                                                            />
+                                                        </label>
+                                                    </td>
+                                                ))}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-4">
+                                Настройки действуют на всех пользователей выбранной роли.
+                            </p>
                         </SectionCard>
                     )}
 

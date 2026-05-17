@@ -61,7 +61,7 @@ const WeatherWidget = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    const apiKey = privateSettings.weatherApiKey;
+    const apiKey = privateSettings.weatherApiKey || settings.weatherApiKey;
     const city = settings.weatherCity || 'Minsk,BY';
 
     useEffect(() => {
@@ -174,6 +174,16 @@ export const DashboardPage = () => {
             return DEFAULT_WIDGETS;
         }
     });
+
+    const roleWidgetAccess = settings.dashboardWidgetAccess || {
+        admin: ['weather', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes'],
+        teacher: ['weather', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes'],
+        canteen: ['weather', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes']
+    };
+
+    const allowedWidgets: string[] = role ? roleWidgetAccess[role as 'admin' | 'teacher' | 'canteen'] ?? [] : [];
+    const filteredWidgets = widgets.filter((widget) => allowedWidgets.includes(widget.id));
+    const canShowWeather = allowedWidgets.includes('weather');
     const [isWidgetModalOpen, setIsWidgetModalOpen] = useState(false);
     const [draggedWidgetId, setDraggedWidgetId] = useState<string | null>(null);
 
@@ -1287,9 +1297,11 @@ export const DashboardPage = () => {
                 </div>
 
                 {/* Weather Widget Dedicated Spot */}
-                <div className="hidden lg:block h-full min-h-[160px]">
-                    <WeatherWidget />
-                </div>
+                {canShowWeather && (
+                    <div className="hidden lg:block h-full min-h-[160px]">
+                        <WeatherWidget />
+                    </div>
+                )}
             </div>
 
             {/* Soft Notifications */}
@@ -1318,7 +1330,7 @@ export const DashboardPage = () => {
 
             {/* Dashboard widgets - Drag and Drop Grid Layout */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {widgets.filter((w) => w.visible).map((widget) => (
+                {filteredWidgets.filter((w) => w.visible).map((widget) => (
                     <div
                         key={widget.id}
                         draggable
@@ -1382,7 +1394,7 @@ export const DashboardPage = () => {
                         Включите нужные виджеты и настройте их порядок.
                     </p>
                     <div className="space-y-2 max-h-[60vh] overflow-y-auto custom-scrollbar pr-2">
-                        {widgets.map((widget, idx) => (
+                        {filteredWidgets.map((widget, idx) => (
                             <div
                                 key={widget.id}
                                 className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600"
@@ -1406,7 +1418,7 @@ export const DashboardPage = () => {
                                     </button>
                                     <button
                                         onClick={() => handleWidgetReorder(widget.id, 'down')}
-                                        disabled={idx === widgets.length - 1}
+                                        disabled={idx === filteredWidgets.length - 1}
                                         className="p-1.5 text-slate-400 hover:text-indigo-600 disabled:opacity-30 disabled:cursor-not-allowed"
                                     >
                                         <Icon name="ArrowRight" className="rotate-90" size={16} />

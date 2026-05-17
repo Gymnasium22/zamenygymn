@@ -274,7 +274,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
             }
         }
 
-        const canLoadFromFirebase = user && role !== 'guest';
         const canUseLocalData = user || role === 'guest';
 
         if (!canUseLocalData) {
@@ -283,13 +282,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
             return;
         }
 
-        // Для авторизованных пользователей подписываемся на Firebase
-        if (!canLoadFromFirebase) {
-            if (!localBackup) setInternalData(getInitialData());
-            setIsLoading(false);
-            return;
-        }
-
+        // Для гостевого просмотра тоже пытаемся загрузить данные из Firebase,
+        // чтобы ученик/родитель видел актуальное расписание даже без авторизации.
         setIsLoading(true);
 
         // 3. Подписываемся на Firebase

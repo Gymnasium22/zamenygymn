@@ -117,6 +117,18 @@ export interface AdminAnnouncement {
     lastUpdated: string;
 }
 
+export type DashboardWidgetId =
+    | 'weather'
+    | 'kpi'
+    | 'search'
+    | 'substitutions'
+    | 'occupancy'
+    | 'conflicts'
+    | 'birthdays'
+    | 'notes';
+
+export type DashboardWidgetRole = 'admin' | 'teacher' | 'canteen';
+
 export interface Settings {
     telegramToken: string;
     publicScheduleId?: string | null; // ID for publicly published schedule
@@ -132,6 +144,7 @@ export interface Settings {
     substitutionDayComments?: Record<string, string>; // ISO date -> common comment for substitutions on that day
     weatherApiKey?: string; // OpenWeatherMap API Key
     weatherCity?: string; // "Minsk,BY"
+    dashboardWidgetAccess?: Record<DashboardWidgetRole, DashboardWidgetId[]>;
     schoolName?: string; // "ГУО «Гимназия №22 г.Минска»"
     directorName?: string; // "Н.В.Кисель"
     unionChairName?: string; // "Ю.Г.Миханова"

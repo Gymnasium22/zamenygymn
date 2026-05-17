@@ -122,6 +122,11 @@ export const INITIAL_DATA: AppData = {
             lastUpdated: ''
         },
         substitutionDayComments: {},
+        dashboardWidgetAccess: {
+            admin: ['weather', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes'],
+            teacher: ['weather', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes'],
+            canteen: ['weather', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes']
+        },
         isScheduleLocked: false,
         autoBackup: false,
         backupTime: '02:00'
