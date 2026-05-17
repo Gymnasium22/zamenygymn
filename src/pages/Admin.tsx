@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useStaticData, useScheduleData } from '../context/DataContext';
+import { DateInput } from '../components/DateInput';
 import { Icon } from '../components/Icons';
 import { Shift, SHIFT_PERIODS, DAYS } from '../types';
 import { formatDateISO, getScheduleForDate } from '../utils/helpers';
@@ -100,10 +101,9 @@ export const AdminPage = () => {
                     <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-2 tracking-wider">
                         Дата
                     </label>
-                    <input
-                        type="date"
+                    <DateInput
                         value={selectedDate}
-                        onChange={(e) => setSelectedDate(e.target.value)}
+                        onChange={setSelectedDate}
                         className="border border-slate-200 dark:border-slate-600 p-3 rounded-xl font-bold outline-none focus:border-indigo-500 bg-transparent dark:text-white w-full md:w-auto min-w-[200px]"
                     />
                 </div>

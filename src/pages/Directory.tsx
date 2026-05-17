@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useStaticData } from '../context/DataContext';
+import { DateInput } from '../components/DateInput';
 import { Icon } from '../components/Icons';
 import { Modal, StaggerContainer } from '../components/UI';
 import { Shift, ROOM_TYPES, Teacher, Subject, ClassEntity, Room } from '../types';
@@ -415,11 +416,10 @@ export const DirectoryPage = () => {
                                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">
                                     Дата рождения
                                 </label>
-                                <input
-                                    type="date"
-                                    className="w-full border border-slate-200 dark:border-slate-600 rounded-xl p-3 text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500"
+                                <DateInput
                                     value={teacherForm.birthDate || ''}
-                                    onChange={(e) => setTeacherForm({ ...teacherForm, birthDate: e.target.value })}
+                                    onChange={(value) => setTeacherForm({ ...teacherForm, birthDate: value })}
+                                    className="w-full border border-slate-200 dark:border-slate-600 rounded-xl p-3 text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500"
                                 />
                             </div>
 

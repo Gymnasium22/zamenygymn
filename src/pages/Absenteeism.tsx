@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useCallback } from 'react';
 import { useStaticData, useScheduleData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
+import { DateInput } from '../components/DateInput';
 // import { dbService } from '../services/db';
 import { Icon } from '../components/Icons';
 import { Modal, useToast } from '../components/UI';
@@ -362,17 +363,16 @@ export const AbsenteeismPage = () => {
                     </div>
 
                     {viewMode === 'day' ? (
-                        <input
-                            type="date"
+                        <DateInput
                             value={selectedDate}
-                            onChange={(e) => setSelectedDate(e.target.value)}
+                            onChange={setSelectedDate}
                             className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-dark-800 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                         />
                     ) : (
-                        <input
+                        <DateInput
                             type="month"
                             value={selectedMonth}
-                            onChange={(e) => setSelectedMonth(e.target.value)}
+                            onChange={setSelectedMonth}
                             className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-dark-800 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                         />
                     )}

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { useStaticData, useScheduleData } from '../context/DataContext';
 import { Icon } from '../components/Icons';
+import { DateInput } from '../components/DateInput';
 import { dbService } from '../services/db';
 import {
     DAYS,
@@ -1698,10 +1699,9 @@ export const ExportPage = () => {
                                 </p>
                             </div>
                             <div className="flex gap-4 items-center">
-                                <input
-                                    type="date"
+                                <DateInput
                                     value={exportDate}
-                                    onChange={(e) => setExportDate(e.target.value)}
+                                    onChange={setExportDate}
                                     className="border border-slate-200 dark:border-slate-600 p-2 rounded-lg font-bold outline-none focus:border-indigo-500 bg-transparent dark:text-white"
                                 />
                                 <button

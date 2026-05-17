@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useStaticData } from '../context/DataContext';
 import { Icon } from '../components/Icons';
+import { DateInput } from '../components/DateInput';
 import { useToast } from '../components/UI';
 import {
     TelegramTemplates,
@@ -550,12 +551,10 @@ export const SettingsPage = () => {
                                         <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">
                                             Chat ID для обратной связи
                                         </label>
-                                        <input
-                                            type="text"
+                                        <PasswordInput
                                             value={feedbackChatId}
-                                            onChange={(e) => setFeedbackChatId(e.target.value)}
+                                            onChange={setFeedbackChatId}
                                             placeholder="-100123456789 или 123456789"
-                                            className="w-full border border-slate-200 dark:border-slate-600 p-3 rounded-xl text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500"
                                         />
                                         <p className="text-[11px] text-slate-400 mt-1">
                                             ID чата или пользователя для сбора обратной связи.
@@ -565,12 +564,10 @@ export const SettingsPage = () => {
                                         <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">
                                             Telegram Chat ID администратора
                                         </label>
-                                        <input
-                                            type="text"
+                                        <PasswordInput
                                             value={adminTelegramChatId}
-                                            onChange={(e) => setAdminTelegramChatId(e.target.value)}
+                                            onChange={setAdminTelegramChatId}
                                             placeholder="123456789"
-                                            className="w-full border border-slate-200 dark:border-slate-600 p-3 rounded-xl text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500"
                                         />
                                         <p className="text-[11px] text-slate-400 mt-1">
                                             Личный ID администратора для системных уведомлений.
@@ -1061,10 +1058,10 @@ const BackupControls: React.FC<{
             {autoBackup && (
                 <div className="flex items-center gap-3">
                     <label className="text-sm font-bold text-slate-700 dark:text-slate-300">Время:</label>
-                    <input
+                    <DateInput
                         type="time"
                         value={backupTime}
-                        onChange={(e) => onBackupTimeChange(e.target.value)}
+                        onChange={onBackupTimeChange}
                         className="border border-slate-200 dark:border-slate-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500"
                     />
                 </div>

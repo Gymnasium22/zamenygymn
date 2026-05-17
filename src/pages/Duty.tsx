@@ -601,7 +601,7 @@ export const DutyPage = () => {
 
                 <div className="overflow-x-auto custom-scrollbar border border-slate-200 dark:border-slate-700 rounded-xl">
                     <table className="w-full border-collapse">
-                        <thead>
+                        <thead className="sticky top-0 z-20">
                             <tr className="bg-slate-50 dark:bg-slate-700/50">
                                 <th className="p-3 text-left text-sm font-bold text-slate-500 dark:text-slate-400 w-64 border-b border-r border-slate-200 dark:border-slate-700">
                                     Зона / День

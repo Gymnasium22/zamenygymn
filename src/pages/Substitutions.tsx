@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { useLocation } from 'react-router-dom';
 import { useStaticData, useScheduleData } from '../context/DataContext';
 import { Icon } from '../components/Icons';
+import { DateInput } from '../components/DateInput';
 import { Modal, useToast } from '../components/UI';
 import { DAYS, ScheduleItem, ClassEntity, Substitution, SubstitutionParams } from '../types';
 import { formatDateISO, formatDateEuropean, getScheduleForDate, generateId } from '../utils/helpers';
@@ -1127,11 +1128,10 @@ export const SubstitutionsPage = () => {
                                         })}
                                     </span>
                                     {/* Invisible date picker overlay */}
-                                    <input
+                                    <DateInput
                                         ref={dateInputRef}
-                                        type="date"
                                         value={selectedDate}
-                                        onChange={(e) => setSelectedDate(e.target.value)}
+                                        onChange={setSelectedDate}
                                         className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                                     />
                                 </div>

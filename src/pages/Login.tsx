@@ -239,7 +239,7 @@ export const LoginPage = () => {
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50/50 dark:bg-slate-700/50 dark:text-white outline-none focus:ring-2 ring-indigo-500/50 transition-all font-medium"
-                                    placeholder="••••••••"
+                                    placeholder="Введите пароль"
                                     required
                                 />
                             </div>

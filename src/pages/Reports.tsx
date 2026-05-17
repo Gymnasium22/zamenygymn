@@ -221,9 +221,9 @@ export const ReportsPage = () => {
             </div>
 
             {reportTab === 'load' && (
-                <div className="bg-white dark:bg-dark-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 overflow-hidden">
+                <div className="bg-white dark:bg-dark-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 overflow-auto max-h-[70vh]">
                     <table className="w-full text-left border-collapse">
-                        <thead className="bg-slate-50 dark:bg-slate-700 border-b border-slate-200 dark:border-slate-600">
+                        <thead className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-700 border-b border-slate-200 dark:border-slate-600">
                             <tr>
                                 <th className="p-4 font-bold text-slate-500 dark:text-slate-400 text-xs uppercase">
                                     Учитель
@@ -361,9 +361,9 @@ export const ReportsPage = () => {
                         </div>
                     </div>
 
-                    <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-600">
+                    <div className="overflow-auto max-h-[70vh] rounded-xl border border-slate-200 dark:border-slate-600">
                         <table className="w-full text-left border-collapse">
-                            <thead className="bg-slate-50 dark:bg-slate-700">
+                            <thead className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-700">
                                 <tr>
                                     {selectedColumns.map((colKey) => (
                                         <th

@@ -169,7 +169,10 @@ const Layout = () => {
 
                     <div className="p-3 border-t border-slate-100 dark:border-slate-700 space-y-2">
                         <div className="flex items-center justify-between px-2">
-                            <div className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase truncate max-w-[120px]">
+                            <div
+                                title={user?.email || 'Гость'}
+                                className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase truncate max-w-[120px]"
+                            >
                                 {user ? user.email || 'Гость' : 'Гость'}
                             </div>
                             <button

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useStaticData } from '../context/DataContext';
 import DOMPurify from 'dompurify';
+import { DateInput } from '../components/DateInput';
 import { Icon } from '../components/Icons';
 import { Modal, useToast } from '../components/UI';
 import { Shift, SHIFT_PERIODS, Bell } from '../types';
@@ -788,10 +789,9 @@ export const BellsPage = () => {
                             <label className="text-sm font-bold text-slate-600 dark:text-slate-300">
                                 Дата для документа:
                             </label>
-                            <input
-                                type="date"
+                            <DateInput
                                 value={exportDate}
-                                onChange={(e) => setExportDate(e.target.value)}
+                                onChange={setExportDate}
                                 className="border border-slate-200 dark:border-slate-600 p-2 rounded-xl text-sm font-bold bg-white dark:bg-slate-800 dark:text-white"
                             />
                         </div>
