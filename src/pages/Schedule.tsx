@@ -74,8 +74,62 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
     const [draggedItem, setDraggedItem] = useState<ScheduleItem | null>(null);
     const [dragOverCell, setDragOverCell] = useState<string | null>(null);
 
-    const isMobile = useMedia({ maxWidth: 767 });
+    const isMobile = useMedia({ maxWidth: 768 });
     const [mobileListView, setMobileListView] = useState(true);
+
+    // --- Mobile Swipe Navigation for Days ---
+    const swipeAreaRef = useRef<HTMLDivElement>(null);
+    const touchStartX = useRef<number | null>(null);
+    const touchStartY = useRef<number | null>(null);
+    const [swipeHint, setSwipeHint] = useState<'left' | 'right' | null>(null);
+
+    const goToNextDay = useCallback(() => {
+        const currentIndex = DAYS.indexOf(selectedDay);
+        if (currentIndex < DAYS.length - 1) {
+            setSelectedDay(DAYS[currentIndex + 1]);
+            if (navigator.vibrate) navigator.vibrate(10);
+        }
+    }, [selectedDay]);
+
+    const goToPrevDay = useCallback(() => {
+        const currentIndex = DAYS.indexOf(selectedDay);
+        if (currentIndex > 0) {
+            setSelectedDay(DAYS[currentIndex - 1]);
+            if (navigator.vibrate) navigator.vibrate(10);
+        }
+    }, [selectedDay]);
+
+    const handleTouchStart = useCallback((e: React.TouchEvent) => {
+        touchStartX.current = e.touches[0].clientX;
+        touchStartY.current = e.touches[0].clientY;
+    }, []);
+
+    const handleTouchMove = useCallback((e: React.TouchEvent) => {
+        if (touchStartX.current === null || touchStartY.current === null) return;
+        const dx = e.touches[0].clientX - touchStartX.current;
+        const dy = e.touches[0].clientY - touchStartY.current;
+        // Only horizontal swipes
+        if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 30) {
+            setSwipeHint(dx > 0 ? 'right' : 'left');
+        }
+    }, []);
+
+    const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+        setSwipeHint(null);
+        if (touchStartX.current === null || touchStartY.current === null) return;
+        const dx = e.changedTouches[0].clientX - touchStartX.current;
+        const dy = e.changedTouches[0].clientY - touchStartY.current;
+        // Threshold: 60px horizontal, less vertical
+        if (Math.abs(dx) > 60 && Math.abs(dy) < 100) {
+            if (dx > 0) {
+                goToPrevDay();
+            } else {
+                goToNextDay();
+            }
+        }
+        touchStartX.current = null;
+        touchStartY.current = null;
+    }, [goToNextDay, goToPrevDay]);
 
     const [isMassOperationsModalOpen, setIsMassOperationsModalOpen] = useState(false);
     const [massOpConfirm, setMassOpConfirm] = useState({ isOpen: false, type: '', day: '', classId: '' });
@@ -836,7 +890,7 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
         }
 
         return (
-            <div className="p-4 space-y-4">
+            <div className="p-4 space-y-3">
                 {lessonsForDay.map((item) => {
                     const subj = subjectsById.get(item.subjectId);
                     const teacher = teachersById.get(item.teacherId);
@@ -844,37 +898,48 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
                     const room = roomsById.get(item.roomId || '');
                     const roomName = room ? room.name : item.roomId;
                     const conflicts = getConflicts(item);
+                    const subjectColor = subj?.color || '#6366f1';
 
                     return (
                         <div
                             key={item.id}
                             onClick={!readOnly ? () => handleEditItem(item) : undefined}
-                            className={`rounded-xl p-4 shadow-sm border ${conflicts.length > 0 ? 'border-red-300 bg-red-50 dark:bg-red-900/20 ring-1 ring-red-200' : 'border-slate-100 dark:border-slate-600 bg-white dark:bg-dark-800'} transition-colors ${!readOnly ? 'cursor-pointer' : ''}`}
+                            className={`rounded-2xl p-4 shadow-sm border mobile-card-lift ${conflicts.length > 0 ? 'border-red-300 bg-red-50 dark:bg-red-900/20 ring-1 ring-red-200' : 'border-slate-100 dark:border-slate-600 bg-white dark:bg-dark-800'} transition-colors ${!readOnly ? 'cursor-pointer' : ''}`}
+                            style={{ borderLeftWidth: '4px', borderLeftColor: conflicts.length > 0 ? undefined : subjectColor }}
                         >
-                            <div className="flex items-center justify-between mb-2">
-                                <span className="text-sm font-bold text-slate-800 dark:text-slate-100">
-                                    {item.period} урок
-                                </span>
+                            <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-2">
+                                    <span className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-sm font-black text-slate-700 dark:text-slate-200">
+                                        {item.period}
+                                    </span>
+                                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                                        урок
+                                    </span>
+                                </div>
                                 {conflicts.length > 0 && (
                                     <button
                                         onClick={(e) => handleConflictClick(e, item)}
-                                        className="bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold shadow-sm"
+                                        className="bg-red-500 text-white rounded-full w-7 h-7 flex items-center justify-center text-xs font-bold shadow-md shadow-red-500/25 active:scale-90 transition-transform"
                                     >
-                                        !
+                                        <Icon name="AlertTriangle" size={14} />
                                     </button>
                                 )}
                             </div>
-                            <div className="text-lg font-black text-indigo-600 dark:text-indigo-400 mb-1">
-                                {subj?.name} {item.direction && `(${item.direction})`}
+                            <div className="text-base font-black text-slate-800 dark:text-white mb-2 leading-tight">
+                                {subj?.name} {item.direction && <span className="text-sm font-medium text-slate-500">({item.direction})</span>}
                             </div>
-                            <div className="text-sm text-slate-700 dark:text-slate-300">
-                                {cls?.name} • {teacher?.name}
-                            </div>
-                            {roomName && (
-                                <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                                    Кабинет: {roomName}
+                            <div className="flex flex-wrap items-center gap-2 text-sm">
+                                <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700/50 px-2.5 py-1 rounded-lg">
+                                    <Icon name={viewMode === 'teacher' ? 'GraduationCap' : 'User'} size={14} />
+                                    <span className="font-medium">{viewMode === 'teacher' ? cls?.name : teacher?.name}</span>
                                 </div>
-                            )}
+                                {roomName && (
+                                    <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-700/50 px-2.5 py-1 rounded-lg">
+                                        <Icon name="MapPin" size={14} />
+                                        <span className="font-medium">{roomName}</span>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     );
                 })}
@@ -883,7 +948,13 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
     };
 
     return (
-        <div className="h-full flex flex-col">
+        <div
+            ref={swipeAreaRef}
+            className={`h-full flex flex-col ${isMobile && viewMode !== 'week' ? 'day-swipe-hint' : ''} ${swipeHint === 'left' ? 'show-left' : ''} ${swipeHint === 'right' ? 'show-right' : ''}`}
+            onTouchStart={isMobile && viewMode !== 'week' ? handleTouchStart : undefined}
+            onTouchMove={isMobile && viewMode !== 'week' ? handleTouchMove : undefined}
+            onTouchEnd={isMobile && viewMode !== 'week' ? handleTouchEnd : undefined}
+        >
             <div className="flex items-center gap-2 mb-4 px-4 pt-2">
                 <h2 className="text-xl font-bold text-slate-800 dark:text-white">
                     {semester === 1 ? 'Расписание (1-е полугодие)' : 'Расписание (2-е полугодие)'}
@@ -915,16 +986,39 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
                         </button>
                     </div>
                     {viewMode !== 'week' && (
-                        <div className="flex overflow-x-auto pb-1 gap-1 max-w-[40vw] hide-scrollbar">
-                            {DAYS.map((day) => (
+                        <div className="flex items-center gap-2">
+                            {/* Mobile swipe hint */}
+                            {isMobile && (
                                 <button
-                                    key={day}
-                                    onClick={() => setSelectedDay(day)}
-                                    className={`whitespace-nowrap px-4 py-2 rounded-xl text-sm font-bold transition-all ${selectedDay === day ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
+                                    onClick={goToPrevDay}
+                                    disabled={DAYS.indexOf(selectedDay) === 0}
+                                    className="md:hidden p-1.5 rounded-lg text-slate-400 disabled:opacity-30 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                                    aria-label="Предыдущий день"
                                 >
-                                    {day}
+                                    <Icon name="ChevronLeft" size={18} />
                                 </button>
-                            ))}
+                            )}
+                            <div className="flex overflow-x-auto pb-1 gap-1 max-w-[40vw] hide-scrollbar">
+                                {DAYS.map((day) => (
+                                    <button
+                                        key={day}
+                                        onClick={() => setSelectedDay(day)}
+                                        className={`whitespace-nowrap px-4 py-2 rounded-xl text-sm font-bold transition-all ${selectedDay === day ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
+                                    >
+                                        {day}
+                                    </button>
+                                ))}
+                            </div>
+                            {isMobile && (
+                                <button
+                                    onClick={goToNextDay}
+                                    disabled={DAYS.indexOf(selectedDay) === DAYS.length - 1}
+                                    className="md:hidden p-1.5 rounded-lg text-slate-400 disabled:opacity-30 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                                    aria-label="Следующий день"
+                                >
+                                    <Icon name="ChevronRight" size={18} />
+                                </button>
+                            )}
                         </div>
                     )}
                     {!readOnly && (
@@ -1033,13 +1127,13 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
                         placeholder="Каб..."
                         value={filterRoom}
                         onChange={(e) => setFilterRoom(e.target.value)}
-                        className="w-20 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg p-2 text-xs font-bold"
+                        className="w-24 sm:w-20 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg p-2 text-xs font-bold"
                     />
                     <input
                         placeholder="Проф..."
                         value={filterDirection}
                         onChange={(e) => setFilterDirection(e.target.value)}
-                        className="w-20 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg p-2 text-xs font-bold"
+                        className="w-24 sm:w-20 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg p-2 text-xs font-bold"
                     />
 
                     {!readOnly && (
@@ -1084,8 +1178,8 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
             )}
 
             <div className="flex-1 bg-white dark:bg-dark-800 rounded-2xl shadow-xl shadow-slate-200/50 dark:shadow-none border border-slate-100 dark:border-slate-700 overflow-hidden flex flex-col transition-colors duration-300 no-print">
-                <div className="overflow-auto flex-1 custom-scrollbar">
-                    {isMobile && mobileListView && !readOnly && filterId ? (
+                <div className={`overflow-auto flex-1 custom-scrollbar ${isMobile ? 'mobile-table-scroll' : ''}`}>
+                    {isMobile && (mobileListView || readOnly) && filterId ? (
                         renderMobileListView()
                     ) : (
                         <table className="w-full border-collapse min-w-[1000px]">

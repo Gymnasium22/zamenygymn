@@ -544,6 +544,186 @@ body {
         max-height: 90vh;
         border-radius: 24px 24px 0 0;
     }
+
+    /* --- 2026 MOBILE ENHANCEMENTS --- */
+
+    /* Mobile-optimized table scroll hint */
+    .mobile-table-scroll {
+        position: relative;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+    }
+
+    .mobile-table-scroll::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: 32px;
+        background: linear-gradient(to right, transparent, rgba(0,0,0,0.06));
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+
+    .mobile-table-scroll.scrollable-right::after {
+        opacity: 1;
+    }
+
+    /* Pull-to-refresh indicator */
+    .pull-to-refresh {
+        position: relative;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .pull-indicator {
+        position: absolute;
+        top: -50px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: white;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: transform 0.2s ease, opacity 0.2s ease;
+        opacity: 0;
+        z-index: 30;
+    }
+
+    .pull-indicator.visible {
+        opacity: 1;
+    }
+
+    .pull-indicator.spinning svg {
+        animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+
+    /* Day swipe indicator */
+    .day-swipe-hint {
+        position: relative;
+    }
+
+    .day-swipe-hint::before,
+    .day-swipe-hint::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: rgba(99, 102, 241, 0.1);
+        transform: translateY(-50%) scale(0);
+        transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        pointer-events: none;
+        z-index: 5;
+    }
+
+    .day-swipe-hint::before {
+        left: 8px;
+    }
+
+    .day-swipe-hint::after {
+        right: 8px;
+    }
+
+    .day-swipe-hint.show-left::before {
+        transform: translateY(-50%) scale(1);
+    }
+
+    .day-swipe-hint.show-right::after {
+        transform: translateY(-50%) scale(1);
+    }
+
+    /* Enhanced mobile touch feedback */
+    .mobile-touch-feedback {
+        position: relative;
+        overflow: hidden;
+    }
+
+    .mobile-touch-feedback::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(circle at var(--touch-x, 50%) var(--touch-y, 50%), rgba(99, 102, 241, 0.15) 0%, transparent 60%);
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        pointer-events: none;
+    }
+
+    .mobile-touch-feedback:active::after {
+        opacity: 1;
+    }
+
+    /* Mobile bottom sheet overlay */
+    .mobile-bottom-sheet {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: white;
+        border-radius: 24px 24px 0 0;
+        box-shadow: 0 -4px 20px rgba(0,0,0,0.1);
+        transform: translateY(100%);
+        transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        max-height: 85vh;
+        overflow-y: auto;
+        z-index: 50;
+    }
+
+    .mobile-bottom-sheet.open {
+        transform: translateY(0);
+    }
+
+    .mobile-bottom-sheet-handle {
+        width: 36px;
+        height: 4px;
+        background: #cbd5e1;
+        border-radius: 2px;
+        margin: 12px auto;
+    }
+
+    /* Compact mobile header */
+    .mobile-header-compact {
+        padding-top: max(0.75rem, env(safe-area-inset-top));
+        padding-left: max(1rem, env(safe-area-inset-left));
+        padding-right: max(1rem, env(safe-area-inset-right));
+    }
+
+    /* Mobile card lift effect */
+    .mobile-card-lift {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .mobile-card-lift:active {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 16px rgba(0,0,0,0.1);
+    }
+
+    /* Dark mode mobile enhancements */
+    .dark .mobile-bottom-sheet {
+        background: #1e293b;
+    }
+
+    .dark .pull-indicator {
+        background: #1e293b;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+
+    .dark .mobile-table-scroll::after {
+        background: linear-gradient(to right, transparent, rgba(255,255,255,0.06));
+    }
 }
 
 /* Card holiday highlight styles removed */

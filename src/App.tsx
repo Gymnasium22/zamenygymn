@@ -4,6 +4,7 @@ import { DataProvider, useStaticData, StaticDataProvider, ScheduleDataProvider }
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Icon } from './components/Icons';
 import { StatusWidget, BottomNavigation, ToastProvider, CommandPalette } from './components/UI';
+import { PullToRefresh } from './components/PullToRefresh';
 import { DashboardPage } from './pages/Dashboard';
 import { SchedulePage } from './pages/Schedule';
 import { SubstitutionsPage } from './pages/Substitutions';
@@ -211,8 +212,23 @@ const Layout = () => {
                     <span className="font-bold text-slate-800 dark:text-white text-lg">Гимназия Pro22</span>
                 </header>
 
-                <div key={location.pathname} className="flex-1 overflow-auto p-4 lg:p-8 pb-24 lg:pb-8 custom-scrollbar relative animate-page-in">
-                    <Outlet />
+                <div key={location.pathname} className="flex-1 overflow-auto lg:overflow-auto p-4 lg:p-8 pb-24 lg:pb-8 custom-scrollbar relative animate-page-in">
+                    {/* Mobile-only pull-to-refresh wrapper */}
+                    <div className="lg:hidden h-full">
+                        <PullToRefresh
+                            onRefresh={async () => {
+                                // Force re-render by triggering a small delay
+                                // Firebase syncs automatically, this is for UX feedback
+                                await new Promise((r) => setTimeout(r, 800));
+                            }}
+                        >
+                            <Outlet />
+                        </PullToRefresh>
+                    </div>
+                    {/* Desktop: no pull-to-refresh */}
+                    <div className="hidden lg:block h-full">
+                        <Outlet />
+                    </div>
                 </div>
 
                 <BottomNavigation onMenuClick={() => setIsMobileMenuOpen(true)} role={role} />

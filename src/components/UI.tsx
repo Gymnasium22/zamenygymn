@@ -81,7 +81,7 @@ export const ToastContainer = ({ toasts, onRemoveToast }: ToastContainerProps) =
     if (toasts.length === 0) return null;
 
     return (
-        <div className="fixed top-4 right-4 z-[60] space-y-2">
+        <div className="fixed top-4 right-4 z-[60] space-y-2 md:top-4 md:right-4 md:left-auto md:w-auto left-4 right-4 w-auto">
             {toasts.length > 1 && (
                 <div className="flex justify-end mb-2">
                     <button
@@ -295,8 +295,10 @@ const activeModals = new Set<string>();
 export const Toast = ({ id, type, title, message, duration = 5000, onClose }: ToastProps) => {
     const [isVisible, setIsVisible] = useState(true);
     const [isExiting, setIsExiting] = useState(false);
+    const [swipeX, setSwipeX] = useState(0);
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const handleCloseRef = useRef<() => void>(() => {});
+    const touchStartX = useRef(0);
 
     const handleClose = useCallback(() => {
         // Очищаем таймер при ручном закрытии
@@ -327,6 +329,26 @@ export const Toast = ({ id, type, title, message, duration = 5000, onClose }: To
             }
         };
     }, [duration]);
+
+    // Mobile swipe to dismiss
+    const handleTouchStart = (e: React.TouchEvent) => {
+        touchStartX.current = e.touches[0].clientX;
+    };
+
+    const handleTouchMove = (e: React.TouchEvent) => {
+        const diff = e.touches[0].clientX - touchStartX.current;
+        if (diff > 0) {
+            setSwipeX(diff);
+        }
+    };
+
+    const handleTouchEnd = () => {
+        if (swipeX > 100) {
+            handleClose();
+        } else {
+            setSwipeX(0);
+        }
+    };
 
     if (!isVisible) return null;
 
@@ -375,7 +397,17 @@ export const Toast = ({ id, type, title, message, duration = 5000, onClose }: To
                 : 'Info';
 
     return (
-        <div className={`max-w-sm w-full animate-slide-in ${isExiting ? 'animate-fade-out' : ''}`}>
+        <div
+            className={`max-w-sm md:max-w-sm w-full animate-slide-in ${isExiting ? 'animate-fade-out' : ''}`}
+            style={{
+                transform: `translateX(${swipeX}px)`,
+                transition: swipeX === 0 ? 'transform 0.3s ease' : 'none',
+                opacity: swipeX > 50 ? 1 - (swipeX - 50) / 100 : 1,
+            }}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+        >
             <div className={`modern-card border p-4 transition-all duration-300 ${styles.bg} ${
                 type === 'success' ? 'shadow-emerald-500/10 dark:shadow-emerald-500/20 hover:shadow-emerald-500/35 hover-glow-emerald border-emerald-200/60 dark:border-emerald-800/60' :
                 type === 'danger' ? 'shadow-red-500/10 dark:shadow-red-500/20 hover:shadow-red-500/35 hover-glow-red border-red-200/60 dark:border-red-800/60' :
@@ -392,7 +424,7 @@ export const Toast = ({ id, type, title, message, duration = 5000, onClose }: To
                     </div>
                     <button
                         onClick={handleClose}
-                        className="flex-shrink-0 text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 transition-colors tactile-btn p-1 rounded-full hover:bg-black/5 dark:hover:bg-white/5"
+                        className="flex-shrink-0 text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 transition-colors tactile-btn p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 min-w-[36px] min-h-[36px] flex items-center justify-center"
                         aria-label="Закрыть уведомление"
                     >
                         <Icon name="X" size={16} />
@@ -887,70 +919,78 @@ export const BottomNavigation = ({ onMenuClick, role }: BottomNavProps) => {
     const showDashboard = isAdmin || isTeacher;
     const showSchedule = isAdmin || isTeacher || isGuest;
     const showNutrition = isAdmin || isTeacher || isCanteen;
+    const navigate = useNavigate();
 
     // Determine current semester for schedule navigation
     const currentSemester = getActiveSemester(new Date(), settings);
     const schedulePath = currentSemester === 2 ? '/schedule2' : '/schedule';
 
+    const handleNavClick = (path: string) => {
+        // Haptic feedback for mobile (2026 standard)
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+            navigator.vibrate(8);
+        }
+        navigate(path);
+    };
+
+    const navItems = [];
+    if (showDashboard) {
+        navItems.push({ to: '/dashboard', icon: 'Home', label: 'Рабочий', shortLabel: 'Главная' });
+    }
+    if (showSchedule) {
+        navItems.push({ to: schedulePath, icon: 'Calendar', label: 'Расписание', shortLabel: 'Распис.' });
+    }
+    if (showNutrition) {
+        navItems.push({ to: '/nutrition', icon: 'Coffee', label: 'Питание', shortLabel: 'Питание' });
+    }
+    if (isAdmin) {
+        navItems.push({ to: '/substitutions', icon: 'Repeat', label: 'Замены', shortLabel: 'Замены' });
+    }
+
     return (
-        <div className="fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-dark-800/90 backdrop-blur-xl border-t border-slate-200 dark:border-slate-700 z-40 pb-safe md:hidden transition-all duration-300 no-select">
-            <div className="flex justify-around items-center h-20">
-                {showDashboard && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-dark-800/95 backdrop-blur-xl border-t border-slate-200/80 dark:border-slate-700/80 z-40 pb-safe md:hidden transition-all duration-300 no-select safe-area-inset">
+            {/* Active indicator pill background */}
+            <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent opacity-50" />
+            <div className="flex justify-around items-center h-16 sm:h-20">
+                {navItems.map((item) => (
                     <NavLink
-                        to="/dashboard"
+                        key={item.to}
+                        to={item.to}
+                        onClick={() => handleNavClick(item.to)}
                         className={({ isActive }) =>
-                            `flex flex-col items-center justify-center gap-1.5 p-2.5 rounded-2xl transition-all duration-300 flex-1 h-full ${isActive ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/20' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100/50 dark:hover:bg-slate-700/30'}`
+                            `relative flex flex-col items-center justify-center gap-1 p-1.5 sm:p-2.5 rounded-2xl transition-all duration-300 flex-1 h-full ${isActive ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'} active:scale-95`
                         }
                     >
-                        <Icon name="Home" size={26} strokeWidth={2.5} />
-                        <span className="text-[11px] md:text-[10px] font-bold uppercase tracking-wider">Рабочий</span>
+                        {({ isActive }) => (
+                            <>
+                                {/* Active indicator dot */}
+                                {isActive && (
+                                    <span className="absolute -top-0.5 w-8 h-1 bg-indigo-500 rounded-full shadow-sm shadow-indigo-500/30" />
+                                )}
+                                <div className={`p-1.5 rounded-xl transition-all duration-300 ${isActive ? 'bg-indigo-50 dark:bg-indigo-900/20 shadow-sm' : ''}`}>
+                                    <Icon name={item.icon} size={22} strokeWidth={2.5} className="sm:w-[26px] sm:h-[26px]" />
+                                </div>
+                                <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider leading-none">
+                                    {item.shortLabel}
+                                </span>
+                            </>
+                        )}
                     </NavLink>
-                )}
-
-                {showSchedule && (
-                    <NavLink
-                        to={schedulePath}
-                        className={({ isActive }) =>
-                            `flex flex-col items-center justify-center gap-1.5 p-2.5 rounded-2xl transition-all duration-300 flex-1 h-full ${isActive ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/20' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100/50 dark:hover:bg-slate-700/30'}`
-                        }
-                    >
-                        <Icon name="Calendar" size={26} strokeWidth={2.5} />
-                        <span className="text-[11px] md:text-[10px] font-bold uppercase tracking-wider">
-                            Расписание
-                        </span>
-                    </NavLink>
-                )}
-
-                {showNutrition && (
-                    <NavLink
-                        to="/nutrition"
-                        className={({ isActive }) =>
-                            `flex flex-col items-center justify-center gap-1.5 p-2.5 rounded-2xl transition-all duration-300 flex-1 h-full ${isActive ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/20' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100/50 dark:hover:bg-slate-700/30'}`
-                        }
-                    >
-                        <Icon name="Coffee" size={26} strokeWidth={2.5} />
-                        <span className="text-[11px] md:text-[10px] font-bold uppercase tracking-wider">Питание</span>
-                    </NavLink>
-                )}
-
-                {isAdmin && (
-                    <NavLink
-                        to="/substitutions"
-                        className={({ isActive }) =>
-                            `flex flex-col items-center justify-center gap-1.5 p-2.5 rounded-2xl transition-all duration-300 flex-1 h-full ${isActive ? 'text-indigo-600 dark:text-indigo-400 bg-indigo-50/50 dark:bg-indigo-900/20' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100/50 dark:hover:bg-slate-700/30'}`
-                        }
-                    >
-                        <Icon name="Repeat" size={26} strokeWidth={2.5} />
-                        <span className="text-[11px] md:text-[10px] font-bold uppercase tracking-wider">Замены</span>
-                    </NavLink>
-                )}
+                ))}
 
                 <button
-                    onClick={onMenuClick}
-                    className="flex flex-col items-center justify-center gap-1.5 p-2.5 rounded-2xl text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 active:text-indigo-600 active:bg-indigo-50/50 dark:active:bg-indigo-900/20 transition-all duration-300 flex-1 h-full hover:bg-slate-100/50 dark:hover:bg-slate-700/30"
+                    onClick={() => {
+                        if (typeof navigator !== 'undefined' && navigator.vibrate) {
+                            navigator.vibrate(8);
+                        }
+                        onMenuClick();
+                    }}
+                    className="relative flex flex-col items-center justify-center gap-1 p-1.5 sm:p-2.5 rounded-2xl text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 active:text-indigo-600 transition-all duration-300 flex-1 h-full active:scale-95"
                 >
-                    <Icon name="Menu" size={26} strokeWidth={2.5} />
-                    <span className="text-[11px] md:text-[10px] font-bold uppercase tracking-wider">Меню</span>
+                    <div className="p-1.5 rounded-xl">
+                        <Icon name="Menu" size={22} strokeWidth={2.5} className="sm:w-[26px] sm:h-[26px]" />
+                    </div>
+                    <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider leading-none">Меню</span>
                 </button>
             </div>
         </div>
