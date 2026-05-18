@@ -21,7 +21,7 @@ const performBackup = async (
         try {
             const formData = new FormData();
             formData.append('chat_id', settings.feedbackChatId);
-            formData.append('caption', `📦 Автобекап ${formatDateEuropean(new Date())}`);
+            formData.append('caption', `📦 Автобэкап ${formatDateEuropean(new Date())}`);
             formData.append('document', new File([blob], `backup_${formatDateISO()}.json`, { type: 'application/json' }));
             const response = await fetch(
                 `https://api.telegram.org/bot${privateSettings.telegramToken}/sendDocument`,

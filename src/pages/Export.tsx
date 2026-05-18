@@ -2,15 +2,11 @@ import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react'
 import { useStaticData, useScheduleData } from '../context/DataContext';
 import { Icon } from '../components/Icons';
 import { DateInput } from '../components/DateInput';
-import { dbService } from '../services/db';
 import {
     DAYS,
     DayOfWeek,
     Shift,
     SHIFT_PERIODS,
-    AppData,
-    StaticAppData,
-    ScheduleAndSubstitutionData,
     Substitution,
     ScheduleItem,
     ClassEntity,
@@ -18,17 +14,14 @@ import {
     Teacher,
     Room
 } from '../types';
-import { INITIAL_DATA, getInitialData } from '../constants';
-import { formatDateISO, formatDateEuropean, generateId, getActiveSemester } from '../utils/helpers';
+import { formatDateISO, formatDateEuropean, getActiveSemester } from '../utils/helpers';
 import { exportService } from '../services/exportService';
-import { Modal, useToast } from '../components/UI';
+import { useToast } from '../components/UI';
 import { SanitaryScheduleTab } from '../components/SanitaryScheduleTab';
 
 // --- Хелперы ---
 
 import { escapeHtml, sanitizeColor } from '../utils/escapeHtml';
-import { stripDangerousKeys } from '../utils/safeMerge';
-import { AppDataImportSchema, AppDataImport } from '../utils/importSchema';
 
 // --- Вынесенные компоненты печати (не пересоздаются на каждый рендер) ---
 
@@ -226,19 +219,14 @@ const MatrixPrintContent = ({ classes, matrixGrade, currentSchedule, subjects, r
 };
 
 export const ExportPage = () => {
-    const { subjects, teachers, classes, rooms, settings, bellSchedule, saveStaticData, dutyZones, privateSettings } = useStaticData();
+    const { subjects, teachers, classes, rooms, settings } = useStaticData();
     const {
         schedule1,
         schedule2,
-        substitutions,
-        saveScheduleData,
-        dutySchedule,
-        nutritionRecords,
-        absenteeismRecords
+        substitutions
     } = useScheduleData();
     const { addToast } = useToast();
 
-    const fileInputRef = useRef<HTMLInputElement>(null);
     const printRef1 = useRef<HTMLDivElement>(null);
     const printRef2 = useRef<HTMLDivElement>(null);
 
@@ -250,60 +238,13 @@ export const ExportPage = () => {
     });
 
     const [isGenerating, setIsGenerating] = useState(false);
-    const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
-    const [publicScheduleUrl, setPublicScheduleUrl] = useState('');
-    const [, setPublicScheduleId] = useState('');
-
-    // Lazy-load QRCode component for publish modal (reduces main chunk size)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const [QRCodeComponent, setQRCodeComponent] = useState<React.ComponentType<any> | null>(null);
-    useEffect(() => {
-        if (isPublishModalOpen && publicScheduleUrl && !QRCodeComponent) {
-            import('qrcode.react').then((mod) => setQRCodeComponent(() => mod.QRCodeSVG));
-        }
-    }, [isPublishModalOpen, publicScheduleUrl, QRCodeComponent]);
 
     // Matrix Print State
     const [isMatrixPrintOpen, setIsMatrixPrintOpen] = useState(false);
     const [matrixGrade, setMatrixGrade] = useState<string>('');
 
-    type ExportTabId = 'data' | 'sanitary' | 'public';
+    type ExportTabId = 'data' | 'sanitary';
     const [activeExportTab, setActiveExportTab] = useState<ExportTabId>('data');
-
-    const fullAppData: AppData = useMemo(
-        () => ({
-            subjects,
-            teachers,
-            classes,
-            rooms,
-            settings,
-            bellSchedule,
-            schedule: schedule1,
-            schedule2,
-            substitutions,
-            dutyZones,
-            dutySchedule,
-            nutritionRecords,
-            absenteeismRecords,
-            privateSettings,
-        }),
-        [
-            subjects,
-            teachers,
-            classes,
-            rooms,
-            settings,
-            bellSchedule,
-            schedule1,
-            schedule2,
-            substitutions,
-            dutyZones,
-            dutySchedule,
-            nutritionRecords,
-            absenteeismRecords,
-            privateSettings,
-        ]
-    );
 
     // Получаем расписание для экспорта (Excel, Матрица) на основе селектора
     const getScheduleForExport = () => (exportSemester === 2 ? schedule2 : schedule1);
@@ -342,60 +283,7 @@ export const ExportPage = () => {
         }
     }, [availableGrades, matrixGrade]);
 
-    // --- Простая runtime-валидация импорта ---
-    const validateImportData = (data: unknown): string[] => {
-        const result = AppDataImportSchema.safeParse(data);
-        if (!result.success) {
-            return result.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`);
-        }
-        const d = result.data;
-        const errors: string[] = [];
-        if (!d.teachers?.length && !d.schedule?.length && !d.schedule2?.length) {
-            errors.push('Файл не содержит распознаваемых данных (teachers/schedule/schedule2)');
-        }
-        return errors;
-    };
 
-    const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = async (ev: ProgressEvent<FileReader>) => {
-            try {
-                const rawJson = JSON.parse(ev.target?.result as string);
-                const json = stripDangerousKeys(rawJson) as AppDataImport;
-                const validationErrors = validateImportData(json);
-                if (validationErrors.length > 0) {
-                    addToast({
-                        type: 'danger',
-                        title: 'Неверный формат файла',
-                        message: validationErrors.join('\n')
-                    });
-                    return;
-                }
-                if (window.confirm('Это перезапишет текущую базу данных. Продолжить?')) {
-                    const mergedData = {
-                        ...getInitialData(),
-                        ...json,
-                        rooms: json.rooms || INITIAL_DATA.rooms,
-                        classes: json.classes || [],
-                        schedule: json.schedule || [],
-                        schedule2: json.schedule2 || [],
-                        teachers: json.teachers || [],
-                        subjects: json.subjects || [],
-                        substitutions: json.substitutions || [],
-                        settings: { ...INITIAL_DATA.settings, ...json.settings }
-                    } as unknown as AppData;
-                    await saveStaticData(mergedData as Partial<StaticAppData>);
-                    await saveScheduleData(mergedData as Partial<ScheduleAndSubstitutionData>);
-                    addToast({ type: 'success', title: 'Успешно', message: 'База успешно восстановлена!' });
-                }
-            } catch {
-                addToast({ type: 'danger', title: 'Ошибка', message: 'Ошибка чтения файла.' });
-            }
-        };
-        reader.readAsText(file);
-    };
 
     const exportStyledExcel = () => {
         const currentSchedule = getScheduleForExport();
@@ -1554,33 +1442,6 @@ export const ExportPage = () => {
         );
     };
 
-    const handlePublishSchedule = async () => {
-        const newPublicId = generateId();
-        await dbService.setPublicData(newPublicId, fullAppData);
-
-        await saveStaticData({ settings: { ...settings, publicScheduleId: newPublicId } });
-
-        const publicUrl = `${window.location.origin}${window.location.pathname}#/public?id=${newPublicId}`;
-        setPublicScheduleUrl(publicUrl);
-        setPublicScheduleId(newPublicId);
-        setIsPublishModalOpen(true);
-    };
-
-    const clearPublicSchedule = async () => {
-        if (
-            !settings.publicScheduleId ||
-            !window.confirm(
-                'Вы уверены, что хотите удалить публичное расписание? Оно станет недоступно по текущей ссылке.'
-            )
-        ) {
-            return;
-        }
-        await dbService.deletePublicData(settings.publicScheduleId);
-        await saveStaticData({ settings: { ...settings, publicScheduleId: null } });
-        addToast({ type: 'success', title: 'Успешно', message: 'Публичное расписание удалено.' });
-        setPublicScheduleUrl('');
-        setPublicScheduleId('');
-    };
 
     const subjectsById = useMemo(() => {
         const map = new Map<string, Subject>();
@@ -1608,38 +1469,6 @@ export const ExportPage = () => {
 
     return (
         <div className="max-w-5xl mx-auto space-y-8 pb-20">
-            <section className="bg-white dark:bg-dark-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
-                <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
-                    <Icon name="Download" className="text-indigo-600 dark:text-indigo-400" /> Резервное копирование
-                </h2>
-                <div className="flex flex-wrap gap-4">
-                    <button
-                        onClick={() => {
-                            const { privateSettings: _, ...exportData } = fullAppData;
-                            dbService.exportJson(exportData as AppData);
-                        }}
-                        className="btn-primary btn-ripple flex items-center gap-2"
-                    >
-                        <Icon name="Download" size={20} /> Скачать JSON
-                    </button>
-                    <div className="relative">
-                        <input
-                            type="file"
-                            ref={fileInputRef}
-                            onChange={handleImport}
-                            accept=".json"
-                            className="hidden"
-                        />
-                        <button
-                            onClick={() => fileInputRef.current?.click()}
-                            className="px-6 py-3 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 rounded-xl font-bold hover:bg-slate-50 dark:hover:bg-slate-600 transition flex items-center gap-2"
-                        >
-                            <Icon name="Upload" size={20} /> Загрузить JSON
-                        </button>
-                    </div>
-                </div>
-            </section>
-
             <section className="bg-white dark:bg-dark-800 p-3 sm:p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
                 <div className="flex flex-wrap gap-2">
                     <button
@@ -1652,7 +1481,7 @@ export const ExportPage = () => {
                         ].join(' ')}
                     >
                         <span className="inline-flex items-center gap-2">
-                            <Icon name="FileSpreadsheet" size={18} /> Экспорт
+                            <Icon name="FileSpreadsheet" size={18} /> Экспорт замен
                         </span>
                     </button>
                     <button
@@ -1666,19 +1495,6 @@ export const ExportPage = () => {
                     >
                         <span className="inline-flex items-center gap-2">
                             <Icon name="Shield" size={18} /> Санстанция
-                        </span>
-                    </button>
-                    <button
-                        onClick={() => setActiveExportTab('public')}
-                        className={[
-                            'px-4 py-2 rounded-xl font-black text-sm transition border',
-                            activeExportTab === 'public'
-                                ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-200 dark:shadow-none'
-                                : 'bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600'
-                        ].join(' ')}
-                    >
-                        <span className="inline-flex items-center gap-2">
-                            <Icon name="QrCode" size={18} /> Публичное
                         </span>
                     </button>
                 </div>
@@ -1876,87 +1692,6 @@ export const ExportPage = () => {
                     teachers={teachers}
                 />
             )}
-
-            {activeExportTab === 'public' && (
-                <section className="bg-white dark:bg-dark-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
-                    <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
-                        <Icon name="QrCode" className="text-purple-600 dark:text-purple-400" /> Публичное расписание
-                    </h2>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-                        Опубликуйте актуальное расписание для учеников и родителей. Будет сгенерирована уникальная
-                        ссылка с QR-кодом.
-                    </p>
-                    {settings.publicScheduleId ? (
-                        <div className="flex flex-col md:flex-row items-center gap-4">
-                            <div className="flex-1">
-                                <p className="text-sm font-bold text-slate-600 dark:text-slate-300 mb-2">
-                                    Расписание опубликовано! ID:{' '}
-                                    <span className="font-mono bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded">
-                                        {settings.publicScheduleId}
-                                    </span>
-                                </p>
-                                <button
-                                    onClick={() => setIsPublishModalOpen(true)}
-                                    className="px-4 py-2 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition flex items-center gap-2"
-                                >
-                                    <Icon name="Share2" size={16} /> Показать QR-код и ссылку
-                                </button>
-                                <button
-                                    onClick={clearPublicSchedule}
-                                    className="ml-3 px-4 py-2 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 border border-red-100 dark:border-red-900 rounded-xl font-bold hover:bg-red-100 dark:hover:bg-red-900/50 transition flex items-center gap-2"
-                                >
-                                    <Icon name="Trash2" size={16} /> Отменить публикацию
-                                </button>
-                            </div>
-                        </div>
-                    ) : (
-                        <button
-                            onClick={handlePublishSchedule}
-                            disabled={isGenerating}
-                            className="px-6 py-3 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition shadow-lg shadow-purple-200 dark:shadow-none flex items-center gap-2 disabled:opacity-50"
-                        >
-                            <Icon name="Share2" size={20} /> Опубликовать расписание
-                        </button>
-                    )}
-                </section>
-            )}
-
-            <Modal
-                isOpen={isPublishModalOpen}
-                onClose={() => setIsPublishModalOpen(false)}
-                title="Публичное расписание"
-            >
-                <div className="flex flex-col items-center justify-center p-4 text-center space-y-4">
-                    <p className="text-sm text-slate-600 dark:text-slate-300">
-                        Отсканируйте QR-код или перейдите по ссылке, чтобы увидеть публичное расписание.
-                    </p>
-                    {publicScheduleUrl && QRCodeComponent && (
-                        <>
-                            <QRCodeComponent
-                                value={publicScheduleUrl}
-                                size={256}
-                                level="H"
-                                includeMargin={true}
-                                className="p-2 bg-white border border-slate-200 rounded-lg shadow-md"
-                            />
-                            <a
-                                href={publicScheduleUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-indigo-600 hover:underline text-sm font-medium break-all"
-                            >
-                                {publicScheduleUrl}
-                            </a>
-                            <button
-                                onClick={() => navigator.clipboard.writeText(publicScheduleUrl)}
-                                className="px-4 py-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 rounded-xl text-sm font-bold hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition flex items-center gap-2"
-                            >
-                                <Icon name="Copy" size={16} /> Копировать ссылку
-                            </button>
-                        </>
-                    )}
-                </div>
-            </Modal>
 
             {isMatrixPrintOpen && (
                 <div className="fixed inset-0 z-[100] bg-white flex flex-col">

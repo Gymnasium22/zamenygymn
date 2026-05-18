@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useStaticData } from '../context/DataContext';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useStaticData, useScheduleData } from '../context/DataContext';
 import { Icon } from '../components/Icons';
 import { DateInput } from '../components/DateInput';
-import { useToast } from '../components/UI';
+import { useToast, Modal } from '../components/UI';
 import {
     TelegramTemplates,
     AdminAnnouncement,
@@ -10,15 +10,19 @@ import {
     AuditLogEntry,
     AppData,
     DashboardWidgetId,
-    DashboardWidgetRole
+    DashboardWidgetRole,
+    StaticAppData,
+    ScheduleAndSubstitutionData
 } from '../types';
-import { INITIAL_DATA } from '../constants';
-import { formatDateEuropean, formatDateISO } from '../utils/helpers';
+import { INITIAL_DATA, getInitialData } from '../constants';
+import { formatDateEuropean, formatDateISO, generateId } from '../utils/helpers';
 import { auditLog } from '../services/auditLog';
 import { safeLocalStorageGet } from '../utils/localStorage';
 import { stripDangerousKeys } from '../utils/safeMerge';
 import { SemesterConfig } from '../components/settings/SemesterConfig';
 import { TelegramTemplateEditor } from '../components/settings/TelegramTemplateEditor';
+import { dbService } from '../services/db';
+import { AppDataImportSchema, AppDataImport } from '../utils/importSchema';
 
 type SettingsSection =
     | 'integrations'
@@ -180,12 +184,183 @@ const DASHBOARD_WIDGETS: { id: DashboardWidgetId; label: string }[] = [
 ];
 
 export const SettingsPage = () => {
-    const { settings, privateSettings, saveStaticData } = useStaticData();
+    const {
+        settings,
+        privateSettings,
+        saveStaticData,
+        subjects,
+        teachers,
+        classes,
+        rooms,
+        bellSchedule,
+        dutyZones
+    } = useStaticData();
+    const {
+        schedule1,
+        schedule2,
+        substitutions,
+        saveScheduleData,
+        dutySchedule,
+        nutritionRecords,
+        absenteeismRecords
+    } = useScheduleData();
     const { addToast } = useToast();
+
+    const [passwordInput, setPasswordInput] = useState('');
+    const [passwordError, setPasswordError] = useState('');
+    const [isUnlocked, setIsUnlocked] = useState(() => {
+        return sessionStorage.getItem('settings_unlocked') === 'true';
+    });
 
     const [activeSection, setActiveSection] = useState<SettingsSection>('integrations');
     const [isSavingSection, setIsSavingSection] = useState<SettingsSection | null>(null);
     const [confirmResetOpen, setConfirmResetOpen] = useState(false);
+
+    // Full DB Import / Export refs and states
+    const dbFileInputRef = useRef<HTMLInputElement>(null);
+    const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
+    const [publicScheduleUrl, setPublicScheduleUrl] = useState('');
+    
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const [QRCodeComponent, setQRCodeComponent] = useState<React.ComponentType<any> | null>(null);
+    useEffect(() => {
+        if (isPublishModalOpen && publicScheduleUrl && !QRCodeComponent) {
+            import('qrcode.react').then((mod) => setQRCodeComponent(() => mod.QRCodeSVG));
+        }
+    }, [isPublishModalOpen, publicScheduleUrl, QRCodeComponent]);
+
+    useEffect(() => {
+        if (settings?.publicScheduleId) {
+            const publicUrl = `${window.location.origin}${window.location.pathname}#/public?id=${settings.publicScheduleId}`;
+            setPublicScheduleUrl(publicUrl);
+        } else {
+            setPublicScheduleUrl('');
+        }
+    }, [settings?.publicScheduleId]);
+
+    const fullAppData: AppData = useMemo(
+        () => ({
+            subjects,
+            teachers,
+            classes,
+            rooms,
+            settings,
+            bellSchedule,
+            schedule: schedule1,
+            schedule2,
+            substitutions,
+            dutyZones,
+            dutySchedule,
+            nutritionRecords,
+            absenteeismRecords,
+            privateSettings,
+        }),
+        [
+            subjects,
+            teachers,
+            classes,
+            rooms,
+            settings,
+            bellSchedule,
+            schedule1,
+            schedule2,
+            substitutions,
+            dutyZones,
+            dutySchedule,
+            nutritionRecords,
+            absenteeismRecords,
+            privateSettings,
+        ]
+    );
+
+    const validateImportData = (data: unknown): string[] => {
+        const result = AppDataImportSchema.safeParse(data);
+        if (!result.success) {
+            return result.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`);
+        }
+        const d = result.data;
+        const errors: string[] = [];
+        if (!d.teachers?.length && !d.schedule?.length && !d.schedule2?.length) {
+            errors.push('Файл не содержит распознаваемых данных (teachers/schedule/schedule2)');
+        }
+        return errors;
+    };
+
+    const handleFullImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = async (ev: ProgressEvent<FileReader>) => {
+            try {
+                const rawJson = JSON.parse(ev.target?.result as string);
+                const json = stripDangerousKeys(rawJson) as AppDataImport;
+                const validationErrors = validateImportData(json);
+                if (validationErrors.length > 0) {
+                    addToast({
+                        type: 'danger',
+                        title: 'Неверный формат файла',
+                        message: validationErrors.join('\n')
+                    });
+                    return;
+                }
+                if (window.confirm('Это перезапишет всю базу данных (все расписания, замены, списки). Продолжить?')) {
+                    const mergedData = {
+                        ...getInitialData(),
+                        ...json,
+                        rooms: json.rooms || INITIAL_DATA.rooms,
+                        classes: json.classes || [],
+                        schedule: json.schedule || [],
+                        schedule2: json.schedule2 || [],
+                        teachers: json.teachers || [],
+                        subjects: json.subjects || [],
+                        substitutions: json.substitutions || [],
+                        settings: { ...INITIAL_DATA.settings, ...json.settings }
+                    } as unknown as AppData;
+                    await saveStaticData(mergedData as Partial<StaticAppData>);
+                    await saveScheduleData(mergedData as Partial<ScheduleAndSubstitutionData>);
+                    addToast({ type: 'success', title: 'Успешно', message: 'База данных успешно восстановлена!' });
+                }
+            } catch {
+                addToast({ type: 'danger', title: 'Ошибка', message: 'Ошибка чтения файла.' });
+            }
+        };
+        reader.readAsText(file);
+    };
+
+    const handlePublishSchedule = async () => {
+        const newPublicId = generateId();
+        try {
+            await dbService.setPublicData(newPublicId, fullAppData);
+            await saveStaticData({ settings: { ...settings, publicScheduleId: newPublicId } });
+            const publicUrl = `${window.location.origin}${window.location.pathname}#/public?id=${newPublicId}`;
+            setPublicScheduleUrl(publicUrl);
+            setIsPublishModalOpen(true);
+            addToast({ type: 'success', title: 'Успешно', message: 'Расписание опубликовано!' });
+        } catch (e) {
+            console.error(e);
+            addToast({ type: 'danger', title: 'Ошибка', message: 'Не удалось опубликовать расписание.' });
+        }
+    };
+
+    const clearPublicSchedule = async () => {
+        if (
+            !settings.publicScheduleId ||
+            !window.confirm(
+                'Вы уверены, что хотите удалить публичное расписание? Оно станет недоступно по текущей ссылке.'
+            )
+        ) {
+            return;
+        }
+        try {
+            await dbService.deletePublicData(settings.publicScheduleId);
+            await saveStaticData({ settings: { ...settings, publicScheduleId: null } });
+            addToast({ type: 'success', title: 'Успешно', message: 'Публичное расписание удалено.' });
+            setPublicScheduleUrl('');
+        } catch (e) {
+            console.error(e);
+            addToast({ type: 'danger', title: 'Ошибка', message: 'Не удалось удалить публичное расписание.' });
+        }
+    };
 
     // --- Local state for each section ---
 
@@ -496,7 +671,7 @@ export const SettingsPage = () => {
                     backupTime
                 }
             });
-            addToast({ type: 'success', title: 'Сохранено', message: 'Настройки бекапа обновлены' });
+            addToast({ type: 'success', title: 'Сохранено', message: 'Настройки бэкапа обновлены' });
         } catch {
             addToast({ type: 'danger', title: 'Ошибка', message: 'Не удалось сохранить' });
         } finally {
@@ -534,6 +709,59 @@ export const SettingsPage = () => {
             addToast({ type: 'danger', title: 'Ошибка', message: 'Не удалось сбросить настройки' });
         }
     };
+
+    const handleUnlock = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (passwordInput === 'Gymn22Minsk26') {
+            setIsUnlocked(true);
+            sessionStorage.setItem('settings_unlocked', 'true');
+            setPasswordError('');
+            addToast({ type: 'success', title: 'Успешно', message: 'Доступ к настройкам разрешен' });
+        } else {
+            setPasswordError('Неверный пароль');
+            addToast({ type: 'danger', title: 'Ошибка', message: 'Неверный пароль для доступа к настройкам' });
+        }
+    };
+
+    if (!isUnlocked) {
+        return (
+            <div className="h-full flex items-center justify-center p-4">
+                <div className="max-w-md w-full p-8 bg-white dark:bg-dark-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-xl flex flex-col items-center justify-center animate-page-in">
+                    <div className="w-16 h-16 rounded-2xl bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mb-6 shadow-sm">
+                        <Icon name="Lock" size={32} />
+                    </div>
+                    <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-2 text-center">Доступ ограничен</h2>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 text-center">
+                        Для просмотра и редактирования настроек системы необходимо ввести пароль администратора.
+                    </p>
+                    <form onSubmit={handleUnlock} className="w-full space-y-4">
+                        <div className="space-y-1">
+                            <PasswordInput
+                                value={passwordInput}
+                                onChange={(v) => {
+                                    setPasswordInput(v);
+                                    if (passwordError) setPasswordError('');
+                                }}
+                                placeholder="Введите пароль доступа"
+                                id="settings-password"
+                            />
+                            {passwordError && (
+                                <p className="text-xs text-red-500 font-semibold mt-1 flex items-center gap-1">
+                                    <Icon name="AlertTriangle" size={12} /> {passwordError}
+                                </p>
+                            )}
+                        </div>
+                        <button
+                            type="submit"
+                            className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm shadow-lg shadow-indigo-200 dark:shadow-none transition flex items-center justify-center gap-2"
+                        >
+                            <Icon name="Unlock" size={16} /> Войти в настройки
+                        </button>
+                    </form>
+                </div>
+            </div>
+        );
+    }
 
     if (!settings) {
         return (
@@ -982,7 +1210,7 @@ export const SettingsPage = () => {
                                     </div>
                                     <div>
                                         <h3 className="font-bold text-slate-800 dark:text-white text-base">
-                                            Автоматический бекап
+                                            Автоматический бэкап
                                         </h3>
                                         <p className="text-xs text-slate-500 dark:text-slate-400">
                                             Отправка резервной копии в Telegram
@@ -1002,17 +1230,24 @@ export const SettingsPage = () => {
                             </div>
 
                             <div className="bg-white dark:bg-dark-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm p-6">
-                                <div className="flex items-center gap-3 mb-4">
-                                    <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-                                        <Icon name="Download" size={20} />
-                                    </div>
-                                    <div>
-                                        <h3 className="font-bold text-slate-800 dark:text-white text-base">
-                                            Резервная копия
-                                        </h3>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400">
-                                            Экспорт и импорт всех настроек
-                                        </p>
+                                <div className="flex items-center justify-between gap-3 mb-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                                            <Icon name="Download" size={20} />
+                                        </div>
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <h3 className="font-bold text-slate-800 dark:text-white text-base">
+                                                    Резервная копия настроек
+                                                </h3>
+                                                <span className="text-[10px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 px-1.5 py-0.5 rounded-full">
+                                                    Только настройки
+                                                </span>
+                                            </div>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400">
+                                                Экспорт и импорт системных настроек, ключей API и шаблонов
+                                            </p>
+                                        </div>
                                     </div>
                                 </div>
                                 <div className="flex flex-col sm:flex-row gap-3">
@@ -1021,11 +1256,11 @@ export const SettingsPage = () => {
                                         className="px-4 py-2.5 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 rounded-xl font-bold text-sm hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition flex items-center justify-center gap-2"
                                     >
                                         <Icon name="Download" size={16} />
-                                        Экспортировать в JSON
+                                        Экспортировать настройки
                                     </button>
                                     <label className="px-4 py-2.5 bg-slate-50 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold text-sm hover:bg-slate-100 dark:hover:bg-slate-600 transition flex items-center justify-center gap-2 cursor-pointer border border-slate-200 dark:border-slate-600">
                                         <Icon name="Upload" size={16} />
-                                        Импортировать из JSON
+                                        Импортировать настройки
                                         <input
                                             type="file"
                                             accept=".json"
@@ -1038,6 +1273,134 @@ export const SettingsPage = () => {
                                         />
                                     </label>
                                 </div>
+                            </div>
+
+                            <div className="bg-white dark:bg-dark-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm p-6">
+                                <div className="flex items-center justify-between gap-3 mb-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0">
+                                            <Icon name="Database" size={20} />
+                                        </div>
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <h3 className="font-bold text-slate-800 dark:text-white text-base">
+                                                    Полная копия базы данных
+                                                </h3>
+                                                <span className="text-[10px] font-bold bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 px-1.5 py-0.5 rounded-full">
+                                                    Вся база данных
+                                                </span>
+                                            </div>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400">
+                                                Сохранение и восстановление всех данных: расписаний, замен, питания, пропусков, справочников (учителя, классы, предметы)
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex flex-col sm:flex-row gap-3">
+                                    <button
+                                        onClick={() => {
+                                            const { privateSettings: _, ...exportData } = fullAppData;
+                                            dbService.exportJson(exportData as AppData);
+                                        }}
+                                        className="px-4 py-2.5 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400 rounded-xl font-bold text-sm hover:bg-purple-100 dark:hover:bg-purple-900/40 transition flex items-center justify-center gap-2"
+                                    >
+                                        <Icon name="Download" size={16} />
+                                        Экспортировать всю БД
+                                    </button>
+                                    <label className="px-4 py-2.5 bg-slate-50 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-bold text-sm hover:bg-slate-100 dark:hover:bg-slate-600 transition flex items-center justify-center gap-2 cursor-pointer border border-slate-200 dark:border-slate-600">
+                                        <Icon name="Upload" size={16} />
+                                        Восстановить всю БД из JSON
+                                        <input
+                                            type="file"
+                                            ref={dbFileInputRef}
+                                            accept=".json"
+                                            className="hidden"
+                                            onChange={handleFullImport}
+                                        />
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div className="bg-white dark:bg-dark-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm p-6">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="w-10 h-10 rounded-xl bg-teal-50 dark:bg-teal-900/20 text-teal-600 dark:text-teal-400 flex items-center justify-center shrink-0">
+                                        <Icon name="QrCode" size={20} />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-slate-800 dark:text-white text-base">
+                                            Публичное расписание
+                                        </h3>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                                            Публикация интерактивной версии расписания для учеников и родителей
+                                        </p>
+                                    </div>
+                                </div>
+                                
+                                {publicScheduleUrl ? (
+                                    <div className="space-y-4">
+                                        <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-100 dark:border-slate-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                                            <div className="min-w-0 flex-1">
+                                                <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Ссылка для просмотра</div>
+                                                <a 
+                                                    href={publicScheduleUrl} 
+                                                    target="_blank" 
+                                                    rel="noopener noreferrer"
+                                                    className="text-sm font-semibold text-indigo-600 dark:text-indigo-400 hover:underline break-all block"
+                                                >
+                                                    {publicScheduleUrl}
+                                                </a>
+                                            </div>
+                                            <div className="flex gap-2 shrink-0">
+                                                <button
+                                                    onClick={() => {
+                                                        navigator.clipboard.writeText(publicScheduleUrl);
+                                                        addToast({ type: 'success', title: 'Успешно', message: 'Ссылка скопирована' });
+                                                    }}
+                                                    className="p-2 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 rounded-lg transition"
+                                                    title="Копировать ссылку"
+                                                >
+                                                    <Icon name="Copy" size={16} />
+                                                </button>
+                                                <button
+                                                    onClick={() => setIsPublishModalOpen(true)}
+                                                    className="p-2 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 rounded-lg transition"
+                                                    title="Показать QR-код"
+                                                >
+                                                    <Icon name="QrCode" size={16} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2">
+                                            <button
+                                                onClick={handlePublishSchedule}
+                                                className="px-4 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition flex items-center gap-2"
+                                            >
+                                                <Icon name="RefreshCw" size={16} />
+                                                Обновить публикацию
+                                            </button>
+                                            <button
+                                                onClick={clearPublicSchedule}
+                                                className="px-4 py-2.5 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 rounded-xl font-bold text-sm hover:bg-red-100 dark:hover:bg-red-900/40 transition flex items-center gap-2 border border-red-100 dark:border-red-900"
+                                            >
+                                                <Icon name="Trash2" size={16} />
+                                                Удалить публикацию
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div>
+                                        <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+                                            Расписание ещё не опубликовано. Создайте общедоступную версию, которой смогут пользоваться ученики и учителя без авторизации.
+                                        </p>
+                                        <button
+                                            onClick={handlePublishSchedule}
+                                            className="px-4 py-2.5 bg-teal-600 text-white rounded-xl font-bold text-sm hover:bg-teal-700 transition flex items-center gap-2"
+                                        >
+                                            <Icon name="Share2" size={16} />
+                                            Опубликовать расписание
+                                        </button>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="bg-white dark:bg-dark-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm p-6">
@@ -1093,6 +1456,46 @@ export const SettingsPage = () => {
                 onConfirm={handleReset}
                 onCancel={() => setConfirmResetOpen(false)}
             />
+
+            <Modal
+                isOpen={isPublishModalOpen}
+                onClose={() => setIsPublishModalOpen(false)}
+                title="Публичное расписание"
+            >
+                <div className="flex flex-col items-center justify-center p-4 text-center space-y-4">
+                    <p className="text-sm text-slate-600 dark:text-slate-300">
+                        Отсканируйте QR-код или перейдите по ссылке, чтобы увидеть публичное расписание.
+                    </p>
+                    {publicScheduleUrl && QRCodeComponent && (
+                        <>
+                            <QRCodeComponent
+                                value={publicScheduleUrl}
+                                size={256}
+                                level="H"
+                                includeMargin={true}
+                                className="p-2 bg-white border border-slate-200 rounded-lg shadow-md"
+                            />
+                            <a
+                                href={publicScheduleUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-indigo-600 hover:underline text-sm font-medium break-all"
+                            >
+                                {publicScheduleUrl}
+                            </a>
+                            <button
+                                onClick={() => {
+                                    navigator.clipboard.writeText(publicScheduleUrl);
+                                    addToast({ type: 'success', title: 'Успешно', message: 'Ссылка скопирована' });
+                                }}
+                                className="px-4 py-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 rounded-xl text-sm font-bold hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition flex items-center gap-2"
+                            >
+                                <Icon name="Copy" size={16} /> Копировать ссылку
+                            </button>
+                        </>
+                    )}
+                </div>
+            </Modal>
         </div>
     );
 };
@@ -1116,7 +1519,7 @@ const BackupControls: React.FC<{
         try {
             const data = safeLocalStorageGet('gym_data_local_backup_v2');
             if (!data) {
-                addToast({ type: 'warning', title: 'Бекап', message: 'Нет данных для бекапа' });
+                addToast({ type: 'warning', title: 'Бэкап', message: 'Нет данных для бэкапа' });
                 return;
             }
             const blob = new Blob([data], { type: 'application/json' });
@@ -1133,18 +1536,18 @@ const BackupControls: React.FC<{
             if (privateSettings.telegramToken && settings.feedbackChatId) {
                 const formData = new FormData();
                 formData.append('chat_id', settings.feedbackChatId);
-                formData.append('caption', `Автобекап ${formatDateEuropean(new Date())}`);
+                formData.append('caption', `Автобэкап ${formatDateEuropean(new Date())}`);
                 formData.append('document', new File([blob], `backup_${formatDateISO()}.json`, { type: 'application/json' }));
                 await fetch(
                     `https://api.telegram.org/bot${privateSettings.telegramToken}/sendDocument`,
                     { method: 'POST', body: formData }
                 );
-                addToast({ type: 'success', title: 'Бекап', message: 'Файл сохранён и отправлен в Telegram' });
+                addToast({ type: 'success', title: 'Бэкап', message: 'Файл сохранён и отправлен в Telegram' });
             } else {
-                addToast({ type: 'success', title: 'Бекап', message: 'Файл сохранён' });
+                addToast({ type: 'success', title: 'Бэкап', message: 'Файл сохранён' });
             }
         } catch {
-            addToast({ type: 'danger', title: 'Ошибка', message: 'Не удалось создать бекап' });
+            addToast({ type: 'danger', title: 'Ошибка', message: 'Не удалось создать бэкап' });
         } finally {
             setIsBackingUp(false);
         }
@@ -1168,7 +1571,7 @@ const BackupControls: React.FC<{
                     />
                 </div>
                 <div>
-                    <div className="text-sm font-bold text-slate-700 dark:text-slate-300">Автоматический бекап</div>
+                    <div className="text-sm font-bold text-slate-700 dark:text-slate-300">Автоматический бэкап</div>
                     <div className="text-xs text-slate-400">Каждый день в указанное время</div>
                 </div>
             </div>
@@ -1192,7 +1595,7 @@ const BackupControls: React.FC<{
                     className="px-4 py-2.5 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 rounded-xl font-bold text-sm hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition flex items-center gap-2 disabled:opacity-50"
                 >
                     <Icon name={isBackingUp ? 'Loader' : 'Download'} size={16} className={isBackingUp ? 'animate-spin' : ''} />
-                    {isBackingUp ? 'Создание...' : 'Создать бекап сейчас'}
+                    {isBackingUp ? 'Создание...' : 'Создать бэкап сейчас'}
                 </button>
                 <button
                     onClick={onSave}
@@ -1218,11 +1621,24 @@ const BackupControls: React.FC<{
 // Audit Log Viewer Component
 const AuditLogViewer: React.FC = () => {
     const [entries, setEntries] = useState<AuditLogEntry[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
     const { addToast } = useToast();
 
-    useEffect(() => {
-        setEntries(auditLog.getEntries(100));
+    const fetchEntries = useCallback(async () => {
+        setIsLoading(true);
+        try {
+            const logs = await auditLog.getEntries(100);
+            setEntries(logs);
+        } catch (e) {
+            console.error(e);
+        } finally {
+            setIsLoading(false);
+        }
     }, []);
+
+    useEffect(() => {
+        fetchEntries();
+    }, [fetchEntries]);
 
     const actionLabels: Record<string, string> = {
         create: 'Создание',
@@ -1256,62 +1672,84 @@ const AuditLogViewer: React.FC = () => {
         apply: 'Настройки применены'
     };
 
-    const handleRefresh = () => setEntries(auditLog.getEntries(100));
+    const handleRefresh = () => fetchEntries();
 
-    const handleExportJson = () => {
-        const blob = new Blob([auditLog.exportJson()], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `audit_log_${formatDateISO()}.json`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-        addToast({ type: 'success', title: 'Экспорт', message: 'Журнал действий сохранён в JSON' });
-    };
-
-    const handleExportExcel = () => {
-        const all = auditLog.getEntries(200);
-        if (all.length === 0) {
-            addToast({ type: 'warning', title: 'Журнал пуст', message: 'Нет данных для экспорта' });
-            return;
+    const handleExportJson = async () => {
+        setIsLoading(true);
+        try {
+            const all = await auditLog.getEntries(200);
+            const blob = new Blob([JSON.stringify(all, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `audit_log_${formatDateISO()}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            addToast({ type: 'success', title: 'Экспорт', message: 'Журнал действий сохранён в JSON' });
+        } catch {
+            addToast({ type: 'danger', title: 'Ошибка', message: 'Не удалось экспортировать журнал' });
+        } finally {
+            setIsLoading(false);
         }
-        const BOM = '\uFEFF';
-        const headers = ['Дата', 'Время', 'Пользователь', 'Роль', 'Действие', 'Тип объекта', 'Название объекта', 'Подробное описание'];
-        const rows = all.map((e) => {
-            const dt = new Date(e.timestamp);
-            const date = dt.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
-            const time = dt.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-            const action = actionLabels[e.action] || e.action;
-            const entity = entityLabels[e.entityType] || e.entityType;
-            const baseDesc = actionDescriptions[e.action] || e.action;
-            const fullDesc = [
-                baseDesc,
-                e.entityName ? `Объект: «${e.entityName}»` : '',
-                e.details ? `Детали: ${e.details}` : ''
-            ].filter(Boolean).join('. ');
-            return [date, time, e.userEmail, e.userRole, action, entity, e.entityName || '', fullDesc]
-                .map((v) => `"${String(v).replace(/"/g, '""')}"`).join(';');
-        });
-        const csv = BOM + [headers.map((h) => `"${h}"`).join(';'), ...rows].join('\r\n');
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `audit_log_${new Date().toISOString().split('T')[0]}.csv`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-        addToast({ type: 'success', title: 'Экспорт в Excel', message: `Выгружено ${all.length} записей` });
     };
 
-    const handleClear = () => {
+    const handleExportExcel = async () => {
+        setIsLoading(true);
+        try {
+            const all = await auditLog.getEntries(200);
+            if (all.length === 0) {
+                addToast({ type: 'warning', title: 'Журнал пуст', message: 'Нет данных для экспорта' });
+                return;
+            }
+            const BOM = '\uFEFF';
+            const headers = ['Дата', 'Время', 'Пользователь', 'Роль', 'Действие', 'Тип объекта', 'Название объекта', 'Подробное описание'];
+            const rows = all.map((e) => {
+                const dt = new Date(e.timestamp);
+                const date = dt.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                const time = dt.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                const action = actionLabels[e.action] || e.action;
+                const entity = entityLabels[e.entityType] || e.entityType;
+                const baseDesc = actionDescriptions[e.action] || e.action;
+                const fullDesc = [
+                    baseDesc,
+                    e.entityName ? `Объект: «${e.entityName}»` : '',
+                    e.details ? `Детали: ${e.details}` : ''
+                ].filter(Boolean).join('. ');
+                return [date, time, e.userEmail, e.userRole, action, entity, e.entityName || '', fullDesc]
+                    .map((v) => `"${String(v).replace(/"/g, '""')}"`).join(';');
+            });
+            const csv = BOM + [headers.map((h) => `"${h}"`).join(';'), ...rows].join('\r\n');
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `audit_log_${new Date().toISOString().split('T')[0]}.csv`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            addToast({ type: 'success', title: 'Экспорт в Excel', message: `Выгружено ${all.length} записей` });
+        } catch {
+            addToast({ type: 'danger', title: 'Ошибка', message: 'Не удалось экспортировать журнал' });
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleClear = async () => {
         if (!window.confirm('Очистить весь журнал действий? Это действие необратимо.')) return;
-        auditLog.clear();
-        setEntries([]);
-        addToast({ type: 'success', title: 'Журнал очищен', message: 'Все записи удалены' });
+        setIsLoading(true);
+        try {
+            await auditLog.clear();
+            setEntries([]);
+            addToast({ type: 'success', title: 'Журнал очищен', message: 'Все записи удалены' });
+        } catch {
+            addToast({ type: 'danger', title: 'Ошибка', message: 'Не удалось очистить журнал' });
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -1319,31 +1757,40 @@ const AuditLogViewer: React.FC = () => {
             <div className="flex flex-wrap gap-2 mb-3">
                 <button
                     onClick={handleRefresh}
-                    className="px-3 py-1.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition flex items-center gap-1.5"
+                    disabled={isLoading}
+                    className="px-3 py-1.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition flex items-center gap-1.5 disabled:opacity-50"
                 >
-                    <Icon name="RefreshCw" size={12} /> Обновить
+                    <Icon name={isLoading ? 'Loader' : 'RefreshCw'} size={12} className={isLoading ? 'animate-spin' : ''} /> Обновить
                 </button>
                 <button
                     onClick={handleExportJson}
-                    className="px-3 py-1.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition flex items-center gap-1.5"
+                    disabled={isLoading}
+                    className="px-3 py-1.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-lg text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition flex items-center gap-1.5 disabled:opacity-50"
                 >
                     <Icon name="Download" size={12} /> Скачать JSON
                 </button>
                 <button
                     onClick={handleExportExcel}
-                    className="px-3 py-1.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded-lg text-xs font-bold hover:bg-emerald-200 dark:hover:bg-emerald-900/50 transition flex items-center gap-1.5"
+                    disabled={isLoading}
+                    className="px-3 py-1.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 rounded-lg text-xs font-bold hover:bg-emerald-200 dark:hover:bg-emerald-900/50 transition flex items-center gap-1.5 disabled:opacity-50"
                 >
                     <Icon name="FileSpreadsheet" size={12} /> Экспорт в Excel
                 </button>
                 <button
                     onClick={handleClear}
-                    className="px-3 py-1.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-lg text-xs font-bold hover:bg-red-200 dark:hover:bg-red-900/50 transition flex items-center gap-1.5 ml-auto"
+                    disabled={isLoading}
+                    className="px-3 py-1.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-lg text-xs font-bold hover:bg-red-200 dark:hover:bg-red-900/50 transition flex items-center gap-1.5 ml-auto disabled:opacity-50"
                 >
                     <Icon name="Trash2" size={12} /> Очистить журнал
                 </button>
             </div>
-            <div className="max-h-64 overflow-y-auto custom-scrollbar border border-slate-100 dark:border-slate-700 rounded-xl">
-                {entries.length === 0 ? (
+            <div className="max-h-64 overflow-y-auto custom-scrollbar border border-slate-100 dark:border-slate-700 rounded-xl relative">
+                {isLoading && entries.length === 0 ? (
+                    <div className="p-12 text-center text-sm text-slate-400 flex flex-col items-center justify-center">
+                        <Icon name="Loader" size={32} className="animate-spin text-indigo-600 mb-2" />
+                        Загрузка журнала...
+                    </div>
+                ) : entries.length === 0 ? (
                     <div className="p-6 text-center text-sm text-slate-400">
                         <Icon name="FileText" size={32} className="mx-auto mb-2 opacity-30" />
                         Журнал пуст

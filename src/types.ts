@@ -151,8 +151,8 @@ export interface Settings {
     secretaryName?: string; // "Е.К.Шунто"
     currentYear?: number; // 2026
     isScheduleLocked?: boolean; // Блокировка редактирования расписания
-    autoBackup?: boolean; // Автоматический бекап по расписанию
-    backupTime?: string; // Время бекапа в формате HH:MM
+    autoBackup?: boolean; // Автоматический бэкап по расписанию
+    backupTime?: string; // Время бэкапа в формате HH:MM
 }
 
 export interface PrivateSettings {
