@@ -267,11 +267,11 @@ export const Modal = ({ isOpen, onClose, title, children, maxWidth = 'max-w-lg' 
             aria-modal="true"
             aria-labelledby="modal-title"
             tabIndex={-1}
-            className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-fade-in no-print"
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/45 backdrop-blur-md p-4 animate-fade-in no-print"
             onClick={(e) => e.target === e.currentTarget && onClose()}
         >
             <div
-                className={`bg-white/90 dark:bg-dark-800/90 rounded-3xl shadow-2xl w-full ${maxWidth} flex flex-col max-h-[90vh] transition-colors duration-300`}
+                className={`bg-white/95 dark:bg-dark-800/95 backdrop-blur-xl border border-slate-200/50 dark:border-slate-700/50 rounded-3xl shadow-2xl shadow-slate-950/10 dark:shadow-black/50 w-full ${maxWidth} flex flex-col max-h-[90vh] transition-all duration-300 premium-glow-hover`}
             >
                 <div className="flex items-center justify-between px-6 py-5 border-b border-slate-200/50 dark:border-slate-700/50">
                     <h2 id="modal-title" className="text-xl font-bold text-slate-800 dark:text-white tracking-tight">{title}</h2>
@@ -376,7 +376,12 @@ export const Toast = ({ id, type, title, message, duration = 5000, onClose }: To
 
     return (
         <div className={`max-w-sm w-full animate-slide-in ${isExiting ? 'animate-fade-out' : ''}`}>
-            <div className={`modern-card border p-4 ${styles.bg}`}>
+            <div className={`modern-card border p-4 transition-all duration-300 ${styles.bg} ${
+                type === 'success' ? 'shadow-emerald-500/10 dark:shadow-emerald-500/20 hover:shadow-emerald-500/35 hover-glow-emerald border-emerald-200/60 dark:border-emerald-800/60' :
+                type === 'danger' ? 'shadow-red-500/10 dark:shadow-red-500/20 hover:shadow-red-500/35 hover-glow-red border-red-200/60 dark:border-red-800/60' :
+                type === 'warning' ? 'shadow-amber-500/10 dark:shadow-amber-500/20 hover:shadow-amber-500/35 hover-glow-amber border-amber-200/60 dark:border-amber-800/60' :
+                'shadow-indigo-500/10 dark:shadow-indigo-500/20 hover:shadow-indigo-500/35 hover-glow-indigo border-indigo-200/60 dark:border-indigo-800/60'
+            }`}>
                 <div className="flex items-start gap-3">
                     <div className={`flex-shrink-0 ${styles.icon}`}>
                         <Icon name={iconName} size={20} />
@@ -387,7 +392,7 @@ export const Toast = ({ id, type, title, message, duration = 5000, onClose }: To
                     </div>
                     <button
                         onClick={handleClose}
-                        className="flex-shrink-0 text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 transition-colors"
+                        className="flex-shrink-0 text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 transition-colors tactile-btn p-1 rounded-full hover:bg-black/5 dark:hover:bg-white/5"
                         aria-label="Закрыть уведомление"
                     >
                         <Icon name="X" size={16} />
@@ -468,7 +473,7 @@ export const ContextMenu = ({ x, y, onClose, actions }: ContextMenuProps) => {
         <div
             ref={ref}
             role="menu"
-            className="fixed z-[100] bg-white/90 dark:bg-slate-800/90 backdrop-blur-md shadow-xl rounded-2xl border border-slate-100 dark:border-slate-700 py-2 w-56 context-menu no-print"
+            className="fixed z-[100] bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl shadow-xl shadow-slate-900/10 dark:shadow-black/50 rounded-2xl border border-slate-200/60 dark:border-slate-700/60 py-2 w-56 context-menu no-print hover:border-indigo-500/30 dark:hover:border-indigo-400/30 transition-all duration-300 animate-slide-down"
             style={style}
         >
             {actions.map((action, index) => (
@@ -482,7 +487,7 @@ export const ContextMenu = ({ x, y, onClose, actions }: ContextMenuProps) => {
                         action.onClick();
                         onClose();
                     }}
-                    className={`w-full text-left px-4 py-2.5 text-sm font-bold flex items-center gap-3 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors ${action.color || 'text-slate-700 dark:text-slate-200'} ${index === activeIndex ? 'bg-slate-50 dark:bg-slate-700' : ''}`}
+                    className={`w-full text-left px-4 py-2.5 text-sm font-bold flex items-center gap-3 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all duration-150 tactile-btn ${action.color || 'text-slate-700 dark:text-slate-200'} ${index === activeIndex ? 'bg-slate-50 dark:bg-slate-700' : ''}`}
                 >
                     {action.icon && <Icon name={action.icon} size={16} />}
                     {action.label}
@@ -742,14 +747,14 @@ export const SearchableSelect = ({
                 aria-expanded={isOpen}
                 aria-haspopup="listbox"
                 onClick={() => setIsOpen(!isOpen)}
-                className="w-full border border-slate-200 dark:border-slate-600 rounded-xl p-3 text-sm bg-white dark:bg-slate-700 dark:text-white cursor-pointer flex justify-between items-center"
+                className="w-full border border-slate-200 dark:border-slate-600 rounded-xl p-3 text-sm bg-white/95 dark:bg-slate-700/90 dark:text-white cursor-pointer flex justify-between items-center transition-all duration-200 hover:border-indigo-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm"
             >
                 <span className={!value ? 'text-slate-400' : ''}>{selectedLabel}</span>
-                <Icon name="Filter" size={14} className="text-slate-400" />
+                <Icon name="Filter" size={14} className="text-slate-400 transition-transform duration-200" />
             </div>
             {isOpen && (
-                <div role="listbox" className="absolute z-50 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-600 rounded-xl shadow-xl max-h-96 overflow-auto custom-scrollbar">
-                    <div className="p-2 sticky top-0 bg-white dark:bg-slate-800 z-10">
+                <div role="listbox" className="absolute z-50 w-full mt-1 bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl border border-slate-200/50 dark:border-slate-700/50 rounded-xl shadow-xl shadow-slate-900/10 dark:shadow-black/40 max-h-96 overflow-auto custom-scrollbar transition-all duration-200 animate-slide-down">
+                    <div className="p-2 sticky top-0 bg-white dark:bg-slate-800 z-10 border-b border-slate-100 dark:border-slate-700/50">
                         <input
                             autoFocus
                             value={search}

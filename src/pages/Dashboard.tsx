@@ -106,6 +106,12 @@ const WeatherWidget = () => {
         return 'Cloud';
     };
 
+    const getWeatherIconClass = (code: string) => {
+        if (code.startsWith('01')) return 'animate-weather-sun';
+        if (code.startsWith('02') || code.startsWith('03') || code.startsWith('04')) return 'animate-weather-cloud';
+        return '';
+    };
+
     const bgGradient = (() => {
         const code = weatherData.weather[0].icon;
         if (code.endsWith('n')) return 'bg-gradient-to-br from-indigo-900 to-purple-900'; // Night
@@ -115,31 +121,128 @@ const WeatherWidget = () => {
         return 'bg-gradient-to-br from-blue-300 to-slate-400'; // Clouds/Mist
     })();
 
+    const renderLiveEffects = () => {
+        const code = weatherData.weather[0].icon;
+        
+        // Sunny / Clear
+        if (code.startsWith('01')) {
+            return (
+                <div className="absolute top-10 right-10 w-24 h-24 bg-yellow-400/20 dark:bg-yellow-300/15 rounded-full blur-xl animate-pulse pointer-events-none" />
+            );
+        }
+        
+        // Cloudy
+        if (code.startsWith('02') || code.startsWith('03') || code.startsWith('04')) {
+            return (
+                <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-20">
+                    <div className="absolute -left-10 top-2 w-20 h-10 bg-white rounded-full blur-sm cloud-layer-1" />
+                    <div className="absolute -left-20 top-12 w-28 h-12 bg-white rounded-full blur-sm cloud-layer-2" />
+                </div>
+            );
+        }
+        
+        // Rain
+        if (code.startsWith('09') || code.startsWith('10')) {
+            return (
+                <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                    {[...Array(6)].map((_, i) => (
+                        <div 
+                            key={i} 
+                            className="rain-streak" 
+                            style={{ 
+                                left: `${15 + i * 16}%`, 
+                                animationDelay: `${i * 0.18}s`,
+                                animationDuration: `${0.9 + i * 0.12}s` 
+                            }} 
+                        />
+                    ))}
+                </div>
+            );
+        }
+        
+        // Snow
+        if (code.startsWith('11')) {
+            return (
+                <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                    {[...Array(6)].map((_, i) => (
+                        <div 
+                            key={i} 
+                            className="snow-flake-particle" 
+                            style={{ 
+                                left: `${10 + i * 18}%`, 
+                                animationDelay: `${i * 0.3}s`,
+                                animationDuration: `${3.8 + i * 0.4}s` 
+                            }} 
+                        />
+                    ))}
+                </div>
+            );
+        }
+        
+        // Mist / Fog
+        if (code.startsWith('50')) {
+            return (
+                <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                    {[...Array(3)].map((_, i) => (
+                        <div 
+                            key={i} 
+                            className="mist-streak w-2/3" 
+                            style={{ 
+                                top: `${20 + i * 25}%`, 
+                                animationDelay: `${i * 1.5}s`,
+                                animationDuration: `${8 + i * 2}s` 
+                            }} 
+                        />
+                    ))}
+                </div>
+            );
+        }
+
+        return null;
+    };
+
     return (
         <div
-            className={`p-5 rounded-3xl relative overflow-hidden shadow-lg text-white ${bgGradient} flex flex-col justify-center h-full`}
+            className={`py-3.5 px-4 rounded-3xl relative overflow-hidden shadow-md text-white ${bgGradient} flex flex-col justify-between group hover:shadow-lg transition-all duration-300`}
         >
-            <div className="absolute -top-10 -right-10 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
+            <div className="absolute -top-10 -right-10 w-28 h-28 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
+            {renderLiveEffects()}
 
             <div className="relative z-10 flex justify-between items-center">
                 <div>
-                    <div className="text-3xl font-black">{Math.round(weatherData.main.temp)}°</div>
-                    <div className="text-xs opacity-90 font-medium">{weatherData.name}</div>
+                    <div className="text-2xl font-black tracking-tight">{Math.round(weatherData.main.temp)}°</div>
+                    <div className="text-[11px] opacity-90 font-semibold">{weatherData.name}</div>
                 </div>
                 <div className="flex flex-col items-end">
                     <Icon
                         name={getWeatherIcon(weatherData.weather[0].icon)}
-                        size={36}
-                        className="text-white/90 drop-shadow-md mb-1"
+                        size={28}
+                        className={`text-white/90 drop-shadow-md mb-0.5 transition-transform duration-300 group-hover:scale-110 ${getWeatherIconClass(weatherData.weather[0].icon)}`}
                     />
-                    <div className="text-[10px] opacity-75 capitalize">{weatherData.weather[0].description}</div>
+                    <div className="text-[8px] opacity-85 uppercase tracking-wider font-bold capitalize">{weatherData.weather[0].description}</div>
                 </div>
             </div>
 
-            <div className="mt-3 pt-2 border-t border-white/20 flex justify-between text-center relative z-10">
+            {/* Advanced Telemetry Grid */}
+            <div className="mt-2 grid grid-cols-3 gap-0.5 bg-white/10 dark:bg-black/10 backdrop-blur-md rounded-xl py-1.5 px-2 text-[8px] font-semibold text-center border border-white/10 relative z-10 transition-transform duration-300 hover:scale-[1.02]">
+                <div className="flex flex-col items-center gap-0.5">
+                    <span className="opacity-75 uppercase tracking-wider text-[7px]">Ощущ.</span>
+                    <span className="font-black text-white text-xs">{Math.round(weatherData.main.feels_like ?? weatherData.main.temp)}°</span>
+                </div>
+                <div className="flex flex-col items-center gap-0.5 border-x border-white/10">
+                    <span className="opacity-75 uppercase tracking-wider text-[7px]">Влажн.</span>
+                    <span className="font-black text-white text-xs">{weatherData.main.humidity ?? 0}%</span>
+                </div>
+                <div className="flex flex-col items-center gap-0.5">
+                    <span className="opacity-75 uppercase tracking-wider text-[7px]">Ветер</span>
+                    <span className="font-black text-white text-xs">{Math.round(weatherData.wind?.speed ?? 0)} м/с</span>
+                </div>
+            </div>
+
+            <div className="mt-2.5 pt-2 border-t border-white/15 flex justify-between text-center relative z-10">
                 {forecastData.slice(0, 3).map((day, idx) => (
                     <div key={idx} className="flex flex-col items-center">
-                        <span className="text-[9px] opacity-80 uppercase font-bold">
+                        <span className="text-[8px] opacity-80 uppercase font-bold">
                             {new Date(day.dt * 1000).toLocaleDateString('ru-RU', { weekday: 'short' })}
                         </span>
                         <span className="text-xs font-bold">{Math.round(day.main.temp)}°</span>
@@ -1298,8 +1401,10 @@ export const DashboardPage = () => {
 
                 {/* Weather Widget Dedicated Spot */}
                 {canShowWeather && (
-                    <div className="hidden lg:block h-full min-h-[160px]">
-                        <WeatherWidget />
+                    <div className="hidden lg:flex items-center justify-end">
+                        <div className="w-full max-w-[280px]">
+                            <WeatherWidget />
+                        </div>
                     </div>
                 )}
             </div>

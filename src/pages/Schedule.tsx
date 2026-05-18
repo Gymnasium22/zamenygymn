@@ -736,7 +736,7 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
                             onDragEnd={!readOnly ? handleDragEnd : undefined}
                             onClick={!readOnly ? () => handleEditItem(item) : undefined}
                             onContextMenu={!readOnly ? (e) => handleContextMenu(e, item, null) : undefined}
-                            className={`rounded-lg p-2 text-xs shadow-sm ${!readOnly ? 'hover:shadow-md cursor-grab active:cursor-grabbing' : ''} border flex flex-col gap-0.5 flex-1 relative group transition-transform ${conflicts.length > 0 ? 'border-red-300 bg-red-50 dark:bg-red-900/20 ring-1 ring-red-200' : 'border-slate-100 dark:border-slate-600'}`}
+                            className={`rounded-lg p-2 text-xs shadow-sm ${!readOnly ? 'hover:shadow-md cursor-grab active:cursor-grabbing' : ''} border flex flex-col gap-0.5 flex-1 relative group transition-all ${conflicts.length > 0 ? 'border-red-300 bg-red-50 dark:bg-red-900/20 ring-1 ring-red-200 conflict-glow-card' : 'border-slate-100 dark:border-slate-600'}`}
                             style={conflicts.length === 0 && subj?.color ? { backgroundColor: `${subj.color}40` } : {}}
                         >
                             <div className="flex justify-between items-center gap-1">
@@ -780,7 +780,7 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
                             {conflicts.length > 0 && (
                                 <button
                                     onClick={(e) => handleConflictClick(e, item)}
-                                    className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-bold shadow-sm hover:bg-red-600 hover:scale-110 transition-all z-10"
+                                    className="absolute -top-1.5 -right-1.5 bg-gradient-to-r from-red-500 to-rose-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] font-bold shadow-md shadow-red-500/25 hover:scale-110 active:scale-95 transition-all z-10 tactile-btn"
                                     title="Нажмите для деталей конфликта"
                                 >
                                     !

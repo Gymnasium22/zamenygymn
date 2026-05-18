@@ -149,15 +149,26 @@ const Layout = () => {
                                 to={item.to}
                                 onClick={() => setIsMobileMenuOpen(false)}
                                 className={({ isActive }) => `
-                                    group flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-semibold transition-all relative
+                                    group flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-semibold transition-all relative tactile-btn
                                     ${isActive
-                                        ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 shadow-sm'
-                                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/50 hover:text-slate-700 dark:hover:text-slate-300'
+                                        ? 'bg-indigo-50/80 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 shadow-sm border border-indigo-100/50 dark:border-indigo-900/30'
+                                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/30 hover:text-slate-700 dark:hover:text-slate-300 border border-transparent'
                                     }
                                 `}
                             >
-                                <Icon name={item.icon} size={18} className="flex-shrink-0" />
-                                <span className="flex-1 truncate">{item.label}</span>
+                                {({ isActive }) => (
+                                    <>
+                                        {isActive && (
+                                            <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-gradient-to-b from-indigo-500 to-purple-600 dark:from-indigo-400 dark:to-purple-500 rounded-r-full shadow shadow-indigo-500/50 sidebar-indicator" />
+                                        )}
+                                        <Icon 
+                                            name={item.icon} 
+                                            size={18} 
+                                            className={`flex-shrink-0 transition-transform duration-300 ${isActive ? 'scale-110 text-indigo-600 dark:text-indigo-400' : 'group-hover:scale-110 text-slate-500 dark:text-slate-400'}`} 
+                                        />
+                                        <span className="flex-1 truncate">{item.label}</span>
+                                    </>
+                                )}
                             </NavLink>
                         ))}
                     </nav>
