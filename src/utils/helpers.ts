@@ -57,8 +57,6 @@ export const formatDateISO = (date: Date = new Date()): string => {
     return `${year}-${month}-${day}`;
 };
 
-export const getLocalDateString = formatDateISO;
-
 /**
  * Форматирование даты в европейском формате DD.MM.YYYY
  */

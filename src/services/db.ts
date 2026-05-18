@@ -1,5 +1,6 @@
 import { AppData } from '../types';
 import { INITIAL_DATA } from '../constants';
+import { formatDateISO } from '../utils/helpers';
 import { firestoreDB, auth } from './firebase';
 import { collection, doc, setDoc, writeBatch, onSnapshot, getDocs, query, deleteDoc, getDoc } from 'firebase/firestore';
 import { User } from 'firebase/auth';
@@ -477,13 +478,7 @@ export const dbService = {
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        const getLocalDateString = (date: Date = new Date()): string => {
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
-            return `${year}-${month}-${day}`;
-        };
-        link.download = `gymnasium_backup_${getLocalDateString()}.json`;
+        link.download = `gymnasium_backup_${formatDateISO()}.json`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);

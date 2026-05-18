@@ -112,7 +112,7 @@ export const DirectoryPage = () => {
         e.preventDefault();
     };
 
-    const onDrop = async (e: React.DragEvent, index: number) => {
+    const onDrop = async (_e: React.DragEvent, index: number) => {
         if (draggedIdx === null || draggedIdx === index) return;
 
         const reorderWithUpdate = <T extends { order?: number }>(items: T[]) => {

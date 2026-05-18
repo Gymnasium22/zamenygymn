@@ -4,6 +4,24 @@
  */
 const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 
+/**
+ * Strip prototype-pollution keys from an object recursively.
+ */
+export function stripDangerousKeys(obj: unknown): unknown {
+    if (Array.isArray(obj)) {
+        return obj.map(stripDangerousKeys);
+    }
+    if (obj !== null && typeof obj === 'object') {
+        const result: Record<string, unknown> = {};
+        for (const key of Object.keys(obj)) {
+            if (DANGEROUS_KEYS.has(key)) continue;
+            result[key] = stripDangerousKeys((obj as Record<string, unknown>)[key]);
+        }
+        return result;
+    }
+    return obj;
+}
+
 export function safeMerge<T extends Record<string, unknown>>(target: T, source: Record<string, unknown>): T {
     const result: Record<string, unknown> = { ...target };
     for (const key of Object.keys(source)) {
@@ -25,20 +43,4 @@ export function safeMerge<T extends Record<string, unknown>>(target: T, source: 
     return result as T;
 }
 
-/**
- * Strip prototype-pollution keys from an object recursively.
- */
-export function stripDangerousKeys(obj: unknown): unknown {
-    if (Array.isArray(obj)) {
-        return obj.map(stripDangerousKeys);
-    }
-    if (obj !== null && typeof obj === 'object') {
-        const result: Record<string, unknown> = {};
-        for (const key of Object.keys(obj)) {
-            if (DANGEROUS_KEYS.has(key)) continue;
-            result[key] = stripDangerousKeys((obj as Record<string, unknown>)[key]);
-        }
-        return result;
-    }
-    return obj;
-}
+

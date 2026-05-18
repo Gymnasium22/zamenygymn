@@ -5,7 +5,7 @@ import { Icon } from '../components/Icons';
 import { DayOfWeek, DAYS, ScheduleItem, Shift } from '../types';
 import { useNavigate, NavLink } from 'react-router-dom';
 import { Modal, useToast } from '../components/UI';
-import { getActiveSemester, getLocalDateString } from '../utils/helpers';
+import { getActiveSemester, formatDateISO } from '../utils/helpers';
 import { weatherService, WeatherData, ForecastItem } from '../services/weatherService';
 import { escapeMarkdown } from '../utils/escapeHtml';
 import { safeLocalStorageGet, safeLocalStorageSet } from '../utils/localStorage';
@@ -380,11 +380,11 @@ export const DashboardPage = () => {
         return 'Добрый вечер';
     }, [currentDate]);
 
-    const todayStr = useMemo(() => getLocalDateString(currentDate), [currentDate]);
+    const todayStr = useMemo(() => formatDateISO(currentDate), [currentDate]);
     const tomorrowStr = useMemo(() => {
         const d = new Date(currentDate);
         d.setDate(d.getDate() + 1);
-        return getLocalDateString(d);
+        return formatDateISO(d);
     }, [currentDate]);
     const todayDayOfWeek = useMemo(() => {
         const idx = currentDate.getDay();
@@ -465,7 +465,7 @@ export const DashboardPage = () => {
 
         const getLessonStatus = (
             lesson: ScheduleItem | undefined,
-            teacherId: string,
+            _teacherId: string,
             isSubstitution: boolean
         ): { text: string; color: EntityStatus['statusColor']; room: string } => {
             if (!lesson) return { text: 'Свободен', color: 'blue', room: '' };
