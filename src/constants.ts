@@ -128,6 +128,7 @@ export const INITIAL_DATA: AppData = {
             canteen: ['weather', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes']
         },
         isScheduleLocked: false,
+        allowTeacherEdit: false,
         autoBackup: false,
         backupTime: '02:00'
     },

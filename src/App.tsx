@@ -440,5 +440,7 @@ export default function App() {
 
 const SchedulePageWrapper = ({ semester = 1 }: { semester?: 1 | 2 }) => {
     const { role } = useAuth();
-    return <SchedulePage readOnly={role !== 'admin'} semester={semester} />;
+    const { settings } = useStaticData();
+    const canEdit = role === 'admin' || (role === 'teacher' && settings?.allowTeacherEdit);
+    return <SchedulePage readOnly={!canEdit} semester={semester} />;
 };

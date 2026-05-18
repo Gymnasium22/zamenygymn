@@ -151,6 +151,7 @@ export interface Settings {
     secretaryName?: string; // "Е.К.Шунто"
     currentYear?: number; // 2026
     isScheduleLocked?: boolean; // Блокировка редактирования расписания
+    allowTeacherEdit?: boolean; // Разрешить учителям редактировать расписание
     autoBackup?: boolean; // Автоматический бэкап по расписанию
     backupTime?: string; // Время бэкапа в формате HH:MM
 }

@@ -385,6 +385,7 @@ export const SettingsPage = () => {
     }>({ firstSemesterMonths: [], secondSemesterMonths: [] });
     const [bellPresets, setBellPresets] = useState<BellPreset[]>([]);
     const [isScheduleLocked, setIsScheduleLocked] = useState(false);
+    const [allowTeacherEdit, setAllowTeacherEdit] = useState(false);
     const [autoBackup, setAutoBackup] = useState(false);
     const [backupTime, setBackupTime] = useState('02:00');
 
@@ -423,6 +424,7 @@ export const SettingsPage = () => {
         );
         setBellPresets(settings.bellPresets || []);
         setIsScheduleLocked(settings.isScheduleLocked || false);
+        setAllowTeacherEdit(settings.allowTeacherEdit || false);
         setAutoBackup(settings.autoBackup || false);
         setBackupTime(settings.backupTime || '02:00');
         setTemplates(
@@ -483,8 +485,9 @@ export const SettingsPage = () => {
             JSON.stringify([...semesterConfig.secondSemesterMonths].sort()) !==
                 JSON.stringify([...origSem.secondSemesterMonths].sort());
         const lockChanged = (settings.isScheduleLocked || false) !== isScheduleLocked;
-        return semChanged || lockChanged;
-    }, [semesterConfig, settings, isScheduleLocked]);
+        const teacherEditChanged = (settings.allowTeacherEdit || false) !== allowTeacherEdit;
+        return semChanged || lockChanged || teacherEditChanged;
+    }, [semesterConfig, settings, isScheduleLocked, allowTeacherEdit]);
 
     const notificationsDirty = useMemo(() => {
         if (!settings) return false;
@@ -563,7 +566,8 @@ export const SettingsPage = () => {
                 settings: {
                     ...settings,
                     semesterConfig,
-                    isScheduleLocked
+                    isScheduleLocked,
+                    allowTeacherEdit
                 }
             });
             addToast({ type: 'success', title: 'Сохранено', message: 'Настройки расписания обновлены' });
@@ -572,7 +576,7 @@ export const SettingsPage = () => {
         } finally {
             setIsSavingSection(null);
         }
-    }, [settings, semesterConfig, isScheduleLocked, saveStaticData, addToast]);
+    }, [settings, semesterConfig, isScheduleLocked, allowTeacherEdit, saveStaticData, addToast]);
 
     const saveNotifications = useCallback(async () => {
         setIsSavingSection('notifications');
@@ -1070,6 +1074,29 @@ export const SettingsPage = () => {
                                             </div>
                                             <div className="text-xs text-slate-400">
                                                 При включении никто не сможет менять уроки, пока админ не разблокирует
+                                            </div>
+                                        </div>
+                                    </label>
+
+                                    <label className="flex items-center gap-3 cursor-pointer group mt-4">
+                                        <div
+                                            className={`relative w-11 h-6 rounded-full transition-colors ${
+                                                allowTeacherEdit ? 'bg-indigo-600' : 'bg-slate-200 dark:bg-slate-600'
+                                            }`}
+                                            onClick={() => setAllowTeacherEdit(!allowTeacherEdit)}
+                                        >
+                                            <div
+                                                className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                                                    allowTeacherEdit ? 'translate-x-5' : 'translate-x-0'
+                                                }`}
+                                            />
+                                        </div>
+                                        <div>
+                                            <div className="text-sm font-bold text-slate-700 dark:text-slate-300">
+                                                Разрешить учителям редактировать расписание
+                                            </div>
+                                            <div className="text-xs text-slate-400">
+                                                Учитель сможет самостоятельно вносить изменения в расписание уроков
                                             </div>
                                         </div>
                                     </label>
