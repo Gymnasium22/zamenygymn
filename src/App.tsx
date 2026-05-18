@@ -25,9 +25,6 @@ import { AppData } from './types';
 import { INITIAL_DATA, getInitialData } from './constants';
 import { useAutoBackup } from './hooks/useAutoBackup';
 import { safeLocalStorageGet, safeLocalStorageSet } from './utils/localStorage';
-import { useTelegram } from './context/TelegramContext';
-import { TelegramLayout } from './components/telegram/TelegramLayout';
-import { TelegramAuthGuard } from './components/telegram/TelegramAuthGuard';
 
 const ProtectedRoute = ({ children, allowedRoles }: React.PropsWithChildren<{ allowedRoles?: string[] }>) => {
     const { role, loading } = useAuth();
@@ -318,142 +315,6 @@ const PublicLayout = () => {
     );
 };
 
-const AppRoutes = () => {
-    const { isMiniApp } = useTelegram();
-
-    return (
-        <HashRouter>
-            <React.Suspense fallback={<div className="h-screen flex items-center justify-center bg-slate-50 dark:bg-dark-950"><Icon name="Loader" className="animate-spin text-indigo-600" size={48} /></div>}>
-                <Routes>
-                    {/* Telegram Mini App имеет свою авторизацию — не нужен /login */}
-                    {!isMiniApp && <Route path="/login" element={<LoginPage />} />}
-                    <Route
-                        path="/"
-                        element={
-                            isMiniApp ? (
-                                <TelegramAuthGuard>
-                                    <TelegramLayout />
-                                </TelegramAuthGuard>
-                            ) : (
-                                <ProtectedRoute>
-                                    <Layout />
-                                </ProtectedRoute>
-                            )
-                        }
-                    >
-                        <Route index element={isMiniApp ? <Navigate to="/schedule" replace /> : <HomeRedirect />} />
-                        {!isMiniApp && (
-                            <Route
-                                path="dashboard"
-                                element={
-                                    <ProtectedRoute allowedRoles={['admin', 'teacher', 'canteen']}>
-                                        <DashboardPage />
-                                    </ProtectedRoute>
-                                }
-                            />
-                        )}
-                        <Route path="schedule" element={<SchedulePageWrapper semester={1} />} />
-                        <Route path="schedule2" element={<SchedulePageWrapper semester={2} />} />
-                        {!isMiniApp && (
-                            <>
-                                <Route
-                                    path="substitutions"
-                                    element={
-                                        <ProtectedRoute allowedRoles={['admin']}>
-                                            <SubstitutionsPage />
-                                        </ProtectedRoute>
-                                    }
-                                />
-                                <Route
-                                    path="duty"
-                                    element={
-                                        <ProtectedRoute allowedRoles={['admin']}>
-                                            <DutyPage />
-                                        </ProtectedRoute>
-                                    }
-                                />
-                            </>
-                        )}
-                        <Route
-                            path="nutrition"
-                            element={
-                                <ProtectedRoute allowedRoles={['admin', 'teacher', 'canteen']}>
-                                    <NutritionPage />
-                                </ProtectedRoute>
-                            }
-                        />
-                        {!isMiniApp && (
-                            <>
-                                <Route
-                                    path="absenteeism"
-                                    element={
-                                        <ProtectedRoute allowedRoles={['admin', 'teacher']}>
-                                            <AbsenteeismPage />
-                                        </ProtectedRoute>
-                                    }
-                                />
-                                <Route
-                                    path="directory"
-                                    element={
-                                        <ProtectedRoute allowedRoles={['admin']}>
-                                            <DirectoryPage />
-                                        </ProtectedRoute>
-                                    }
-                                />
-                            </>
-                        )}
-                        <Route
-                            path="bells"
-                            element={
-                                <ProtectedRoute allowedRoles={['admin']}>
-                                    <BellsPage />
-                                </ProtectedRoute>
-                            }
-                        />
-                        {!isMiniApp && (
-                            <>
-                                <Route
-                                    path="admin"
-                                    element={
-                                        <ProtectedRoute allowedRoles={['admin']}>
-                                            <AdminPage />
-                                        </ProtectedRoute>
-                                    }
-                                />
-                                <Route
-                                    path="reports"
-                                    element={
-                                        <ProtectedRoute allowedRoles={['admin']}>
-                                            <ReportsPage />
-                                        </ProtectedRoute>
-                                    }
-                                />
-                                <Route
-                                    path="export"
-                                    element={
-                                        <ProtectedRoute allowedRoles={['admin']}>
-                                            <ExportPage />
-                                        </ProtectedRoute>
-                                    }
-                                />
-                                <Route
-                                    path="settings"
-                                    element={
-                                        <ProtectedRoute allowedRoles={['admin']}>
-                                            <SettingsPage />
-                                        </ProtectedRoute>
-                                    }
-                                />
-                            </>
-                        )}
-                    </Route>
-                    <Route path="/public" element={<PublicLayout />} />
-                </Routes>
-            </React.Suspense>
-        </HashRouter>
-    );
-};
-
 export default function App() {
     return (
         <ToastProvider>
@@ -461,7 +322,114 @@ export default function App() {
                 <DataProvider>
                     <StaticDataProvider>
                         <ScheduleDataProvider>
-                            <AppRoutes />
+                            <HashRouter>
+                                <React.Suspense fallback={<div className="h-screen flex items-center justify-center bg-slate-50 dark:bg-dark-950"><Icon name="Loader" className="animate-spin text-indigo-600" size={48} /></div>}>
+                                    <Routes>
+                                        <Route path="/login" element={<LoginPage />} />
+                                        <Route
+                                            path="/"
+                                            element={
+                                                <ProtectedRoute>
+                                                    <Layout />
+                                                </ProtectedRoute>
+                                            }
+                                        >
+                                            <Route index element={<HomeRedirect />} />
+                                            <Route
+                                                path="dashboard"
+                                                element={
+                                                    <ProtectedRoute allowedRoles={['admin', 'teacher', 'canteen']}>
+                                                        <DashboardPage />
+                                                    </ProtectedRoute>
+                                                }
+                                            />
+                                            <Route path="schedule" element={<SchedulePageWrapper semester={1} />} />
+                                            <Route path="schedule2" element={<SchedulePageWrapper semester={2} />} />
+                                            <Route
+                                                path="substitutions"
+                                                element={
+                                                    <ProtectedRoute allowedRoles={['admin']}>
+                                                        <SubstitutionsPage />
+                                                    </ProtectedRoute>
+                                                }
+                                            />
+                                            <Route
+                                                path="duty"
+                                                element={
+                                                    <ProtectedRoute allowedRoles={['admin']}>
+                                                        <DutyPage />
+                                                    </ProtectedRoute>
+                                                }
+                                            />
+                                            <Route
+                                                path="nutrition"
+                                                element={
+                                                    <ProtectedRoute allowedRoles={['admin', 'teacher', 'canteen']}>
+                                                        <NutritionPage />
+                                                    </ProtectedRoute>
+                                                }
+                                            />
+                                            <Route
+                                                path="absenteeism"
+                                                element={
+                                                    <ProtectedRoute allowedRoles={['admin', 'teacher']}>
+                                                        <AbsenteeismPage />
+                                                    </ProtectedRoute>
+                                                }
+                                            />
+                                            <Route
+                                                path="directory"
+                                                element={
+                                                    <ProtectedRoute allowedRoles={['admin']}>
+                                                        <DirectoryPage />
+                                                    </ProtectedRoute>
+                                                }
+                                            />
+                                            <Route
+                                                path="bells"
+                                                element={
+                                                    <ProtectedRoute allowedRoles={['admin']}>
+                                                        <BellsPage />
+                                                    </ProtectedRoute>
+                                                }
+                                            />
+                                            <Route
+                                                path="admin"
+                                                element={
+                                                    <ProtectedRoute allowedRoles={['admin']}>
+                                                        <AdminPage />
+                                                    </ProtectedRoute>
+                                                }
+                                            />
+                                            <Route
+                                                path="reports"
+                                                element={
+                                                    <ProtectedRoute allowedRoles={['admin']}>
+                                                        <ReportsPage />
+                                                    </ProtectedRoute>
+                                                }
+                                            />
+                                            <Route
+                                                path="export"
+                                                element={
+                                                    <ProtectedRoute allowedRoles={['admin']}>
+                                                        <ExportPage />
+                                                    </ProtectedRoute>
+                                                }
+                                            />
+                                            <Route
+                                                path="settings"
+                                                element={
+                                                    <ProtectedRoute allowedRoles={['admin']}>
+                                                        <SettingsPage />
+                                                    </ProtectedRoute>
+                                                }
+                                            />
+                                        </Route>
+                                        <Route path="/public" element={<PublicLayout />} />
+                                    </Routes>
+                                </React.Suspense>
+                            </HashRouter>
                         </ScheduleDataProvider>
                     </StaticDataProvider>
                 </DataProvider>
