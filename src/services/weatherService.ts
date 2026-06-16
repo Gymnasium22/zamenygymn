@@ -97,6 +97,10 @@ class WeatherService {
 
             return response;
         } catch (err) {
+            // AbortController при размонтировании (React Strict Mode) — не ошибка
+            if ((err as Error)?.name === 'AbortError') {
+                throw err;
+            }
             console.error(err);
             throw err;
         }

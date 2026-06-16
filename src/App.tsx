@@ -322,7 +322,12 @@ export default function App() {
                 <DataProvider>
                     <StaticDataProvider>
                         <ScheduleDataProvider>
-                            <HashRouter>
+                            <HashRouter
+                                future={{
+                                    v7_startTransition: true,
+                                    v7_relativeSplatPath: true
+                                }}
+                            >
                                 <React.Suspense fallback={<div className="h-screen flex items-center justify-center bg-slate-50 dark:bg-dark-950"><Icon name="Loader" className="animate-spin text-indigo-600" size={48} /></div>}>
                                     <Routes>
                                         <Route path="/login" element={<LoginPage />} />

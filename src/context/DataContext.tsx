@@ -626,10 +626,10 @@ export const ScheduleDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
     // Определяем текущий семестр на основе унифицированной функции
     const now = new Date();
     const currentSemester = getActiveSemester(now, data.settings);
-    const activeSchedule = useMemo(
-        () => (currentSemester === 2 ? data.schedule2 || [] : data.schedule || []),
-        [currentSemester, data.schedule, data.schedule2]
-    );
+    const activeSchedule = useMemo(() => {
+        if (currentSemester === null) return [];
+        return currentSemester === 2 ? data.schedule2 || [] : data.schedule || [];
+    }, [currentSemester, data.schedule, data.schedule2]);
 
     const saveSemesterSchedule = useCallback(
         async (semester: 1 | 2, newData: ScheduleItem[]) => {

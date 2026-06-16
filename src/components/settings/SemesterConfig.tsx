@@ -69,19 +69,25 @@ export const SemesterConfig: React.FC<SemesterConfigProps> = ({
         };
     }, [firstSemesterMonths, secondSemesterMonths]);
 
+    const vacationMonths = useMemo(() => {
+        return Array.from({ length: 12 }, (_, i) => i).filter(
+            (m) => !firstSemesterMonths.includes(m) && !secondSemesterMonths.includes(m)
+        );
+    }, [firstSemesterMonths, secondSemesterMonths]);
+
     return (
         <div className="space-y-4">
             <div className="flex flex-wrap gap-2">
                 {MONTHS.map((name, idx) => {
                     const status = getMonthStatus(idx);
                     const base =
-                        'px-3 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer select-none';
+                        'px-3 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer select-none relative group';
                     const activeFirst =
                         'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border-indigo-300 dark:border-indigo-700 shadow-sm';
                     const activeSecond =
                         'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700 shadow-sm';
                     const inactive =
-                        'bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600';
+                        'bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800 hover:border-amber-400 dark:hover:border-amber-600';
 
                     return (
                         <button
@@ -105,6 +111,11 @@ export const SemesterConfig: React.FC<SemesterConfigProps> = ({
                             }`}
                         >
                             {name}
+                            {status === 'none' && (
+                                <span className="absolute -top-2 -right-1 text-[8px] font-black bg-amber-400 dark:bg-amber-600 text-white px-1 rounded-full leading-4">
+                                    К
+                                </span>
+                            )}
                         </button>
                     );
                 })}
@@ -125,17 +136,17 @@ export const SemesterConfig: React.FC<SemesterConfigProps> = ({
                 </div>
                 {stats.none > 0 && (
                     <div className="flex items-center gap-1.5">
-                        <span className="w-3 h-3 rounded bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700" />
-                        <span className="text-slate-600 dark:text-slate-400">
-                            Не выбрано ({stats.none})
+                        <span className="w-3 h-3 rounded bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800" />
+                        <span className="text-amber-600 dark:text-amber-400 font-semibold">
+                            Каникулы ({stats.none}): {vacationMonths.map(m => MONTHS[m]).join(', ')}
                         </span>
                     </div>
                 )}
             </div>
 
             <p className="text-[11px] text-slate-400 dark:text-slate-500">
-                ЛКМ — переключить семестр, ПКМ — сменить семестр/сбросить. Месяцы без семестра
-                исключаются из расчёта активного расписания.
+                ЛКМ — переключить семестр, ПКМ — сменить семестр/сбросить. Месяцы <span className="font-bold text-amber-500">«К»</span> — каникулярные,
+                расписание уроков в эти месяцы неактивно.
             </p>
         </div>
     );

@@ -399,6 +399,10 @@ export const DashboardPage = () => {
     // 1. Determine current school state
     const schoolStatus = useMemo(() => {
         const now = new Date();
+        if (getActiveSemester(now, settings) === null) {
+            return { type: 'vacation', label: 'Каникулы' };
+        }
+
         const minutesNow = now.getHours() * 60 + now.getMinutes();
         const dayMap = [
             null,
@@ -449,7 +453,7 @@ export const DashboardPage = () => {
         }
 
         return { type: 'unknown', label: 'Нет расписания звонков' };
-    }, [bellSchedule]);
+    }, [bellSchedule, settings]);
 
     // 2. Perform Live Search
     useEffect(() => {
@@ -736,14 +740,15 @@ export const DashboardPage = () => {
     // --- KPI Metrics --- (must be after occupancyStats)
     const kpiData = useMemo(() => {
         const todayLessons = todayDayOfWeek ? (schedule || []).filter((s) => s.day === todayDayOfWeek).length : 0;
+        const validRoomIds = new Set(rooms.map((r) => r.id));
         const occupiedRooms = new Set(
             (schedule || [])
-                .filter((s) => s.day === todayDayOfWeek)
+                .filter((s) => s.day === todayDayOfWeek && s.roomId && validRoomIds.has(s.roomId))
                 .map((s) => s.roomId)
-                .filter(Boolean)
         ).size;
-        const totalRooms = Math.max(1, rooms.length);
-        const roomUtilization = Math.round((occupiedRooms / totalRooms) * 100);
+        const totalRooms = rooms.length;
+        const roomUtilization =
+            totalRooms > 0 ? Math.min(100, Math.round((occupiedRooms / totalRooms) * 100)) : 0;
         const substitutionsTomorrow = (substitutions || []).filter((s) => s.date === tomorrowStr).length;
         return {
             absentTeachers: occupancyStats.absentCount,
@@ -754,7 +759,7 @@ export const DashboardPage = () => {
             occupiedRooms,
             totalRooms
         };
-    }, [schedule, todayDayOfWeek, rooms.length, substitutions, tomorrowStr, occupancyStats]);
+    }, [schedule, todayDayOfWeek, rooms, substitutions, tomorrowStr, occupancyStats]);
 
     const problemZones = useMemo(() => {
         const nextDay = new Date(currentDate);
@@ -873,15 +878,19 @@ export const DashboardPage = () => {
     };
 
     const handleWidgetResize = (id: string) => {
-        setWidgets((prev) => prev.map(w => {
-            if (w.id === id) {
-                const currentSpan = w.colSpan || 1;
-                // Cycle through 1, 2, 3, 4
-                const nextSpan = currentSpan >= 4 ? 1 : currentSpan + 1;
-                return { ...w, colSpan: nextSpan };
-            }
-            return w;
-        }));
+        setWidgets((prev) => {
+            const newWidgets = prev.map(w => {
+                if (w.id === id) {
+                    const currentSpan = w.colSpan || 1;
+                    // Cycle through 1, 2, 3, 4
+                    const nextSpan = currentSpan >= 4 ? 1 : currentSpan + 1;
+                    return { ...w, colSpan: nextSpan };
+                }
+                return w;
+            });
+            safeLocalStorageSet('gym_dashboard_widgets_v4', JSON.stringify(newWidgets));
+            return newWidgets;
+        });
     };
 
     const getColSpanClass = (span: number = 1) => {
@@ -940,7 +949,7 @@ export const DashboardPage = () => {
                                         key={`${item.type}-${item.id}`}
                                         className="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-slate-700/50 border border-slate-100 dark:border-slate-600 hover:border-indigo-300 dark:hover:border-indigo-500 transition-colors cursor-pointer"
                                         onClick={() => {
-                                            const currentSemester = getActiveSemester(new Date(), settings);
+                                            const currentSemester = getActiveSemester(new Date(), settings) ?? 1;
                                             const targetPath = currentSemester === 2 ? '/schedule2' : '/schedule';
                                             const dayParam = todayDayOfWeek ? `&day=${todayDayOfWeek}` : '';
 
@@ -1109,35 +1118,14 @@ export const DashboardPage = () => {
                             </div>
                         ) : (
                             <div className="flex items-center justify-between flex-1 animate-fade-in px-2">
-                                <div className="relative w-28 h-28">
-                                    <svg
-                                        viewBox="0 0 36 36"
-                                        className="w-full h-full transform -rotate-90 drop-shadow-md"
-                                    >
-                                        <path
-                                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                                            fill="none"
-                                            stroke="#e2e8f0"
-                                            strokeWidth="3"
-                                            className="dark:stroke-slate-700"
-                                            strokeLinecap="round"
-                                        />
-                                        <path
-                                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                                            fill="none"
-                                            stroke="url(#gradient)"
-                                            strokeWidth="3"
-                                            strokeDasharray={`${occupancyStats.presentPercent}, 100`}
-                                            strokeLinecap="round"
-                                        />
-                                        <defs>
-                                            <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                                                <stop offset="0%" stopColor="#3b82f6" />
-                                                <stop offset="100%" stopColor="#06b6d4" />
-                                            </linearGradient>
-                                        </defs>
-                                    </svg>
-                                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                <div className="relative w-28 h-28 flex items-center justify-center drop-shadow-md">
+                                    <div
+                                        className="absolute inset-0 rounded-full"
+                                        style={{
+                                            background: `conic-gradient(#3b82f6 ${occupancyStats.presentPercent * 3.6}deg, #e2e8f0 0deg)`
+                                        }}
+                                    />
+                                    <div className="absolute inset-[10px] bg-white dark:bg-slate-800 rounded-full flex flex-col items-center justify-center">
                                         <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
                                             На месте
                                         </span>
@@ -1244,7 +1232,15 @@ export const DashboardPage = () => {
                             <h3 className="font-bold text-lg dark:text-white">Возможные конфликты</h3>
                         </div>
                         <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar pr-2">
-                            {problemZones.length ? (
+                            {schoolStatus.type === 'vacation' ? (
+                                <div className="p-4 text-center">
+                                    <div className="w-10 h-10 rounded-2xl bg-violet-100 dark:bg-violet-900/30 text-violet-500 flex items-center justify-center mx-auto mb-2">
+                                        <Icon name="Sun" size={20} />
+                                    </div>
+                                    <p className="text-sm font-bold text-violet-600 dark:text-violet-400">Каникулы</p>
+                                    <p className="text-xs text-slate-400 mt-1">Расписание неактивно — конфликты не проверяются</p>
+                                </div>
+                            ) : problemZones.length ? (
                                 problemZones.map((p) => (
                                     <div
                                         key={`${p.class}-${p.issue}`}
@@ -1408,6 +1404,26 @@ export const DashboardPage = () => {
                     </div>
                 )}
             </div>
+
+            {/* Vacation Banner */}
+            {schoolStatus.type === 'vacation' && (
+                <div className="bg-gradient-to-r from-violet-500/10 via-indigo-500/10 to-sky-500/10 dark:from-violet-900/30 dark:via-indigo-900/30 dark:to-sky-900/30 border border-indigo-200 dark:border-indigo-800 rounded-2xl p-5 animate-fade-in flex items-center gap-5">
+                    <div className="w-12 h-12 shrink-0 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/30">
+                        <Icon name="Sun" size={24} />
+                    </div>
+                    <div className="flex-1">
+                        <h3 className="font-bold text-lg text-indigo-800 dark:text-indigo-200">🏖️ Сейчас каникулы</h3>
+                        <p className="text-sm text-indigo-600/80 dark:text-indigo-300/80 mt-0.5">
+                            Текущий месяц не относится ни к одному семестру — расписание уроков неактивно.
+                            Конфигурацию семестров можно изменить в{' '}
+                            <a href="#/settings" className="font-bold underline underline-offset-2 hover:text-indigo-800 dark:hover:text-indigo-100 transition-colors">
+                                Настройках → Расписание
+                            </a>
+                            .
+                        </p>
+                    </div>
+                </div>
+            )}
 
             {/* Soft Notifications */}
             {role === 'admin' && unresolvedSubstitutions > 0 && (

@@ -7,6 +7,11 @@ import { collection, addDoc, getDocs, query, orderBy, limit as firestoreLimit, w
 const STORAGE_KEY = 'gym_audit_log';
 const MAX_ENTRIES = 200;
 
+const isPermissionDenied = (error: unknown): boolean => {
+    const code = (error as { code?: string })?.code;
+    return code === 'permission-denied' || code === 'PERMISSION_DENIED';
+};
+
 class AuditLogService {
     private readEntries(): AuditLogEntry[] {
         try {
@@ -55,7 +60,9 @@ class AuditLogService {
                 const docRef = collection(firestoreDB, 'audit_log');
                 await addDoc(docRef, entry);
             } catch (e) {
-                console.warn('Failed to write audit log to Firestore:', e);
+                if (!isPermissionDenied(e)) {
+                    console.warn('Failed to write audit log to Firestore:', e);
+                }
             }
         }
     }
@@ -88,7 +95,9 @@ class AuditLogService {
                     return dbEntries;
                 }
             } catch (e) {
-                console.warn('Failed to fetch audit log from Firestore, falling back to local storage:', e);
+                if (!isPermissionDenied(e)) {
+                    console.warn('Failed to fetch audit log from Firestore, falling back to local storage:', e);
+                }
             }
         }
         return this.readEntries().slice(-limit).reverse();
@@ -106,7 +115,9 @@ class AuditLogService {
                 });
                 await batch.commit();
             } catch (e) {
-                console.warn('Failed to clear Firestore audit log:', e);
+                if (!isPermissionDenied(e)) {
+                    console.warn('Failed to clear Firestore audit log:', e);
+                }
             }
         }
     }

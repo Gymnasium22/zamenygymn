@@ -5,7 +5,7 @@ import { Icon } from '../components/Icons';
 import { DateInput } from '../components/DateInput';
 import { Modal, useToast } from '../components/UI';
 import { DAYS, ScheduleItem, ClassEntity, Substitution, SubstitutionParams } from '../types';
-import { formatDateISO, formatDateEuropean, getScheduleForDate, generateId } from '../utils/helpers';
+import { formatDateISO, formatDateEuropean, getScheduleForDate, generateId, getActiveSemester } from '../utils/helpers';
 import { escapeMarkdown } from '../utils/escapeHtml';
 import useMedia from 'use-media';
 
@@ -108,6 +108,10 @@ export const SubstitutionsPage = () => {
 
         return getScheduleForDate(new Date(selectedDate), mockData);
     }, [selectedDate, schedule1, schedule2, settings]);
+
+    const isVacationDate = useMemo(() => {
+        return getActiveSemester(new Date(selectedDate), settings) === null;
+    }, [selectedDate, settings]);
 
     useEffect(() => {
         if (location.state?.subParams) {
@@ -1199,6 +1203,23 @@ export const SubstitutionsPage = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Vacation Banner */}
+            {isVacationDate && (
+                <div className="bg-gradient-to-r from-violet-500/10 via-amber-500/5 to-sky-500/10 dark:from-violet-900/30 dark:via-amber-900/10 dark:to-sky-900/30 border border-violet-200 dark:border-violet-800 rounded-2xl p-4 flex items-center gap-4 animate-fade-in">
+                    <div className="w-10 h-10 shrink-0 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-500/20">
+                        <Icon name="Sun" size={20} />
+                    </div>
+                    <div className="flex-1">
+                        <p className="font-bold text-violet-800 dark:text-violet-200 text-sm">
+                            🏖️ Выбранная дата приходится на период каникул
+                        </p>
+                        <p className="text-xs text-violet-600/80 dark:text-violet-300/80 mt-0.5">
+                            Расписание уроков за этот месяц неактивно. Замены можно создавать вручную, но уроки из расписания не будут подтягиваться автоматически.
+                        </p>
+                    </div>
+                </div>
+            )}
 
             {/* Mobile Tabs Switcher */}
             <div className="md:hidden flex bg-white dark:bg-dark-800 p-1 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 shrink-0">

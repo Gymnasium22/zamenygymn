@@ -17,19 +17,26 @@ export const generateId = (): string => {
 };
 
 /**
- * Определяет текущий семестр на основе даты и конфигурации
+ * Определяет текущий семестр на основе даты и конфигурации.
+ * null — месяц не назначен ни одному семестру (каникулы).
  */
-export const getActiveSemester = (date: Date, settings?: AppData['settings']): 1 | 2 => {
+export const getActiveSemester = (date: Date, settings?: AppData['settings']): 1 | 2 | null => {
     const currentMonth = date.getMonth();
     const semesterConfig = settings?.semesterConfig;
 
-    if (semesterConfig) {
+    if (semesterConfig && Array.isArray(semesterConfig.secondSemesterMonths) && Array.isArray(semesterConfig.firstSemesterMonths)) {
         if (semesterConfig.secondSemesterMonths.includes(currentMonth)) return 2;
         if (semesterConfig.firstSemesterMonths.includes(currentMonth)) return 1;
+        return null;
     }
 
-    // По умолчанию: Январь (0) - Май (4) = 2 семестр, остальное = 1 семестр
-    return currentMonth >= 0 && currentMonth <= 4 ? 2 : 1;
+    // Без конфигурации:
+    // Январь (0) - Май (4) = 2 семестр
+    // Сентябрь (8) - Декабрь (11) = 1 семестр
+    // Июнь (5) - Август (7) = каникулы (null)
+    if (currentMonth >= 0 && currentMonth <= 4) return 2;
+    if (currentMonth >= 8 && currentMonth <= 11) return 1;
+    return null;
 };
 
 /**
@@ -44,6 +51,7 @@ export const getScheduleForDate = (
     }
 ): ScheduleItem[] => {
     const semester = getActiveSemester(date, data.settings);
+    if (semester === null) return [];
     return semester === 2 ? data.schedule2 || [] : data.schedule || [];
 };
 

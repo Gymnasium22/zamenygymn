@@ -234,7 +234,7 @@ export const ExportPage = () => {
 
     // Выбор полугодия для ручного экспорта (по умолчанию текущее)
     const [exportSemester, setExportSemester] = useState<1 | 2>(() => {
-        return getActiveSemester(new Date(), settings);
+        return getActiveSemester(new Date(), settings) ?? 2;
     });
 
     const [isGenerating, setIsGenerating] = useState(false);

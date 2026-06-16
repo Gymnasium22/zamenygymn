@@ -58,6 +58,12 @@ service cloud.firestore {
       allow write: if request.auth != null && request.auth.token.email == "admin@gymnasium22.com";
     }
 
+    // Журнал аудита — только администратор
+    match /audit_log/{document} {
+      allow read, create: if request.auth != null && request.auth.token.email == "admin@gymnasium22.com";
+      allow update, delete: if request.auth != null && request.auth.token.email == "admin@gymnasium22.com";
+    }
+
     // Пропуски (absenteeism_records) - админ и учителя
     match /absenteeism_records/{document} {
       allow read: if request.auth != null && (request.auth.token.email == "admin@gymnasium22.com" || request.auth.token.email == "teacher@gymnasium22.com");

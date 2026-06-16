@@ -530,7 +530,7 @@ export const ContextMenu = ({ x, y, onClose, actions }: ContextMenuProps) => {
 };
 
 export const StatusWidget = () => {
-    const { bellSchedule, isSaving } = useStaticData();
+    const { bellSchedule, settings, isSaving } = useStaticData();
     const [status, setStatus] = useState('Загрузка...');
     const [details, setDetails] = useState('');
     const [progress, setProgress] = useState(0);
@@ -567,6 +567,15 @@ export const StatusWidget = () => {
             ];
             const todayName = dayMap[dayIndex];
             setCurrentDayName(todayName || 'Выходной');
+
+            // Проверяем каникулы — если месяц не принадлежит ни одному семестру
+            if (getActiveSemester(now, settings) === null) {
+                setStatus('Каникулы');
+                setDetails('Расписание неактивно');
+                setColor('bg-violet-500');
+                setProgress(0);
+                return;
+            }
 
             if (!todayName) {
                 setStatus('Сегодня выходной');
@@ -643,7 +652,7 @@ export const StatusWidget = () => {
         updateStatus();
         const interval = setInterval(updateStatus, 60000);
         return () => clearInterval(interval);
-    }, [bellSchedule]);
+    }, [bellSchedule, settings]);
 
     return (
         <div className="mx-4 mt-auto mb-20 md:mb-4 p-4 rounded-2xl flex flex-col gap-3 relative overflow-hidden group">
@@ -679,7 +688,7 @@ export const StatusWidget = () => {
                         </div>
                     )}
                     <Icon
-                        name={isSaving ? 'Loader' : !isOnline ? 'WifiOff' : 'Clock'}
+                        name={isSaving ? 'Loader' : !isOnline ? 'WifiOff' : color === 'bg-violet-500' ? 'Sun' : 'Clock'}
                         size={16}
                         className={
                             isSaving
@@ -690,7 +699,9 @@ export const StatusWidget = () => {
                                     ? 'text-indigo-600'
                                     : color === 'bg-amber-500'
                                       ? 'text-amber-500'
-                                      : 'text-slate-400'
+                                      : color === 'bg-violet-500'
+                                        ? 'text-violet-500'
+                                        : 'text-slate-400'
                         }
                     />
                 </div>
@@ -922,7 +933,7 @@ export const BottomNavigation = ({ onMenuClick, role }: BottomNavProps) => {
     const navigate = useNavigate();
 
     // Determine current semester for schedule navigation
-    const currentSemester = getActiveSemester(new Date(), settings);
+    const currentSemester = getActiveSemester(new Date(), settings) ?? 1;
     const schedulePath = currentSemester === 2 ? '/schedule2' : '/schedule';
 
     const handleNavClick = (path: string) => {

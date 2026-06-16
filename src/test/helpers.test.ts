@@ -28,6 +28,32 @@ describe('getActiveSemester', () => {
         } as AppData['settings'];
         expect(getActiveSemester(date, settings)).toBe(1);
     });
+
+    it('возвращает null для каникулярного месяца (июнь)', () => {
+        const date = new Date(2026, 5, 15);
+        const settings = {
+            semesterConfig: {
+                firstSemesterMonths: [8, 9, 10, 11],
+                secondSemesterMonths: [0, 1, 2, 3, 4]
+            }
+        } as AppData['settings'];
+        expect(getActiveSemester(date, settings)).toBeNull();
+    });
+
+    it('возвращает null для июня (5) без кастомной конфигурации', () => {
+        const date = new Date(2026, 5, 15);
+        expect(getActiveSemester(date)).toBeNull();
+    });
+
+    it('возвращает null для июля (6) без кастомной конфигурации', () => {
+        const date = new Date(2026, 6, 15);
+        expect(getActiveSemester(date)).toBeNull();
+    });
+
+    it('возвращает null для августа (7) без кастомной конфигурации', () => {
+        const date = new Date(2026, 7, 15);
+        expect(getActiveSemester(date)).toBeNull();
+    });
 });
 
 describe('formatDateISO', () => {
@@ -55,5 +81,18 @@ describe('getScheduleForDate', () => {
         const schedule = [{ id: '1' }] as ScheduleItem[];
         const schedule2 = [{ id: '2' }] as ScheduleItem[];
         expect(getScheduleForDate(date, { schedule, schedule2 })).toEqual(schedule);
+    });
+
+    it('возвращает пустой массив в каникулы', () => {
+        const date = new Date(2026, 5, 15); // июнь
+        const schedule = [{ id: '1' }] as ScheduleItem[];
+        const schedule2 = [{ id: '2' }] as ScheduleItem[];
+        const settings = {
+            semesterConfig: {
+                firstSemesterMonths: [8, 9, 10, 11],
+                secondSemesterMonths: [0, 1, 2, 3, 4]
+            }
+        } as AppData['settings'];
+        expect(getScheduleForDate(date, { settings, schedule, schedule2 })).toEqual([]);
     });
 });
