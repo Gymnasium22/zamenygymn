@@ -1,4 +1,4 @@
-import i from"./purify.es-Csrj9YNg.js";import{t as c}from"./index-C4brlEoV.js";const b={saveAsExcel:(o,e,t)=>{const r=`
+import i from"./purify.es-Csrj9YNg.js";import{t as c}from"./index-BGyZjka4.js";const b={saveAsExcel:(o,e,t)=>{const r=`
             <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
             <head>
                 <meta charset="UTF-8">
