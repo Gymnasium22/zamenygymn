@@ -1,82 +1,127 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Публичные расписания - доступны всем
+
+    // ===== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getUserDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function getUserRole() {
+      return isAuthenticated() ? getUserDoc().role : null;
+    }
+
+    function isActive() {
+      return isAuthenticated() && getUserDoc().isActive == true;
+    }
+
+    function isAdmin() {
+      return isActive() && getUserRole() == 'admin';
+    }
+
+    function isTeacher() {
+      return isActive() && getUserRole() == 'teacher';
+    }
+
+    function isCanteen() {
+      return isActive() && getUserRole() == 'canteen';
+    }
+
+    function hasPermission(permission) {
+      return isActive() && permission in getUserDoc().permissions;
+    }
+
+    // ===== КОЛЛЕКЦИЯ ПОЛЬЗОВАТЕЛЕЙ =====
+
+    match /users/{userId} {
+      allow read: if isAdmin() || (isAuthenticated() && request.auth.uid == userId);
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ===== ПУБЛИЧНЫЕ РАСПИСАНИЯ =====
+
     match /publicSchedules/{document} {
       allow read: if true;
     }
 
-    // Основные справочные данные для расписания доступны всем, включая гостевой просмотр
-    match /teachers/{document} {
-      allow read: if true;
-    }
-    match /subjects/{document} {
-      allow read: if true;
-    }
-    match /classes/{document} {
-      allow read: if true;
-    }
-    match /rooms/{document} {
-      allow read: if true;
-    }
-    match /schedule_sem1/{document} {
-      allow read: if true;
-    }
-    match /schedule_sem2/{document} {
-      allow read: if true;
-    }
-    match /config/settings {
-      allow read: if true;
-    }
-    match /config/bells {
-      allow read: if true;
-    }
+    // ===== СПРАВОЧНИКИ (чтение для всех — нужно для гостевого просмотра) =====
+
+    match /teachers/{document} { allow read: if true; }
+    match /subjects/{document} { allow read: if true; }
+    match /classes/{document} { allow read: if true; }
+    match /rooms/{document} { allow read: if true; }
+    match /schedule_sem1/{document} { allow read: if true; }
+    match /schedule_sem2/{document} { allow read: if true; }
+    match /config/settings { allow read: if true; }
+    match /config/bells { allow read: if true; }
+
+    // ===== СЕКРЕТЫ =====
+
     match /config/secrets {
-      allow read, write: if request.auth != null && request.auth.token.email == "admin@gymnasium22.com";
+      allow read, write: if isAdmin();
     }
 
-    // Специальные правила для записей о питании
-    match /nutrition_records/{document} {
-      allow read: if request.auth != null;
-      // Администратор и учителя могут делать все, столовая - только читать
-      allow write: if request.auth != null && request.auth.token.email != "canteen@gymnasium22.com";
-      allow update: if request.auth != null && request.auth.token.email != "canteen@gymnasium22.com";
-      allow delete: if request.auth != null && request.auth.token.email != "canteen@gymnasium22.com";
-    }
+    // ===== ЗАМЕНЫ =====
 
-    // Замены и дежурства - только для админа и учителей
     match /substitutions/{document} {
-      allow read: if request.auth != null && (request.auth.token.email == "admin@gymnasium22.com" || request.auth.token.email == "teacher@gymnasium22.com" || request.auth.token.email == "canteen@gymnasium22.com");
-      allow write: if request.auth != null && request.auth.token.email == "admin@gymnasium22.com";
+      allow read: if isActive() && (isAdmin() || isTeacher() || isCanteen());
+      allow write: if isActive() && (isAdmin() || hasPermission('edit_substitutions'));
+      allow update: if isActive() && (isAdmin() || hasPermission('edit_substitutions'));
+      allow delete: if isActive() && isAdmin();
     }
+
+    // ===== ДЕЖУРСТВА =====
+
     match /duty_zones/{document} {
-      allow read: if request.auth != null && (request.auth.token.email == "admin@gymnasium22.com" || request.auth.token.email == "teacher@gymnasium22.com");
-      allow write: if request.auth != null && request.auth.token.email == "admin@gymnasium22.com";
+      allow read: if isActive() && (isAdmin() || isTeacher());
+      allow write: if isActive() && (isAdmin() || hasPermission('edit_duty'));
+      allow delete: if isActive() && isAdmin();
     }
+
     match /duty_schedule/{document} {
-      allow read: if request.auth != null && (request.auth.token.email == "admin@gymnasium22.com" || request.auth.token.email == "teacher@gymnasium22.com");
-      allow write: if request.auth != null && request.auth.token.email == "admin@gymnasium22.com";
+      allow read: if isActive() && (isAdmin() || isTeacher());
+      allow write: if isActive() && (isAdmin() || hasPermission('edit_duty'));
+      allow update: if isActive() && (isAdmin() || hasPermission('edit_duty'));
+      allow delete: if isActive() && isAdmin();
     }
 
-    // Журнал аудита — только администратор
-    match /audit_log/{document} {
-      allow read, create: if request.auth != null && request.auth.token.email == "admin@gymnasium22.com";
-      allow update, delete: if request.auth != null && request.auth.token.email == "admin@gymnasium22.com";
+    // ===== ПИТАНИЕ =====
+
+    match /nutrition_records/{document} {
+      allow read: if isActive();
+      allow write: if isActive() && (isAdmin() || hasPermission('edit_nutrition'));
+      allow update: if isActive() && (isAdmin() || hasPermission('edit_nutrition'));
+      allow delete: if isActive() && isAdmin();
     }
 
-    // Пропуски (absenteeism_records) - админ и учителя
+    // ===== ПРОПУСКИ =====
+
     match /absenteeism_records/{document} {
-      allow read: if request.auth != null && (request.auth.token.email == "admin@gymnasium22.com" || request.auth.token.email == "teacher@gymnasium22.com");
-      allow write: if request.auth != null && (request.auth.token.email == "admin@gymnasium22.com" || request.auth.token.email == "teacher@gymnasium22.com");
-      allow update: if request.auth != null && (request.auth.token.email == "admin@gymnasium22.com" || request.auth.token.email == "teacher@gymnasium22.com");
-      allow delete: if request.auth != null && request.auth.token.email == "admin@gymnasium22.com";
+      allow read: if isActive() && (isAdmin() || isTeacher());
+      allow write: if isActive() && (isAdmin() || hasPermission('edit_absenteeism'));
+      allow update: if isActive() && (isAdmin() || hasPermission('edit_absenteeism'));
+      allow delete: if isActive() && isAdmin();
     }
 
-    // Админ может писать во все коллекции
+    // ===== ЖУРНАЛ АУДИТА =====
+
+    match /audit_log/{document} {
+      allow read, write: if isAdmin();
+    }
+
+    // ===== ЗАПАСНОЕ ПРАВИЛО ДЛЯ АДМИНА =====
+
     match /{document=**} {
-      allow write: if request.auth != null && request.auth.token.email == "admin@gymnasium22.com";
-      allow update: if request.auth != null && request.auth.token.email == "admin@gymnasium22.com";
-      allow delete: if request.auth != null && request.auth.token.email == "admin@gymnasium22.com";
+      allow write: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
   }
 }

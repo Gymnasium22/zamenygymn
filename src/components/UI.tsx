@@ -54,6 +54,7 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
     );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useToast = () => {
     const context = useContext(ToastContext);
     if (!context) {
@@ -297,6 +298,7 @@ export const Toast = ({ id, type, title, message, duration = 5000, onClose }: To
     const [isExiting, setIsExiting] = useState(false);
     const [swipeX, setSwipeX] = useState(0);
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const exitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const handleCloseRef = useRef<() => void>(() => {});
     const touchStartX = useRef(0);
 
@@ -306,9 +308,13 @@ export const Toast = ({ id, type, title, message, duration = 5000, onClose }: To
             clearTimeout(timerRef.current);
             timerRef.current = null;
         }
+        if (exitTimerRef.current) {
+            clearTimeout(exitTimerRef.current);
+        }
 
         setIsExiting(true);
-        setTimeout(() => {
+        exitTimerRef.current = setTimeout(() => {
+            exitTimerRef.current = null;
             setIsVisible(false);
             onClose(id);
         }, 300);
@@ -326,6 +332,9 @@ export const Toast = ({ id, type, title, message, duration = 5000, onClose }: To
         return () => {
             if (timerRef.current) {
                 clearTimeout(timerRef.current);
+            }
+            if (exitTimerRef.current) {
+                clearTimeout(exitTimerRef.current);
             }
         };
     }, [duration]);
@@ -918,18 +927,12 @@ export const BarChart = ({ items, max, barClassName = 'bg-indigo-500' }: BarChar
 
 interface BottomNavProps {
     onMenuClick: () => void;
-    role: string | null;
+    allowedPages?: import('../types').PageId[];
 }
 
-export const BottomNavigation = ({ onMenuClick, role }: BottomNavProps) => {
+export const BottomNavigation = ({ onMenuClick, allowedPages = [] }: BottomNavProps) => {
     const { settings } = useStaticData();
-    const isAdmin = role === 'admin';
-    const isTeacher = role === 'teacher';
-    const isCanteen = role === 'canteen';
-    const isGuest = role === 'guest';
-    const showDashboard = isAdmin || isTeacher;
-    const showSchedule = isAdmin || isTeacher || isGuest;
-    const showNutrition = isAdmin || isTeacher || isCanteen;
+    const canView = (page: import('../types').PageId) => allowedPages.includes(page);
     const navigate = useNavigate();
 
     // Determine current semester for schedule navigation
@@ -944,17 +947,17 @@ export const BottomNavigation = ({ onMenuClick, role }: BottomNavProps) => {
         navigate(path);
     };
 
-    const navItems = [];
-    if (showDashboard) {
+    const navItems: { to: string; icon: string; label: string; shortLabel: string }[] = [];
+    if (canView('dashboard')) {
         navItems.push({ to: '/dashboard', icon: 'Home', label: 'Рабочий', shortLabel: 'Главная' });
     }
-    if (showSchedule) {
+    if (canView('schedule') || canView('schedule2')) {
         navItems.push({ to: schedulePath, icon: 'Calendar', label: 'Расписание', shortLabel: 'Распис.' });
     }
-    if (showNutrition) {
+    if (canView('nutrition')) {
         navItems.push({ to: '/nutrition', icon: 'Coffee', label: 'Питание', shortLabel: 'Питание' });
     }
-    if (isAdmin) {
+    if (canView('substitutions')) {
         navItems.push({ to: '/substitutions', icon: 'Repeat', label: 'Замены', shortLabel: 'Замены' });
     }
 

@@ -1,7 +1,7 @@
 import { useState, useRef, useMemo } from 'react';
 import { useStaticData, useScheduleData } from '../context/DataContext';
 import { Icon } from '../components/Icons';
-import { Modal, SearchableSelect } from '../components/UI';
+import { Modal, SearchableSelect, useToast } from '../components/UI';
 import { DAYS, Shift, DutyZone, DayOfWeek, DutyRecord } from '../types';
 import { generateId } from '../utils/helpers';
 import { exportService } from '../services/exportService';
@@ -10,6 +10,7 @@ import { escapeHtml } from '../utils/escapeHtml';
 export const DutyPage = () => {
     const { teachers, dutyZones, rooms, saveStaticData } = useStaticData();
     const { dutySchedule, saveScheduleData, schedule1, schedule2 } = useScheduleData();
+    const { addToast } = useToast();
 
     // --- РУЧНАЯ РЕГУЛИРОВКА ВЫСОТЫ ДЛЯ PNG ЭКСПОРТА ---
     const manualOffsets = {
@@ -79,9 +80,13 @@ export const DutyPage = () => {
             });
         }
 
-        await saveScheduleData({ dutySchedule: newSchedule });
-        setIsModalOpen(false);
-        setSelectedTeacherId(null);
+        try {
+            await saveScheduleData({ dutySchedule: newSchedule });
+            setIsModalOpen(false);
+            setSelectedTeacherId(null);
+        } catch {
+            addToast({ type: 'danger', title: 'Ошибка сохранения', message: 'Не удалось сохранить дежурство' });
+        }
     };
 
     const handleRemoveDuty = async () => {
@@ -90,9 +95,13 @@ export const DutyPage = () => {
         newSchedule = newSchedule.filter(
             (d) => !(d.zoneId === selectedCell.zoneId && d.day === selectedCell.day && d.shift === selectedShift)
         );
-        await saveScheduleData({ dutySchedule: newSchedule });
-        setIsModalOpen(false);
-        setSelectedTeacherId(null);
+        try {
+            await saveScheduleData({ dutySchedule: newSchedule });
+            setIsModalOpen(false);
+            setSelectedTeacherId(null);
+        } catch {
+            addToast({ type: 'danger', title: 'Ошибка удаления', message: 'Не удалось удалить дежурство' });
+        }
     };
 
     const isRoomInZone = (roomName: string, zone: DutyZone) => {

@@ -16,6 +16,7 @@ import { getActiveSemester, generateId } from '../utils/helpers';
 import { produce } from 'immer';
 import { auditLog } from '../services/auditLog';
 import { safeLocalStorageGet, safeLocalStorageSet } from '../utils/localStorage';
+import { logger } from '../utils/logger';
 
 interface FullDataContextType {
     data: AppData;
@@ -76,7 +77,7 @@ const syncQueue = {
                     syncQueue.items = parsed;
                 }
             } catch (e) {
-                console.warn('Failed to parse persistent sync queue', e);
+                logger.warn('Failed to parse persistent sync queue', e);
             }
         }
     },
@@ -85,7 +86,7 @@ const syncQueue = {
         try {
             safeLocalStorageSet(PERSISTENT_QUEUE_KEY, JSON.stringify(syncQueue.items));
         } catch (e) {
-            console.warn('Failed to save sync queue', e);
+            logger.warn('Failed to save sync queue', e);
         }
     },
 
@@ -94,7 +95,7 @@ const syncQueue = {
         if (syncQueue.items.length >= MAX_QUEUE_SIZE) {
             const dropped = syncQueue.items.length - MAX_QUEUE_SIZE + 1;
             syncQueue.items = syncQueue.items.slice(-(MAX_QUEUE_SIZE - 1));
-            console.warn(`Sync queue exceeded ${MAX_QUEUE_SIZE} items. Dropped ${dropped} oldest item(s).`);
+            logger.warn(`Sync queue exceeded ${MAX_QUEUE_SIZE} items. Dropped ${dropped} oldest item(s).`);
         }
         const id = generateId();
         syncQueue.items.push({
@@ -124,13 +125,13 @@ const syncQueue = {
                     // Если ошибка квоты, оставляем в очереди но не удаляем
                     const err = error as { code?: string; message?: string };
                     if (err.code === 'resource-exhausted') {
-                        console.warn('Quota exhausted, keeping item in queue:', item.id);
+                        logger.warn('Quota exhausted, keeping item in queue:', item.id);
                         break; // Stop processing to avoid spamming
                     }
 
                     if (item.retryCount >= 10) {
                         // Increased from 3 to 10 for better resilience
-                        console.error('Не удалось синхронизировать после 10 попыток:', item.id);
+                        logger.error('Не удалось синхронизировать после 10 попыток:', item.id);
                         itemsToRemove.push(item.id); // Удаляем после 10 попыток
                     }
                 }
@@ -153,15 +154,15 @@ const syncQueue = {
 // Единообразная обработка ошибок
 const handleError = {
     log: (message: string, error?: unknown) => {
-        console.error(message, error);
+        logger.error(message, error);
     },
 
     warn: (message: string, error?: unknown) => {
-        console.warn(message, error);
+        logger.warn(message, error);
     },
 
     alert: (message: string, error?: unknown) => {
-        console.error(message, error);
+        logger.error(message, error);
         window.dispatchEvent(
             new CustomEvent('app-toast', {
                 detail: { type: 'danger', title: 'Ошибка', message }
@@ -191,7 +192,7 @@ const handleError = {
                 message = `Ошибка ${context}: ${err.message || 'Неизвестная ошибка'}`;
         }
 
-        console.error(`Firebase ${context}:`, error);
+        logger.error(`Firebase ${context}:`, error);
         window.dispatchEvent(
             new CustomEvent('app-toast', {
                 detail: { type: 'danger', title: 'Ошибка Firebase', message }
@@ -206,7 +207,7 @@ const handleError = {
             ? `Сохранено локально. Синхронизируется при подключении к сети.`
             : `Ошибка ${context}. Данные сохранены локально и будут синхронизированы при восстановлении соединения.`;
 
-        console.warn(`Firebase ${context} (оффлайн):`, error);
+        logger.warn(`Firebase ${context} (оффлайн):`, error);
 
         window.dispatchEvent(
             new CustomEvent('app-toast', {
@@ -274,16 +275,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
             }
         }
 
-        const canUseLocalData = user || role === 'guest';
-
-        if (!canUseLocalData) {
+        if (!user) {
             setInternalData(getInitialData());
             setIsLoading(false);
             return;
         }
 
-        // Для гостевого просмотра тоже пытаемся загрузить данные из Firebase,
-        // чтобы ученик/родитель видел актуальное расписание даже без авторизации.
         setIsLoading(true);
 
         // 3. Подписываемся на Firebase
@@ -372,7 +369,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
 
     const saveData = useCallback(
         async (newData: Partial<AppData>, addToHistory = true) => {
-            const isGuest = role === 'guest';
             setIsSaving(true);
 
             try {
@@ -395,8 +391,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                     safeLocalStorageSet(LOCAL_STORAGE_KEY, JSON.stringify(mergedData));
                 }
 
-                // 3. Пробуем отправить в облако (только для авторизованных, не для гостей и не для публичных данных)
-                if (!initialData && user && !isGuest) {
+                // 3. Пробуем отправить в облако (только для авторизованных и не для публичных данных)
+                if (!initialData && user) {
                     try {
                         await dbService.save(newData, user);
                     } catch (dbError: unknown) {
@@ -404,12 +400,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                         handleError.firebaseOffline(dbError, 'сохранения данных', newData);
                         // НЕ откатываем интерфейс - данные остались в localStorage и будут синхронизированы позже
                     }
-                } else if (isGuest) {
-                    // Гость не сохраняет данные в облако
                 }
 
                 // 4. Audit log
-                if (user && !isGuest) {
+                if (user) {
                     const entityMap: Record<string, AuditLogEntry['entityType']> = {
                         schedule: 'schedule', schedule2: 'schedule', subjects: 'subject',
                         teachers: 'teacher', classes: 'class', rooms: 'room',
@@ -436,7 +430,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                     newHistory.push(mergedData);
 
                     // History management: keep reasonable limit to prevent memory bloat
-                    const MAX_HISTORY = 50;
+                    const MAX_HISTORY = 20;
                     let newPointer: number;
                     if (newHistory.length > MAX_HISTORY) {
                         // Remove oldest items, keep the most recent MAX_HISTORY
@@ -465,7 +459,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
     // Автоматическая синхронизация при восстановлении сети
     useEffect(() => {
         const handleOnline = () => {
-            if (syncQueue.items.length > 0 && user && role !== 'guest' && !initialData) {
+            if (syncQueue.items.length > 0 && user && !initialData) {
                 syncQueue.process(user);
             }
         };
@@ -685,6 +679,7 @@ export const ScheduleDataProvider: React.FC<{ children: React.ReactNode }> = ({ 
     return <ScheduleDataContext.Provider value={contextValue}>{children}</ScheduleDataContext.Provider>;
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useStaticData = () => {
     const context = useContext(StaticDataContext);
     if (!context) throw new Error('useStaticData must be used within StaticDataProvider');
@@ -731,6 +726,7 @@ export const useStaticData = () => {
     );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useScheduleData = () => {
     const context = useContext(ScheduleDataContext);
     if (!context) throw new Error('useScheduleData must be used within ScheduleDataProvider');
@@ -776,6 +772,7 @@ export const useScheduleData = () => {
     );
 };
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useData = () => {
     const context = useContext(FullDataContext);
     if (!context) throw new Error('useData must be used within DataProvider');

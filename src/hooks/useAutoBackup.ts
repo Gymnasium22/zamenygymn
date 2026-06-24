@@ -3,6 +3,7 @@ import { useStaticData } from '../context/DataContext';
 import { formatDateISO, formatDateEuropean } from '../utils/helpers';
 import { AppData } from '../types';
 import { safeLocalStorageGet, safeLocalStorageSet } from '../utils/localStorage';
+import { logger } from '../utils/logger';
 
 const LAST_BACKUP_KEY = 'gym_last_auto_backup_date';
 
@@ -35,7 +36,7 @@ const performBackup = async (
                 throw new Error(result.description || 'Telegram API error');
             }
         } catch (err) {
-            console.warn('Auto-backup failed:', err);
+            logger.warn('Auto-backup failed:', err);
         }
     }
 };

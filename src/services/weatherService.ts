@@ -24,6 +24,7 @@ export interface WeatherResponse {
 }
 
 import { safeLocalStorageGet, safeLocalStorageSet } from '../utils/localStorage';
+import { logger } from '../utils/logger';
 
 const CACHE_KEY = 'gym_weather_cache';
 const CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
@@ -41,7 +42,7 @@ class WeatherService {
                     };
                 }
             } catch {
-                console.warn('Weather cache invalid');
+                logger.warn('Weather cache invalid');
             }
         }
 
@@ -101,7 +102,7 @@ class WeatherService {
             if ((err as Error)?.name === 'AbortError') {
                 throw err;
             }
-            console.error(err);
+            logger.error(err);
             throw err;
         }
     }

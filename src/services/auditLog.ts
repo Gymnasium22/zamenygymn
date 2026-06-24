@@ -2,6 +2,7 @@ import { AuditLogEntry } from '../types';
 import { generateId } from '../utils/helpers';
 import { safeLocalStorageGet, safeLocalStorageSet, safeLocalStorageRemove } from '../utils/localStorage';
 import { firestoreDB } from './firebase';
+import { logger } from '../utils/logger';
 import { collection, addDoc, getDocs, query, orderBy, limit as firestoreLimit, writeBatch } from 'firebase/firestore';
 
 const STORAGE_KEY = 'gym_audit_log';
@@ -61,7 +62,7 @@ class AuditLogService {
                 await addDoc(docRef, entry);
             } catch (e) {
                 if (!isPermissionDenied(e)) {
-                    console.warn('Failed to write audit log to Firestore:', e);
+                    logger.warn('Failed to write audit log to Firestore:', e);
                 }
             }
         }
@@ -96,7 +97,7 @@ class AuditLogService {
                 }
             } catch (e) {
                 if (!isPermissionDenied(e)) {
-                    console.warn('Failed to fetch audit log from Firestore, falling back to local storage:', e);
+                    logger.warn('Failed to fetch audit log from Firestore, falling back to local storage:', e);
                 }
             }
         }
@@ -116,7 +117,7 @@ class AuditLogService {
                 await batch.commit();
             } catch (e) {
                 if (!isPermissionDenied(e)) {
-                    console.warn('Failed to clear Firestore audit log:', e);
+                    logger.warn('Failed to clear Firestore audit log:', e);
                 }
             }
         }

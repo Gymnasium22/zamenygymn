@@ -1,6 +1,5 @@
 import { expect } from 'vitest';
 import * as matchers from '@testing-library/jest-dom/matchers';
-import { randomUUID } from 'node:crypto';
 
 expect.extend(matchers);
 
@@ -10,6 +9,11 @@ if (!globalThis.crypto) {
 }
 if (!globalThis.crypto.randomUUID) {
     Object.defineProperty(globalThis.crypto, 'randomUUID', {
-        value: () => randomUUID(),
+        value: () =>
+            'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+                const r = (Math.random() * 16) | 0;
+                const v = c === 'x' ? r : (r & 0x3) | 0x8;
+                return v.toString(16);
+            })
     });
 }

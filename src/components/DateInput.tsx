@@ -1,5 +1,6 @@
 import { forwardRef } from 'react';
 import type { ChangeEvent, ForwardedRef, InputHTMLAttributes } from 'react';
+import { isValidDateString } from '../utils/helpers';
 
 export interface DateInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'type' | 'value' | 'onChange'> {
     value: string;
@@ -27,7 +28,13 @@ export const DateInput = forwardRef(function DateInput(
             lang={locale}
             inputMode="numeric"
             value={value}
-            onChange={(e: ChangeEvent<HTMLInputElement>) => onChange(e.target.value)}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                const newValue = e.target.value;
+                if (type === 'date' && newValue && !isValidDateString(newValue)) {
+                    return;
+                }
+                onChange(newValue);
+            }}
             className={className}
         />
     );

@@ -1,9 +1,19 @@
 import { AppData } from '../types';
 import { INITIAL_DATA } from '../constants';
 import { formatDateISO } from '../utils/helpers';
+import { logger } from '../utils/logger';
 import { firestoreDB, auth } from './firebase';
-import { collection, doc, setDoc, writeBatch, onSnapshot, getDocs, query, deleteDoc, getDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, writeBatch, onSnapshot, getDocs, query, deleteDoc, getDoc, where, orderBy } from 'firebase/firestore';
 import { User } from 'firebase/auth';
+
+// Сколько последних дней загружать для больших журнальных коллекций
+const RECENT_RECORDS_DAYS = 90;
+
+const getRecentCutoffDate = (): string => {
+    const date = new Date();
+    date.setDate(date.getDate() - RECENT_RECORDS_DAYS);
+    return formatDateISO(date);
+};
 
 // Конфигурация коллекций
 const COLLECTIONS = {
@@ -110,7 +120,7 @@ async function awaitHZ<T>(
     try {
         return await fn();
     } catch (e) {
-        console.error('Firestore read error (likely quota):', e);
+        logger.error('Firestore read error (likely quota):', e);
         if (options.throwOnError) {
             throw e; // Re-throw for UI error handling
         }
@@ -131,7 +141,7 @@ export const dbService = {
                 cache.delete(id);
             }
         } catch (error) {
-            console.error(`Failed to delete document ${collectionName}/${id}:`, error);
+            logger.error(`Failed to delete document ${collectionName}/${id}:`, error);
             throw error;
         }
     },
@@ -208,7 +218,7 @@ export const dbService = {
                 // Атомарно заменяем кеш только после успешной записи
                 collectionCache.set(collectionName, cachedItems);
             } catch (error) {
-                console.error(`Failed to sync ${collectionName}:`, error);
+                logger.error(`Failed to sync ${collectionName}:`, error);
                 throw error;
             }
         });
@@ -236,7 +246,7 @@ export const dbService = {
 
             collectionCache.set(collectionName, cachedItems);
         } catch (error) {
-            console.error(`Failed to sync cache for ${collectionName}:`, error);
+            logger.error(`Failed to sync cache for ${collectionName}:`, error);
             // Не бросаем ошибку, чтобы не ломать загрузку
         }
     },
@@ -347,9 +357,10 @@ export const dbService = {
         };
 
         const unsubs: (() => void)[] = [];
+        const recentCutoff = getRecentCutoffDate();
 
-        const subColl = (colName: string, key: keyof AppData) => {
-            const q = query(collection(firestoreDB, colName));
+        const subColl = (colName: string, key: keyof AppData, constraints: Parameters<typeof query>[1][] = []) => {
+            const q = query(collection(firestoreDB, colName), ...constraints);
             return onSnapshot(
                 q,
                 (snapshot) => {
@@ -376,7 +387,7 @@ export const dbService = {
                     triggerUpdate(key as string);
                 },
                 (err) => {
-                    console.warn(`Error reading ${colName}:`, err);
+                    logger.warn(`Error reading ${colName}:`, err);
                     loadedCollections.add(key as string);
                     triggerUpdate();
                     onError?.(err);
@@ -390,11 +401,26 @@ export const dbService = {
         unsubs.push(subColl(COLLECTIONS.ROOMS, 'rooms'));
         unsubs.push(subColl(COLLECTIONS.SCHEDULE_1, 'schedule'));
         unsubs.push(subColl(COLLECTIONS.SCHEDULE_2, 'schedule2'));
-        unsubs.push(subColl(COLLECTIONS.SUBSTITUTIONS, 'substitutions'));
+        unsubs.push(
+            subColl(COLLECTIONS.SUBSTITUTIONS, 'substitutions', [
+                where('date', '>=', recentCutoff),
+                orderBy('date', 'desc')
+            ])
+        );
         unsubs.push(subColl(COLLECTIONS.DUTY_ZONES, 'dutyZones'));
         unsubs.push(subColl(COLLECTIONS.DUTY_SCHEDULE, 'dutySchedule'));
-        unsubs.push(subColl(COLLECTIONS.NUTRITION, 'nutritionRecords'));
-        unsubs.push(subColl(COLLECTIONS.ABSENTEEISM, 'absenteeismRecords'));
+        unsubs.push(
+            subColl(COLLECTIONS.NUTRITION, 'nutritionRecords', [
+                where('date', '>=', recentCutoff),
+                orderBy('date', 'desc')
+            ])
+        );
+        unsubs.push(
+            subColl(COLLECTIONS.ABSENTEEISM, 'absenteeismRecords', [
+                where('date', '>=', recentCutoff),
+                orderBy('date', 'desc')
+            ])
+        );
 
         // Listen to settings (individual document — avoids permission issues with collection-wide queries)
         unsubs.push(
@@ -410,7 +436,7 @@ export const dbService = {
                     triggerUpdate();
                 },
                 (err) => {
-                    console.warn('Error reading settings:', err);
+                    logger.warn('Error reading settings:', err);
                     loadedCollections.add('settings');
                     triggerUpdate();
                 }
@@ -432,7 +458,7 @@ export const dbService = {
                     triggerUpdate();
                 },
                 (err) => {
-                    console.warn('Error reading bells:', err);
+                    logger.warn('Error reading bells:', err);
                     loadedCollections.add('bellSchedule');
                     triggerUpdate();
                 }
@@ -455,7 +481,7 @@ export const dbService = {
                         triggerUpdate();
                     },
                     (err) => {
-                        console.warn('Error reading secrets:', err);
+                        logger.warn('Error reading secrets:', err);
                         loadedCollections.add('privateSettings');
                         triggerUpdate();
                     }
@@ -558,7 +584,7 @@ export const dbService = {
             if (d.exists()) return d.data() as AppData;
             return null;
         } catch (error) {
-            console.error(error);
+            logger.error(error);
             return null;
         }
     },

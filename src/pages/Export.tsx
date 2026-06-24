@@ -14,7 +14,7 @@ import {
     Teacher,
     Room
 } from '../types';
-import { formatDateISO, formatDateEuropean, getActiveSemester } from '../utils/helpers';
+import { formatDateISO, formatDateEuropean, getActiveSemester, getDateOrToday } from '../utils/helpers';
 import { exportService } from '../services/exportService';
 import { useToast } from '../components/UI';
 import { SanitaryScheduleTab } from '../components/SanitaryScheduleTab';
@@ -22,6 +22,7 @@ import { SanitaryScheduleTab } from '../components/SanitaryScheduleTab';
 // --- Хелперы ---
 
 import { escapeHtml, sanitizeColor } from '../utils/escapeHtml';
+import { logger } from '../utils/logger';
 
 // --- Вынесенные компоненты печати (не пересоздаются на каждый рендер) ---
 
@@ -44,7 +45,7 @@ const ReportHeader = ({ exportDate, dayComment }: ReportHeaderProps) => (
             <div className="text-right">
                 <div className="text-xs text-slate-400 uppercase font-bold tracking-wider mb-1">Дата</div>
                 <div className="text-xl font-bold text-slate-800">
-                    {new Date(exportDate).toLocaleDateString('ru-RU', {
+                    {getDateOrToday(exportDate).toLocaleDateString('ru-RU', {
                         day: 'numeric',
                         month: 'long',
                         year: 'numeric'
@@ -777,17 +778,17 @@ export const ExportPage = () => {
     };
 
     const exportMonthlySubstitutionsExcel = () => {
-        const targetDate = new Date(exportDate);
+        const targetDate = getDateOrToday(exportDate);
         const targetMonth = targetDate.getUTCMonth();
         const targetYear = targetDate.getUTCFullYear();
 
         // Фильтруем замены за выбранный месяц
         const monthlySubs = substitutions
             .filter((s) => {
-                const sDate = new Date(s.date);
+                const sDate = getDateOrToday(s.date);
                 return sDate.getUTCMonth() === targetMonth && sDate.getUTCFullYear() === targetYear;
             })
-            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+            .sort((a, b) => getDateOrToday(a.date).getTime() - getDateOrToday(b.date).getTime());
 
         if (monthlySubs.length === 0) {
             addToast({ type: 'warning', title: 'Внимание', message: 'Нет данных о заменах за выбранный месяц.' });
@@ -1040,18 +1041,18 @@ export const ExportPage = () => {
     };
 
     const exportRefusalsExcel = () => {
-        const targetDate = new Date(exportDate);
+        const targetDate = getDateOrToday(exportDate);
         const targetMonth = targetDate.getUTCMonth();
         const targetYear = targetDate.getUTCFullYear();
 
         const refusalsData = substitutions
             .filter((s) => {
-                const sDate = new Date(s.date);
+                const sDate = getDateOrToday(s.date);
                 const inMonth = sDate.getUTCMonth() === targetMonth && sDate.getUTCFullYear() === targetYear;
                 const hasRefusals = s.refusals && s.refusals.length > 0;
                 return inMonth && hasRefusals;
             })
-            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+            .sort((a, b) => getDateOrToday(a.date).getTime() - getDateOrToday(b.date).getTime());
 
         if (refusalsData.length === 0) {
             addToast({ type: 'warning', title: 'Внимание', message: 'Нет данных об отказах за выбранный месяц.' });
@@ -1183,7 +1184,7 @@ export const ExportPage = () => {
             link.click();
             document.body.removeChild(link);
         } catch (e) {
-            console.error(e);
+            logger.error(e);
             addToast({ type: 'danger', title: 'Ошибка', message: 'Ошибка при создании изображения' });
         } finally {
             setIsGenerating(false);
@@ -1211,7 +1212,7 @@ export const ExportPage = () => {
             link.click();
             document.body.removeChild(link);
         } catch (e) {
-            console.error(e);
+            logger.error(e);
             addToast({ type: 'danger', title: 'Ошибка', message: 'Ошибка при создании изображения' });
         } finally {
             setIsGenerating(false);

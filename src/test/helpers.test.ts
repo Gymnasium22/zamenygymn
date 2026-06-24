@@ -1,5 +1,15 @@
 import { describe, it, expect } from 'vitest';
-import { getActiveSemester, getScheduleForDate, formatDateISO } from '../utils/helpers';
+import {
+    getActiveSemester,
+    getScheduleForDate,
+    formatDateISO,
+    isValidDateString,
+    parseDateSafe,
+    getDateOrToday,
+    isValidMonthString,
+    parseMonthSafe,
+    getMonthOrNow
+} from '../utils/helpers';
 import { AppData, ScheduleItem } from '../types';
 
 describe('getActiveSemester', () => {
@@ -94,5 +104,90 @@ describe('getScheduleForDate', () => {
             }
         } as AppData['settings'];
         expect(getScheduleForDate(date, { settings, schedule, schedule2 })).toEqual([]);
+    });
+});
+
+
+describe('isValidDateString', () => {
+    it('принимает корректную дату', () => {
+        expect(isValidDateString('2026-05-13')).toBe(true);
+    });
+
+    it('отклоняет невалидную дату', () => {
+        expect(isValidDateString('2026-02-30')).toBe(false);
+    });
+
+    it('отклоняет пустую строку', () => {
+        expect(isValidDateString('')).toBe(false);
+    });
+
+    it('отклоняет неправильный формат', () => {
+        expect(isValidDateString('13.05.2026')).toBe(false);
+    });
+});
+
+describe('parseDateSafe', () => {
+    it('парсит корректную строку', () => {
+        const date = parseDateSafe('2026-05-13');
+        expect(date).not.toBeNull();
+        expect(date!.toISOString().startsWith('2026-05-13')).toBe(true);
+    });
+
+    it('возвращает null для невалидной строки', () => {
+        expect(parseDateSafe('invalid')).toBeNull();
+    });
+
+    it('возвращает null для пустой строки', () => {
+        expect(parseDateSafe('')).toBeNull();
+    });
+});
+
+describe('getDateOrToday', () => {
+    it('возвращает дату для корректной строки', () => {
+        const date = getDateOrToday('2026-05-13');
+        expect(date.toISOString().startsWith('2026-05-13')).toBe(true);
+    });
+
+    it('возвращает сегодня для невалидной строки', () => {
+        const date = getDateOrToday('invalid');
+        expect(date.getTime()).not.toBeNaN();
+    });
+});
+
+describe('isValidMonthString', () => {
+    it('принимает корректный месяц', () => {
+        expect(isValidMonthString('2026-05')).toBe(true);
+    });
+
+    it('отклоняет месяц больше 12', () => {
+        expect(isValidMonthString('2026-13')).toBe(false);
+    });
+
+    it('отклоняет неправильный формат', () => {
+        expect(isValidMonthString('05.2026')).toBe(false);
+    });
+});
+
+describe('parseMonthSafe', () => {
+    it('парсит корректный месяц', () => {
+        const date = parseMonthSafe('2026-05');
+        expect(date).not.toBeNull();
+        expect(date!.getMonth()).toBe(4);
+    });
+
+    it('возвращает null для невалидного месяца', () => {
+        expect(parseMonthSafe('2026-13')).toBeNull();
+    });
+});
+
+describe('getMonthOrNow', () => {
+    it('возвращает месяц для корректной строки', () => {
+        const date = getMonthOrNow('2026-05');
+        expect(date.getMonth()).toBe(4);
+    });
+
+    it('возвращает сегодня для невалидной строки', () => {
+        const date = getMonthOrNow('invalid');
+        expect(date.getTime()).not.toBeNaN();
     });
 });

@@ -2,8 +2,8 @@
 
 [![React](https://img.shields.io/badge/React-18.2.0-blue.svg)](https://reactjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.4.2-blue.svg)](https://www.typescriptlang.org/)
-[![Firebase](https://img.shields.io/badge/Firebase-10.12.2-orange.svg)](https://firebase.google.com/)
-[![Vite](https://img.shields.io/badge/Vite-5.4.21-646CFF.svg)](https://vitejs.dev/)
+[![Firebase](https://img.shields.io/badge/Firebase-11.6.0-orange.svg)](https://firebase.google.com/)
+[![Vite](https://img.shields.io/badge/Vite-6.3.5-646CFF.svg)](https://vitejs.dev/)
 [![PWA](https://img.shields.io/badge/PWA-Ready-green.svg)](https://web.dev/progressive-web-apps/)
 
 Современная веб-система для управления расписанием, заменами и справочниками гимназии №22.
@@ -93,7 +93,8 @@
 
 - **Frontend:** React 18, TypeScript, Tailwind CSS
 - **Backend:** Firebase Firestore, Firebase Auth
-- **Build:** Vite
+- **Build:** Vite 6
+- **Tests:** Vitest 4
 - **PWA:** Workbox, Vite PWA Plugin
 - **UI Components:** Custom компоненты с Heroicons
 - **Charts:** BarChart компоненты для отчетов

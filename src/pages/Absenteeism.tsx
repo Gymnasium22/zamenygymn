@@ -6,7 +6,8 @@ import { DateInput } from '../components/DateInput';
 import { Icon } from '../components/Icons';
 import { Modal, useToast } from '../components/UI';
 import { AbsenteeismRecord, StudentAbsence } from '../types';
-import { formatDateISO, formatDateEuropean, generateId } from '../utils/helpers';
+import { formatDateISO, formatDateEuropean, generateId, getMonthOrNow, getDateOrToday } from '../utils/helpers';
+import DOMPurify from 'dompurify';
 
 export const AbsenteeismPage = () => {
     const { classes } = useStaticData();
@@ -47,7 +48,7 @@ export const AbsenteeismPage = () => {
     const recordsForMonth = useMemo(() => {
         const [year, month] = selectedMonth.split('-').map(Number);
         return absenteeismRecords.filter((r) => {
-            const recordDate = new Date(r.date);
+            const recordDate = getDateOrToday(r.date);
             return recordDate.getFullYear() === year && recordDate.getMonth() + 1 === month;
         });
     }, [absenteeismRecords, selectedMonth]);
@@ -253,10 +254,13 @@ export const AbsenteeismPage = () => {
             ? absenteeismRecords.map((r) => (r.id === record.id ? record : r))
             : [...absenteeismRecords, record];
 
-        await saveScheduleData({ absenteeismRecords: updatedRecords });
-
-        addToast({ type: 'success', title: editingRecord ? 'Запись обновлена' : 'Запись сохранена' });
-        closeModal();
+        try {
+            await saveScheduleData({ absenteeismRecords: updatedRecords });
+            addToast({ type: 'success', title: editingRecord ? 'Запись обновлена' : 'Запись сохранена' });
+            closeModal();
+        } catch {
+            addToast({ type: 'danger', title: 'Ошибка сохранения', message: 'Не удалось сохранить запись о пропуске' });
+        }
     }, [selectedClassId, absences, editingRecord, absenteeismRecords, saveScheduleData, selectedDate, user, addToast]);
 
     const deleteRecord = async () => {
@@ -265,12 +269,13 @@ export const AbsenteeismPage = () => {
         if (window.confirm('Вы уверены, что хотите удалить запись? Класс вернется в список "Не заполнено".')) {
             const updatedRecords = absenteeismRecords.filter((r) => r.id !== editingRecord.id);
 
-            // Update local state and sync via standard method (just like Substitutions)
-            // This will trigger dbService.save -> syncCollection which handles both cache and Firestore
-            await saveScheduleData({ absenteeismRecords: updatedRecords });
-
-            addToast({ type: 'success', title: 'Запись удалена' });
-            closeModal();
+            try {
+                await saveScheduleData({ absenteeismRecords: updatedRecords });
+                addToast({ type: 'success', title: 'Запись удалена' });
+                closeModal();
+            } catch {
+                addToast({ type: 'danger', title: 'Ошибка удаления', message: 'Не удалось удалить запись о пропуске' });
+            }
         }
     };
 
@@ -284,7 +289,7 @@ export const AbsenteeismPage = () => {
             return;
         }
 
-        const printContent = printRef.current.innerHTML;
+        const printContent = DOMPurify.sanitize(printRef.current.innerHTML);
         printWindow.document.write(`
             <!DOCTYPE html>
             <html>
@@ -484,7 +489,7 @@ export const AbsenteeismPage = () => {
                     <div className="p-6 border-b border-slate-200 dark:border-slate-700">
                         <h2 className="text-lg font-semibold text-slate-800 dark:text-white">
                             Статистика за{' '}
-                            {new Date(selectedMonth).toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}
+                            {getMonthOrNow(selectedMonth).toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}
                         </h2>
                         <p className="text-slate-500 mt-1">Сводная таблица по всем классам</p>
                     </div>
@@ -671,7 +676,7 @@ export const AbsenteeismPage = () => {
                     <h1 className="text-2xl font-black mb-4 text-center">
                         {viewMode === 'day'
                             ? `Отчёт по пропускам за ${formatDateEuropean(selectedDate)}`
-                            : `Отчёт по пропускам за ${new Date(selectedMonth).toLocaleString('ru-RU', { month: 'long', year: 'numeric' })}`}
+                            : `Отчёт по пропускам за ${getMonthOrNow(selectedMonth).toLocaleString('ru-RU', { month: 'long', year: 'numeric' })}`}
                     </h1>
 
                     <table className="w-full border-collapse">

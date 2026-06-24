@@ -76,3 +76,64 @@ export const formatDateEuropean = (date: Date | string): string => {
     const year = d.getFullYear();
     return `${day}.${month}.${year}`;
 };
+
+/**
+ * Проверяет, является ли строка валидной датой в формате YYYY-MM-DD.
+ */
+export const isValidDateString = (value: string): boolean => {
+    if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    const date = new Date(value);
+    if (isNaN(date.getTime())) return false;
+    const [year, month, day] = value.split('-').map(Number);
+    return (
+        date.getUTCFullYear() === year &&
+        date.getUTCMonth() + 1 === month &&
+        date.getUTCDate() === day
+    );
+};
+
+/**
+ * Безопасно парсит строку даты YYYY-MM-DD в объект Date.
+ * Возвращает null, если дата невалидна.
+ */
+export const parseDateSafe = (value: string | Date | undefined): Date | null => {
+    if (!value) return null;
+    const date = typeof value === 'string' ? new Date(value) : value;
+    if (isNaN(date.getTime())) return null;
+    return date;
+};
+
+/**
+ * Возвращает дату из строки или текущую дату, если строка невалидна.
+ */
+export const getDateOrToday = (value: string | Date | undefined): Date => {
+    return parseDateSafe(value) ?? new Date();
+};
+
+/**
+ * Проверяет, является ли строка валидным месяцем в формате YYYY-MM.
+ */
+export const isValidMonthString = (value: string): boolean => {
+    if (!value || !/^\d{4}-\d{2}$/.test(value)) return false;
+    const [year, month] = value.split('-').map(Number);
+    return year > 0 && month >= 1 && month <= 12;
+};
+
+/**
+ * Безопасно парсит строку месяца YYYY-MM в объект Date (первый день месяца).
+ * Возвращает null, если строка невалидна.
+ */
+export const parseMonthSafe = (value: string | undefined): Date | null => {
+    if (!value || !isValidMonthString(value)) return null;
+    const [year, month] = value.split('-').map(Number);
+    const date = new Date(year, month - 1, 1);
+    if (isNaN(date.getTime())) return null;
+    return date;
+};
+
+/**
+ * Возвращает месяц из строки или текущую дату, если строка невалидна.
+ */
+export const getMonthOrNow = (value: string | undefined): Date => {
+    return parseMonthSafe(value) ?? new Date();
+};

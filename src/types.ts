@@ -278,3 +278,68 @@ export const ROOM_TYPES = [
     'Технология',
     'Актовый зал'
 ];
+
+
+// --- USER MANAGEMENT TYPES ---
+
+export type UserRole = 'admin' | 'teacher' | 'canteen';
+
+export type PageId =
+    | 'dashboard'
+    | 'schedule'
+    | 'schedule2'
+    | 'substitutions'
+    | 'duty'
+    | 'nutrition'
+    | 'absenteeism'
+    | 'bells'
+    | 'directory'
+    | 'reports'
+    | 'export'
+    | 'admin'
+    | 'settings'
+    | 'users';
+
+export type Permission =
+    | 'view_dashboard'
+    | 'view_schedule'
+    | 'edit_schedule'
+    | 'view_substitutions'
+    | 'edit_substitutions'
+    | 'view_duty'
+    | 'edit_duty'
+    | 'view_nutrition'
+    | 'edit_nutrition'
+    | 'view_absenteeism'
+    | 'edit_absenteeism'
+    | 'view_bells'
+    | 'edit_bells'
+    | 'view_directory'
+    | 'edit_directory'
+    | 'view_reports'
+    | 'view_export'
+    | 'view_admin'
+    | 'view_settings'
+    | 'manage_users';
+
+export interface UserProfile {
+    id: string;
+    email: string;
+    displayName: string;
+    firstName?: string;
+    role: UserRole;
+    isActive: boolean;
+    permissions: Permission[];
+    allowedPages: PageId[];
+    createdAt?: string;
+    createdBy?: string;
+    lastLoginAt?: string;
+}
+
+export interface RoleDefinition {
+    id: UserRole;
+    name: string;
+    description: string;
+    defaultPermissions: Permission[];
+    defaultPages: PageId[];
+}

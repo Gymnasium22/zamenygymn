@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useStaticData, useScheduleData } from '../context/DataContext';
 import { Icon } from '../components/Icons';
 import { exportService } from '../services/exportService';
+import { escapeCsv } from '../utils/csv';
 import { BarChart } from '../components/UI';
 import { DAYS } from '../types';
 
@@ -136,23 +137,25 @@ export const ReportsPage = () => {
                 tariffData
                     .map(
                         (r) =>
-                            `"${r.name}",${r.weeklyHours},${r.subsTaken},${r.subsMissed},${r.actualHours},"${Object.entries(
-                                r.subjectBreakdown
-                            )
-                                .map(([k, v]) => k + ': ' + v)
-                                .join(', ')}"`
+                            `${escapeCsv(r.name)},${escapeCsv(r.weeklyHours)},${escapeCsv(r.subsTaken)},${escapeCsv(
+                                r.subsMissed
+                            )},${escapeCsv(r.actualHours)},${escapeCsv(
+                                Object.entries(r.subjectBreakdown)
+                                    .map(([k, v]) => k + ': ' + v)
+                                    .join(', ')
+                            )}`
                     )
                     .join('\n');
         } else if (reportTab === 'sanpin') {
-            content = 'Day,Score\n' + sanPinData.map((r) => `${r.label},${r.value}`).join('\n');
+            content = 'Day,Score\n' + sanPinData.map((r) => `${escapeCsv(r.label)},${escapeCsv(r.value)}`).join('\n');
         } else if (reportTab === 'builder') {
-            const header = selectedColumns.map((key) => reportColumns.find((c) => c.key === key)?.label).join(',');
+            const header = selectedColumns.map((key) => escapeCsv(reportColumns.find((c) => c.key === key)?.label)).join(',');
             const rows = tariffData
                 .map((r) => {
                     return selectedColumns
                         .map((key) => {
                             const val = r[key as keyof typeof r];
-                            return typeof val === 'string' && val.includes(',') ? `"${val}"` : val;
+                            return escapeCsv(val);
                         })
                         .join(',');
                 })

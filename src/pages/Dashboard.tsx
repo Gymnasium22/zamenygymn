@@ -9,6 +9,7 @@ import { getActiveSemester, formatDateISO } from '../utils/helpers';
 import { weatherService, WeatherData, ForecastItem } from '../services/weatherService';
 import { escapeMarkdown } from '../utils/escapeHtml';
 import { safeLocalStorageGet, safeLocalStorageSet } from '../utils/localStorage';
+import { logger } from '../utils/logger';
 
 // Enhanced interfaces for Live Search
 interface EntityStatus {
@@ -79,7 +80,7 @@ const WeatherWidget = () => {
                 setLoading(false);
             } catch (err) {
                 if ((err as Error).name === 'AbortError') return;
-                console.error(err);
+                logger.error(err);
                 setError('Ошибка загрузки погоды');
                 setLoading(false);
             }
@@ -256,7 +257,7 @@ const WeatherWidget = () => {
 export const DashboardPage = () => {
     const { subjects, teachers, classes, rooms, bellSchedule, settings, privateSettings } = useStaticData();
     const { schedule, substitutions } = useScheduleData();
-    const { role } = useAuth();
+    const { role, profile } = useAuth();
     const navigate = useNavigate();
     const { addToast } = useToast();
 
@@ -289,18 +290,26 @@ export const DashboardPage = () => {
     const canShowWeather = allowedWidgets.includes('weather');
     const [isWidgetModalOpen, setIsWidgetModalOpen] = useState(false);
     const [draggedWidgetId, setDraggedWidgetId] = useState<string | null>(null);
+    const widgetDragTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const handleDragStart = (e: React.DragEvent<HTMLDivElement>, id: string) => {
         setDraggedWidgetId(id);
         e.dataTransfer.effectAllowed = 'move';
-        setTimeout(() => {
-            if (e.target instanceof HTMLElement) {
-                e.target.style.opacity = '0.5';
+        if (widgetDragTimeoutRef.current) clearTimeout(widgetDragTimeoutRef.current);
+        const target = e.target;
+        widgetDragTimeoutRef.current = setTimeout(() => {
+            widgetDragTimeoutRef.current = null;
+            if (target instanceof HTMLElement) {
+                target.style.opacity = '0.5';
             }
         }, 0);
     };
 
     const handleDragEnd = (e: React.DragEvent<HTMLDivElement>) => {
+        if (widgetDragTimeoutRef.current) {
+            clearTimeout(widgetDragTimeoutRef.current);
+            widgetDragTimeoutRef.current = null;
+        }
         setDraggedWidgetId(null);
         if (e.target instanceof HTMLElement) {
             e.target.style.opacity = '1';
@@ -853,7 +862,7 @@ export const DashboardPage = () => {
             }
         } catch (error) {
             if ((error as Error).name === 'AbortError') return;
-            console.error('Ошибка отправки в Telegram:', error);
+            logger.error('Ошибка отправки в Telegram:', error);
             addToast({ type: 'danger', title: 'Ошибка', message: `Не удалось отправить сообщение. Ошибка: ${error}` });
         } finally {
             setIsSendingFeedback(false);
@@ -1352,7 +1361,7 @@ export const DashboardPage = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
                 <div className="lg:col-span-2 flex flex-col justify-end">
                     <h1 className="text-4xl font-black text-slate-800 dark:text-white tracking-tight mb-1 bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400">
-                        {greeting}, {role === 'admin' ? 'Администратор' : role === 'canteen' ? 'Столовая' : 'Учитель'}!
+                        {greeting}, {profile?.firstName || profile?.displayName || (role === 'admin' ? 'Администратор' : role === 'canteen' ? 'Столовая' : 'Учитель')}!
                     </h1>
                     <p className="text-slate-500 dark:text-slate-400 text-lg font-medium mb-4">
                         Сегодня{' '}

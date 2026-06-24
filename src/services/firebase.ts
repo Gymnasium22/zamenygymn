@@ -37,4 +37,4 @@ if (!firebaseConfig.apiKey) {
     console.log('Firebase initialized successfully (Modular SDK)');
 }
 
-export { firestoreDB, auth };
+export { app, firebaseConfig, firestoreDB, auth };

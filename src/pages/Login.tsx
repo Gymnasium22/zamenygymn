@@ -4,9 +4,10 @@ import { useAuth } from '../context/AuthContext';
 import { Icon } from '../components/Icons';
 import { useNavigate } from 'react-router-dom';
 import { signInWithEmailAndPassword } from 'firebase/auth';
+import { logger } from '../utils/logger';
 
 export const LoginPage = () => {
-    const { setGuestRole, role, loading: authLoading } = useAuth();
+    const { role, loading: authLoading } = useAuth();
     const navigate = useNavigate();
     const [mode, setMode] = useState<'select' | 'teacher' | 'admin' | 'canteen'>('select');
     const [email, setEmail] = useState('');
@@ -16,9 +17,7 @@ export const LoginPage = () => {
 
     useEffect(() => {
         if (!authLoading && role) {
-            if (role === 'admin' || role === 'teacher' || role === 'canteen') {
-                navigate('/dashboard');
-            }
+            navigate('/dashboard');
         }
     }, [role, authLoading, navigate]);
 
@@ -34,17 +33,9 @@ export const LoginPage = () => {
         }
 
         try {
-            let loginEmail = email;
-
-            if (mode === 'teacher') {
-                loginEmail = 'teacher@gymnasium22.com';
-            } else if (mode === 'canteen') {
-                loginEmail = 'canteen@gymnasium22.com';
-            }
-
-            await signInWithEmailAndPassword(auth, loginEmail, password);
+            await signInWithEmailAndPassword(auth, email.trim(), password);
         } catch (err) {
-            console.error('Firebase Auth Error:', err);
+            logger.error('Firebase Auth Error:', err);
             const errorCode = (err as { code?: string })?.code;
 
             let friendlyMessage = 'Произошла неизвестная ошибка входа.';
@@ -69,28 +60,6 @@ export const LoginPage = () => {
         }
     };
 
-    const handleParentLogin = () => {
-        setGuestRole();
-        navigate('/schedule');
-    };
-
-    // Check for saved quick login
-    const [savedRole, setSavedRole] = useState<string | null>(null);
-    useEffect(() => {
-        const saved = localStorage.getItem('gym_quick_login');
-        if (saved) setSavedRole(saved);
-    }, []);
-
-    const handleQuickLogin = () => {
-        if (savedRole === 'guest') {
-            handleParentLogin();
-        }
-    };
-
-    const saveQuickLogin = (roleType: string) => {
-        localStorage.setItem('gym_quick_login', roleType);
-    };
-
     return (
         <div className="min-h-screen mesh-gradient-bg flex items-center justify-center p-4 relative overflow-hidden">
             {/* Background Decorations */}
@@ -111,50 +80,6 @@ export const LoginPage = () => {
 
                 {mode === 'select' && (
                     <div className="space-y-3 sm:space-y-4 animate-fade-in">
-                        {/* Quick login badge for returning users */}
-                        {savedRole === 'guest' && (
-                            <button
-                                onClick={handleQuickLogin}
-                                className="w-full p-3 sm:p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 shadow-sm hover:shadow-md active:scale-[0.98] transition-all text-left flex items-center gap-3 relative overflow-hidden mb-2"
-                            >
-                                <div className="bg-emerald-500 p-2 rounded-xl text-white">
-                                    <Icon name="Zap" size={20} />
-                                </div>
-                                <div>
-                                    <div className="font-bold text-emerald-800 dark:text-emerald-200 text-sm">
-                                        Быстрый вход
-                                    </div>
-                                    <div className="text-xs text-emerald-600 dark:text-emerald-400">
-                                        Родитель / Ученик
-                                    </div>
-                                </div>
-                                <Icon name="ArrowRight" className="ml-auto text-emerald-400" size={18} />
-                            </button>
-                        )}
-
-                        <button
-                            onClick={() => { handleParentLogin(); saveQuickLogin('guest'); }}
-                            className="w-full p-5 sm:p-4 rounded-2xl bg-white/80 dark:bg-slate-800/80 border border-white/60 dark:border-slate-700 shadow-sm hover:shadow-lg hover:bg-white dark:hover:bg-slate-800 group transition-all text-left flex items-center gap-4 relative overflow-hidden mobile-touch-feedback active:scale-[0.98]"
-                        >
-                            <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                            <div className="bg-emerald-100 dark:bg-emerald-900/50 p-3 rounded-xl text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform shrink-0">
-                                <Icon name="Users" size={24} />
-                            </div>
-                            <div className="relative z-10 min-w-0">
-                                <div className="font-bold text-slate-800 dark:text-white text-base sm:text-lg">
-                                    Родитель / Ученик
-                                </div>
-                                <div className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                                    Только просмотр
-                                </div>
-                            </div>
-                            <Icon
-                                name="ArrowRight"
-                                className="ml-auto text-slate-300 group-hover:text-emerald-500 transition-colors shrink-0"
-                                size={20}
-                            />
-                        </button>
-
                         <button
                             onClick={() => setMode('teacher')}
                             className="w-full p-5 sm:p-4 rounded-2xl bg-white/80 dark:bg-slate-800/80 border border-white/60 dark:border-slate-700 shadow-sm hover:shadow-lg hover:bg-white dark:hover:bg-slate-800 group transition-all text-left flex items-center gap-4 relative overflow-hidden mobile-touch-feedback active:scale-[0.98]"
@@ -166,7 +91,7 @@ export const LoginPage = () => {
                             <div className="relative z-10 min-w-0">
                                 <div className="font-bold text-slate-800 dark:text-white text-base sm:text-lg truncate">Учитель</div>
                                 <div className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                                    Вход по общему паролю
+                                    Вход по логину и паролю
                                 </div>
                             </div>
                             <Icon
@@ -187,7 +112,7 @@ export const LoginPage = () => {
                             <div className="relative z-10 min-w-0">
                                 <div className="font-bold text-slate-800 dark:text-white text-base sm:text-lg truncate">Столовая</div>
                                 <div className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                                    Вход по общему паролю
+                                    Вход по логину и паролю
                                 </div>
                             </div>
                             <Icon
@@ -242,27 +167,25 @@ export const LoginPage = () => {
                             </h2>
                         </div>
 
-                        {mode === 'admin' && (
-                            <div>
-                                <label className="block text-xs font-bold uppercase text-slate-500 dark:text-slate-400 mb-2 ml-1">
-                                    Email
-                                </label>
-                                <div className="relative">
-                                    <Icon name="User" className="absolute left-4 top-3.5 text-slate-400" size={18} />
-                                    <input
-                                        type="email"
-                                        inputMode="email"
-                                        autoComplete="email"
-                                        value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
-                                        className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50/50 dark:bg-slate-700/50 dark:text-white outline-none focus:ring-2 ring-indigo-500/50 transition-all font-medium"
-                                        placeholder="admin@school.com"
-                                        autoFocus
-                                        required
-                                    />
-                                </div>
+                        <div>
+                            <label className="block text-xs font-bold uppercase text-slate-500 dark:text-slate-400 mb-2 ml-1">
+                                Email
+                            </label>
+                            <div className="relative">
+                                <Icon name="User" className="absolute left-4 top-3.5 text-slate-400" size={18} />
+                                <input
+                                    type="email"
+                                    inputMode="email"
+                                    autoComplete="email"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50/50 dark:bg-slate-700/50 dark:text-white outline-none focus:ring-2 ring-indigo-500/50 transition-all font-medium"
+                                    placeholder="Введите email"
+                                    autoFocus
+                                    required
+                                />
                             </div>
-                        )}
+                        </div>
 
                         <div>
                             <label className="block text-xs font-bold uppercase text-slate-500 dark:text-slate-400 mb-2 ml-1">

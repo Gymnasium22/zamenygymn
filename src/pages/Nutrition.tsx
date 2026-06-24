@@ -5,18 +5,18 @@ import { DateInput } from '../components/DateInput';
 import { Icon } from '../components/Icons';
 import { Modal, useToast, SearchableSelect } from '../components/UI';
 import { NutritionRecord } from '../types';
-import { formatDateISO, formatDateEuropean, generateId } from '../utils/helpers';
+import { formatDateISO, formatDateEuropean, generateId, getDateOrToday, getMonthOrNow } from '../utils/helpers';
 import { exportService } from '../services/exportService';
 
 export const NutritionPage = () => {
     const { classes } = useStaticData();
     const { nutritionRecords, saveScheduleData } = useScheduleData();
-    const { role, user } = useAuth();
+    const { role, user, hasPermission } = useAuth();
     const { addToast } = useToast();
 
     const isAdmin = role === 'admin';
-    const isTeacher = role === 'teacher';
     const isCanteen = role === 'canteen';
+    const canEditNutrition = hasPermission('edit_nutrition');
 
     const [selectedDate, setSelectedDate] = useState(formatDateISO());
     const [viewMode, setViewMode] = useState<'day' | 'month'>('day');
@@ -43,7 +43,7 @@ export const NutritionPage = () => {
     const recordsForMonth = useMemo(() => {
         const [year, month] = selectedMonth.split('-').map(Number);
         return nutritionRecords.filter((r) => {
-            const recordDate = new Date(r.date);
+            const recordDate = getDateOrToday(r.date);
             return recordDate.getFullYear() === year && recordDate.getMonth() + 1 === month;
         });
     }, [nutritionRecords, selectedMonth]);
@@ -214,9 +214,13 @@ export const NutritionPage = () => {
             }
         }
 
-        await saveScheduleData({ nutritionRecords: updatedRecords });
-        addToast({ type: 'success', title: 'Данные сохранены' });
-        closeModal();
+        try {
+            await saveScheduleData({ nutritionRecords: updatedRecords });
+            addToast({ type: 'success', title: 'Данные сохранены' });
+            closeModal();
+        } catch {
+            addToast({ type: 'danger', title: 'Ошибка сохранения', message: 'Не удалось сохранить данные о питании' });
+        }
     }, [
         selectedClassId,
         totalCount,
@@ -235,7 +239,11 @@ export const NutritionPage = () => {
             const record = nutritionRecords.find((r) => r.id === recordId);
             if (!record) return;
 
-            // Teachers can only delete their own records
+            // Only users with edit permission can delete, and non-admins can delete only their own records
+            if (!canEditNutrition) {
+                addToast({ type: 'warning', title: 'У вас нет права удалять записи о питании' });
+                return;
+            }
             if (!isAdmin && record.enteredBy !== user?.uid) {
                 addToast({ type: 'warning', title: 'Вы можете удалять только свои записи' });
                 return;
@@ -244,10 +252,14 @@ export const NutritionPage = () => {
             if (!window.confirm('Удалить запись?')) return;
 
             const updatedRecords = nutritionRecords.filter((r) => r.id !== recordId);
-            await saveScheduleData({ nutritionRecords: updatedRecords });
-            addToast({ type: 'success', title: 'Запись удалена' });
+            try {
+                await saveScheduleData({ nutritionRecords: updatedRecords });
+                addToast({ type: 'success', title: 'Запись удалена' });
+            } catch {
+                addToast({ type: 'danger', title: 'Ошибка удаления', message: 'Не удалось удалить запись о питании' });
+            }
         },
-        [nutritionRecords, saveScheduleData, isAdmin, user, addToast]
+        [nutritionRecords, saveScheduleData, canEditNutrition, isAdmin, user, addToast]
     );
 
     // Export to PDF (using print)
@@ -364,7 +376,7 @@ export const NutritionPage = () => {
                             </p>
                         </div>
                     </div>
-                    {isTeacher || isAdmin ? (
+                    {canEditNutrition ? (
                         <div className="flex flex-wrap gap-2">
                             {classesWithoutData.map((cls) => (
                                 <button
@@ -448,9 +460,9 @@ export const NutritionPage = () => {
                     <h2 className="text-lg font-bold text-slate-800 dark:text-white">
                         {viewMode === 'day'
                             ? `Данные за ${formatDateEuropean(selectedDate)}`
-                            : `Данные за ${new Date(selectedMonth + '-01').toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}`}
+                            : `Данные за ${getMonthOrNow(selectedMonth).toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}`}
                     </h2>
-                    {(isTeacher || isAdmin) && viewMode === 'day' && (
+                    {canEditNutrition && viewMode === 'day' && (
                         <button
                             onClick={() => openModal()}
                             className="px-4 py-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition-colors font-semibold flex items-center gap-2"
@@ -478,12 +490,7 @@ export const NutritionPage = () => {
                                     <th className="px-4 py-3 text-center text-sm font-semibold text-slate-700 dark:text-slate-300">
                                         Обычные
                                     </th>
-                                    {isAdmin && (
-                                        <th className="px-4 py-3 text-center text-sm font-semibold text-slate-700 dark:text-slate-300">
-                                            Действия
-                                        </th>
-                                    )}
-                                    {isTeacher && (
+                                    {canEditNutrition && (
                                         <th className="px-4 py-3 text-center text-sm font-semibold text-slate-700 dark:text-slate-300">
                                             Действия
                                         </th>
@@ -494,7 +501,7 @@ export const NutritionPage = () => {
                                 {recordsForDate.length === 0 ? (
                                     <tr>
                                         <td
-                                            colSpan={isAdmin || isTeacher ? 5 : 4}
+                                            colSpan={canEditNutrition ? 5 : 4}
                                             className="px-4 py-8 text-center text-slate-500 dark:text-slate-400"
                                         >
                                             Нет данных за выбранную дату
@@ -526,18 +533,16 @@ export const NutritionPage = () => {
                                                 <td className="px-4 py-3 text-center text-green-600 font-semibold">
                                                     {record.regularCount}
                                                 </td>
-                                                {!isCanteen && (
+                                                {canEditNutrition && (
                                                     <td className="px-4 py-3 text-center">
                                                         <div className="flex items-center justify-center gap-2">
-                                                            {(isTeacher || isAdmin) && (
-                                                                <button
-                                                                    onClick={() => openModal(undefined, record)}
-                                                                    className="p-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 text-indigo-600 rounded-lg transition-colors"
-                                                                    title="Редактировать"
-                                                                >
-                                                                    <Icon name="Edit" size={18} />
-                                                                </button>
-                                                            )}
+                                                            <button
+                                                                onClick={() => openModal(undefined, record)}
+                                                                className="p-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 text-indigo-600 rounded-lg transition-colors"
+                                                                title="Редактировать"
+                                                            >
+                                                                <Icon name="Edit" size={18} />
+                                                            </button>
                                                             <button
                                                                 onClick={() => deleteRecord(record.id)}
                                                                 className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 rounded-lg transition-colors"
@@ -590,7 +595,7 @@ export const NutritionPage = () => {
                                     monthStats.statsByDate.map(([date, stats]) => (
                                         <tr key={date} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
                                             <td className="px-4 py-3 font-semibold text-slate-800 dark:text-white">
-                                                {new Date(date).toLocaleDateString('ru-RU', {
+                                                {getDateOrToday(date).toLocaleDateString('ru-RU', {
                                                     weekday: 'short',
                                                     day: 'numeric',
                                                     month: 'short'
@@ -625,7 +630,7 @@ export const NutritionPage = () => {
                         <>
                             <p className="text-center mb-6 text-slate-600">
                                 Дата:{' '}
-                                {new Date(selectedDate).toLocaleDateString('ru-RU', {
+                                {getDateOrToday(selectedDate).toLocaleDateString('ru-RU', {
                                     day: 'numeric',
                                     month: 'long',
                                     year: 'numeric'
@@ -686,7 +691,7 @@ export const NutritionPage = () => {
                         <>
                             <p className="text-center mb-6 text-slate-600">
                                 Месяц:{' '}
-                                {new Date(selectedMonth + '-01').toLocaleDateString('ru-RU', {
+                                {getMonthOrNow(selectedMonth).toLocaleDateString('ru-RU', {
                                     month: 'long',
                                     year: 'numeric'
                                 })}

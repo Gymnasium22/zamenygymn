@@ -3,7 +3,7 @@ import { useStaticData, useScheduleData } from '../context/DataContext';
 import { DateInput } from '../components/DateInput';
 import { Icon } from '../components/Icons';
 import { Shift, SHIFT_PERIODS, DAYS } from '../types';
-import { formatDateISO, getScheduleForDate } from '../utils/helpers';
+import { formatDateISO, getScheduleForDate, getDateOrToday } from '../utils/helpers';
 
 
 export const AdminPage = () => {
@@ -21,7 +21,7 @@ export const AdminPage = () => {
     // Определяем актуальное расписание на основе выбранной даты
     const activeSchedule = useMemo(() => {
         const data = { schedule: schedule1, schedule2, settings };
-        const schedule = getScheduleForDate(new Date(selectedDate), data);
+        const schedule = getScheduleForDate(getDateOrToday(selectedDate), data);
         return schedule;
     }, [selectedDate, schedule1, schedule2, settings]);
 
@@ -34,7 +34,7 @@ export const AdminPage = () => {
     }, [roomShift]);
 
     const selectedDayOfWeek = useMemo(() => {
-        const idx = new Date(selectedDate).getDay();
+        const idx = getDateOrToday(selectedDate).getDay();
         if (idx === 0 || idx === 6) return null;
         return DAYS[idx - 1];
     }, [selectedDate]);

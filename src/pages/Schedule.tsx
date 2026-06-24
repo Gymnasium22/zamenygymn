@@ -39,6 +39,9 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
     const scheduleRef = useRef(schedule);
     scheduleRef.current = schedule;
 
+    // Ref для очистки drag-and-drop таймаута
+    const dragTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
     // Вспомогательная функция для сохранения, которая знает о текущем семестре
     const saveCurrentSchedule = async (newScheduleData: ScheduleItem[]) => {
         await saveSemesterSchedule(semester, newScheduleData);
@@ -529,10 +532,18 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
         setDraggedItem(item);
         e.dataTransfer.effectAllowed = 'move';
         const el = e.currentTarget as HTMLElement;
-        setTimeout(() => el.classList.add('dragging'), 0);
+        if (dragTimeoutRef.current) clearTimeout(dragTimeoutRef.current);
+        dragTimeoutRef.current = setTimeout(() => {
+            dragTimeoutRef.current = null;
+            el.classList.add('dragging');
+        }, 0);
     };
 
     const handleDragEnd = (e: React.DragEvent) => {
+        if (dragTimeoutRef.current) {
+            clearTimeout(dragTimeoutRef.current);
+            dragTimeoutRef.current = null;
+        }
         const el = e.currentTarget as HTMLElement;
         el.classList.remove('dragging');
         setDraggedItem(null);

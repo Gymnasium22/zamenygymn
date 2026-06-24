@@ -17,12 +17,14 @@ import {
 import { INITIAL_DATA, getInitialData } from '../constants';
 import { formatDateEuropean, formatDateISO, generateId } from '../utils/helpers';
 import { auditLog } from '../services/auditLog';
+import { logger } from '../utils/logger';
 import { safeLocalStorageGet } from '../utils/localStorage';
 import { stripDangerousKeys } from '../utils/safeMerge';
 import { SemesterConfig } from '../components/settings/SemesterConfig';
 import { TelegramTemplateEditor } from '../components/settings/TelegramTemplateEditor';
 import { dbService } from '../services/db';
 import { AppDataImportSchema, AppDataImport } from '../utils/importSchema';
+import { UsersManagement } from '../components/settings/UsersManagement';
 
 type SettingsSection =
     | 'integrations'
@@ -30,7 +32,8 @@ type SettingsSection =
     | 'schedule'
     | 'notifications'
     | 'widgets'
-    | 'system';
+    | 'system'
+    | 'users';
 
 const SECTIONS: { id: SettingsSection; label: string; icon: string }[] = [
     { id: 'integrations', label: 'Интеграции', icon: 'Plug' },
@@ -38,7 +41,8 @@ const SECTIONS: { id: SettingsSection; label: string; icon: string }[] = [
     { id: 'schedule', label: 'Расписание', icon: 'Calendar' },
     { id: 'notifications', label: 'Уведомления', icon: 'MessageSquare' },
     { id: 'widgets', label: 'Виджеты', icon: 'Layout' },
-    { id: 'system', label: 'Система', icon: 'Database' }
+    { id: 'system', label: 'Система', icon: 'Database' },
+    { id: 'users', label: 'Пользователи', icon: 'Users' }
 ];
 
 // --- Helper Components ---
@@ -206,11 +210,7 @@ export const SettingsPage = () => {
     } = useScheduleData();
     const { addToast } = useToast();
 
-    const [passwordInput, setPasswordInput] = useState('');
-    const [passwordError, setPasswordError] = useState('');
-    const [isUnlocked, setIsUnlocked] = useState(() => {
-        return sessionStorage.getItem('settings_unlocked') === 'true';
-    });
+
 
     const [activeSection, setActiveSection] = useState<SettingsSection>('integrations');
     const [isSavingSection, setIsSavingSection] = useState<SettingsSection | null>(null);
@@ -221,8 +221,7 @@ export const SettingsPage = () => {
     const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
     const [publicScheduleUrl, setPublicScheduleUrl] = useState('');
     
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const [QRCodeComponent, setQRCodeComponent] = useState<React.ComponentType<any> | null>(null);
+    const [QRCodeComponent, setQRCodeComponent] = useState<React.ComponentType<{ value: string; size?: number; level?: string; includeMargin?: boolean; className?: string }> | null>(null);
     useEffect(() => {
         if (isPublishModalOpen && publicScheduleUrl && !QRCodeComponent) {
             import('qrcode.react').then((mod) => setQRCodeComponent(() => mod.QRCodeSVG));
@@ -304,18 +303,23 @@ export const SettingsPage = () => {
                     return;
                 }
                 if (window.confirm('Это перезапишет всю базу данных (все расписания, замены, списки). Продолжить?')) {
-                    const mergedData = {
-                        ...getInitialData(),
-                        ...json,
-                        rooms: json.rooms || INITIAL_DATA.rooms,
-                        classes: json.classes || [],
-                        schedule: json.schedule || [],
-                        schedule2: json.schedule2 || [],
-                        teachers: json.teachers || [],
-                        subjects: json.subjects || [],
-                        substitutions: json.substitutions || [],
-                        settings: { ...INITIAL_DATA.settings, ...json.settings }
-                    } as unknown as AppData;
+                    const initial = getInitialData();
+                    const mergedData: Partial<AppData> = {
+                        ...initial,
+                        rooms: (json.rooms as AppData['rooms']) || initial.rooms,
+                        classes: (json.classes as AppData['classes']) || [],
+                        schedule: (json.schedule as AppData['schedule']) || [],
+                        schedule2: (json.schedule2 as AppData['schedule2']) || [],
+                        teachers: (json.teachers as AppData['teachers']) || [],
+                        subjects: (json.subjects as AppData['subjects']) || [],
+                        substitutions: (json.substitutions as AppData['substitutions']) || [],
+                        dutyZones: (json.dutyZones as unknown as AppData['dutyZones']) || initial.dutyZones,
+                        dutySchedule: (json.dutySchedule as unknown as AppData['dutySchedule']) || [],
+                        nutritionRecords: (json.nutritionRecords as unknown as AppData['nutritionRecords']) || [],
+                        absenteeismRecords: (json.absenteeismRecords as unknown as AppData['absenteeismRecords']) || [],
+                        bellSchedule: (json.bellSchedule as AppData['bellSchedule']) || initial.bellSchedule,
+                        settings: { ...initial.settings, ...(json.settings || {}) }
+                    };
                     await saveStaticData(mergedData as Partial<StaticAppData>);
                     await saveScheduleData(mergedData as Partial<ScheduleAndSubstitutionData>);
                     addToast({ type: 'success', title: 'Успешно', message: 'База данных успешно восстановлена!' });
@@ -337,7 +341,7 @@ export const SettingsPage = () => {
             setIsPublishModalOpen(true);
             addToast({ type: 'success', title: 'Успешно', message: 'Расписание опубликовано!' });
         } catch (e) {
-            console.error(e);
+            logger.error(e);
             addToast({ type: 'danger', title: 'Ошибка', message: 'Не удалось опубликовать расписание.' });
         }
     };
@@ -357,7 +361,7 @@ export const SettingsPage = () => {
             addToast({ type: 'success', title: 'Успешно', message: 'Публичное расписание удалено.' });
             setPublicScheduleUrl('');
         } catch (e) {
-            console.error(e);
+            logger.error(e);
             addToast({ type: 'danger', title: 'Ошибка', message: 'Не удалось удалить публичное расписание.' });
         }
     };
@@ -713,59 +717,6 @@ export const SettingsPage = () => {
             addToast({ type: 'danger', title: 'Ошибка', message: 'Не удалось сбросить настройки' });
         }
     };
-
-    const handleUnlock = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (passwordInput === 'Gymn22Minsk26') {
-            setIsUnlocked(true);
-            sessionStorage.setItem('settings_unlocked', 'true');
-            setPasswordError('');
-            addToast({ type: 'success', title: 'Успешно', message: 'Доступ к настройкам разрешен' });
-        } else {
-            setPasswordError('Неверный пароль');
-            addToast({ type: 'danger', title: 'Ошибка', message: 'Неверный пароль для доступа к настройкам' });
-        }
-    };
-
-    if (!isUnlocked) {
-        return (
-            <div className="h-full flex items-center justify-center p-4">
-                <div className="max-w-md w-full p-8 bg-white dark:bg-dark-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-xl flex flex-col items-center justify-center animate-page-in">
-                    <div className="w-16 h-16 rounded-2xl bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mb-6 shadow-sm">
-                        <Icon name="Lock" size={32} />
-                    </div>
-                    <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-2 text-center">Доступ ограничен</h2>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 text-center">
-                        Для просмотра и редактирования настроек системы необходимо ввести пароль администратора.
-                    </p>
-                    <form onSubmit={handleUnlock} className="w-full space-y-4">
-                        <div className="space-y-1">
-                            <PasswordInput
-                                value={passwordInput}
-                                onChange={(v) => {
-                                    setPasswordInput(v);
-                                    if (passwordError) setPasswordError('');
-                                }}
-                                placeholder="Введите пароль доступа"
-                                id="settings-password"
-                            />
-                            {passwordError && (
-                                <p className="text-xs text-red-500 font-semibold mt-1 flex items-center gap-1">
-                                    <Icon name="AlertTriangle" size={12} /> {passwordError}
-                                </p>
-                            )}
-                        </div>
-                        <button
-                            type="submit"
-                            className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm shadow-lg shadow-indigo-200 dark:shadow-none transition flex items-center justify-center gap-2"
-                        >
-                            <Icon name="Unlock" size={16} /> Войти в настройки
-                        </button>
-                    </form>
-                </div>
-            </div>
-        );
-    }
 
     if (!settings) {
         return (
@@ -1228,6 +1179,12 @@ export const SettingsPage = () => {
                         </SectionCard>
                     )}
 
+                    {activeSection === 'users' && (
+                        <div className="bg-white dark:bg-dark-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm p-6">
+                            <UsersManagement />
+                        </div>
+                    )}
+
                     {activeSection === 'system' && (
                         <div className="space-y-6">
                             <div className="bg-white dark:bg-dark-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm p-6">
@@ -1657,7 +1614,7 @@ const AuditLogViewer: React.FC = () => {
             const logs = await auditLog.getEntries(100);
             setEntries(logs);
         } catch (e) {
-            console.error(e);
+            logger.error(e);
         } finally {
             setIsLoading(false);
         }

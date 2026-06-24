@@ -5,8 +5,16 @@ import { Icon } from '../components/Icons';
 import { DateInput } from '../components/DateInput';
 import { Modal, useToast } from '../components/UI';
 import { DAYS, ScheduleItem, ClassEntity, Substitution, SubstitutionParams } from '../types';
-import { formatDateISO, formatDateEuropean, getScheduleForDate, generateId, getActiveSemester } from '../utils/helpers';
+import {
+    formatDateISO,
+    formatDateEuropean,
+    getScheduleForDate,
+    generateId,
+    getActiveSemester,
+    getDateOrToday
+} from '../utils/helpers';
 import { escapeMarkdown } from '../utils/escapeHtml';
+import { logger } from '../utils/logger';
 import useMedia from 'use-media';
 
 // Subcomponents
@@ -106,11 +114,11 @@ export const SubstitutionsPage = () => {
             schedule2: schedule2
         };
 
-        return getScheduleForDate(new Date(selectedDate), mockData);
+        return getScheduleForDate(getDateOrToday(selectedDate), mockData);
     }, [selectedDate, schedule1, schedule2, settings]);
 
     const isVacationDate = useMemo(() => {
-        return getActiveSemester(new Date(selectedDate), settings) === null;
+        return getActiveSemester(getDateOrToday(selectedDate), settings) === null;
     }, [selectedDate, settings]);
 
     useEffect(() => {
@@ -192,14 +200,14 @@ export const SubstitutionsPage = () => {
     }, [dayComment, selectedDate, saveStaticData]);
 
     const selectedDayOfWeek = useMemo(() => {
-        const idx = new Date(selectedDate).getDay();
+        const idx = getDateOrToday(selectedDate).getDay();
         if (idx === 0 || idx === 6) return null;
         return DAYS[idx - 1];
     }, [selectedDate]);
 
     // --- Date Navigation Helpers ---
     const changeDate = (days: number) => {
-        const d = new Date(selectedDate);
+        const d = getDateOrToday(selectedDate);
         d.setDate(d.getDate() + days);
         setSelectedDate(formatDateISO(d));
     };
@@ -314,21 +322,20 @@ export const SubstitutionsPage = () => {
             const lessonsToProcess = activeSchedule.filter(
                 (s) => s.teacherId === selectedTeacherId && s.day === selectedDayOfWeek
             );
-            const newSubs = substitutionsRef.current.filter(
+            const existingSubs = substitutionsRef.current.filter(
                 (s) => !(s.originalTeacherId === selectedTeacherId && s.date === selectedDate)
             );
 
-            lessonsToProcess.forEach((l) => {
-                newSubs.push({
-                    id: generateId(),
-                    date: selectedDate,
-                    scheduleItemId: l.id,
-                    originalTeacherId: l.teacherId,
-                    replacementTeacherId: batchActionType === 'cancel' ? 'cancelled' : batchReplacementId,
-                    lessonAbsenceReason: batchAbsenceReason,
-                    dayComment: dayComment || undefined
-                });
-            });
+            const createdSubs = lessonsToProcess.map((l) => ({
+                id: generateId(),
+                date: selectedDate,
+                scheduleItemId: l.id,
+                originalTeacherId: l.teacherId,
+                replacementTeacherId: batchActionType === 'cancel' ? 'cancelled' : batchReplacementId,
+                lessonAbsenceReason: batchAbsenceReason,
+                dayComment: dayComment || undefined
+            }));
+            const newSubs = [...existingSubs, ...createdSubs];
             await saveScheduleData({ substitutions: newSubs });
         }
 
@@ -418,7 +425,7 @@ export const SubstitutionsPage = () => {
                 setCurrentSubParams(null);
                 setSubstitutionComment('');
             } catch (error) {
-                console.error('Failed to save substitution:', error);
+                logger.error('Failed to save substitution:', error);
                 addToast({
                     type: 'danger',
                     title: 'Ошибка',
@@ -699,10 +706,18 @@ export const SubstitutionsPage = () => {
         return template.replace('{{date}}', dateStr).replace('{{content}}', content);
     };
 
-    const copyToClipboard = () => {
+    const copyToClipboard = async () => {
         const text = generateSubstitutionText();
-        navigator.clipboard.writeText(text);
-        addToast({ type: 'success', title: 'Скопировано', message: 'Сводка замен скопирована в буфер' });
+        try {
+            await navigator.clipboard.writeText(text);
+            addToast({ type: 'success', title: 'Скопировано', message: 'Сводка замен скопирована в буфер' });
+        } catch {
+            addToast({
+                type: 'danger',
+                title: 'Не удалось скопировать',
+                message: 'Доступ к буферу обмена запрещён. Скопируйте текст вручную.'
+            });
+        }
     };
 
     const sendSummaryToTelegram = async () => {
@@ -732,7 +747,7 @@ export const SubstitutionsPage = () => {
             }
             addToast({ type: 'success', title: 'Отправлено', message: 'Сводка отправлена в Telegram' });
         } catch (e) {
-            console.error(e);
+            logger.error(e);
             addToast({ type: 'danger', title: 'Ошибка', message: `Не удалось отправить: ${e}` });
         } finally {
             setIsSendingSummary(false);
@@ -847,7 +862,7 @@ export const SubstitutionsPage = () => {
             }
             addToast({ type: 'success', title: 'Отправлено', message: `Уведомление отправлено ${teacher.name}` });
         } catch (e) {
-            console.error(e);
+            logger.error(e);
             addToast({ type: 'danger', title: 'Ошибка', message: `Ошибка отправки: ${e}` });
         } finally {
             setTelegramChoiceOpen(false);
@@ -1125,7 +1140,7 @@ export const SubstitutionsPage = () => {
                                 <div className="flex-1 flex items-center justify-center gap-2 font-bold text-slate-700 dark:text-slate-200 cursor-pointer relative group">
                                     <Icon name="Calendar" size={18} className="text-indigo-500" />
                                     <span>
-                                        {new Date(selectedDate).toLocaleDateString('ru-RU', {
+                                        {getDateOrToday(selectedDate).toLocaleDateString('ru-RU', {
                                             day: 'numeric',
                                             month: 'long',
                                             weekday: 'short'
@@ -1533,12 +1548,12 @@ export const SubstitutionsPage = () => {
                                         }
                                         return true;
                                     })
-                                    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                                    .sort((a, b) => getDateOrToday(b.date).getTime() - getDateOrToday(a.date).getTime())
                                     .map((s) => {
                                         const orig = teachers.find((t) => t.id === s.originalTeacherId);
                                         const rep = teachers.find((t) => t.id === s.replacementTeacherId);
                                         const item = activeSchedule.find((i) => i.id === s.scheduleItemId) || {
-                                            period: '?' as unknown as number,
+                                            period: -1,
                                             classId: '?'
                                         };
                                         const cls = classes.find((c) => c.id === item.classId);

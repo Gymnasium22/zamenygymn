@@ -1,4 +1,4 @@
-import { AppData, Shift } from './types';
+import { AppData, Shift, RoleDefinition } from './types';
 
 export const DEFAULT_BELLS = [
     { shift: Shift.First, period: 1, start: '08:00', end: '08:45', day: 'default' },
@@ -137,3 +137,92 @@ export const INITIAL_DATA: AppData = {
         weatherApiKey: ''
     }
 };
+
+
+export const ROLE_DEFINITIONS: RoleDefinition[] = [
+    {
+        id: 'admin',
+        name: 'Администратор',
+        description: 'Полный доступ ко всем функциям',
+        defaultPermissions: [
+            'view_dashboard',
+            'view_schedule',
+            'edit_schedule',
+            'view_substitutions',
+            'edit_substitutions',
+            'view_duty',
+            'edit_duty',
+            'view_nutrition',
+            'edit_nutrition',
+            'view_absenteeism',
+            'edit_absenteeism',
+            'view_bells',
+            'edit_bells',
+            'view_directory',
+            'edit_directory',
+            'view_reports',
+            'view_export',
+            'view_admin',
+            'view_settings',
+            'manage_users'
+        ],
+        defaultPages: [
+            'dashboard',
+            'schedule',
+            'schedule2',
+            'substitutions',
+            'duty',
+            'nutrition',
+            'absenteeism',
+            'bells',
+            'directory',
+            'reports',
+            'export',
+            'admin',
+            'settings',
+            'users'
+        ]
+    },
+    {
+        id: 'teacher',
+        name: 'Учитель',
+        description: 'Работа с расписанием, заменами, питанием, пропусками',
+        defaultPermissions: [
+            'view_dashboard',
+            'view_schedule',
+            'view_substitutions',
+            'view_duty',
+            'view_nutrition',
+            'edit_nutrition',
+            'view_absenteeism',
+            'edit_absenteeism',
+            'view_bells',
+            'view_directory'
+        ],
+        defaultPages: [
+            'dashboard',
+            'schedule',
+            'schedule2',
+            'substitutions',
+            'duty',
+            'nutrition',
+            'absenteeism',
+            'bells',
+            'directory'
+        ]
+    },
+    {
+        id: 'canteen',
+        name: 'Столовая',
+        description: 'Просмотр и редактирование питания',
+        defaultPermissions: [
+            'view_dashboard',
+            'view_schedule',
+            'view_nutrition',
+            'edit_nutrition',
+            'view_bells',
+            'view_directory'
+        ],
+        defaultPages: ['dashboard', 'schedule', 'schedule2', 'nutrition', 'bells', 'directory']
+    },
+];

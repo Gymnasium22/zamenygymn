@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useStaticData } from '../context/DataContext';
 import { DateInput } from '../components/DateInput';
 import { Icon } from '../components/Icons';
-import { Modal, StaggerContainer } from '../components/UI';
+import { Modal, StaggerContainer, useToast } from '../components/UI';
 import { Shift, ROOM_TYPES, Teacher, Subject, ClassEntity, Room } from '../types';
 import { formatDateEuropean } from '../utils/helpers';
 import { generateId } from '../utils/helpers';
@@ -11,6 +11,7 @@ type DirectoryTabId = 'teachers' | 'subjects' | 'classes' | 'rooms';
 
 export const DirectoryPage = () => {
     const { subjects, teachers, classes, rooms, saveStaticData } = useStaticData();
+    const { addToast } = useToast();
 
     const [activeTab, setActiveTab] = useState<DirectoryTabId>('teachers');
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -79,26 +80,36 @@ export const DirectoryPage = () => {
             newList.push(newItem as (typeof newList)[number]);
         }
 
-        await saveStaticData({ [key]: newList });
-        setIsModalOpen(false);
+        try {
+            await saveStaticData({ [key]: newList });
+            setIsModalOpen(false);
+            addToast({ type: 'success', title: 'Сохранено' });
+        } catch {
+            addToast({ type: 'danger', title: 'Ошибка сохранения', message: 'Не удалось сохранить изменения в справочнике' });
+        }
     };
 
     const handleDelete = async (id: string) => {
         if (!window.confirm('Удалить запись?')) return;
 
-        switch (activeTab) {
-            case 'teachers':
-                await saveStaticData({ teachers: teachers.filter((t) => t.id !== id) });
-                break;
-            case 'subjects':
-                await saveStaticData({ subjects: subjects.filter((s) => s.id !== id) });
-                break;
-            case 'classes':
-                await saveStaticData({ classes: classes.filter((c) => c.id !== id) });
-                break;
-            case 'rooms':
-                await saveStaticData({ rooms: rooms.filter((r) => r.id !== id) });
-                break;
+        try {
+            switch (activeTab) {
+                case 'teachers':
+                    await saveStaticData({ teachers: teachers.filter((t) => t.id !== id) });
+                    break;
+                case 'subjects':
+                    await saveStaticData({ subjects: subjects.filter((s) => s.id !== id) });
+                    break;
+                case 'classes':
+                    await saveStaticData({ classes: classes.filter((c) => c.id !== id) });
+                    break;
+                case 'rooms':
+                    await saveStaticData({ rooms: rooms.filter((r) => r.id !== id) });
+                    break;
+            }
+            addToast({ type: 'success', title: 'Запись удалена' });
+        } catch {
+            addToast({ type: 'danger', title: 'Ошибка удаления', message: 'Не удалось удалить запись из справочника' });
         }
     };
 

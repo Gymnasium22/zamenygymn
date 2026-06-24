@@ -1,4 +1,5 @@
 import DOMPurify from 'dompurify';
+import { logger } from '../utils/logger';
 
 /**
  * Service for handling data exports to various formats (Excel, PNG, CSV).
@@ -68,7 +69,7 @@ export const exportService = {
             await navigator.clipboard.writeText(text);
             return true;
         } catch (err) {
-            console.error('Failed to copy text: ', err);
+            logger.error('Failed to copy text: ', err);
             return false;
         }
     },

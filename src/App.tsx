@@ -21,13 +21,18 @@ const NutritionPage = React.lazy(() => import('./pages/Nutrition').then(m => ({ 
 const AbsenteeismPage = React.lazy(() => import('./pages/Absenteeism').then(m => ({ default: m.AbsenteeismPage })));
 const LoginPage = React.lazy(() => import('./pages/Login').then(m => ({ default: m.LoginPage })));
 import { dbService } from './services/db';
-import { AppData } from './types';
+import { AppData, PageId } from './types';
 import { INITIAL_DATA, getInitialData } from './constants';
 import { useAutoBackup } from './hooks/useAutoBackup';
 import { safeLocalStorageGet, safeLocalStorageSet } from './utils/localStorage';
+import { logger } from './utils/logger';
 
-const ProtectedRoute = ({ children, allowedRoles }: React.PropsWithChildren<{ allowedRoles?: string[] }>) => {
-    const { role, loading } = useAuth();
+const ProtectedRoute = ({
+    children,
+    allowedRoles,
+    pageId
+}: React.PropsWithChildren<{ allowedRoles?: string[]; pageId?: PageId }>) => {
+    const { role, loading, canViewPage, allowedPages } = useAuth();
 
     if (loading)
         return (
@@ -41,17 +46,22 @@ const ProtectedRoute = ({ children, allowedRoles }: React.PropsWithChildren<{ al
     }
 
     if (allowedRoles && !allowedRoles.includes(role)) {
-        return <Navigate to={role === 'guest' ? '/schedule' : '/dashboard'} replace />;
+        return <Navigate to={allowedPages.includes('schedule') ? '/schedule' : '/login'} replace />;
+    }
+
+    if (pageId && !canViewPage(pageId)) {
+        return <Navigate to={allowedPages.includes('schedule') ? '/schedule' : '/login'} replace />;
     }
 
     return <>{children}</>;
 };
 
 const HomeRedirect = () => {
-    const { role, loading } = useAuth();
+    const { loading, allowedPages } = useAuth();
     if (loading) return null;
-    if (role === 'guest') return <Navigate to="/schedule" replace />;
-    return <Navigate to="/dashboard" replace />;
+    if (allowedPages.includes('dashboard')) return <Navigate to="/dashboard" replace />;
+    if (allowedPages.includes('schedule')) return <Navigate to="/schedule" replace />;
+    return <Navigate to="/login" replace />;
 };
 
 const Layout = () => {
@@ -59,7 +69,7 @@ const Layout = () => {
     const [isCommandOpen, setIsCommandOpen] = useState(false);
     const [theme, setTheme] = useState(safeLocalStorageGet('theme') || 'light');
     const { isLoading } = useStaticData();
-    const { logout, role, user } = useAuth();
+    const { logout, user, allowedPages, canViewPage } = useAuth();
     const location = useLocation();
     useAutoBackup();
 
@@ -100,24 +110,24 @@ const Layout = () => {
             </div>
         );
 
-    // Простое плоское меню без группировки
-    const menuItems = [
-        { to: '/dashboard', label: 'Рабочий стол', icon: 'Home', roles: ['admin', 'teacher', 'canteen'] },
-        { to: '/schedule', label: 'Расписание 1 пол.', icon: 'Calendar', roles: ['admin', 'teacher', 'guest'] },
-        { to: '/schedule2', label: 'Расписание 2 пол.', icon: 'Calendar', roles: ['admin', 'teacher', 'guest'] },
-        { to: '/substitutions', label: 'Замены', icon: 'Repeat', roles: ['admin'] },
-        { to: '/duty', label: 'Дежурство', icon: 'Shield', roles: ['admin'] },
-        { to: '/nutrition', label: 'Питание', icon: 'Coffee', roles: ['admin', 'teacher', 'canteen'] },
-        { to: '/absenteeism', label: 'Пропуски', icon: 'UserX', roles: ['admin', 'teacher'] },
-        { to: '/bells', label: 'Звонки', icon: 'Bell', roles: ['admin'] },
-        { to: '/directory', label: 'Справочники', icon: 'BookOpen', roles: ['admin'] },
-        { to: '/reports', label: 'Отчеты', icon: 'BarChart2', roles: ['admin'] },
-        { to: '/export', label: 'Экспорт', icon: 'Download', roles: ['admin'] },
-        { to: '/admin', label: 'Администрация', icon: 'Users', roles: ['admin'] },
-        { to: '/settings', label: 'Настройки', icon: 'Settings', roles: ['admin'] }
+    // Меню строится на основе allowedPages из профиля пользователя
+    const menuItems: { to: string; label: string; icon: string; pageId: import('./types').PageId }[] = [
+        { to: '/dashboard', label: 'Рабочий стол', icon: 'Home', pageId: 'dashboard' },
+        { to: '/schedule', label: 'Расписание 1 пол.', icon: 'Calendar', pageId: 'schedule' },
+        { to: '/schedule2', label: 'Расписание 2 пол.', icon: 'Calendar', pageId: 'schedule2' },
+        { to: '/substitutions', label: 'Замены', icon: 'Repeat', pageId: 'substitutions' },
+        { to: '/duty', label: 'Дежурство', icon: 'Shield', pageId: 'duty' },
+        { to: '/nutrition', label: 'Питание', icon: 'Coffee', pageId: 'nutrition' },
+        { to: '/absenteeism', label: 'Пропуски', icon: 'UserX', pageId: 'absenteeism' },
+        { to: '/bells', label: 'Звонки', icon: 'Bell', pageId: 'bells' },
+        { to: '/directory', label: 'Справочники', icon: 'BookOpen', pageId: 'directory' },
+        { to: '/reports', label: 'Отчеты', icon: 'BarChart2', pageId: 'reports' },
+        { to: '/export', label: 'Экспорт', icon: 'Download', pageId: 'export' },
+        { to: '/admin', label: 'Администрация', icon: 'Users', pageId: 'admin' },
+        { to: '/settings', label: 'Настройки', icon: 'Settings', pageId: 'settings' }
     ];
 
-    const filteredMenuItems = menuItems.filter((item) => item.roles.includes(role || ''));
+    const filteredMenuItems = menuItems.filter((item) => canViewPage(item.pageId));
 
     return (
         <div className="flex h-screen bg-slate-50 dark:bg-dark-950 overflow-hidden transition-colors duration-300 mesh-gradient-bg">
@@ -231,7 +241,7 @@ const Layout = () => {
                     </div>
                 </div>
 
-                <BottomNavigation onMenuClick={() => setIsMobileMenuOpen(true)} role={role} />
+                <BottomNavigation onMenuClick={() => setIsMobileMenuOpen(true)} allowedPages={allowedPages} />
             </main>
             <CommandPalette isOpen={isCommandOpen} onClose={() => setIsCommandOpen(false)} />
         </div>
@@ -259,7 +269,7 @@ const PublicLayout = () => {
                     setLoadingPublic(false);
                 })
                 .catch((e) => {
-                    console.error('Failed to load public data:', e);
+                    logger.error('Failed to load public data:', e);
                     setPublicData(null);
                     setLoadingPublic(false);
                 });
@@ -343,7 +353,7 @@ export default function App() {
                                             <Route
                                                 path="dashboard"
                                                 element={
-                                                    <ProtectedRoute allowedRoles={['admin', 'teacher', 'canteen']}>
+                                                    <ProtectedRoute pageId="dashboard">
                                                         <DashboardPage />
                                                     </ProtectedRoute>
                                                 }
@@ -353,7 +363,7 @@ export default function App() {
                                             <Route
                                                 path="substitutions"
                                                 element={
-                                                    <ProtectedRoute allowedRoles={['admin']}>
+                                                    <ProtectedRoute pageId="substitutions">
                                                         <SubstitutionsPage />
                                                     </ProtectedRoute>
                                                 }
@@ -361,7 +371,7 @@ export default function App() {
                                             <Route
                                                 path="duty"
                                                 element={
-                                                    <ProtectedRoute allowedRoles={['admin']}>
+                                                    <ProtectedRoute pageId="duty">
                                                         <DutyPage />
                                                     </ProtectedRoute>
                                                 }
@@ -369,7 +379,7 @@ export default function App() {
                                             <Route
                                                 path="nutrition"
                                                 element={
-                                                    <ProtectedRoute allowedRoles={['admin', 'teacher', 'canteen']}>
+                                                    <ProtectedRoute pageId="nutrition">
                                                         <NutritionPage />
                                                     </ProtectedRoute>
                                                 }
@@ -377,7 +387,7 @@ export default function App() {
                                             <Route
                                                 path="absenteeism"
                                                 element={
-                                                    <ProtectedRoute allowedRoles={['admin', 'teacher']}>
+                                                    <ProtectedRoute pageId="absenteeism">
                                                         <AbsenteeismPage />
                                                     </ProtectedRoute>
                                                 }
@@ -385,7 +395,7 @@ export default function App() {
                                             <Route
                                                 path="directory"
                                                 element={
-                                                    <ProtectedRoute allowedRoles={['admin']}>
+                                                    <ProtectedRoute pageId="directory">
                                                         <DirectoryPage />
                                                     </ProtectedRoute>
                                                 }
@@ -393,7 +403,7 @@ export default function App() {
                                             <Route
                                                 path="bells"
                                                 element={
-                                                    <ProtectedRoute allowedRoles={['admin']}>
+                                                    <ProtectedRoute pageId="bells">
                                                         <BellsPage />
                                                     </ProtectedRoute>
                                                 }
@@ -401,7 +411,7 @@ export default function App() {
                                             <Route
                                                 path="admin"
                                                 element={
-                                                    <ProtectedRoute allowedRoles={['admin']}>
+                                                    <ProtectedRoute pageId="admin">
                                                         <AdminPage />
                                                     </ProtectedRoute>
                                                 }
@@ -409,7 +419,7 @@ export default function App() {
                                             <Route
                                                 path="reports"
                                                 element={
-                                                    <ProtectedRoute allowedRoles={['admin']}>
+                                                    <ProtectedRoute pageId="reports">
                                                         <ReportsPage />
                                                     </ProtectedRoute>
                                                 }
@@ -417,7 +427,7 @@ export default function App() {
                                             <Route
                                                 path="export"
                                                 element={
-                                                    <ProtectedRoute allowedRoles={['admin']}>
+                                                    <ProtectedRoute pageId="export">
                                                         <ExportPage />
                                                     </ProtectedRoute>
                                                 }
@@ -425,7 +435,7 @@ export default function App() {
                                             <Route
                                                 path="settings"
                                                 element={
-                                                    <ProtectedRoute allowedRoles={['admin']}>
+                                                    <ProtectedRoute pageId="settings">
                                                         <SettingsPage />
                                                     </ProtectedRoute>
                                                 }
@@ -444,8 +454,8 @@ export default function App() {
 }
 
 const SchedulePageWrapper = ({ semester = 1 }: { semester?: 1 | 2 }) => {
-    const { role } = useAuth();
+    const { role, hasPermission } = useAuth();
     const { settings } = useStaticData();
-    const canEdit = role === 'admin' || (role === 'teacher' && settings?.allowTeacherEdit);
+    const canEdit = hasPermission('edit_schedule') || (role === 'teacher' && settings?.allowTeacherEdit);
     return <SchedulePage readOnly={!canEdit} semester={semester} />;
 };

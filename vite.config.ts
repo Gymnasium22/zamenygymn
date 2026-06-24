@@ -82,7 +82,7 @@ export default defineConfig({
             }
           },
           {
-            urlPattern: /^https:\/\/.*\.firebaseio\.com\/.*/i,
+            urlPattern: /^https:\/\/.*\.googleapis\.com\/.*/i,
             handler: 'NetworkFirst',
             options: {
               cacheName: 'firebase-cache',
