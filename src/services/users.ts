@@ -139,7 +139,7 @@ export const usersService = {
         const profile: Omit<UserProfile, 'id'> = {
             email: params.email,
             displayName: params.displayName,
-            firstName: params.firstName,
+            firstName: params.firstName || '',
             role: params.role,
             isActive: true,
             permissions: params.permissions ?? defaults.defaultPermissions,
@@ -177,8 +177,11 @@ export const usersService = {
             }
         }
 
-        if (Object.keys(profileChanges).length > 0) {
-            await updateDoc(doc(db, COLLECTION_NAME, uid), profileChanges);
+        const sanitizedChanges = Object.fromEntries(
+            Object.entries(profileChanges).filter(([, value]) => value !== undefined)
+        );
+        if (Object.keys(sanitizedChanges).length > 0) {
+            await updateDoc(doc(db, COLLECTION_NAME, uid), sanitizedChanges);
         }
     },
 

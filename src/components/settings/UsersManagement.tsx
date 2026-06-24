@@ -137,7 +137,7 @@ export const UsersManagement = () => {
             if (editingUser) {
                 await usersService.update(editingUser.id, {
                     displayName: form.displayName,
-                    firstName: form.firstName || undefined,
+                    firstName: form.firstName,
                     role: form.role,
                     permissions: form.permissions,
                     allowedPages: form.allowedPages,
@@ -153,7 +153,7 @@ export const UsersManagement = () => {
                     email: form.email,
                     password: form.password,
                     displayName: form.displayName,
-                    firstName: form.firstName || undefined,
+                    firstName: form.firstName,
                     role: form.role,
                     permissions: form.permissions,
                     allowedPages: form.allowedPages,
