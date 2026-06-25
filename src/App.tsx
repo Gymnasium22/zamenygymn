@@ -21,6 +21,8 @@ const ArchivePage = React.lazy(() => import('./pages/Archive').then(m => ({ defa
 const DutyPage = React.lazy(() => import('./pages/Duty').then(m => ({ default: m.DutyPage })));
 const NutritionPage = React.lazy(() => import('./pages/Nutrition').then(m => ({ default: m.NutritionPage })));
 const AbsenteeismPage = React.lazy(() => import('./pages/Absenteeism').then(m => ({ default: m.AbsenteeismPage })));
+const CalendarPage = React.lazy(() => import('./pages/Calendar').then(m => ({ default: m.CalendarPage })));
+const PlannerPage = React.lazy(() => import('./pages/Planner').then(m => ({ default: m.PlannerPage })));
 const LoginPage = React.lazy(() => import('./pages/Login').then(m => ({ default: m.LoginPage })));
 import { dbService } from './services/db';
 import { AppData, PageId } from './types';
@@ -29,7 +31,6 @@ import { useAutoBackup } from './hooks/useAutoBackup';
 import { useSessionTimeout } from './hooks/useSessionTimeout';
 import { safeLocalStorageGet, safeLocalStorageSet } from './utils/localStorage';
 import { logger } from './utils/logger';
-import { FeedbackModal } from './components/FeedbackModal';
 
 const ProtectedRoute = ({
     children,
@@ -78,7 +79,6 @@ const Layout = () => {
     });
     const [showAnnouncement, setShowAnnouncement] = useState(false);
     const [sessionWarning, setSessionWarning] = useState(false);
-    const [feedbackOpen, setFeedbackOpen] = useState(false);
     const [themePreset, setThemePreset] = useState(() => safeLocalStorageGet('theme-preset') || 'default');
     const { isLoading, settings } = useStaticData();
     const { logout, user, profile, loading: authLoading, allowedPages, canViewPage } = useAuth();
@@ -188,6 +188,8 @@ const Layout = () => {
         { to: '/reports', label: 'Отчеты', icon: 'BarChart2', pageId: 'reports' },
         { to: '/export', label: 'Экспорт', icon: 'Download', pageId: 'export' },
         { to: '/admin', label: 'Администрация', icon: 'Users', pageId: 'admin' },
+        { to: '/calendar', label: 'Календарь', icon: 'Calendar', pageId: 'calendar' },
+        { to: '/planner', label: 'Планер', icon: 'CheckSquare', pageId: 'planner' },
         { to: '/settings', label: 'Настройки', icon: 'Settings', pageId: 'settings' },
         { to: '/archive', label: 'Архив', icon: 'Archive', pageId: 'archive' }
     ];
@@ -308,14 +310,6 @@ const Layout = () => {
                                 />
                             ))}
                         </div>
-                        <button
-                            onClick={() => setFeedbackOpen(true)}
-                            className="w-full flex items-center justify-center gap-2 p-2 rounded-xl text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all border border-slate-100 dark:border-slate-700"
-                            title="Сообщить об ошибке или предложить идею"
-                        >
-                            <Icon name="MessageSquare" size={14} />
-                            Обратная связь
-                        </button>
                     </div>
                 </div>
             </aside>
@@ -370,7 +364,6 @@ const Layout = () => {
                     </div>
                 </div>
             )}
-            <FeedbackModal isOpen={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
         </div>
     );
 };
@@ -540,6 +533,22 @@ export default function App() {
                                                 element={
                                                     <ProtectedRoute pageId="admin">
                                                         <AdminPage />
+                                                    </ProtectedRoute>
+                                                }
+                                            />
+                                            <Route
+                                                path="calendar"
+                                                element={
+                                                    <ProtectedRoute pageId="calendar">
+                                                        <CalendarPage />
+                                                    </ProtectedRoute>
+                                                }
+                                            />
+                                            <Route
+                                                path="planner"
+                                                element={
+                                                    <ProtectedRoute pageId="planner">
+                                                        <PlannerPage />
                                                     </ProtectedRoute>
                                                 }
                                             />

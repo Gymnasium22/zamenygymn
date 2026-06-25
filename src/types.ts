@@ -357,6 +357,8 @@ export type PageId =
     | 'reports'
     | 'export'
     | 'admin'
+    | 'calendar'
+    | 'planner'
     | 'settings'
     | 'users'
     | 'archive';
@@ -380,6 +382,10 @@ export type Permission =
     | 'view_reports'
     | 'view_export'
     | 'view_admin'
+    | 'view_calendar'
+    | 'edit_calendar'
+    | 'view_planner'
+    | 'edit_planner'
     | 'view_settings'
     | 'manage_users';
 
@@ -392,6 +398,7 @@ export interface UserProfile {
     isActive: boolean;
     permissions: Permission[];
     allowedPages: PageId[];
+    teacherId?: string; // Привязка к учителю из справочника
     createdAt?: string;
     createdBy?: string;
     lastLoginAt?: string;

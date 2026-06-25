@@ -7,7 +7,7 @@ import { signInWithEmailAndPassword } from 'firebase/auth';
 import { logger } from '../utils/logger';
 
 export const LoginPage = () => {
-    const { role, loading: authLoading } = useAuth();
+    const { role, loading: authLoading, isBlocked } = useAuth();
     const navigate = useNavigate();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -23,10 +23,14 @@ export const LoginPage = () => {
 
     useEffect(() => {
         if (submitted && !authLoading && !role) {
-            setError('Не удалось получить права доступа. Проверьте, что пользователь создан в настройках.');
+            if (isBlocked) {
+                setError('Ваш аккаунт заблокирован. Обратитесь к администратору.');
+            } else {
+                setError('Не удалось получить права доступа. Проверьте, что пользователь создан в настройках.');
+            }
             setSubmitted(false);
         }
-    }, [submitted, authLoading, role]);
+    }, [submitted, authLoading, role, isBlocked]);
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();

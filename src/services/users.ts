@@ -68,6 +68,7 @@ export const usersService = {
                     isActive: data.isActive !== false,
                     permissions: data.permissions || [],
                     allowedPages: data.allowedPages || [],
+                    teacherId: data.teacherId || undefined,
                     createdAt: data.createdAt?.toDate?.().toISOString() || data.createdAt,
                     createdBy: data.createdBy,
                     lastLoginAt: data.lastLoginAt?.toDate?.().toISOString() || data.lastLoginAt
@@ -94,6 +95,7 @@ export const usersService = {
                 isActive: data.isActive !== false,
                 permissions: data.permissions || [],
                 allowedPages: data.allowedPages || [],
+                teacherId: data.teacherId || undefined,
                 createdAt: data.createdAt?.toDate?.().toISOString() || data.createdAt,
                 createdBy: data.createdBy,
                 lastLoginAt: data.lastLoginAt?.toDate?.().toISOString() || data.lastLoginAt
@@ -115,6 +117,7 @@ export const usersService = {
             isActive: data.isActive !== false,
             permissions: data.permissions || [],
             allowedPages: data.allowedPages || [],
+            teacherId: data.teacherId || undefined,
             createdAt: data.createdAt?.toDate?.().toISOString() || data.createdAt,
             createdBy: data.createdBy,
             lastLoginAt: data.lastLoginAt?.toDate?.().toISOString() || data.lastLoginAt
@@ -129,6 +132,7 @@ export const usersService = {
         role: UserRole;
         permissions?: Permission[];
         allowedPages?: PageId[];
+        teacherId?: string;
         createdBy?: string;
     }): Promise<UserProfile> => {
         const db = getFirestore();
@@ -144,6 +148,7 @@ export const usersService = {
             isActive: true,
             permissions: params.permissions ?? defaults.defaultPermissions,
             allowedPages: params.allowedPages ?? defaults.defaultPages,
+            teacherId: params.teacherId,
             createdAt: new Date().toISOString(),
             createdBy: params.createdBy
         };

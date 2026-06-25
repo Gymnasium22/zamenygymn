@@ -170,6 +170,10 @@ export const ROLE_DEFINITIONS: RoleDefinition[] = [
             'view_reports',
             'view_export',
             'view_admin',
+            'view_calendar',
+            'edit_calendar',
+            'view_planner',
+            'edit_planner',
             'view_settings',
             'manage_users'
         ],
@@ -186,6 +190,8 @@ export const ROLE_DEFINITIONS: RoleDefinition[] = [
             'reports',
             'export',
             'admin',
+            'calendar',
+            'planner',
             'settings',
             'users',
             'archive'
@@ -205,7 +211,9 @@ export const ROLE_DEFINITIONS: RoleDefinition[] = [
             'view_absenteeism',
             'edit_absenteeism',
             'view_bells',
-            'view_directory'
+            'view_directory',
+            'view_calendar',
+            'view_planner'
         ],
         defaultPages: [
             'dashboard',
@@ -216,7 +224,9 @@ export const ROLE_DEFINITIONS: RoleDefinition[] = [
             'nutrition',
             'absenteeism',
             'bells',
-            'directory'
+            'directory',
+            'calendar',
+            'planner'
         ]
     },
     {
@@ -229,8 +239,9 @@ export const ROLE_DEFINITIONS: RoleDefinition[] = [
             'view_nutrition',
             'edit_nutrition',
             'view_bells',
-            'view_directory'
+            'view_directory',
+            'view_calendar'
         ],
-        defaultPages: ['dashboard', 'schedule', 'schedule2', 'nutrition', 'bells', 'directory']
+        defaultPages: ['dashboard', 'schedule', 'schedule2', 'nutrition', 'bells', 'directory', 'calendar']
     },
 ];

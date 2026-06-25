@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { usersService, getRoleDefaults } from '../../services/users';
 import { logger } from '../../utils/logger';
 import { useAuth } from '../../context/AuthContext';
+import { useStaticData } from '../../context/DataContext';
 import { useToast } from '../UI';
 import { Icon } from '../Icons';
 import { Modal } from '../UI';
@@ -44,6 +45,9 @@ const ALL_PAGES: { id: PageId; label: string }[] = [
     { id: 'reports', label: 'Отчёты' },
     { id: 'export', label: 'Экспорт' },
     { id: 'admin', label: 'Администрирование' },
+    { id: 'calendar', label: 'Календарь' },
+    { id: 'planner', label: 'Планер' },
+    { id: 'archive', label: 'Архив' },
     { id: 'settings', label: 'Настройки' },
     { id: 'users', label: 'Пользователи' }
 ];
@@ -57,6 +61,7 @@ const formatDate = (iso?: string) => {
 
 export const UsersManagement = () => {
     const { user: currentUser, profile: currentProfile } = useAuth();
+    const { teachers } = useStaticData();
     const { addToast } = useToast();
     const [users, setUsers] = useState<UserProfile[]>([]);
     const [loading, setLoading] = useState(true);
@@ -70,6 +75,7 @@ export const UsersManagement = () => {
             displayName: '',
             firstName: '',
             role: 'teacher' as UserRole,
+            teacherId: '',
             permissions: [] as Permission[],
             allowedPages: [] as PageId[]
         }),
@@ -125,6 +131,7 @@ export const UsersManagement = () => {
             displayName: u.displayName,
             firstName: u.firstName || '',
             role: u.role,
+            teacherId: u.teacherId || '',
             permissions: u.permissions,
             allowedPages: u.allowedPages
         });
@@ -145,6 +152,7 @@ export const UsersManagement = () => {
                     displayName: form.displayName,
                     firstName: form.firstName,
                     role: form.role,
+                    teacherId: form.teacherId || undefined,
                     permissions: form.permissions,
                     allowedPages: form.allowedPages,
                     password: form.password || undefined
@@ -161,6 +169,7 @@ export const UsersManagement = () => {
                     displayName: form.displayName,
                     firstName: form.firstName,
                     role: form.role,
+                    teacherId: form.teacherId || undefined,
                     permissions: form.permissions,
                     allowedPages: form.allowedPages,
                     createdBy: currentUser?.uid
@@ -367,6 +376,11 @@ export const UsersManagement = () => {
                                             <td className="px-4 py-3">
                                                 <div className="font-medium text-slate-800 dark:text-slate-100">{u.displayName}</div>
                                                 <div className="text-xs text-slate-500">{u.email}</div>
+                                                {u.teacherId && (
+                                                    <div className="text-[10px] text-indigo-500 mt-0.5">
+                                                        Учитель: {teachers.find((t) => t.id === u.teacherId)?.name || u.teacherId}
+                                                    </div>
+                                                )}
                                             </td>
                                             <td className="px-4 py-3">
                                                 <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300">
@@ -498,6 +512,26 @@ export const UsersManagement = () => {
                             >
                                 Применить права роли
                             </button>
+                        </div>
+
+                        <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Привязка к учителю (необязательно)</label>
+                            <select
+                                value={form.teacherId}
+                                onChange={(e) => setForm((prev) => ({ ...prev, teacherId: e.target.value }))}
+                                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-dark-700 focus:ring-2 focus:ring-indigo-500 outline-none"
+                            >
+                                <option value="">— Не привязан —</option>
+                                {teachers
+                                    .slice()
+                                    .sort((a, b) => a.name.localeCompare(b.name))
+                                    .map((t) => (
+                                        <option key={t.id} value={t.id}>
+                                            {t.name}
+                                        </option>
+                                    ))}
+                            </select>
+                            <p className="text-[11px] text-slate-400 mt-1">Позволяет системе понимать, какой учитель соответствует этой учётной записи</p>
                         </div>
                     </div>
 

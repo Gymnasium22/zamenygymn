@@ -14,6 +14,7 @@ interface AuthContextType {
     permissions: Permission[];
     allowedPages: PageId[];
     loading: boolean;
+    isBlocked: boolean;
     logout: () => Promise<void>;
     hasPermission: (permission: Permission) => boolean;
     canViewPage: (pageId: PageId) => boolean;
@@ -26,6 +27,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [role, setRole] = useState<UserRole | null>(null);
     const [loading, setLoading] = useState(true);
+    const [isBlocked, setIsBlocked] = useState(false);
 
     const hasPermission = useCallback(
         (permission: Permission) => {
@@ -68,21 +70,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         if (loadedProfile && loadedProfile.isActive) {
                             setProfile(loadedProfile);
                             setRole(loadedProfile.role);
+                            setIsBlocked(false);
+                        } else if (loadedProfile && !loadedProfile.isActive) {
+                            setProfile(null);
+                            setRole(null);
+                            setIsBlocked(true);
                         } else {
                             setProfile(null);
                             setRole(null);
+                            setIsBlocked(false);
                         }
                         setLoading(false);
                     },
                     () => {
                         setProfile(null);
                         setRole(null);
+                        setIsBlocked(false);
                         setLoading(false);
                     }
                 );
             } else {
                 setProfile(null);
                 setRole(null);
+                setIsBlocked(false);
                 setLoading(false);
             }
         });
@@ -110,6 +120,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 permissions: profile?.permissions || [],
                 allowedPages: profile?.allowedPages || [],
                 loading,
+                isBlocked,
                 logout,
                 hasPermission,
                 canViewPage
