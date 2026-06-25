@@ -218,6 +218,57 @@ export interface AbsenteeismRecord {
     updatedBy?: string; // Email/ID of who updated
 }
 
+// --- ARCHIVE TYPES ---
+export interface ArchivedScheduleItem extends ScheduleItem {
+    className: string;
+    subjectName: string;
+    teacherName: string;
+    roomName?: string;
+}
+
+export interface ArchivedSubstitution extends Substitution {
+    className: string;
+    subjectName: string;
+    originalTeacherName: string;
+    replacementTeacherName: string;
+    roomName?: string;
+    replacementRoomName?: string;
+}
+
+export interface ArchivedDutyRecord extends DutyRecord {
+    teacherName: string;
+    zoneName: string;
+}
+
+export interface ArchivedNutritionRecord extends NutritionRecord {
+    className: string;
+}
+
+export interface ArchivedAbsenteeismRecord extends AbsenteeismRecord {
+    className: string;
+}
+
+export interface AcademicYearArchive {
+    version: '1.0';
+    archivedAt: string;
+    yearLabel: string;
+    appVersion?: string;
+    staticSnapshot: {
+        teachers: { id: string; name: string }[];
+        subjects: { id: string; name: string }[];
+        classes: { id: string; name: string; shift: string }[];
+        rooms: { id: string; name: string }[];
+        dutyZones: { id: string; name: string; floor?: string }[];
+    };
+    schedule1: ArchivedScheduleItem[];
+    schedule2: ArchivedScheduleItem[];
+    substitutions: ArchivedSubstitution[];
+    dutySchedule: ArchivedDutyRecord[];
+    nutritionRecords: ArchivedNutritionRecord[];
+    absenteeismRecords: ArchivedAbsenteeismRecord[];
+    substitutionDayComments: Record<string, string>;
+}
+
 // Interfaces for split contexts
 export interface StaticAppData {
     subjects: Subject[];
@@ -298,7 +349,8 @@ export type PageId =
     | 'export'
     | 'admin'
     | 'settings'
-    | 'users';
+    | 'users'
+    | 'archive';
 
 export type Permission =
     | 'view_dashboard'

@@ -36,7 +36,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const canViewPage = useCallback(
         (pageId: PageId) => {
-            return profile?.isActive === true && profile.allowedPages.includes(pageId);
+            if (!profile || profile.isActive !== true) return false;
+            // Администратор по умолчанию имеет доступ ко всем страницам,
+            // даже если в allowedPages ещё не прописан новый раздел.
+            if (profile.role === 'admin') return true;
+            return profile.allowedPages.includes(pageId);
         },
         [profile]
     );

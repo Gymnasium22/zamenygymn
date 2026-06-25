@@ -180,7 +180,8 @@ export const ROLE_DEFINITIONS: RoleDefinition[] = [
             'export',
             'admin',
             'settings',
-            'users'
+            'users',
+            'archive'
         ]
     },
     {

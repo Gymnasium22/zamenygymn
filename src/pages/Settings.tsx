@@ -25,6 +25,7 @@ import { TelegramTemplateEditor } from '../components/settings/TelegramTemplateE
 import { dbService } from '../services/db';
 import { AppDataImportSchema, AppDataImport } from '../utils/importSchema';
 import { UsersManagement } from '../components/settings/UsersManagement';
+import { ArchiveYearSection } from '../components/settings/ArchiveYearSection';
 
 type SettingsSection =
     | 'integrations'
@@ -1187,6 +1188,8 @@ export const SettingsPage = () => {
 
                     {activeSection === 'system' && (
                         <div className="space-y-6">
+                            <ArchiveYearSection />
+
                             <div className="bg-white dark:bg-dark-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm p-6">
                                 <div className="flex items-center gap-3 mb-4">
                                     <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">

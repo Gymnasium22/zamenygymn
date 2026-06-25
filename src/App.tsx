@@ -16,6 +16,7 @@ const AdminPage = React.lazy(() => import('./pages/Admin').then(m => ({ default:
 const SettingsPage = React.lazy(() => import('./pages/Settings').then(m => ({ default: m.SettingsPage })));
 const ExportPage = React.lazy(() => import('./pages/Export').then(m => ({ default: m.ExportPage })));
 const ReportsPage = React.lazy(() => import('./pages/Reports').then(m => ({ default: m.ReportsPage })));
+const ArchivePage = React.lazy(() => import('./pages/Archive').then(m => ({ default: m.ArchivePage })));
 const DutyPage = React.lazy(() => import('./pages/Duty').then(m => ({ default: m.DutyPage })));
 const NutritionPage = React.lazy(() => import('./pages/Nutrition').then(m => ({ default: m.NutritionPage })));
 const AbsenteeismPage = React.lazy(() => import('./pages/Absenteeism').then(m => ({ default: m.AbsenteeismPage })));
@@ -124,7 +125,8 @@ const Layout = () => {
         { to: '/reports', label: 'Отчеты', icon: 'BarChart2', pageId: 'reports' },
         { to: '/export', label: 'Экспорт', icon: 'Download', pageId: 'export' },
         { to: '/admin', label: 'Администрация', icon: 'Users', pageId: 'admin' },
-        { to: '/settings', label: 'Настройки', icon: 'Settings', pageId: 'settings' }
+        { to: '/settings', label: 'Настройки', icon: 'Settings', pageId: 'settings' },
+        { to: '/archive', label: 'Архив', icon: 'Archive', pageId: 'archive' }
     ];
 
     const filteredMenuItems = menuItems.filter((item) => canViewPage(item.pageId));
@@ -437,6 +439,14 @@ export default function App() {
                                                 element={
                                                     <ProtectedRoute pageId="settings">
                                                         <SettingsPage />
+                                                    </ProtectedRoute>
+                                                }
+                                            />
+                                            <Route
+                                                path="archive"
+                                                element={
+                                                    <ProtectedRoute allowedRoles={['admin']} pageId="archive">
+                                                        <ArchivePage />
                                                     </ProtectedRoute>
                                                 }
                                             />

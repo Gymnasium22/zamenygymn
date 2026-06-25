@@ -1262,6 +1262,21 @@ const IconMap: Record<string, React.FC<React.SVGProps<SVGSVGElement>>> = {
             <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
             <circle cx="12" cy="10" r="3" />
         </svg>
+    ),
+    Archive: (p) => (
+        <svg
+            {...p}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        >
+            <polyline points="21 8 21 21 3 21 3 8" />
+            <rect x="1" y="3" width="22" height="5" />
+            <line x1="10" y1="12" x2="14" y2="12" />
+        </svg>
     )
 };
 
