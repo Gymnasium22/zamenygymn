@@ -391,6 +391,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                     safeLocalStorageSet(LOCAL_STORAGE_KEY, JSON.stringify(mergedData));
                 }
 
+                // 2.5. Оповещаем другие вкладки
+                if ('BroadcastChannel' in window) {
+                    const channel = new BroadcastChannel('gym_data_sync');
+                    channel.postMessage({ type: 'data-updated', timestamp: Date.now() });
+                    channel.close();
+                }
+
                 // 3. Пробуем отправить в облако (только для авторизованных и не для публичных данных)
                 if (!initialData && user) {
                     try {
@@ -467,6 +474,26 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
         window.addEventListener('online', handleOnline);
         return () => window.removeEventListener('online', handleOnline);
     }, [user, role, initialData]);
+
+    // BroadcastChannel: синхронизация между вкладками
+    useEffect(() => {
+        if (!('BroadcastChannel' in window)) return;
+        const channel = new BroadcastChannel('gym_data_sync');
+        channel.onmessage = (event) => {
+            if (event.data?.type === 'data-updated') {
+                window.dispatchEvent(
+                    new CustomEvent('app-toast', {
+                        detail: {
+                            type: 'info',
+                            title: 'Синхронизация',
+                            message: 'Данные обновлены в другой вкладке. Перезагрузите страницу для актуальных данных.'
+                        }
+                    })
+                );
+            }
+        };
+        return () => channel.close();
+    }, []);
 
     const undo = useCallback(async () => {
         const prev = historyPointerRef.current;

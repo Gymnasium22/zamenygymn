@@ -76,12 +76,14 @@ export const UsersManagement = () => {
         []
     );
     const [form, setForm] = useState(emptyForm);
+    const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
 
     const loadUsers = async () => {
         try {
             setLoading(true);
             const list = await usersService.getAll();
             setUsers(list.sort((a, b) => a.displayName.localeCompare(b.displayName)));
+            setSelectedUserIds(new Set());
         } catch {
             addToast({ type: 'danger', title: 'Ошибка', message: 'Не удалось загрузить пользователей' });
         } finally {
@@ -224,6 +226,47 @@ export const UsersManagement = () => {
         }));
     };
 
+    const toggleSelectUser = (id: string) => {
+        setSelectedUserIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    const selectAll = () => {
+        if (selectedUserIds.size === users.length) {
+            setSelectedUserIds(new Set());
+        } else {
+            setSelectedUserIds(new Set(users.map((u) => u.id)));
+        }
+    };
+
+    const bulkDeactivate = async () => {
+        if (!window.confirm(`Заблокировать ${selectedUserIds.size} пользователей?`)) return;
+        try {
+            const promises = Array.from(selectedUserIds).map((id) => usersService.setActive(id, false));
+            await Promise.all(promises);
+            await loadUsers();
+            addToast({ type: 'success', title: 'Готово', message: `${selectedUserIds.size} пользователей заблокировано` });
+        } catch {
+            addToast({ type: 'danger', title: 'Ошибка', message: 'Не удалось выполнить массовое действие' });
+        }
+    };
+
+    const bulkDelete = async () => {
+        if (!window.confirm(`Удалить ${selectedUserIds.size} пользователей? Это необратимо.`)) return;
+        try {
+            const promises = Array.from(selectedUserIds).map((id) => usersService.delete(id));
+            await Promise.all(promises);
+            await loadUsers();
+            addToast({ type: 'success', title: 'Готово', message: `${selectedUserIds.size} пользователей удалено` });
+        } catch {
+            addToast({ type: 'danger', title: 'Ошибка', message: 'Не удалось выполнить массовое действие' });
+        }
+    };
+
     if (currentProfile?.role !== 'admin') {
         return (
             <div className="flex flex-col items-center justify-center py-12 text-slate-500">
@@ -260,78 +303,123 @@ export const UsersManagement = () => {
                     <p className="text-slate-500">Пользователей пока нет</p>
                 </div>
             ) : (
-                <div className="bg-white dark:bg-dark-800 rounded-2xl border border-slate-100 dark:border-slate-700 overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left text-sm">
-                            <thead className="bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
-                                <tr>
-                                    <th className="px-4 py-3 font-semibold">Пользователь</th>
-                                    <th className="px-4 py-3 font-semibold">Роль</th>
-                                    <th className="px-4 py-3 font-semibold">Разрешения</th>
-                                    <th className="px-4 py-3 font-semibold">Разделы</th>
-                                    <th className="px-4 py-3 font-semibold">Статус</th>
-                                    <th className="px-4 py-3 font-semibold">Последний вход</th>
-                                    <th className="px-4 py-3 font-semibold text-right">Действия</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                                {users.map((u) => (
-                                    <tr key={u.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
-                                        <td className="px-4 py-3">
-                                            <div className="font-medium text-slate-800 dark:text-slate-100">{u.displayName}</div>
-                                            <div className="text-xs text-slate-500">{u.email}</div>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300">
-                                                {ROLE_DEFINITIONS.find((r) => r.id === u.role)?.name || u.role}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <div className="text-xs text-slate-500">{u.permissions.length} прав</div>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <div className="text-xs text-slate-500">{u.allowedPages.length} разделов</div>
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <button
-                                                onClick={() => toggleActive(u)}
-                                                className={`inline-flex items-center gap-1.5 text-xs font-medium ${
-                                                    u.isActive
-                                                        ? 'text-emerald-600 dark:text-emerald-400'
-                                                        : 'text-slate-400 dark:text-slate-500'
-                                                }`}
-                                            >
-                                                <span
-                                                    className={`w-2 h-2 rounded-full ${
-                                                        u.isActive ? 'bg-emerald-500' : 'bg-slate-300'
-                                                    }`}
-                                                />
-                                                {u.isActive ? 'Активен' : 'Заблокирован'}
-                                            </button>
-                                        </td>
-                                        <td className="px-4 py-3 text-xs text-slate-500">{formatDate(u.lastLoginAt)}</td>
-                                        <td className="px-4 py-3 text-right">
-                                            <div className="inline-flex items-center gap-2">
-                                                <button
-                                                    onClick={() => openEdit(u)}
-                                                    className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                                                    title="Редактировать"
-                                                >
-                                                    <Icon name="Edit2" size={16} />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDelete(u)}
-                                                    className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                                                    title="Удалить"
-                                                >
-                                                    <Icon name="Trash2" size={16} />
-                                                </button>
-                                            </div>
-                                        </td>
+                <div className="space-y-3">
+                    {selectedUserIds.size > 0 && (
+                        <div className="flex items-center gap-3 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl">
+                            <span className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                                Выбрано: {selectedUserIds.size}
+                            </span>
+                            <div className="flex-1" />
+                            <button
+                                onClick={bulkDeactivate}
+                                className="px-3 py-1.5 text-xs font-medium text-amber-700 dark:text-amber-300 bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-700 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
+                            >
+                                Заблокировать
+                            </button>
+                            <button
+                                onClick={bulkDelete}
+                                className="px-3 py-1.5 text-xs font-medium text-red-700 dark:text-red-300 bg-white dark:bg-slate-800 border border-red-300 dark:border-red-700 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+                            >
+                                Удалить
+                            </button>
+                            <button
+                                onClick={() => setSelectedUserIds(new Set())}
+                                className="px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-400 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                            >
+                                Снять выбор
+                            </button>
+                        </div>
+                    )}
+                    <div className="bg-white dark:bg-dark-800 rounded-2xl border border-slate-100 dark:border-slate-700 overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left text-sm">
+                                <thead className="bg-slate-50 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+                                    <tr>
+                                        <th className="px-4 py-3 w-10">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedUserIds.size === users.length && users.length > 0}
+                                                onChange={selectAll}
+                                                className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                            />
+                                        </th>
+                                        <th className="px-4 py-3 font-semibold">Пользователь</th>
+                                        <th className="px-4 py-3 font-semibold">Роль</th>
+                                        <th className="px-4 py-3 font-semibold">Разрешения</th>
+                                        <th className="px-4 py-3 font-semibold">Разделы</th>
+                                        <th className="px-4 py-3 font-semibold">Статус</th>
+                                        <th className="px-4 py-3 font-semibold">Последний вход</th>
+                                        <th className="px-4 py-3 font-semibold text-right">Действия</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                                    {users.map((u) => (
+                                        <tr key={u.id} className={`hover:bg-slate-50 dark:hover:bg-slate-700/50 ${selectedUserIds.has(u.id) ? 'bg-indigo-50/50 dark:bg-indigo-900/10' : ''}`}>
+                                            <td className="px-4 py-3">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedUserIds.has(u.id)}
+                                                    onChange={() => toggleSelectUser(u.id)}
+                                                    className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                                    disabled={u.id === currentUser?.uid}
+                                                />
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <div className="font-medium text-slate-800 dark:text-slate-100">{u.displayName}</div>
+                                                <div className="text-xs text-slate-500">{u.email}</div>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300">
+                                                    {ROLE_DEFINITIONS.find((r) => r.id === u.role)?.name || u.role}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <div className="text-xs text-slate-500">{u.permissions.length} прав</div>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <div className="text-xs text-slate-500">{u.allowedPages.length} разделов</div>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <button
+                                                    onClick={() => toggleActive(u)}
+                                                    className={`inline-flex items-center gap-1.5 text-xs font-medium ${
+                                                        u.isActive
+                                                            ? 'text-emerald-600 dark:text-emerald-400'
+                                                            : 'text-slate-400 dark:text-slate-500'
+                                                    }`}
+                                                >
+                                                    <span
+                                                        className={`w-2 h-2 rounded-full ${
+                                                            u.isActive ? 'bg-emerald-500' : 'bg-slate-300'
+                                                        }`}
+                                                    />
+                                                    {u.isActive ? 'Активен' : 'Заблокирован'}
+                                                </button>
+                                            </td>
+                                            <td className="px-4 py-3 text-xs text-slate-500">{formatDate(u.lastLoginAt)}</td>
+                                            <td className="px-4 py-3 text-right">
+                                                <div className="inline-flex items-center gap-2">
+                                                    <button
+                                                        onClick={() => openEdit(u)}
+                                                        className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                                                        title="Редактировать"
+                                                    >
+                                                        <Icon name="Edit2" size={16} />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleDelete(u)}
+                                                        className="p-1.5 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                        title="Удалить"
+                                                    >
+                                                        <Icon name="Trash2" size={16} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             )}

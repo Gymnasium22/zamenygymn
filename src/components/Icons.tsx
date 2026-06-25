@@ -1316,9 +1316,18 @@ const IconMap: Record<string, React.FC<React.SVGProps<SVGSVGElement>>> = {
 interface IconProps extends React.SVGProps<SVGSVGElement> {
     name: string;
     size?: number;
+    title?: string;
 }
 
-export const Icon: React.FC<IconProps> = ({ name, size = 24, className = '', ...props }) => {
-    const Comp = IconMap[name] || IconMap['Info']; // Fallback to Info if not found
-    return <Comp width={size} height={size} className={className} {...props} />;
+export const Icon: React.FC<IconProps> = ({ name, size = 24, className = '', title, ...props }) => {
+    const Comp = IconMap[name] || IconMap['Info'];
+    const svg = <Comp width={size} height={size} className={className} {...props} />;
+    if (title) {
+        return (
+            <span className="inline-flex" title={title}>
+                {svg}
+            </span>
+        );
+    }
+    return svg;
 };

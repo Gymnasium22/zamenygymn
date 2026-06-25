@@ -26,8 +26,10 @@ import { dbService } from './services/db';
 import { AppData, PageId } from './types';
 import { INITIAL_DATA, getInitialData } from './constants';
 import { useAutoBackup } from './hooks/useAutoBackup';
+import { useSessionTimeout } from './hooks/useSessionTimeout';
 import { safeLocalStorageGet, safeLocalStorageSet } from './utils/localStorage';
 import { logger } from './utils/logger';
+import { FeedbackModal } from './components/FeedbackModal';
 
 const ProtectedRoute = ({
     children,
@@ -69,12 +71,29 @@ const HomeRedirect = () => {
 const Layout = () => {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isCommandOpen, setIsCommandOpen] = useState(false);
-    const [theme, setTheme] = useState(safeLocalStorageGet('theme') || 'light');
+    const [theme, setTheme] = useState(() => {
+        const saved = safeLocalStorageGet('theme');
+        if (saved === 'light' || saved === 'dark') return saved;
+        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    });
     const [showAnnouncement, setShowAnnouncement] = useState(false);
+    const [sessionWarning, setSessionWarning] = useState(false);
+    const [feedbackOpen, setFeedbackOpen] = useState(false);
+    const [themePreset, setThemePreset] = useState(() => safeLocalStorageGet('theme-preset') || 'default');
     const { isLoading, settings } = useStaticData();
     const { logout, user, profile, loading: authLoading, allowedPages, canViewPage } = useAuth();
     const location = useLocation();
     useAutoBackup();
+
+    useSessionTimeout({
+        timeoutMinutes: 30,
+        warningMinutes: 2,
+        onWarning: () => setSessionWarning(true),
+        onTimeout: () => {
+            setSessionWarning(false);
+            logout();
+        }
+    });
 
     useEffect(() => {
         if (isLoading || authLoading || !user || !profile) return;
@@ -111,6 +130,35 @@ const Layout = () => {
 
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
+    const [compact, setCompact] = useState(() => safeLocalStorageGet('compact') === 'true');
+
+    useEffect(() => {
+        if (compact) document.documentElement.classList.add('compact');
+        else document.documentElement.classList.remove('compact');
+        safeLocalStorageSet('compact', String(compact));
+    }, [compact]);
+
+    useEffect(() => {
+        if (themePreset && themePreset !== 'default') {
+            document.documentElement.setAttribute('data-theme', themePreset);
+        } else {
+            document.documentElement.removeAttribute('data-theme');
+        }
+        safeLocalStorageSet('theme-preset', themePreset);
+    }, [themePreset]);
+
+    useEffect(() => {
+        const mq = window.matchMedia('(prefers-color-scheme: dark)');
+        const handleChange = (e: MediaQueryListEvent) => {
+            const saved = safeLocalStorageGet('theme');
+            if (!saved || saved === 'auto') {
+                setTheme(e.matches ? 'dark' : 'light');
+            }
+        };
+        mq.addEventListener('change', handleChange);
+        return () => mq.removeEventListener('change', handleChange);
     }, []);
 
     useEffect(() => {
@@ -226,10 +274,48 @@ const Layout = () => {
                             <button
                                 onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
                                 className="flex items-center justify-center gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:text-indigo-600 transition-all border border-slate-100 dark:border-slate-600 active:scale-95 shadow-sm"
+                                title="Сменить тему"
                             >
                                 {theme === 'light' ? <Icon name="Moon" size={18} /> : <Icon name="Sun" size={18} />}
                             </button>
+                            <button
+                                onClick={() => setCompact((c) => !c)}
+                                className={`flex items-center justify-center gap-2 p-2.5 rounded-xl transition-all border active:scale-95 shadow-sm ${
+                                    compact
+                                        ? 'bg-indigo-50 text-indigo-600 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:border-indigo-700'
+                                        : 'bg-slate-50 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:text-indigo-600 border-slate-100 dark:border-slate-600'
+                                }`}
+                                title="Компактный режим"
+                            >
+                                <Icon name="Columns" size={18} />
+                            </button>
                         </div>
+                        <div className="flex items-center justify-center gap-2">
+                            {[
+                                { id: 'default', color: 'bg-gradient-to-br from-indigo-500 to-purple-600' },
+                                { id: 'ocean', color: 'bg-gradient-to-br from-sky-500 to-cyan-500' },
+                                { id: 'forest', color: 'bg-gradient-to-br from-emerald-500 to-lime-500' },
+                                { id: 'sunset', color: 'bg-gradient-to-br from-amber-500 to-orange-500' },
+                                { id: 'rose', color: 'bg-gradient-to-br from-rose-500 to-pink-500' }
+                            ].map((t) => (
+                                <button
+                                    key={t.id}
+                                    onClick={() => setThemePreset(t.id)}
+                                    className={`w-6 h-6 rounded-full ${t.color} transition-all ${
+                                        themePreset === t.id ? 'ring-2 ring-offset-2 ring-slate-400 scale-110' : 'opacity-60 hover:opacity-100'
+                                    }`}
+                                    title={t.id === 'default' ? 'Классика' : t.id === 'ocean' ? 'Океан' : t.id === 'forest' ? 'Лес' : t.id === 'sunset' ? 'Закат' : 'Роза'}
+                                />
+                            ))}
+                        </div>
+                        <button
+                            onClick={() => setFeedbackOpen(true)}
+                            className="w-full flex items-center justify-center gap-2 p-2 rounded-xl text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all border border-slate-100 dark:border-slate-700"
+                            title="Сообщить об ошибке или предложить идею"
+                        >
+                            <Icon name="MessageSquare" size={14} />
+                            Обратная связь
+                        </button>
                     </div>
                 </div>
             </aside>
@@ -267,6 +353,24 @@ const Layout = () => {
                     onClose={() => setShowAnnouncement(false)}
                 />
             )}
+            {sessionWarning && (
+                <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-fade-in">
+                    <div className="bg-white dark:bg-dark-800 rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center">
+                        <Icon name="Clock" size={48} className="mx-auto mb-4 text-amber-500" />
+                        <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-2">Сессия истекает</h3>
+                        <p className="text-sm text-slate-600 dark:text-slate-300 mb-6">
+                            Вы неактивны более 28 минут. Через 2 минуты произойдёт автоматический выход.
+                        </p>
+                        <button
+                            onClick={() => setSessionWarning(false)}
+                            className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-colors"
+                        >
+                            Продолжить работу
+                        </button>
+                    </div>
+                </div>
+            )}
+            <FeedbackModal isOpen={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
         </div>
     );
 };

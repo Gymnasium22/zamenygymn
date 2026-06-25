@@ -2,6 +2,85 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Theme System */
+:root {
+    --theme-primary-500: #6366f1;
+    --theme-primary-600: #4f46e5;
+    --theme-primary-700: #4338ca;
+    --theme-accent-500: #a855f7;
+    --theme-gradient-from: rgba(99, 102, 241, 0.15);
+    --theme-gradient-to: rgba(168, 85, 247, 0.15);
+}
+
+[data-theme="ocean"] {
+    --theme-primary-500: #0ea5e9;
+    --theme-primary-600: #0284c7;
+    --theme-primary-700: #0369a1;
+    --theme-accent-500: #06b6d4;
+    --theme-gradient-from: rgba(14, 165, 233, 0.15);
+    --theme-gradient-to: rgba(6, 182, 212, 0.15);
+}
+
+[data-theme="forest"] {
+    --theme-primary-500: #10b981;
+    --theme-primary-600: #059669;
+    --theme-primary-700: #047857;
+    --theme-accent-500: #84cc16;
+    --theme-gradient-from: rgba(16, 185, 129, 0.15);
+    --theme-gradient-to: rgba(132, 204, 22, 0.15);
+}
+
+[data-theme="sunset"] {
+    --theme-primary-500: #f59e0b;
+    --theme-primary-600: #d97706;
+    --theme-primary-700: #b45309;
+    --theme-accent-500: #f97316;
+    --theme-gradient-from: rgba(245, 158, 11, 0.15);
+    --theme-gradient-to: rgba(249, 115, 22, 0.15);
+}
+
+[data-theme="rose"] {
+    --theme-primary-500: #f43f5e;
+    --theme-primary-600: #e11d48;
+    --theme-primary-700: #be123c;
+    --theme-accent-500: #fb7185;
+    --theme-gradient-from: rgba(244, 63, 94, 0.15);
+    --theme-gradient-to: rgba(251, 113, 133, 0.15);
+}
+
+/* Override key elements with theme variables */
+[data-theme] .theme-bg-primary {
+    background-color: var(--theme-primary-600);
+}
+[data-theme] .theme-bg-primary:hover {
+    background-color: var(--theme-primary-700);
+}
+[data-theme] .theme-text-primary {
+    color: var(--theme-primary-600);
+}
+[data-theme] .theme-text-primary:hover {
+    color: var(--theme-primary-700);
+}
+[data-theme] .theme-border-primary {
+    border-color: var(--theme-primary-500);
+}
+[data-theme] .theme-ring-primary:focus {
+    --tw-ring-color: var(--theme-primary-500);
+}
+[data-theme] .mesh-gradient-bg {
+    background-image:
+        radial-gradient(at 0% 0%, var(--theme-gradient-from) 0px, transparent 50%),
+        radial-gradient(at 100% 0%, var(--theme-gradient-to) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(56, 189, 248, 0.15) 0px, transparent 50%),
+        radial-gradient(at 0% 100%, rgba(236, 72, 153, 0.15) 0px, transparent 50%);
+}
+[data-theme="dark"] .mesh-gradient-bg {
+    background-image:
+        radial-gradient(at 0% 0%, var(--theme-gradient-from) 0px, transparent 50%),
+        radial-gradient(at 100% 0%, var(--theme-gradient-to) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(56, 189, 248, 0.1) 0px, transparent 50%);
+}
+
 @keyframes fade-in {
     from { opacity: 0; }
     to { opacity: 1; }
@@ -492,6 +571,75 @@ body {
     .btn-ripple::before {
         display: none !important;
     }
+}
+
+/* Sticky table headers */
+table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+/* Compact mode */
+.compact body {
+    font-size: 13px;
+}
+.compact .p-4 {
+    padding: 0.5rem;
+}
+.compact .p-5 {
+    padding: 0.75rem;
+}
+.compact .p-6 {
+    padding: 0.75rem;
+}
+.compact .px-6 {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+}
+.compact .py-3 {
+    padding-top: 0.375rem;
+    padding-bottom: 0.375rem;
+}
+.compact .py-4 {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+}
+.compact .space-y-6 > * + * {
+    margin-top: 0.75rem;
+}
+.compact .space-y-4 > * + * {
+    margin-top: 0.5rem;
+}
+.compact .gap-4 {
+    gap: 0.5rem;
+}
+.compact .gap-5 {
+    gap: 0.75rem;
+}
+.compact .gap-6 {
+    gap: 0.75rem;
+}
+.compact .text-2xl {
+    font-size: 1.25rem;
+}
+.compact .text-xl {
+    font-size: 1.1rem;
+}
+.compact .text-lg {
+    font-size: 1rem;
+}
+.compact .rounded-2xl {
+    border-radius: 0.75rem;
+}
+.compact .rounded-xl {
+    border-radius: 0.5rem;
+}
+.compact .min-h-screen {
+    min-height: auto;
+}
+.compact aside nav a {
+    padding: 0.375rem 0.75rem;
 }
 
 /* Print optimizations */
