@@ -332,78 +332,80 @@ export const UsersManagement = () => {
                 </div>
             )}
 
-            <Modal isOpen={isModalOpen} onClose={closeModal} title={editingUser ? 'Редактировать пользователя' : 'Новый пользователь'}>
-                <form onSubmit={handleSubmit} className="space-y-5 max-h-[80vh] overflow-y-auto pr-1">
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">ФИО / Имя</label>
-                        <input
-                            type="text"
-                            value={form.displayName}
-                            onChange={(e) => setForm({ ...form, displayName: e.target.value })}
-                            className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-dark-700 focus:ring-2 focus:ring-indigo-500 outline-none"
-                            required
-                        />
-                    </div>
+            <Modal isOpen={isModalOpen} onClose={closeModal} title={editingUser ? 'Редактировать пользователя' : 'Новый пользователь'} maxWidth="max-w-3xl">
+                <form onSubmit={handleSubmit} className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">ФИО / Имя</label>
+                            <input
+                                type="text"
+                                value={form.displayName}
+                                onChange={(e) => setForm({ ...form, displayName: e.target.value })}
+                                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-dark-700 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                required
+                            />
+                        </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Как обращаться (например, Имя)</label>
-                        <input
-                            type="text"
-                            value={form.firstName}
-                            onChange={(e) => setForm({ ...form, firstName: e.target.value })}
-                            className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-dark-700 focus:ring-2 focus:ring-indigo-500 outline-none"
-                            placeholder="Иван"
-                        />
-                    </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Как обращаться</label>
+                            <input
+                                type="text"
+                                value={form.firstName}
+                                onChange={(e) => setForm({ ...form, firstName: e.target.value })}
+                                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-dark-700 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                placeholder="Иван"
+                            />
+                        </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Email</label>
-                        <input
-                            type="email"
-                            value={form.email}
-                            disabled={!!editingUser}
-                            onChange={(e) => setForm({ ...form, email: e.target.value })}
-                            className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-dark-700 disabled:bg-slate-100 dark:disabled:bg-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none"
-                            required
-                        />
-                    </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Email</label>
+                            <input
+                                type="email"
+                                value={form.email}
+                                disabled={!!editingUser}
+                                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-dark-700 disabled:bg-slate-100 dark:disabled:bg-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                required
+                            />
+                        </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                            {editingUser ? 'Новый пароль (оставьте пустым, чтобы не менять)' : 'Пароль'}
-                        </label>
-                        <input
-                            type="password"
-                            value={form.password}
-                            onChange={(e) => setForm({ ...form, password: e.target.value })}
-                            className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-dark-700 focus:ring-2 focus:ring-indigo-500 outline-none"
-                            minLength={editingUser ? undefined : 6}
-                            required={!editingUser}
-                        />
-                    </div>
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                                {editingUser ? 'Новый пароль (оставьте пустым, чтобы не менять)' : 'Пароль'}
+                            </label>
+                            <input
+                                type="password"
+                                value={form.password}
+                                onChange={(e) => setForm({ ...form, password: e.target.value })}
+                                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-dark-700 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                minLength={editingUser ? undefined : 6}
+                                required={!editingUser}
+                            />
+                        </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Роль</label>
-                        <select
-                            value={form.role}
-                            onChange={(e) => applyRoleDefaults(e.target.value as UserRole)}
-                            className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-dark-700 focus:ring-2 focus:ring-indigo-500 outline-none"
-                        >
-                            {ROLE_DEFINITIONS.map((r) => (
-                                <option key={r.id} value={r.id}>
-                                    {r.name} — {r.description}
-                                </option>
-                            ))}
-                        </select>
+                        <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Роль</label>
+                            <select
+                                value={form.role}
+                                onChange={(e) => applyRoleDefaults(e.target.value as UserRole)}
+                                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-dark-700 focus:ring-2 focus:ring-indigo-500 outline-none"
+                            >
+                                {ROLE_DEFINITIONS.map((r) => (
+                                    <option key={r.id} value={r.id}>
+                                        {r.name} — {r.description}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
 
                     <div>
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Разрешения</label>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-dark-700/50">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-2 p-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-dark-700/50">
                             {ALL_PERMISSIONS.map((p) => (
                                 <label
                                     key={p.id}
-                                    className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300 cursor-pointer"
+                                    className="flex items-start gap-2.5 text-sm text-slate-700 dark:text-slate-300 cursor-pointer"
                                 >
                                     <input
                                         type="checkbox"
@@ -419,11 +421,11 @@ export const UsersManagement = () => {
 
                     <div>
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Доступные разделы</label>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-48 overflow-y-auto p-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-dark-700/50">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-2 p-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-dark-700/50">
                             {ALL_PAGES.map((p) => (
                                 <label
                                     key={p.id}
-                                    className="flex items-start gap-2 text-sm text-slate-700 dark:text-slate-300 cursor-pointer"
+                                    className="flex items-start gap-2.5 text-sm text-slate-700 dark:text-slate-300 cursor-pointer"
                                 >
                                     <input
                                         type="checkbox"
@@ -441,13 +443,13 @@ export const UsersManagement = () => {
                         <button
                             type="button"
                             onClick={closeModal}
-                            className="flex-1 px-4 py-2 border border-slate-200 dark:border-slate-600 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                            className="flex-1 px-4 py-2.5 border border-slate-200 dark:border-slate-600 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
                         >
                             Отмена
                         </button>
                         <button
                             type="submit"
-                            className="flex-1 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-colors"
+                            className="flex-1 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-colors"
                         >
                             {editingUser ? 'Сохранить' : 'Создать'}
                         </button>
