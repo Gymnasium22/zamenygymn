@@ -16,6 +16,7 @@ import {
 import { escapeMarkdown } from '../utils/escapeHtml';
 import { logger } from '../utils/logger';
 import useMedia from 'use-media';
+import { VirtualList } from '../components/VirtualList';
 
 // Subcomponents
 import { TeacherCard } from '../components/Substitutions/TeacherCard';
@@ -1274,19 +1275,42 @@ export const SubstitutionsPage = () => {
                             onSearchChange={setTeacherSearch}
                         />
 
-                        <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 space-y-2">
-                            {filteredTeachersList.map((t) => (
-                                <TeacherCard
-                                    key={t.id}
-                                    teacher={t}
-                                    isAbsent={t.unavailableDates.includes(selectedDate)}
-                                    absenceReason={t.absenceReasons ? t.absenceReasons[selectedDate] : ''}
-                                    selectedDate={selectedDate}
-                                    onOpenAbsenceModal={openAbsenceModal}
-                                    onRemoveAbsence={removeAbsence}
-                                    onDragStart={handleDragStart}
+                        <div className="flex-1 overflow-hidden pr-1">
+                            {filteredTeachersList.length > 20 ? (
+                                <VirtualList
+                                    items={filteredTeachersList}
+                                    itemHeight={72}
+                                    containerHeight={400}
+                                    renderItem={(t) => (
+                                        <div className="py-1">
+                                            <TeacherCard
+                                                teacher={t}
+                                                isAbsent={t.unavailableDates.includes(selectedDate)}
+                                                absenceReason={t.absenceReasons ? t.absenceReasons[selectedDate] : ''}
+                                                selectedDate={selectedDate}
+                                                onOpenAbsenceModal={openAbsenceModal}
+                                                onRemoveAbsence={removeAbsence}
+                                                onDragStart={handleDragStart}
+                                            />
+                                        </div>
+                                    )}
                                 />
-                            ))}
+                            ) : (
+                                <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 space-y-2">
+                                    {filteredTeachersList.map((t) => (
+                                        <TeacherCard
+                                            key={t.id}
+                                            teacher={t}
+                                            isAbsent={t.unavailableDates.includes(selectedDate)}
+                                            absenceReason={t.absenceReasons ? t.absenceReasons[selectedDate] : ''}
+                                            selectedDate={selectedDate}
+                                            onOpenAbsenceModal={openAbsenceModal}
+                                            onRemoveAbsence={removeAbsence}
+                                            onDragStart={handleDragStart}
+                                        />
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

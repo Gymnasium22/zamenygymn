@@ -264,6 +264,18 @@ export const UsersManagement = () => {
         }
     };
 
+    const bulkActivate = async () => {
+        if (!window.confirm(`Активировать ${selectedUserIds.size} пользователей?`)) return;
+        try {
+            const promises = Array.from(selectedUserIds).map((id) => usersService.setActive(id, true));
+            await Promise.all(promises);
+            await loadUsers();
+            addToast({ type: 'success', title: 'Готово', message: `${selectedUserIds.size} пользователей активировано` });
+        } catch {
+            addToast({ type: 'danger', title: 'Ошибка', message: 'Не удалось выполнить массовое действие' });
+        }
+    };
+
     const bulkDelete = async () => {
         if (!window.confirm(`Удалить ${selectedUserIds.size} пользователей? Это необратимо.`)) return;
         try {
@@ -319,6 +331,12 @@ export const UsersManagement = () => {
                                 Выбрано: {selectedUserIds.size}
                             </span>
                             <div className="flex-1" />
+                            <button
+                                onClick={bulkActivate}
+                                className="px-3 py-1.5 text-xs font-medium text-emerald-700 dark:text-emerald-300 bg-white dark:bg-slate-800 border border-emerald-300 dark:border-emerald-700 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-colors"
+                            >
+                                Активировать
+                            </button>
                             <button
                                 onClick={bulkDeactivate}
                                 className="px-3 py-1.5 text-xs font-medium text-amber-700 dark:text-amber-300 bg-white dark:bg-slate-800 border border-amber-300 dark:border-amber-700 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
@@ -413,6 +431,17 @@ export const UsersManagement = () => {
                                             <td className="px-4 py-3 text-xs text-slate-500">{formatDate(u.lastLoginAt)}</td>
                                             <td className="px-4 py-3 text-right">
                                                 <div className="inline-flex items-center gap-2">
+                                                    <button
+                                                        onClick={() => toggleActive(u)}
+                                                        className={`p-1.5 rounded-lg transition-colors ${
+                                                            u.isActive
+                                                                ? 'text-amber-500 hover:text-amber-600 hover:bg-amber-50'
+                                                                : 'text-emerald-500 hover:text-emerald-600 hover:bg-emerald-50'
+                                                        }`}
+                                                        title={u.isActive ? 'Заблокировать' : 'Активировать'}
+                                                    >
+                                                        <Icon name={u.isActive ? 'Lock' : 'Unlock'} size={16} />
+                                                    </button>
                                                     <button
                                                         onClick={() => openEdit(u)}
                                                         className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"

@@ -18,6 +18,7 @@ import { formatDateISO, formatDateEuropean, getActiveSemester, getDateOrToday } 
 import { exportService } from '../services/exportService';
 import { useToast } from '../components/UI';
 import { SanitaryScheduleTab } from '../components/SanitaryScheduleTab';
+import { PrintPreviewModal } from '../components/PrintPreviewModal';
 
 // --- Хелперы ---
 
@@ -243,6 +244,14 @@ export const ExportPage = () => {
     // Matrix Print State
     const [isMatrixPrintOpen, setIsMatrixPrintOpen] = useState(false);
     const [matrixGrade, setMatrixGrade] = useState<string>('');
+
+    // Print Preview State
+    const [previewOpen, setPreviewOpen] = useState(false);
+    const [previewTitle, setPreviewTitle] = useState('');
+    const [previewHtml, setPreviewHtml] = useState('');
+
+    // Class schedule export state
+    const [exportClassId, setExportClassId] = useState<string>(classes[0]?.id || '');
 
     type ExportTabId = 'data' | 'sanitary';
     const [activeExportTab, setActiveExportTab] = useState<ExportTabId>('data');
@@ -777,12 +786,11 @@ export const ExportPage = () => {
         exportService.saveAsExcel(content, `Сетка_Расписания_${matrixGrade}_параллель.xls`, styles);
     };
 
-    const exportMonthlySubstitutionsExcel = () => {
+    const buildMonthlySubstitutionsHtml = (): { html: string; styles: string; title: string } | null => {
         const targetDate = getDateOrToday(exportDate);
         const targetMonth = targetDate.getUTCMonth();
         const targetYear = targetDate.getUTCFullYear();
 
-        // Фильтруем замены за выбранный месяц
         const monthlySubs = substitutions
             .filter((s) => {
                 const sDate = getDateOrToday(s.date);
@@ -790,13 +798,10 @@ export const ExportPage = () => {
             })
             .sort((a, b) => getDateOrToday(a.date).getTime() - getDateOrToday(b.date).getTime());
 
-        if (monthlySubs.length === 0) {
-            addToast({ type: 'warning', title: 'Внимание', message: 'Нет данных о заменах за выбранный месяц.' });
-            return;
-        }
+        if (monthlySubs.length === 0) return null;
 
         interface SubstitutionDetail {
-            subs: Substitution[]; // Array of subs for grouped display
+            subs: Substitution[];
             scheduleItem: ScheduleItem;
             cls: ClassEntity | undefined;
             subj: Subject | undefined;
@@ -804,10 +809,8 @@ export const ExportPage = () => {
             reason: string;
         }
 
-        // Group by scheduleItemId to handle merges
         const groupedSubs = new Map<string, Substitution[]>();
         monthlySubs.forEach((sub) => {
-            // Group by item AND date to separate same lesson on different days
             const key = `${sub.scheduleItemId}_${sub.date}`;
             const existing = groupedSubs.get(key) || [];
             existing.push(sub);
@@ -819,7 +822,6 @@ export const ExportPage = () => {
 
         groupedSubs.forEach((subsGroup) => {
             const firstSub = subsGroup[0];
-            // Ищем урок в обоих расписаниях
             const scheduleItem = getScheduleItemById(firstSub.scheduleItemId);
             if (!scheduleItem) return;
 
@@ -829,7 +831,6 @@ export const ExportPage = () => {
 
             let reason = firstSub.lessonAbsenceReason || origTeacher?.absenceReasons?.[firstSub.date] || '';
 
-            // Logic overrides for display
             if (
                 firstSub.replacementTeacherId === firstSub.originalTeacherId &&
                 firstSub.replacementRoomId &&
@@ -930,21 +931,18 @@ export const ExportPage = () => {
             </table>
         `;
 
-        // Render Main Table
         if (mainSubs.length > 0) {
             content += renderTableLocal(mainSubs);
         } else {
             content += `<p>Замен с подтвержденной причиной не найдено.</p>`;
         }
 
-        // Render No Record Table (if any)
         if (noRecordSubs.length > 0) {
             content += `<br/><br/>`;
             content += `<h3 style="color: #b91c1c;">Замены без записи (Не подтверждена причина)</h3>`;
             content += renderTableLocal(noRecordSubs, true);
         }
 
-        // --- NEW SUMMARY TABLE ---
         const teacherStats = new Map<
             string,
             { name: string; total: number; withoutRecord: number; merger: number; other: number; illness: number }
@@ -978,7 +976,6 @@ export const ExportPage = () => {
 
             stats.total++;
 
-            // Priority: Merger > Illness > Without Record > Other
             if (sub.isMerger) {
                 stats.merger++;
             } else if (reason === 'Болезнь') {
@@ -1033,14 +1030,36 @@ export const ExportPage = () => {
             .date-row { background-color: #f3f4f6; font-weight: bold; }
         `;
 
-        exportService.saveAsExcel(
-            content,
-            `Отчет_Замены_${targetDate.getMonth() + 1}_${targetDate.getFullYear()}.xls`,
-            styles
-        );
+        return {
+            html: content,
+            styles,
+            title: `Отчет по заменам за ${targetDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}`
+        };
     };
 
-    const exportRefusalsExcel = () => {
+    const exportMonthlySubstitutionsExcel = () => {
+        const result = buildMonthlySubstitutionsHtml();
+        if (!result) {
+            addToast({ type: 'warning', title: 'Внимание', message: 'Нет данных о заменах за выбранный месяц.' });
+            return;
+        }
+        const { html, styles, title } = result;
+        exportService.saveAsExcel(html, `${title.replace(/\s/g, '_')}.xls`, styles);
+    };
+
+    const previewMonthlySubstitutions = () => {
+        const result = buildMonthlySubstitutionsHtml();
+        if (!result) {
+            addToast({ type: 'warning', title: 'Внимание', message: 'Нет данных о заменах за выбранный месяц.' });
+            return;
+        }
+        const { html, title } = result;
+        setPreviewTitle(title);
+        setPreviewHtml(html);
+        setPreviewOpen(true);
+    };
+
+    const buildRefusalsHtml = (): { html: string; title: string } | null => {
         const targetDate = getDateOrToday(exportDate);
         const targetMonth = targetDate.getUTCMonth();
         const targetYear = targetDate.getUTCFullYear();
@@ -1054,10 +1073,7 @@ export const ExportPage = () => {
             })
             .sort((a, b) => getDateOrToday(a.date).getTime() - getDateOrToday(b.date).getTime());
 
-        if (refusalsData.length === 0) {
-            addToast({ type: 'warning', title: 'Внимание', message: 'Нет данных об отказах за выбранный месяц.' });
-            return;
-        }
+        if (refusalsData.length === 0) return null;
 
         let html = `
             <h3>Отчет об отказах за ${targetDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}</h3>
@@ -1117,8 +1133,102 @@ export const ExportPage = () => {
 
         html += `</tbody></table>`;
 
-        const fileName = `Отчет_Отказы_${targetDate.getMonth() + 1}_${targetDate.getFullYear()}`;
-        exportService.saveAsExcel(html, fileName);
+        return {
+            html,
+            title: `Отчет об отказах за ${targetDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}`
+        };
+    };
+
+    const exportRefusalsExcel = () => {
+        const result = buildRefusalsHtml();
+        if (!result) {
+            addToast({ type: 'warning', title: 'Внимание', message: 'Нет данных об отказах за выбранный месяц.' });
+            return;
+        }
+        const { html, title } = result;
+        exportService.saveAsExcel(html, `${title.replace(/\s/g, '_')}.xls`);
+    };
+
+    const previewRefusals = () => {
+        const result = buildRefusalsHtml();
+        if (!result) {
+            addToast({ type: 'warning', title: 'Внимание', message: 'Нет данных об отказах за выбранный месяц.' });
+            return;
+        }
+        const { html, title } = result;
+        setPreviewTitle(title);
+        setPreviewHtml(html);
+        setPreviewOpen(true);
+    };
+
+    const buildClassScheduleHtml = (classId: string, semester: 1 | 2): { html: string; title: string } | null => {
+        const cls = classes.find((c) => c.id === classId);
+        if (!cls) return null;
+
+        const schedule = semester === 2 ? schedule2 : schedule1;
+        const classSchedule = schedule
+            .filter((s) => s.classId === classId)
+            .sort((a, b) => {
+                const dayOrder = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт'];
+                const dayDiff = dayOrder.indexOf(a.day) - dayOrder.indexOf(b.day);
+                if (dayDiff !== 0) return dayDiff;
+                return a.period - b.period;
+            });
+
+        let html = `<h2>Расписание класса ${cls.name}</h2>`;
+        html += `<p>Смена: ${cls.shift}</p>`;
+
+        if (classSchedule.length === 0) {
+            html += `<p>Расписание не заполнено</p>`;
+            return { html, title: `Расписание ${cls.name}` };
+        }
+
+        html += `<table style="border-collapse: collapse; width: 100%;">`;
+        html += `<thead><tr><th>День</th><th>Урок</th><th>Предмет</th><th>Учитель</th><th>Кабинет</th><th>Группа</th></tr></thead>`;
+        html += `<tbody>`;
+
+        classSchedule.forEach((item) => {
+            const subj = subjects.find((s) => s.id === item.subjectId);
+            const teacher = teachers.find((t) => t.id === item.teacherId);
+            const room = rooms.find((r) => r.id === item.roomId);
+            html += `<tr>`;
+            html += `<td>${item.day}</td>`;
+            html += `<td>${item.period}</td>`;
+            html += `<td>${subj?.name || '?'}</td>`;
+            html += `<td>${teacher?.name || '?'}</td>`;
+            html += `<td>${room?.name || '-'}</td>`;
+            html += `<td>${item.direction || '-'}</td>`;
+            html += `</tr>`;
+        });
+
+        html += `</tbody></table>`;
+
+        return {
+            html,
+            title: `Расписание ${cls.name} (${semester} полугодие)`
+        };
+    };
+
+    const exportClassSchedule = () => {
+        const result = buildClassScheduleHtml(exportClassId, exportSemester);
+        if (!result) {
+            addToast({ type: 'warning', title: 'Внимание', message: 'Класс не найден.' });
+            return;
+        }
+        const { html, title } = result;
+        exportService.saveAsExcel(html, `${title.replace(/\s/g, '_')}.xls`);
+    };
+
+    const previewClassSchedule = () => {
+        const result = buildClassScheduleHtml(exportClassId, exportSemester);
+        if (!result) {
+            addToast({ type: 'warning', title: 'Внимание', message: 'Класс не найден.' });
+            return;
+        }
+        const { html, title } = result;
+        setPreviewTitle(title);
+        setPreviewHtml(html);
+        setPreviewOpen(true);
     };
 
     const copyForGoogleSheets = async () => {
@@ -1671,10 +1781,56 @@ export const ExportPage = () => {
                                 <Icon name="List" size={20} /> Отчет по заменам (XLS)
                             </button>
                             <button
+                                onClick={previewMonthlySubstitutions}
+                                className="px-6 py-3 bg-slate-50 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-600 rounded-xl font-bold hover:bg-slate-100 dark:hover:bg-slate-600 transition flex items-center gap-2"
+                            >
+                                <Icon name="Eye" size={20} /> Предпросмотр замен
+                            </button>
+                            <button
                                 onClick={exportRefusalsExcel}
                                 className="px-6 py-3 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 border border-red-100 dark:border-red-900 rounded-xl font-bold hover:bg-red-100 dark:hover:bg-red-900/50 transition flex items-center gap-2"
                             >
                                 <Icon name="UserX" size={20} /> Отчет об отказах (XLS)
+                            </button>
+                            <button
+                                onClick={previewRefusals}
+                                className="px-6 py-3 bg-slate-50 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-600 rounded-xl font-bold hover:bg-slate-100 dark:hover:bg-slate-600 transition flex items-center gap-2"
+                            >
+                                <Icon name="Eye" size={20} /> Предпросмотр отказов
+                            </button>
+                        </div>
+                    </section>
+
+                    <section className="bg-white dark:bg-dark-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
+                        <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
+                            <Icon name="GraduationCap" className="text-indigo-600 dark:text-indigo-400" /> Расписание класса
+                        </h2>
+                        <div className="flex flex-wrap gap-4 items-center">
+                            <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl p-1.5 pl-3">
+                                <span className="text-xs font-bold text-slate-500 dark:text-slate-400">Класс:</span>
+                                <select
+                                    value={exportClassId}
+                                    onChange={(e) => setExportClassId(e.target.value)}
+                                    className="bg-transparent text-sm font-bold text-slate-700 dark:text-slate-200 outline-none cursor-pointer"
+                                >
+                                    {classes.map((c) => (
+                                        <option key={c.id} value={c.id}>
+                                            {c.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <button
+                                onClick={exportClassSchedule}
+                                className="px-6 py-3 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900 rounded-xl font-bold hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition flex items-center gap-2"
+                            >
+                                <Icon name="FileSpreadsheet" size={20} /> Скачать Excel
+                            </button>
+                            <button
+                                onClick={previewClassSchedule}
+                                className="px-6 py-3 bg-slate-50 dark:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-600 rounded-xl font-bold hover:bg-slate-100 dark:hover:bg-slate-600 transition flex items-center gap-2"
+                            >
+                                <Icon name="Eye" size={20} /> Предпросмотр
                             </button>
                         </div>
                     </section>
@@ -1720,6 +1876,13 @@ export const ExportPage = () => {
                     </div>
                 </div>
             )}
+
+            <PrintPreviewModal
+                isOpen={previewOpen}
+                onClose={() => setPreviewOpen(false)}
+                title={previewTitle}
+                htmlContent={previewHtml}
+            />
         </div>
     );
 };

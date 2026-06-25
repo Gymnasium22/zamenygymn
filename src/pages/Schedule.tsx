@@ -637,7 +637,11 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
             }
         }
 
-        const classConflict = conflictingItems.find((item) => item.classId === newItem.classId);
+        const classConflict = conflictingItems.find((item) => {
+            if (item.classId !== newItem.classId) return false;
+            if (item.direction && newItem.direction && item.direction !== newItem.direction) return false;
+            return true;
+        });
         if (classConflict) {
             conflicts.push({
                 type: 'class',
