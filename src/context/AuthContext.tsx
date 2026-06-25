@@ -21,16 +21,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Временная миграция: если у пользователя ещё нет профиля, но он входит по старому email,
-// создаём профиль на основе email.
-const resolveLegacyRole = (email: string | null): UserRole => {
-    if (!email) return 'teacher';
-    if (email === 'admin@gymnasium22.com') return 'admin';
-    if (email === 'teacher@gymnasium22.com') return 'teacher';
-    if (email === 'canteen@gymnasium22.com') return 'canteen';
-    return 'teacher';
-};
-
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
     const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -75,28 +65,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 unsubProfile = usersService.subscribe(
                     currentUser.uid,
                     async (loadedProfile) => {
-                        if (!loadedProfile) {
-                            // Профиль не найден — возможно, это старый пользователь.
-                            // Создаём профиль на основе email.
-                            const legacyRole = resolveLegacyRole(currentUser.email);
-                            try {
-                                const created = await usersService.create({
-                                    email: currentUser.email || '',
-                                    password: Math.random().toString(36).slice(-12), // Временный пароль, никому не показывается
-                                    displayName: currentUser.displayName || currentUser.email || 'Пользователь',
-                                    role: legacyRole,
-                                    createdBy: 'system_legacy_migration'
-                                });
-                                setProfile(created);
-                                setRole(created.role);
-                            } catch (e) {
-                                logger.error('Failed to migrate legacy user:', e);
-                                setProfile(null);
-                                setRole(null);
-                            }
-                        } else {
+                        if (loadedProfile && loadedProfile.isActive) {
                             setProfile(loadedProfile);
                             setRole(loadedProfile.role);
+                        } else {
+                            setProfile(null);
+                            setRole(null);
                         }
                         setLoading(false);
                     },

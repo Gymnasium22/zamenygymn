@@ -13,6 +13,7 @@ export const LoginPage = () => {
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [submitted, setSubmitted] = useState(false);
 
     useEffect(() => {
         if (!authLoading && role) {
@@ -20,14 +21,23 @@ export const LoginPage = () => {
         }
     }, [role, authLoading, navigate]);
 
+    useEffect(() => {
+        if (submitted && !authLoading && !role) {
+            setError('Не удалось получить права доступа. Проверьте, что пользователь создан в настройках.');
+            setSubmitted(false);
+        }
+    }, [submitted, authLoading, role]);
+
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
         setLoading(true);
+        setSubmitted(true);
 
         if (!auth) {
             setError('Firebase недоступен. Проверьте настройки.');
             setLoading(false);
+            setSubmitted(false);
             return;
         }
 
@@ -35,6 +45,7 @@ export const LoginPage = () => {
             await signInWithEmailAndPassword(auth, email.trim(), password);
         } catch (err) {
             logger.error('Firebase Auth Error:', err);
+            setSubmitted(false);
             const errorCode = (err as { code?: string })?.code;
 
             let friendlyMessage = 'Произошла неизвестная ошибка входа.';
@@ -54,7 +65,6 @@ export const LoginPage = () => {
                     friendlyMessage = 'Ошибка входа. Проверьте сеть.';
             }
             setError(friendlyMessage);
-        } finally {
             setLoading(false);
         }
     };
@@ -125,15 +135,15 @@ export const LoginPage = () => {
 
                     <button
                         type="submit"
-                        disabled={loading || authLoading}
+                        disabled={loading || authLoading || (submitted && !role)}
                         className="w-full py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-bold hover:shadow-lg hover:shadow-indigo-500/30 transition-all active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                     >
-                        {loading || authLoading ? (
+                        {loading || authLoading || (submitted && !role) ? (
                             <Icon name="Loader" className="animate-spin" size={20} />
                         ) : (
                             <Icon name="LogOut" className="rotate-180" size={20} />
                         )}
-                        {loading ? 'Вход...' : 'Войти в систему'}
+                        {loading || (submitted && !role) ? 'Вход...' : 'Войти в систему'}
                     </button>
                 </form>
             </div>
