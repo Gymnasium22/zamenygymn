@@ -40,6 +40,7 @@ export const ArchiveYearSection = () => {
     const [loadingCounts, setLoadingCounts] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [yearLabel, setYearLabel] = useState(defaultYearLabel(data.settings.currentYear));
+    const [fileSavedConfirmed, setFileSavedConfirmed] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
 
     const totalRecords = useMemo(
@@ -65,6 +66,7 @@ export const ArchiveYearSection = () => {
 
     const openModal = () => {
         setYearLabel(defaultYearLabel(data.settings.currentYear));
+        setFileSavedConfirmed(false);
         setIsModalOpen(true);
         loadCounts();
     };
@@ -233,6 +235,19 @@ export const ArchiveYearSection = () => {
                         </ul>
                     </div>
 
+                    <label className="flex items-start gap-3 p-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-dark-700/50 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={fileSavedConfirmed}
+                            onChange={(e) => setFileSavedConfirmed(e.target.checked)}
+                            className="mt-0.5 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+                        />
+                        <span className="text-sm text-slate-700 dark:text-slate-300">
+                            Я сохранил скачанный архивный файл и подтверждаю необратимую очистку
+                            годовых данных из базы.
+                        </span>
+                    </label>
+
                     <div className="flex gap-3 pt-2">
                         <button
                             type="button"
@@ -245,7 +260,7 @@ export const ArchiveYearSection = () => {
                         <button
                             type="button"
                             onClick={handleCloseYear}
-                            disabled={isProcessing || !yearLabel.trim()}
+                            disabled={isProcessing || !yearLabel.trim() || !fileSavedConfirmed}
                             className="flex-1 px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                         >
                             {isProcessing ? (
