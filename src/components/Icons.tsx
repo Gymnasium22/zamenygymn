@@ -1277,6 +1277,39 @@ const IconMap: Record<string, React.FC<React.SVGProps<SVGSVGElement>>> = {
             <rect x="1" y="3" width="22" height="5" />
             <line x1="10" y1="12" x2="14" y2="12" />
         </svg>
+    ),
+    PartyPopper: (p) => (
+        <svg
+            {...p}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        >
+            <path d="M5.8 11.3 2 22l10.7-3.79" />
+            <path d="M4 3h.01" />
+            <path d="M22 8h.01" />
+            <path d="M15 2h.01" />
+            <path d="M22 20h.01" />
+            <path d="m22 2-2.24.75a2.9 2.9 0 0 1-3.74 3.73l-1.74 5.21a3.43 3.43 0 0 0-.76 1.93c0 1.7 1.3 3.08 2.9 3.08 1.06 0 1.98-.57 2.47-1.42l3.27-5.48a2.9 2.9 0 0 0-2.17-4.4Z" />
+            <path d="m14.67 14.19-3.24.85a2.9 2.9 0 0 1-3.74-3.73l-1.74-5.21A3.43 3.43 0 0 0 5.2 4.17C3.5 4.17 2.12 5.47 2.12 7.07c0 1.06.57 1.98 1.42 2.47l5.48 3.27a2.9 2.9 0 0 0 4.4-2.17Z" />
+        </svg>
+    ),
+    Megaphone: (p) => (
+        <svg
+            {...p}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        >
+            <path d="m3 11 18-5v12L3 14v-3z" />
+            <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" />
+        </svg>
     )
 };
 

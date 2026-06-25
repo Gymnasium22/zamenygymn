@@ -6,6 +6,7 @@ import { useToast, Modal } from '../components/UI';
 import {
     TelegramTemplates,
     AdminAnnouncement,
+    AppAnnouncement,
     BellPreset,
     AuditLogEntry,
     AppData,
@@ -20,6 +21,7 @@ import { auditLog } from '../services/auditLog';
 import { logger } from '../utils/logger';
 import { safeLocalStorageGet } from '../utils/localStorage';
 import { stripDangerousKeys } from '../utils/safeMerge';
+import { formatAnnouncement } from '../utils/announcementFormat';
 import { SemesterConfig } from '../components/settings/SemesterConfig';
 import { TelegramTemplateEditor } from '../components/settings/TelegramTemplateEditor';
 import { dbService } from '../services/db';
@@ -405,6 +407,13 @@ export const SettingsPage = () => {
         active: false,
         lastUpdated: ''
     });
+    const [appAnnouncement, setAppAnnouncement] = useState<AppAnnouncement>({
+        title: '',
+        message: '',
+        active: false,
+        lastUpdated: '',
+        publishedAt: ''
+    });
     const [dashboardWidgetAccess, setDashboardWidgetAccess] = useState<Record<DashboardWidgetRole, DashboardWidgetId[]>>(DEFAULT_DASHBOARD_WIDGET_ACCESS);
     const [widgetAccessDirty, setWidgetAccessDirty] = useState(false);
 
@@ -443,6 +452,15 @@ export const SettingsPage = () => {
         );
         setAnnouncement(
             settings.adminAnnouncement || { message: '', active: false, lastUpdated: '' }
+        );
+        setAppAnnouncement(
+            settings.appAnnouncement || {
+                title: '',
+                message: '',
+                active: false,
+                lastUpdated: '',
+                publishedAt: ''
+            }
         );
         setDashboardWidgetAccess(settings.dashboardWidgetAccess || DEFAULT_DASHBOARD_WIDGET_ACCESS);
     }, [settings, privateSettings]);
@@ -1081,7 +1099,7 @@ export const SettingsPage = () => {
                                         Доска объявлений
                                     </h4>
                                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
-                                        Сообщение отобразится на рабочем столе всех учителей.
+                                        Сообщение отобразится на рабочем столе всех пользователей.
                                     </p>
                                     <textarea
                                         value={announcement.message}
@@ -1124,6 +1142,150 @@ export const SettingsPage = () => {
                                                 Обновлено: {formatDateEuropean(announcement.lastUpdated)}
                                             </span>
                                         )}
+                                    </div>
+                                </div>
+
+                                <div className="pt-6 border-t border-slate-100 dark:border-slate-700">
+                                    <h4 className="font-bold text-sm text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2">
+                                        <Icon name="Megaphone" size={16} />
+                                        Всплывающее уведомление
+                                    </h4>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+                                        Красивое уведомление с эмодзи и разметкой. Каждый пользователь
+                                        увидит его один раз после публикации.
+                                    </p>
+
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+                                                Заголовок
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={appAnnouncement.title || ''}
+                                                onChange={(e) =>
+                                                    setAppAnnouncement({ ...appAnnouncement, title: e.target.value })
+                                                }
+                                                className="w-full border border-slate-200 dark:border-slate-600 rounded-xl p-3 text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500"
+                                                placeholder="🎉 Важная новость"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+                                                Текст уведомления
+                                            </label>
+                                            <textarea
+                                                value={appAnnouncement.message}
+                                                onChange={(e) =>
+                                                    setAppAnnouncement({ ...appAnnouncement, message: e.target.value })
+                                                }
+                                                rows={6}
+                                                className="w-full border border-slate-200 dark:border-slate-600 rounded-xl p-3 text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500 resize-none"
+                                                placeholder="Например: **Срочный педсовет** сегодня в 14:00!\n- Пункт 1\n- Пункт 2"
+                                            />
+                                            <p className="mt-1.5 text-[10px] text-slate-400">
+                                                Поддерживается: **жирный**, *курсив*, - списки, 1. нумерация,
+                                                [ссылка](https://...), эмодзи.
+                                            </p>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+                                                Предпросмотр
+                                            </label>
+                                            <div className="rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 p-4 text-sm text-slate-800 dark:text-slate-200">
+                                                <h5 className="font-bold text-base mb-2">
+                                                    {appAnnouncement.title || 'Уведомление'}
+                                                </h5>
+                                                <div
+                                                    className="whitespace-pre-wrap"
+                                                    dangerouslySetInnerHTML={{
+                                                        __html: appAnnouncement.message
+                                                            ? formatAnnouncement(appAnnouncement.message)
+                                                            : '<p class="text-slate-400 italic">Текст уведомления...</p>'
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="flex flex-wrap items-center gap-3">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const now = new Date().toISOString();
+                                                    const next = {
+                                                        ...appAnnouncement,
+                                                        title: appAnnouncement.title || 'Уведомление',
+                                                        active: true,
+                                                        publishedAt: now,
+                                                        lastUpdated: now
+                                                    };
+                                                    setAppAnnouncement(next);
+                                                    saveStaticData({
+                                                        settings: {
+                                                            ...settings,
+                                                            appAnnouncement: next
+                                                        }
+                                                    });
+                                                    addToast({
+                                                        type: 'success',
+                                                        title: 'Опубликовано',
+                                                        message: 'Всплывающее уведомление опубликовано.'
+                                                    });
+                                                }}
+                                                className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm flex items-center gap-2 transition"
+                                            >
+                                                <Icon name="Send" size={16} />
+                                                {appAnnouncement.publishedAt ? 'Переопубликовать' : 'Опубликовать'}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    const next = {
+                                                        ...appAnnouncement,
+                                                        active: false,
+                                                        lastUpdated: new Date().toISOString()
+                                                    };
+                                                    setAppAnnouncement(next);
+                                                    saveStaticData({
+                                                        settings: {
+                                                            ...settings,
+                                                            appAnnouncement: next
+                                                        }
+                                                    });
+                                                    addToast({
+                                                        type: 'info',
+                                                        title: 'Снято с публикации',
+                                                        message: 'Всплывающее уведомление снято с публикации.'
+                                                    });
+                                                }}
+                                                className="px-4 py-2.5 border border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 rounded-xl font-bold text-sm text-slate-700 dark:text-slate-300 transition"
+                                            >
+                                                Снять с публикации
+                                            </button>
+                                        </div>
+
+                                        <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                                            <span>
+                                                Статус:{" "}
+                                                <span
+                                                    className={`font-bold ${
+                                                        appAnnouncement.active
+                                                            ? 'text-emerald-600 dark:text-emerald-400'
+                                                            : 'text-slate-600 dark:text-slate-400'
+                                                    }`}
+                                                >
+                                                    {appAnnouncement.active ? 'Опубликовано' : 'Черновик'}
+                                                </span>
+                                            </span>
+                                            {appAnnouncement.publishedAt && (
+                                                <span>
+                                                    Опубликовано:{" "}
+                                                    {formatDateEuropean(appAnnouncement.publishedAt)}
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             </div>

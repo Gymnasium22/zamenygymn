@@ -117,6 +117,14 @@ export interface AdminAnnouncement {
     lastUpdated: string;
 }
 
+export interface AppAnnouncement {
+    title?: string;
+    message: string;
+    active: boolean;
+    lastUpdated?: string;
+    publishedAt?: string;
+}
+
 export type DashboardWidgetId =
     | 'weather'
     | 'kpi'
@@ -141,6 +149,7 @@ export interface Settings {
     };
     telegramTemplates?: TelegramTemplates;
     adminAnnouncement?: AdminAnnouncement;
+    appAnnouncement?: AppAnnouncement;
     substitutionDayComments?: Record<string, string>; // ISO date -> common comment for substitutions on that day
     weatherApiKey?: string; // OpenWeatherMap API Key
     weatherCity?: string; // "Minsk,BY"
@@ -386,6 +395,7 @@ export interface UserProfile {
     createdAt?: string;
     createdBy?: string;
     lastLoginAt?: string;
+    dismissedAppAnnouncementAt?: string;
 }
 
 export interface RoleDefinition {

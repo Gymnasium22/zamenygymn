@@ -41,7 +41,11 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isAdmin() || (isAuthenticated() && request.auth.uid == userId);
       allow create: if isAdmin();
-      allow update: if isAdmin();
+      allow update: if isAdmin() || (
+          isAuthenticated() &&
+          request.auth.uid == userId &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['dismissedAppAnnouncementAt', 'lastLoginAt'])
+      );
       allow delete: if isAdmin();
     }
 

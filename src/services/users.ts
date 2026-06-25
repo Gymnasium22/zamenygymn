@@ -208,5 +208,14 @@ export const usersService = {
         } catch (e) {
             logger.error('Failed to update last login:', e);
         }
+    },
+
+    dismissAppAnnouncement: async (uid: string, publishedAt: string): Promise<void> => {
+        const db = getFirestore();
+        try {
+            await updateDoc(doc(db, COLLECTION_NAME, uid), { dismissedAppAnnouncementAt: publishedAt });
+        } catch (e) {
+            logger.error('Failed to dismiss app announcement:', e);
+        }
     }
 };

@@ -1384,7 +1384,7 @@ export const DashboardPage = () => {
                         </button>
                     </div>
 
-                    {/* Admin Broadcast moved here for flow */}
+                    {/* Admin Broadcast */}
                     {settings?.adminAnnouncement?.active && (
                         <div className="mt-6 bg-amber-100 dark:bg-amber-900/30 border-l-4 border-amber-500 p-4 rounded-r-xl shadow-sm">
                             <div className="flex items-start gap-4">

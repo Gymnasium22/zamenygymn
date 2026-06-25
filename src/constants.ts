@@ -121,6 +121,13 @@ export const INITIAL_DATA: AppData = {
             active: false,
             lastUpdated: ''
         },
+        appAnnouncement: {
+            title: '',
+            message: '',
+            active: false,
+            lastUpdated: '',
+            publishedAt: ''
+        },
         substitutionDayComments: {},
         dashboardWidgetAccess: {
             admin: ['weather', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes'],

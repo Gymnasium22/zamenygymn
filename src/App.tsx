@@ -4,6 +4,7 @@ import { DataProvider, useStaticData, StaticDataProvider, ScheduleDataProvider }
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Icon } from './components/Icons';
 import { StatusWidget, BottomNavigation, ToastProvider, CommandPalette } from './components/UI';
+import { AnnouncementModal } from './components/AnnouncementModal';
 import { PullToRefresh } from './components/PullToRefresh';
 import { DashboardPage } from './pages/Dashboard';
 import { SchedulePage } from './pages/Schedule';
@@ -69,10 +70,24 @@ const Layout = () => {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isCommandOpen, setIsCommandOpen] = useState(false);
     const [theme, setTheme] = useState(safeLocalStorageGet('theme') || 'light');
-    const { isLoading } = useStaticData();
-    const { logout, user, allowedPages, canViewPage } = useAuth();
+    const [showAnnouncement, setShowAnnouncement] = useState(false);
+    const { isLoading, settings } = useStaticData();
+    const { logout, user, profile, loading: authLoading, allowedPages, canViewPage } = useAuth();
     const location = useLocation();
     useAutoBackup();
+
+    useEffect(() => {
+        if (isLoading || authLoading || !user || !profile) return;
+        const announcement = settings?.appAnnouncement;
+        if (
+            announcement?.active &&
+            announcement.publishedAt &&
+            profile.dismissedAppAnnouncementAt !== announcement.publishedAt &&
+            safeLocalStorageGet(`dismissedAppAnnouncement_${user.uid}`) !== announcement.publishedAt
+        ) {
+            setShowAnnouncement(true);
+        }
+    }, [isLoading, authLoading, user, profile, settings?.appAnnouncement]);
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -246,6 +261,12 @@ const Layout = () => {
                 <BottomNavigation onMenuClick={() => setIsMobileMenuOpen(true)} allowedPages={allowedPages} />
             </main>
             <CommandPalette isOpen={isCommandOpen} onClose={() => setIsCommandOpen(false)} />
+            {showAnnouncement && settings?.appAnnouncement && (
+                <AnnouncementModal
+                    announcement={settings.appAnnouncement}
+                    onClose={() => setShowAnnouncement(false)}
+                />
+            )}
         </div>
     );
 };

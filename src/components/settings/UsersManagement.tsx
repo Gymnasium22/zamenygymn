@@ -98,16 +98,20 @@ export const UsersManagement = () => {
         const defaults = getRoleDefaults(role);
         setForm((prev) => ({
             ...prev,
-            role,
-            permissions: defaults.defaultPermissions,
-            allowedPages: defaults.defaultPages
+            permissions: [...defaults.defaultPermissions],
+            allowedPages: [...defaults.defaultPages]
         }));
     };
 
     const openCreate = () => {
         setEditingUser(null);
-        setForm({ ...emptyForm });
-        applyRoleDefaults('teacher');
+        const defaults = getRoleDefaults('teacher');
+        setForm({
+            ...emptyForm,
+            role: 'teacher',
+            permissions: [...defaults.defaultPermissions],
+            allowedPages: [...defaults.defaultPages]
+        });
         setIsModalOpen(true);
     };
 
@@ -383,19 +387,29 @@ export const UsersManagement = () => {
                             />
                         </div>
 
-                        <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Роль</label>
-                            <select
-                                value={form.role}
-                                onChange={(e) => applyRoleDefaults(e.target.value as UserRole)}
-                                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-dark-700 focus:ring-2 focus:ring-indigo-500 outline-none"
+                        <div className="md:col-span-2 flex items-end gap-3">
+                            <div className="flex-1">
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Роль</label>
+                                <select
+                                    value={form.role}
+                                    onChange={(e) => setForm((prev) => ({ ...prev, role: e.target.value as UserRole }))}
+                                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-dark-700 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                >
+                                    {ROLE_DEFINITIONS.map((r) => (
+                                        <option key={r.id} value={r.id}>
+                                            {r.name} — {r.description}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => applyRoleDefaults(form.role)}
+                                className="px-3 py-2.5 text-sm font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-400 dark:hover:bg-indigo-900/30 rounded-xl border border-indigo-200 dark:border-indigo-800 transition-colors shrink-0"
+                                title="Сбросить права и разделы на значения по умолчанию для выбранной роли"
                             >
-                                {ROLE_DEFINITIONS.map((r) => (
-                                    <option key={r.id} value={r.id}>
-                                        {r.name} — {r.description}
-                                    </option>
-                                ))}
-                            </select>
+                                Применить права роли
+                            </button>
                         </div>
                     </div>
 
