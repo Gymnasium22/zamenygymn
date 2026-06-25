@@ -5,15 +5,19 @@ import { useData } from '../../context/DataContext';
 import { archiveService } from '../../services/archiveService';
 import { logger } from '../../utils/logger';
 
-const defaultYearLabel = (currentYear?: number): string => {
-    if (currentYear) {
-        return `${currentYear - 1}/${currentYear}`;
-    }
+const getCurrentAcademicYearEnd = (settingsCurrentYear?: number): number => {
+    if (settingsCurrentYear) return settingsCurrentYear;
     const now = new Date();
     const year = now.getFullYear();
-    const month = now.getMonth();
-    return month >= 8 ? `${year}/${year + 1}` : `${year - 1}/${year}`;
+    const month = now.getMonth(); // 0-11
+    // С 1 сентября (month >= 8) уже идёт новый учебный год, который закончится в мае year + 1
+    return month >= 8 ? year + 1 : year;
 };
+
+const yearLabelFromEnd = (yearEnd: number): string => `${yearEnd - 1}/${yearEnd}`;
+
+const defaultYearLabel = (currentYear?: number): string =>
+    yearLabelFromEnd(getCurrentAcademicYearEnd(currentYear));
 
 interface Counts {
     schedule1: number;
@@ -48,6 +52,12 @@ export const ArchiveYearSection = () => {
         [counts]
     );
 
+    const currentYearEnd = useMemo(
+        () => getCurrentAcademicYearEnd(data.settings.currentYear),
+        [data.settings.currentYear]
+    );
+    const nextYearEnd = useMemo(() => currentYearEnd + 1, [currentYearEnd]);
+
     const loadCounts = async () => {
         setLoadingCounts(true);
         try {
@@ -65,7 +75,7 @@ export const ArchiveYearSection = () => {
     }, []);
 
     const openModal = () => {
-        setYearLabel(defaultYearLabel(data.settings.currentYear));
+        setYearLabel(yearLabelFromEnd(currentYearEnd));
         setFileSavedConfirmed(false);
         setIsModalOpen(true);
         loadCounts();
@@ -100,7 +110,8 @@ export const ArchiveYearSection = () => {
                 absenteeismRecords: [],
                 settings: {
                     ...data.settings,
-                    substitutionDayComments: {}
+                    substitutionDayComments: {},
+                    currentYear: nextYearEnd
                 }
             });
             setCounts({
@@ -115,7 +126,7 @@ export const ArchiveYearSection = () => {
             addToast({
                 type: 'success',
                 title: 'Учебный год закрыт',
-                message: `Архив ${archive.yearLabel} сохранён и загружен. Коллекции очищены.`
+                message: `Архив ${archive.yearLabel} сохранён и загружен. Текущий учебный год изменён на ${yearLabelFromEnd(nextYearEnd)}.`
             });
         } catch (error) {
             logger.error('Failed to close academic year', error);
@@ -213,7 +224,7 @@ export const ArchiveYearSection = () => {
 
                     <div>
                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-                            Учебный год
+                            Учебный год для архива
                         </label>
                         <input
                             type="text"
@@ -222,6 +233,17 @@ export const ArchiveYearSection = () => {
                             className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-dark-700 focus:ring-2 focus:ring-amber-500 outline-none"
                             placeholder="2025/2026"
                         />
+                        <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+                            Закрывается{' '}
+                            <span className="font-semibold text-slate-700 dark:text-slate-300">
+                                {yearLabelFromEnd(currentYearEnd)}
+                            </span>
+                            . После закрытия текущий учебный год автоматически станет{' '}
+                            <span className="font-semibold text-slate-700 dark:text-slate-300">
+                                {yearLabelFromEnd(nextYearEnd)}
+                            </span>
+                            .
+                        </p>
                     </div>
 
                     <div className="text-sm text-slate-600 dark:text-slate-300 space-y-1">
