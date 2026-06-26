@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
-import { useStaticData, useScheduleData } from '../context/DataContext';
+import { useData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { Icon } from '../components/Icons';
 import { DayOfWeek, DAYS, ScheduleItem, Shift } from '../types';
@@ -256,6 +256,7 @@ const WeatherWidget = () => {
 };
 
 export const DashboardPage = () => {
+    const { data } = useData();
     const { subjects, teachers, classes, rooms, bellSchedule, settings, privateSettings } = useStaticData();
     const { schedule, substitutions } = useScheduleData();
     const { role, profile } = useAuth();
@@ -298,7 +299,7 @@ export const DashboardPage = () => {
         if (!window.confirm('Перенести все данные из Firebase в Supabase? Это действие нельзя отменить.')) return;
         setMigrating(true);
         try {
-            await migrateDataToSupabase('f1bd501e-e4ee-4e9f-a657-cbd6ccee41c7');
+            await migrateDataToSupabase(data, 'f1bd501e-e4ee-4e9f-a657-cbd6ccee41c7');
             addToast({ type: 'success', title: 'Готово', message: 'Данные успешно перенесены в Supabase' });
         } catch (err) {
             logger.error('Migration error:', err);
