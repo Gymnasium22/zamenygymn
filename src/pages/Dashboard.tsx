@@ -9,6 +9,7 @@ import { getActiveSemester, formatDateISO } from '../utils/helpers';
 import { weatherService, WeatherData, ForecastItem } from '../services/weatherService';
 import { escapeMarkdown } from '../utils/escapeHtml';
 import { safeLocalStorageGet, safeLocalStorageSet } from '../utils/localStorage';
+import { migrateDataToSupabase } from '../services/migration';
 import { logger } from '../utils/logger';
 
 // Enhanced interfaces for Live Search
@@ -291,6 +292,21 @@ export const DashboardPage = () => {
     const [isWidgetModalOpen, setIsWidgetModalOpen] = useState(false);
     const [draggedWidgetId, setDraggedWidgetId] = useState<string | null>(null);
     const widgetDragTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const [migrating, setMigrating] = useState(false);
+
+    const handleMigrate = async () => {
+        if (!window.confirm('Перенести все данные из Firebase в Supabase? Это действие нельзя отменить.')) return;
+        setMigrating(true);
+        try {
+            await migrateDataToSupabase('f1bd501e-e4ee-4e9f-a657-cbd6ccee41c7');
+            addToast({ type: 'success', title: 'Готово', message: 'Данные успешно перенесены в Supabase' });
+        } catch (err) {
+            logger.error('Migration error:', err);
+            addToast({ type: 'danger', title: 'Ошибка миграции', message: String(err) });
+        } finally {
+            setMigrating(false);
+        }
+    };
 
     const handleDragStart = (e: React.DragEvent<HTMLDivElement>, id: string) => {
         setDraggedWidgetId(id);
@@ -1567,6 +1583,30 @@ export const DashboardPage = () => {
                     </div>
                 </div>
             </Modal>
+            {role === 'admin' && (
+                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl p-6 mt-8">
+                    <h3 className="text-lg font-bold text-amber-800 dark:text-amber-400 mb-2 flex items-center gap-2">
+                        <Icon name="Database" size={20} />
+                        Миграция данных
+                    </h3>
+                    <p className="text-sm text-amber-700 dark:text-amber-300 mb-4">
+                        Перенести все данные (учителя, классы, расписание, замены) из Firebase в Supabase. 
+                        Это действие выполняется один раз.
+                    </p>
+                    <button
+                        onClick={handleMigrate}
+                        disabled={migrating}
+                        className="px-6 py-3 bg-amber-600 text-white rounded-xl font-bold hover:bg-amber-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    >
+                        {migrating ? (
+                            <Icon name="Loader" className="animate-spin" size={18} />
+                        ) : (
+                            <Icon name="Database" size={18} />
+                        )}
+                        {migrating ? 'Перенос данных...' : 'Перенести данные в Supabase'}
+                    </button>
+                </div>
+            )}
         </div>
     );
 };
