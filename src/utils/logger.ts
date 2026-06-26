@@ -12,6 +12,9 @@ export const logger = {
     warn: (...args: unknown[]): void => {
         if (isDev) console.warn(...args);
     },
+    info: (...args: unknown[]): void => {
+        if (isDev) console.info(...args);
+    },
     error: (...args: unknown[]): void => {
         // Ошибки в продакшене можно дополнительно отправлять в Sentry
         if (isDev) console.error(...args);
