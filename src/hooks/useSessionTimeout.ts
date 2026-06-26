@@ -1,6 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { signOut } from 'firebase/auth';
-import { auth } from '../services/firebase';
+import { authAdapter } from '../services/authAdapter';
 import { logger } from '../utils/logger';
 
 interface UseSessionTimeoutOptions {
@@ -27,7 +26,7 @@ export const useSessionTimeout = ({
 
     const logout = useCallback(async () => {
         try {
-            if (auth) await signOut(auth);
+            await authAdapter.signOut();
             onTimeout?.();
         } catch (e) {
             logger.error('Auto-logout error:', e);

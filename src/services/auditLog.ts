@@ -2,6 +2,8 @@ import { AuditLogEntry } from '../types';
 import { generateId } from '../utils/helpers';
 import { safeLocalStorageGet, safeLocalStorageSet, safeLocalStorageRemove } from '../utils/localStorage';
 import { firestoreDB } from './firebase';
+import { supabase } from './supabase';
+import { isSupabase } from './dbProvider';
 import { logger } from '../utils/logger';
 import { collection, addDoc, getDocs, query, orderBy, limit as firestoreLimit, writeBatch } from 'firebase/firestore';
 
@@ -55,8 +57,21 @@ class AuditLogService {
         entries.push(entry);
         this.writeEntries(entries);
 
-        // 2. Write to Firestore directly if available
-        if (firestoreDB) {
+        // 2. Write to database if available
+        if (isSupabase) {
+            try {
+                await supabase.from('audit_log').insert({
+                    user_email: userEmail,
+                    user_role: userRole,
+                    action,
+                    entity_type: entityType,
+                    entity_name: entityName || '',
+                    details: details || ''
+                });
+            } catch (e) {
+                logger.warn('Failed to write audit log to Supabase:', e);
+            }
+        } else if (firestoreDB) {
             try {
                 const docRef = collection(firestoreDB, 'audit_log');
                 await addDoc(docRef, entry);
@@ -69,7 +84,32 @@ class AuditLogService {
     }
 
     async getEntries(limit = 100): Promise<AuditLogEntry[]> {
-        if (firestoreDB) {
+        if (isSupabase) {
+            try {
+                const { data, error } = await supabase
+                    .from('audit_log')
+                    .select('*')
+                    .order('created_at', { ascending: false })
+                    .limit(limit);
+                if (error) throw error;
+                if (data && data.length > 0) {
+                    const dbEntries = data.map((d: Record<string, unknown>) => ({
+                        id: d.id as string,
+                        timestamp: (d.created_at as string) || new Date().toISOString(),
+                        userEmail: (d.user_email as string) || 'unknown',
+                        userRole: (d.user_role as string) || 'unknown',
+                        action: (d.action as string) || 'update',
+                        entityType: (d.entity_type as string) || 'settings',
+                        entityName: (d.entity_name as string) || '',
+                        details: (d.details as string) || ''
+                    } as AuditLogEntry));
+                    this.writeEntries([...dbEntries].reverse());
+                    return dbEntries;
+                }
+            } catch (e) {
+                logger.warn('Failed to fetch audit log from Supabase, falling back to local storage:', e);
+            }
+        } else if (firestoreDB) {
             try {
                 const q = query(
                     collection(firestoreDB, 'audit_log'),
@@ -106,7 +146,13 @@ class AuditLogService {
 
     async clear() {
         safeLocalStorageRemove(STORAGE_KEY);
-        if (firestoreDB) {
+        if (isSupabase) {
+            try {
+                await supabase.from('audit_log').delete().neq('id', '');
+            } catch (e) {
+                logger.warn('Failed to clear Supabase audit log:', e);
+            }
+        } else if (firestoreDB) {
             try {
                 const q = query(collection(firestoreDB, 'audit_log'));
                 const snapshot = await getDocs(q);
