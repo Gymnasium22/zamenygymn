@@ -3,7 +3,6 @@ import { authAdapter } from '../services/authAdapter';
 import { useAuth } from '../context/AuthContext';
 import { Icon } from '../components/Icons';
 import { useNavigate } from 'react-router-dom';
-import { authAdapter } from '../services/authAdapter';
 import { logger } from '../utils/logger';
 
 export const LoginPage = () => {
