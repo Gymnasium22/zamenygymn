@@ -18,6 +18,7 @@ export interface Subject {
     difficulty: number;
     requiredRoomType: string;
     order?: number;
+    organizationId?: string;
 }
 
 export interface Teacher {
@@ -30,6 +31,9 @@ export interface Teacher {
     birthDate?: string;
     telegramChatId?: string;
     order?: number;
+    maxPeriods?: number;
+    classTeacherOf?: string;
+    organizationId?: string;
 }
 
 export interface ClassEntity {
@@ -39,6 +43,7 @@ export interface ClassEntity {
     studentsCount: number;
     order?: number;
     excludeFromReports?: boolean; // New field to hide class from conflict checks
+    organizationId?: string;
 }
 
 export interface Room {
@@ -47,6 +52,7 @@ export interface Room {
     capacity: number;
     type: string;
     order?: number;
+    organizationId?: string;
 }
 
 export interface ScheduleItem {
@@ -59,6 +65,7 @@ export interface ScheduleItem {
     period: number;
     shift: string; // Shift
     direction?: string; // Group or profile
+    organizationId?: string;
 }
 
 export interface Substitution {
@@ -76,6 +83,7 @@ export interface Substitution {
     isRead?: boolean; // NEW: Status of acknowledgement by the teacher
     comment?: string; // NEW: Per-substitution comment
     dayComment?: string; // NEW: Common comment for all substitutions on this date
+    organizationId?: string;
 }
 
 export interface SubstitutionParams {
@@ -163,6 +171,7 @@ export interface Settings {
     allowTeacherEdit?: boolean; // Разрешить учителям редактировать расписание
     autoBackup?: boolean; // Автоматический бэкап по расписанию
     backupTime?: string; // Время бэкапа в формате HH:MM
+    organizationId?: string;
 }
 
 export interface PrivateSettings {
@@ -186,6 +195,7 @@ export interface DutyRecord {
     shift: string; // Shift enum (Added for 2 shifts support)
     zoneId: string;
     teacherId: string;
+    organizationId?: string;
 }
 
 // --- NUTRITION TYPES ---
@@ -198,6 +208,7 @@ export interface NutritionRecord {
     regularCount: number; // Количество обычных (totalCount - benefitCount)
     enteredBy?: string; // ID учителя, который внёс данные
     enteredAt?: string; // ISO Date when record was created/updated
+    organizationId?: string;
 }
 
 export interface NutritionStats {
@@ -225,6 +236,7 @@ export interface AbsenteeismRecord {
     enteredAt?: string; // ISO Date
     updatedAt?: string; // ISO Date of last update
     updatedBy?: string; // Email/ID of who updated
+    organizationId?: string;
 }
 
 // --- ARCHIVE TYPES ---
@@ -324,6 +336,7 @@ export interface AuditLogEntry {
     entityType: 'schedule' | 'substitution' | 'teacher' | 'class' | 'room' | 'subject' | 'settings' | 'bells' | 'duty' | 'nutrition' | 'absenteeism';
     entityName?: string;
     details?: string;
+    organizationId?: string;
 }
 
 export const DAYS = [DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday];
@@ -399,6 +412,7 @@ export interface UserProfile {
     permissions: Permission[];
     allowedPages: PageId[];
     teacherId?: string; // Привязка к учителю из справочника
+    organizationId?: string;
     createdAt?: string;
     createdBy?: string;
     lastLoginAt?: string;
