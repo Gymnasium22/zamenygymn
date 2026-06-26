@@ -10,6 +10,8 @@ import {
 } from '../types';
 import { INITIAL_DATA, DEFAULT_BELLS, DEFAULT_DUTY_ZONES, getInitialData } from '../constants';
 import { dbService } from '../services/db';
+import { supabaseDbService } from '../services/dbSupabase';
+import { isSupabase } from '../services/dbProvider';
 import { useAuth } from './AuthContext';
 import { User } from 'firebase/auth';
 import { getActiveSemester, generateId } from '../utils/helpers';
@@ -118,7 +120,7 @@ const syncQueue = {
                 if (!navigator.onLine) break; // Останавливаемся, если сеть пропала
 
                 try {
-                    await dbService.save(item.data, user);
+                    await dataProvider.save(item.data, user);
                     itemsToRemove.push(item.id);
                 } catch (error: unknown) {
                     item.retryCount++;
@@ -224,6 +226,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
     children,
     initialData
 }) => {
+    const dataProvider = isSupabase ? supabaseDbService : dbService;
+    
     const [data, setInternalData] = useState<AppData>(getInitialData());
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
@@ -286,7 +290,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
         // 3. Подписываемся на Firebase
         let unsubscribe: (() => void) | undefined;
         try {
-            unsubscribe = dbService.subscribe(
+            unsubscribe = dataProvider.subscribe(
                 (loaded) => {
                     setInternalData((prevData) => {
                         // Merge incoming partial data with previous data (which contains localStorage data)
@@ -401,7 +405,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                 // 3. Пробуем отправить в облако (только для авторизованных и не для публичных данных)
                 if (!initialData && user) {
                     try {
-                        await dbService.save(newData, user);
+                        await dataProvider.save(newData, user);
                     } catch (dbError: unknown) {
                         // При ошибке Firestore добавляем в очередь синхронизации вместо отката
                         handleError.firebaseOffline(dbError, 'сохранения данных', newData);
@@ -510,7 +514,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
 
             if (!initialData && user) {
                 try {
-                    dbService.save(prevData, user).catch((e) => handleError.firebase(e, 'отмены изменений'));
+                    dataProvider.save(prevData, user).catch((e) => handleError.firebase(e, 'отмены изменений'));
                 } catch (e) {
                     handleError.firebase(e, 'отмены изменений');
                 }
@@ -533,7 +537,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
 
             if (!initialData && user) {
                 try {
-                    dbService.save(nextData, user).catch((e) => handleError.firebase(e, 'повтора изменений'));
+                    dataProvider.save(nextData, user).catch((e) => handleError.firebase(e, 'повтора изменений'));
                 } catch (e) {
                     handleError.firebase(e, 'повтора изменений');
                 }

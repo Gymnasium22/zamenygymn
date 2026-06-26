@@ -1,14 +1,13 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { User, onAuthStateChanged, signOut, getAuth } from 'firebase/auth';
-import { auth } from '../services/firebase';
-import { usersService } from '../services/users';
+import { User } from 'firebase/auth';
+import { authAdapter } from '../services/authAdapter';
 import { UserProfile, UserRole, Permission, PageId } from '../types';
 import { logger } from '../utils/logger';
 
 export type { UserRole };
 
 interface AuthContextType {
-    user: User | null;
+    user: User | { id: string; email?: string | null } | null;
     role: UserRole | null;
     profile: UserProfile | null;
     permissions: Permission[];
@@ -23,7 +22,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [user, setUser] = useState<User | null>(null);
+    const [user, setUser] = useState<User | { id: string; email?: string | null } | null>(null);
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [role, setRole] = useState<UserRole | null>(null);
     const [loading, setLoading] = useState(true);
@@ -44,16 +43,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
 
     useEffect(() => {
-        if (!auth) {
-            logger.warn('Firebase Auth is not initialized.');
-            setLoading(false);
-            return;
-        }
-
         let unsubProfile: (() => void) | null = null;
 
-        const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-            setUser(currentUser);
+        const unsubscribe = authAdapter.onAuthStateChanged(async (currentUser) => {
+            setUser(currentUser as User | null);
 
             if (unsubProfile) {
                 unsubProfile();
@@ -61,11 +54,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
 
             if (currentUser) {
-                // Обновляем lastLoginAt асинхронно (не ждём)
-                usersService.updateLastLogin(currentUser.uid).catch(() => {});
+                const usersService = authAdapter.getUsersService();
+                const uid = 'uid' in currentUser ? currentUser.uid : currentUser.id;
+
+                usersService.updateLastLogin(uid).catch(() => {});
 
                 unsubProfile = usersService.subscribe(
-                    currentUser.uid,
+                    uid,
                     async (loadedProfile) => {
                         if (loadedProfile && loadedProfile.isActive) {
                             setProfile(loadedProfile);
@@ -104,8 +99,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, []);
 
     const logout = async () => {
-        const authInstance = getAuth();
-        if (authInstance) await signOut(authInstance);
+        await authAdapter.signOut();
         setUser(null);
         setProfile(null);
         setRole(null);
