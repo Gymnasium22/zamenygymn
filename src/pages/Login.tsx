@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { auth } from '../services/firebase';
+import { authAdapter } from '../services/authAdapter';
 import { useAuth } from '../context/AuthContext';
 import { Icon } from '../components/Icons';
 import { useNavigate } from 'react-router-dom';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { authAdapter } from '../services/authAdapter';
 import { logger } from '../utils/logger';
 
 export const LoginPage = () => {
@@ -38,35 +38,24 @@ export const LoginPage = () => {
         setLoading(true);
         setSubmitted(true);
 
-        if (!auth) {
-            setError('Firebase недоступен. Проверьте настройки.');
-            setLoading(false);
-            setSubmitted(false);
-            return;
-        }
-
         try {
-            await signInWithEmailAndPassword(auth, email.trim(), password);
+            const { user: authUser, error: authError } = await authAdapter.signIn(email.trim(), password);
+            if (authError) throw authError;
+            if (!authUser) throw new Error('Не удалось войти');
         } catch (err) {
-            logger.error('Firebase Auth Error:', err);
+            logger.error('Auth Error:', err);
             setSubmitted(false);
-            const errorCode = (err as { code?: string })?.code;
+            const errorCode = (err as { code?: string })?.code || '';
 
             let friendlyMessage = 'Произошла неизвестная ошибка входа.';
-            switch (errorCode) {
-                case 'auth/invalid-credential':
-                case 'auth/wrong-password':
-                case 'auth/user-not-found':
-                    friendlyMessage = 'Неверный логин или пароль.';
-                    break;
-                case 'auth/invalid-email':
-                    friendlyMessage = 'Некорректный формат email.';
-                    break;
-                case 'auth/too-many-requests':
-                    friendlyMessage = 'Слишком много попыток. Подождите.';
-                    break;
-                default:
-                    friendlyMessage = 'Ошибка входа. Проверьте сеть.';
+            if (errorCode.includes('invalid') || errorCode.includes('wrong') || errorCode.includes('not-found')) {
+                friendlyMessage = 'Неверный логин или пароль.';
+            } else if (errorCode.includes('email')) {
+                friendlyMessage = 'Некорректный формат email.';
+            } else if (errorCode.includes('too-many')) {
+                friendlyMessage = 'Слишком много попыток. Подождите.';
+            } else {
+                friendlyMessage = 'Ошибка входа. Проверьте сеть.';
             }
             setError(friendlyMessage);
             setLoading(false);

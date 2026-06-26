@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { usersService, getRoleDefaults } from '../../services/users';
+import { usersService, getRoleDefaults } from '../../services/usersProvider';
 import { logger } from '../../utils/logger';
 import { useAuth } from '../../context/AuthContext';
 import { useStaticData } from '../../context/DataContext';
