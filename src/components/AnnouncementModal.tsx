@@ -23,9 +23,9 @@ export const AnnouncementModal = ({ announcement, onClose }: AnnouncementModalPr
     }, [onClose]);
 
     const handleClose = () => {
-        if (user?.uid && announcement.publishedAt) {
-            usersService.dismissAppAnnouncement(user.uid, announcement.publishedAt);
-            safeLocalStorageSet(`dismissedAppAnnouncement_${user.uid}`, announcement.publishedAt);
+        if (user?.id && announcement.publishedAt) {
+            usersService.dismissAppAnnouncement(user.id, announcement.publishedAt);
+            safeLocalStorageSet(`dismissedAppAnnouncement_${user.id}`, announcement.publishedAt);
         }
         onClose();
     };

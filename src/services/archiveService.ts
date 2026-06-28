@@ -15,7 +15,8 @@ import {
     ArchivedAbsenteeismRecord,
     Substitution,
     NutritionRecord,
-    AbsenteeismRecord
+    AbsenteeismRecord,
+    StudentAbsence
 } from '../types';
 import { formatDateISO } from '../utils/helpers';
 import { logger } from '../utils/logger';
@@ -75,9 +76,9 @@ const supabaseCount = async (table: string, filters?: { column: string; value: u
 const mapSubstitution = (raw: Record<string, unknown>): Substitution => ({
     id: raw.id as string,
     date: raw.date as string,
-    scheduleItemId: (raw.schedule_item_id as string) || undefined,
-    originalTeacherId: (raw.original_teacher_id as string) || undefined,
-    replacementTeacherId: (raw.replacement_teacher_id as string) || undefined,
+    scheduleItemId: (raw.schedule_item_id as string) || '',
+    originalTeacherId: (raw.original_teacher_id as string) || '',
+    replacementTeacherId: (raw.replacement_teacher_id as string) || '',
     replacementRoomId: (raw.replacement_room_id as string) || undefined,
     replacementClassId: (raw.replacement_class_id as string) || undefined,
     replacementSubjectId: (raw.replacement_subject_id as string) || undefined,
@@ -106,7 +107,7 @@ const mapAbsenteeismRecord = (raw: Record<string, unknown>): AbsenteeismRecord =
     id: raw.id as string,
     date: raw.date as string,
     classId: (raw.class_id as string) || '',
-    absences: (raw.absences as unknown[]) || [],
+    absences: (raw.absences as StudentAbsence[]) || [],
     enteredBy: (raw.entered_by as string) || undefined,
     enteredAt: (raw.entered_at as string) || undefined,
     updatedAt: (raw.updated_at as string) || undefined,
@@ -121,7 +122,7 @@ const supabaseFetchAll = async <T>(table: string, columns: string = '*', mapper?
         throw new Error(`Не удалось прочитать таблицу ${table}`);
     }
     if (!mapper) return (data || []) as T[];
-    return (data || []).map((d) => mapper(d as Record<string, unknown>));
+    return (data || []).map((d) => mapper(d as any));
 };
 
 const supabaseDeleteAll = async (table: string): Promise<void> => {

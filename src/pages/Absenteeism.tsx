@@ -244,7 +244,7 @@ export const AbsenteeismPage = () => {
             date: selectedDate,
             classId: selectedClassId,
             absences,
-            enteredBy: editingRecord?.enteredBy || user?.uid,
+            enteredBy: editingRecord?.enteredBy || user?.id,
             enteredAt: editingRecord?.enteredAt || new Date().toISOString(),
             updatedAt: new Date().toISOString(), // Ensure update timestamp for syncing
             updatedBy: user?.email || 'unknown' // Track who updated

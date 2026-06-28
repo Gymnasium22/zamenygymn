@@ -4,24 +4,33 @@ import { supabase } from './supabase';
 import { isSupabase } from './dbProvider';
 import { usersService } from './users';
 import { supabaseUsersService } from './supabase/users';
-import { UserProfile } from '../types';
+
+export interface UnifiedUser {
+    id: string;
+    email?: string | null;
+}
 
 export interface AuthAdapter {
-    getCurrentUser: () => Promise<User | { id: string; email: string | undefined } | null>;
-    onAuthStateChanged: (callback: (user: User | { id: string; email: string | undefined } | null) => void) => () => void;
-    signIn: (email: string, password: string) => Promise<{ user: { id: string; email: string } | null; error: Error | null }>;
+    getCurrentUser: () => Promise<UnifiedUser | null>;
+    onAuthStateChanged: (callback: (user: UnifiedUser | null) => void) => () => void;
+    signIn: (email: string, password: string) => Promise<{ user: UnifiedUser | null; error: Error | null }>;
     signOut: () => Promise<void>;
     getUsersService: () => typeof usersService | typeof supabaseUsersService;
 }
 
+const mapFirebaseUser = (user: User): UnifiedUser => ({
+    id: user.uid,
+    email: user.email
+});
+
 export const firebaseAdapter: AuthAdapter = {
     getCurrentUser: async () => {
-        return firebaseAuth?.currentUser || null;
+        return firebaseAuth?.currentUser ? mapFirebaseUser(firebaseAuth.currentUser) : null;
     },
     onAuthStateChanged: (callback) => {
         if (!firebaseAuth) return () => {};
         const unsubscribe = firebaseAuth.onAuthStateChanged((user) => {
-            callback(user);
+            callback(user ? mapFirebaseUser(user) : null);
         });
         return unsubscribe;
     },
@@ -30,7 +39,7 @@ export const firebaseAdapter: AuthAdapter = {
         try {
             const { signInWithEmailAndPassword } = await import('firebase/auth');
             const result = await signInWithEmailAndPassword(firebaseAuth, email, password);
-            return { user: { id: result.user.uid, email: result.user.email || '' }, error: null };
+            return { user: mapFirebaseUser(result.user), error: null };
         } catch (error) {
             return { user: null, error: error as Error };
         }
@@ -49,7 +58,7 @@ export const supabaseAdapter: AuthAdapter = {
         return data.user ? { id: data.user.id, email: data.user.email || '' } : null;
     },
     onAuthStateChanged: (callback) => {
-        let currentUser: { id: string; email: string } | null = null;
+        let currentUser: UnifiedUser | null = null;
 
         // Immediately check current user — onAuthStateChange only fires on changes, not initial state
         supabase.auth.getUser().then(({ data: userData }) => {
@@ -63,7 +72,7 @@ export const supabaseAdapter: AuthAdapter = {
             }
         });
 
-        const { data } = supabase.auth.onAuthStateChange((event, session) => {
+        const { data } = supabase.auth.onAuthStateChange((_event, session) => {
             if (session?.user) {
                 const newUser = { id: session.user.id, email: session.user.email || '' };
                 if (!currentUser || currentUser.id !== newUser.id || currentUser.email !== newUser.email) {

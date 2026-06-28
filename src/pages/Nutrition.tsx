@@ -175,7 +175,7 @@ export const NutritionPage = () => {
                           totalCount,
                           benefitCount,
                           regularCount,
-                          enteredBy: user?.uid || r.enteredBy,
+                          enteredBy: user?.id || r.enteredBy,
                           enteredAt: now
                       }
                     : r
@@ -193,7 +193,7 @@ export const NutritionPage = () => {
                               totalCount,
                               benefitCount,
                               regularCount,
-                              enteredBy: user?.uid || r.enteredBy,
+                              enteredBy: user?.id || r.enteredBy,
                               enteredAt: now
                           }
                         : r
@@ -207,7 +207,7 @@ export const NutritionPage = () => {
                     totalCount,
                     benefitCount,
                     regularCount,
-                    enteredBy: user?.uid,
+                    enteredBy: user?.id,
                     enteredAt: now
                 };
                 updatedRecords = [...nutritionRecords, newRecord];
@@ -244,7 +244,7 @@ export const NutritionPage = () => {
                 addToast({ type: 'warning', title: 'У вас нет права удалять записи о питании' });
                 return;
             }
-            if (!isAdmin && record.enteredBy !== user?.uid) {
+            if (!isAdmin && record.enteredBy !== user?.id) {
                 addToast({ type: 'warning', title: 'Вы можете удалять только свои записи' });
                 return;
             }

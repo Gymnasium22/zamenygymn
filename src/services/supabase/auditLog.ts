@@ -29,8 +29,8 @@ export const supabaseAuditLogService = {
             return {
                 id: a.id as string,
                 userId: (a.user_id as string) || undefined,
-                userEmail: (a.user_email as string) || undefined,
-                action: a.action as string,
+                userEmail: (a.user_email as string) || '',
+                action: a.action as AuditLogEntry['action'],
                 collection: (a.collection as string) || undefined,
                 targetId: (a.target_id as string) || undefined,
                 details: detailsStr,

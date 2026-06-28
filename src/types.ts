@@ -14,9 +14,9 @@ export enum DayOfWeek {
 export interface Subject {
     id: string;
     name: string;
-    color: string;
-    difficulty: number;
-    requiredRoomType: string;
+    color?: string;
+    difficulty?: number;
+    requiredRoomType?: string;
     order?: number;
     organizationId?: string;
 }
@@ -41,6 +41,8 @@ export interface ClassEntity {
     name: string;
     shift: string; // Shift enum
     studentsCount: number;
+    grade?: string | null;
+    classTeacherId?: string | null;
     order?: number;
     excludeFromReports?: boolean; // New field to hide class from conflict checks
     organizationId?: string;
@@ -49,8 +51,9 @@ export interface ClassEntity {
 export interface Room {
     id: string;
     name: string;
-    capacity: number;
-    type: string;
+    capacity?: number;
+    type?: string;
+    floor?: number | null;
     order?: number;
     organizationId?: string;
 }
@@ -64,6 +67,7 @@ export interface ScheduleItem {
     day: string; // DayOfWeek
     period: number;
     shift: string; // Shift
+    semester?: number;
     direction?: string; // Group or profile
     organizationId?: string;
 }
@@ -99,6 +103,7 @@ export interface SubstitutionParams {
 }
 
 export interface Bell {
+    id?: string;
     shift: string;
     period: number;
     start: string;
@@ -146,7 +151,8 @@ export type DashboardWidgetId =
 export type DashboardWidgetRole = 'admin' | 'teacher' | 'canteen';
 
 export interface Settings {
-    telegramToken: string;
+    id?: string; // Supabase row id
+    telegramToken?: string;
     publicScheduleId?: string | null; // ID for publicly published schedule
     feedbackChatId?: string;
     adminTelegramChatId?: string; // ID администратора для системных уведомлений
@@ -172,6 +178,21 @@ export interface Settings {
     autoBackup?: boolean; // Автоматический бэкап по расписанию
     backupTime?: string; // Время бэкапа в формате HH:MM
     organizationId?: string;
+    // Supabase snake_case fields mapped during migration
+    schoolYear?: string | null;
+    semesterStart1?: string | null;
+    semesterEnd1?: string | null;
+    semesterStart2?: string | null;
+    semesterEnd2?: string | null;
+    shift1Start?: string | null;
+    shift1End?: string | null;
+    shift2Start?: string | null;
+    shift2End?: string | null;
+    periods?: number | null;
+    shift1Periods?: number | null;
+    shift2Periods?: number | null;
+    maxPeriods?: number | null;
+    googleAppsScriptUrl?: string | null;
 }
 
 export interface PrivateSettings {
@@ -206,6 +227,9 @@ export interface NutritionRecord {
     totalCount: number; // Общее количество питающихся
     benefitCount: number; // Количество льготников
     regularCount: number; // Количество обычных (totalCount - benefitCount)
+    breakfastCount?: number; // Завтрак
+    lunchCount?: number; // Обед
+    dinnerCount?: number; // Ужин
     enteredBy?: string; // ID учителя, который внёс данные
     enteredAt?: string; // ISO Date when record was created/updated
     organizationId?: string;
@@ -232,6 +256,8 @@ export interface AbsenteeismRecord {
     date: string; // ISO Date (YYYY-MM-DD)
     classId: string;
     absences: StudentAbsence[];
+    presentCount?: number; // Количество присутствующих
+    absentCount?: number; // Количество отсутствующих
     enteredBy?: string; // ID of teacher/admin
     enteredAt?: string; // ISO Date
     updatedAt?: string; // ISO Date of last update
@@ -331,12 +357,16 @@ export interface AuditLogEntry {
     id: string;
     timestamp: string; // ISO Date
     userEmail: string;
-    userRole: string;
+    userRole?: string;
     action: 'create' | 'update' | 'delete' | 'import' | 'export' | 'apply';
-    entityType: 'schedule' | 'substitution' | 'teacher' | 'class' | 'room' | 'subject' | 'settings' | 'bells' | 'duty' | 'nutrition' | 'absenteeism';
+    entityType?: 'schedule' | 'substitution' | 'teacher' | 'class' | 'room' | 'subject' | 'settings' | 'bells' | 'duty' | 'nutrition' | 'absenteeism';
     entityName?: string;
     details?: string;
     organizationId?: string;
+    // Supabase audit_log table fields (snake_case mapped)
+    userId?: string;
+    collection?: string;
+    targetId?: string;
 }
 
 export const DAYS = [DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday];

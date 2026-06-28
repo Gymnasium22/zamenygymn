@@ -173,7 +173,7 @@ export const UsersManagement = () => {
                     permissions: form.permissions,
                     allowedPages: form.allowedPages,
                     organizationId: currentProfile?.organizationId,
-                    createdBy: currentUser?.uid
+                    createdBy: currentUser?.id
                 });
                 addToast({ type: 'success', title: 'Пользователь создан' });
             }
@@ -186,7 +186,7 @@ export const UsersManagement = () => {
     };
 
     const toggleActive = async (u: UserProfile) => {
-        if (u.id === currentUser?.uid) {
+        if (u.id === currentUser?.id) {
             addToast({ type: 'warning', title: 'Нельзя заблокировать себя' });
             return;
         }
@@ -204,7 +204,7 @@ export const UsersManagement = () => {
     };
 
     const handleDelete = async (u: UserProfile) => {
-        if (u.id === currentUser?.uid) {
+        if (u.id === currentUser?.id) {
             addToast({ type: 'warning', title: 'Нельзя удалить себя' });
             return;
         }
@@ -389,7 +389,7 @@ export const UsersManagement = () => {
                                                     checked={selectedUserIds.has(u.id)}
                                                     onChange={() => toggleSelectUser(u.id)}
                                                     className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                                                    disabled={u.id === currentUser?.uid}
+                                                    disabled={u.id === currentUser?.id}
                                                 />
                                             </td>
                                             <td className="px-4 py-3">

@@ -1,23 +1,8 @@
-import { AppData } from '../types';
+import { AppData, Teacher, Subject, ClassEntity, Room, ScheduleItem, Substitution, DutyRecord, NutritionRecord, AbsenteeismRecord, Settings, DutyZone, Bell } from '../types';
 import { INITIAL_DATA } from '../constants';
 import { logger } from '../utils/logger';
 import { supabase } from './supabase';
 import { isSupabase } from './dbProvider';
-
-interface SaveDataPayload {
-    teachers: Record<string, unknown>[];
-    subjects: Record<string, unknown>[];
-    classes: Record<string, unknown>[];
-    rooms: Record<string, unknown>[];
-    schedule1: Record<string, unknown>[];
-    schedule2: Record<string, unknown>[];
-    substitutions: Record<string, unknown>[];
-    dutyZones: Record<string, unknown>[];
-    dutySchedule: Record<string, unknown>[];
-    nutritionRecords: Record<string, unknown>[];
-    absenteeismRecords: Record<string, unknown>[];
-    settings: Record<string, unknown>;
-}
 
 const toSnakeCase = (obj: Record<string, unknown>): Record<string, unknown> => {
     const result: Record<string, unknown> = {};
@@ -92,18 +77,18 @@ export const supabaseDbService = {
 
                 const data: AppData = {
                     ...INITIAL_DATA,
-                    teachers: (teachersRes.data || []).map((t: Record<string, unknown>) => ({ ...fromSnakeCase(t), id: t.id })),
-                    subjects: (subjectsRes.data || []).map((s: Record<string, unknown>) => ({ ...fromSnakeCase(s), id: s.id })),
-                    classes: (classesRes.data || []).map((c: Record<string, unknown>) => ({ ...fromSnakeCase(c), id: c.id })),
-                    rooms: (roomsRes.data || []).map((r: Record<string, unknown>) => ({ ...fromSnakeCase(r), id: r.id })),
-                    schedule: (schedule1Res.data || []).map((s: Record<string, unknown>) => ({ ...fromSnakeCase(s), id: s.id })),
-                    schedule2: (schedule2Res.data || []).map((s: Record<string, unknown>) => ({ ...fromSnakeCase(s), id: s.id })),
-                    substitutions: (substitutionsRes.data || []).map((s: Record<string, unknown>) => ({ ...fromSnakeCase(s), id: s.id })),
-                    dutySchedule: (dutyRes.data || []).map((d: Record<string, unknown>) => ({ ...fromSnakeCase(d), id: d.id })),
-                    nutritionRecords: (nutritionRes.data || []).map((n: Record<string, unknown>) => ({ ...fromSnakeCase(n), id: n.id })),
-                    absenteeismRecords: (absenteeismRes.data || []).map((a: Record<string, unknown>) => ({ ...fromSnakeCase(a), id: a.id })),
-                    settings: settingsRes.data ? { ...fromSnakeCase(settingsRes.data), id: settingsRes.data.id } : INITIAL_DATA.settings,
-                    dutyZones: (dutyZonesRes.data || []).map((z: Record<string, unknown>) => ({ ...fromSnakeCase(z), id: z.id })),
+                    teachers: (teachersRes.data || []).map((t: Record<string, unknown>) => ({ ...fromSnakeCase(t), id: t.id })) as Teacher[],
+                    subjects: (subjectsRes.data || []).map((s: Record<string, unknown>) => ({ ...fromSnakeCase(s), id: s.id })) as Subject[],
+                    classes: (classesRes.data || []).map((c: Record<string, unknown>) => ({ ...fromSnakeCase(c), id: c.id })) as ClassEntity[],
+                    rooms: (roomsRes.data || []).map((r: Record<string, unknown>) => ({ ...fromSnakeCase(r), id: r.id })) as Room[],
+                    schedule: (schedule1Res.data || []).map((s: Record<string, unknown>) => ({ ...fromSnakeCase(s), id: s.id })) as ScheduleItem[],
+                    schedule2: (schedule2Res.data || []).map((s: Record<string, unknown>) => ({ ...fromSnakeCase(s), id: s.id })) as ScheduleItem[],
+                    substitutions: (substitutionsRes.data || []).map((s: Record<string, unknown>) => ({ ...fromSnakeCase(s), id: s.id })) as Substitution[],
+                    dutySchedule: (dutyRes.data || []).map((d: Record<string, unknown>) => ({ ...fromSnakeCase(d), id: d.id })) as DutyRecord[],
+                    nutritionRecords: (nutritionRes.data || []).map((n: Record<string, unknown>) => ({ ...fromSnakeCase(n), id: n.id })) as NutritionRecord[],
+                    absenteeismRecords: (absenteeismRes.data || []).map((a: Record<string, unknown>) => ({ ...fromSnakeCase(a), id: a.id })) as AbsenteeismRecord[],
+                    settings: settingsRes.data ? { ...fromSnakeCase(settingsRes.data), id: settingsRes.data.id } as Settings : INITIAL_DATA.settings,
+                    dutyZones: (dutyZonesRes.data || []).map((z: Record<string, unknown>) => ({ ...fromSnakeCase(z), id: z.id })) as DutyZone[],
                     bellSchedule: (bellScheduleRes.data || []).map((b: Record<string, unknown>) => ({
                         id: b.id,
                         shift: b.shift,
@@ -112,7 +97,7 @@ export const supabaseDbService = {
                         end: b.end_time,
                         day: b.day,
                         cancelled: b.cancelled
-                    })),
+                    })) as Bell[],
                     privateSettings: settingsRes.data ? {
                         telegramToken: (settingsRes.data as Record<string, unknown>).telegram_token as string,
                         weatherApiKey: (settingsRes.data as Record<string, unknown>).weather_api_key as string
@@ -162,7 +147,7 @@ export const supabaseDbService = {
         // Save each collection to Supabase
         if (data.teachers) {
             await supabase.from('teachers').upsert(data.teachers.map((t) => {
-                const obj = toSnakeCase(t as Record<string, unknown>);
+                const obj = toSnakeCase(t as unknown as Record<string, unknown>);
                 if (!obj.id) obj.id = genId();
                 if (!obj.organization_id) obj.organization_id = ORG_ID;
                 return obj;
@@ -170,7 +155,7 @@ export const supabaseDbService = {
         }
         if (data.subjects) {
             await supabase.from('subjects').upsert(data.subjects.map((s) => {
-                const obj = toSnakeCase(s as Record<string, unknown>);
+                const obj = toSnakeCase(s as unknown as Record<string, unknown>);
                 if (!obj.id) obj.id = genId();
                 if (!obj.organization_id) obj.organization_id = ORG_ID;
                 return obj;
@@ -178,7 +163,7 @@ export const supabaseDbService = {
         }
         if (data.classes) {
             await supabase.from('classes').upsert(data.classes.map((c) => {
-                const obj = toSnakeCase(c as Record<string, unknown>);
+                const obj = toSnakeCase(c as unknown as Record<string, unknown>);
                 if (!obj.id) obj.id = genId();
                 if (!obj.organization_id) obj.organization_id = ORG_ID;
                 return obj;
@@ -186,7 +171,7 @@ export const supabaseDbService = {
         }
         if (data.rooms) {
             await supabase.from('rooms').upsert(data.rooms.map((r) => {
-                const obj = toSnakeCase(r as Record<string, unknown>);
+                const obj = toSnakeCase(r as unknown as Record<string, unknown>);
                 if (!obj.id) obj.id = genId();
                 if (!obj.organization_id) obj.organization_id = ORG_ID;
                 return obj;
@@ -196,7 +181,7 @@ export const supabaseDbService = {
             // Delete all existing schedule items for semester 1, then insert fresh
             await supabase.from('schedule_items').delete().eq('semester', 1).eq('organization_id', ORG_ID);
             await supabase.from('schedule_items').insert(data.schedule.map((s) => {
-                const obj = toSnakeCase(s as Record<string, unknown>);
+                const obj = toSnakeCase(s as unknown as Record<string, unknown>);
                 if (!obj.id) obj.id = genId();
                 if (!obj.organization_id) obj.organization_id = ORG_ID;
                 obj.semester = 1;
@@ -207,7 +192,7 @@ export const supabaseDbService = {
             // Delete all existing schedule items for semester 2, then insert fresh
             await supabase.from('schedule_items').delete().eq('semester', 2).eq('organization_id', ORG_ID);
             await supabase.from('schedule_items').insert(data.schedule2.map((s) => {
-                const obj = toSnakeCase(s as Record<string, unknown>);
+                const obj = toSnakeCase(s as unknown as Record<string, unknown>);
                 if (!obj.id) obj.id = genId();
                 if (!obj.organization_id) obj.organization_id = ORG_ID;
                 obj.semester = 2;
@@ -216,7 +201,7 @@ export const supabaseDbService = {
         }
         if (data.substitutions) {
             await supabase.from('substitutions').upsert(data.substitutions.map((s) => {
-                const obj = toSnakeCase(s as Record<string, unknown>);
+                const obj = toSnakeCase(s as unknown as Record<string, unknown>);
                 if (!obj.id) obj.id = genId();
                 if (!obj.organization_id) obj.organization_id = ORG_ID;
                 return obj;
@@ -224,7 +209,7 @@ export const supabaseDbService = {
         }
         if (data.dutySchedule) {
             await supabase.from('duty').upsert(data.dutySchedule.map((d) => {
-                const obj = toSnakeCase(d as Record<string, unknown>);
+                const obj = toSnakeCase(d as unknown as Record<string, unknown>);
                 if (!obj.id) obj.id = genId();
                 if (!obj.organization_id) obj.organization_id = ORG_ID;
                 return obj;
@@ -232,7 +217,7 @@ export const supabaseDbService = {
         }
         if (data.nutritionRecords) {
             await supabase.from('nutrition').upsert(data.nutritionRecords.map((n) => {
-                const obj = toSnakeCase(n as Record<string, unknown>);
+                const obj = toSnakeCase(n as unknown as Record<string, unknown>);
                 if (!obj.id) obj.id = genId();
                 if (!obj.organization_id) obj.organization_id = ORG_ID;
                 return obj;
@@ -240,7 +225,7 @@ export const supabaseDbService = {
         }
         if (data.absenteeismRecords) {
             await supabase.from('absenteeism').upsert(data.absenteeismRecords.map((a) => {
-                const obj = toSnakeCase(a as Record<string, unknown>);
+                const obj = toSnakeCase(a as unknown as Record<string, unknown>);
                 if (!obj.id) obj.id = genId();
                 if (!obj.organization_id) obj.organization_id = ORG_ID;
                 return obj;
@@ -248,7 +233,7 @@ export const supabaseDbService = {
         }
         if (data.dutyZones) {
             await supabase.from('duty_zones').upsert(data.dutyZones.map((z) => {
-                const obj = toSnakeCase(z as Record<string, unknown>);
+                const obj = toSnakeCase(z as unknown as Record<string, unknown>);
                 if (!obj.id) obj.id = genId();
                 if (!obj.organization_id) obj.organization_id = ORG_ID;
                 return obj;

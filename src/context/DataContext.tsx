@@ -13,7 +13,6 @@ import { dbService } from '../services/db';
 import { supabaseDbService } from '../services/dbSupabase';
 import { isSupabase } from '../services/dbProvider';
 import { useAuth } from './AuthContext';
-import { User } from 'firebase/auth';
 import { getActiveSemester, generateId } from '../utils/helpers';
 import { produce } from 'immer';
 import { auditLog } from '../services/auditLog';
@@ -109,7 +108,7 @@ const syncQueue = {
         syncQueue.save();
     },
 
-    process: async (user: User) => {
+    process: async (dataProvider: { save: (data: Partial<AppData>, user?: { email?: string | null } | null) => Promise<void> }, user: { email?: string | null }) => {
         if (syncQueue.isProcessing || !navigator.onLine) return;
 
         syncQueue.isProcessing = true;
@@ -147,7 +146,7 @@ const syncQueue = {
 
             if (syncQueue.items.length > 0 && navigator.onLine) {
                 // Если остались элементы и сеть есть, попробуем снова через 5 секунд
-                setTimeout(() => syncQueue.process(user), 5000);
+                setTimeout(() => syncQueue.process(dataProvider, user), 5000);
             }
         }
     }
@@ -244,7 +243,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
 
     // Получаем user и role для проверки прав
     const { user, role, loading: authLoading } = useAuth();
-    const userId = user ? ('uid' in user ? user.uid : user.id) : null;
+    const userId = user?.id ?? null;
 
     // Загрузка данных
     useEffect(() => {
@@ -440,7 +439,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                     Object.keys(newData).forEach((key) => {
                         if (entityMap[key]) {
                             auditLog.log(
-                                user.email || user.uid || 'unknown',
+                                user.email || user.id || 'unknown',
                                 role || 'unknown',
                                 'update',
                                 entityMap[key],
@@ -486,13 +485,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
     useEffect(() => {
         const handleOnline = () => {
             if (syncQueue.items.length > 0 && user && !initialData) {
-                syncQueue.process(user);
+                syncQueue.process(dataProvider, user);
             }
         };
 
         window.addEventListener('online', handleOnline);
         return () => window.removeEventListener('online', handleOnline);
-    }, [user, role, initialData]);
+    }, [user, role, initialData, dataProvider]);
 
     // BroadcastChannel: синхронизация между вкладками
     useEffect(() => {

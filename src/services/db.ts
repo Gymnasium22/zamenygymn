@@ -4,7 +4,6 @@ import { formatDateISO } from '../utils/helpers';
 import { logger } from '../utils/logger';
 import { firestoreDB, auth } from './firebase';
 import { collection, doc, setDoc, writeBatch, onSnapshot, getDocs, query, deleteDoc, getDoc, where, orderBy } from 'firebase/firestore';
-import { User } from 'firebase/auth';
 
 // Сколько последних дней загружать для больших журнальных коллекций
 const RECENT_RECORDS_DAYS = 90;
@@ -251,7 +250,7 @@ export const dbService = {
         }
     },
 
-    save: async (data: Partial<AppData>, currentUser?: User | null) => {
+    save: async (data: Partial<AppData>, currentUser?: { email?: string | null } | null) => {
         if (!firestoreDB) return;
 
         const user = currentUser || auth?.currentUser;

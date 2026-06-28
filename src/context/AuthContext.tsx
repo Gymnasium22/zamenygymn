@@ -1,13 +1,11 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { User } from 'firebase/auth';
-import { authAdapter } from '../services/authAdapter';
+import { authAdapter, UnifiedUser } from '../services/authAdapter';
 import { UserProfile, UserRole, Permission, PageId } from '../types';
-import { logger } from '../utils/logger';
 
 export type { UserRole };
 
 interface AuthContextType {
-    user: User | { id: string; email?: string | null } | null;
+    user: UnifiedUser | null;
     role: UserRole | null;
     profile: UserProfile | null;
     permissions: Permission[];
@@ -22,7 +20,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-    const [user, setUser] = useState<User | { id: string; email?: string | null } | null>(null);
+    const [user, setUser] = useState<UnifiedUser | null>(null);
     const [profile, setProfile] = useState<UserProfile | null>(null);
     const [role, setRole] = useState<UserRole | null>(null);
     const [loading, setLoading] = useState(true);
@@ -49,7 +47,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         const unsubscribe = authAdapter.onAuthStateChanged(async (currentUser) => {
             console.log('[AuthContext] Auth state changed:', currentUser ? { id: currentUser.id, email: currentUser.email } : null);
-            setUser(currentUser as User | null);
+            setUser(currentUser);
 
             if (unsubProfile) {
                 unsubProfile();
@@ -58,7 +56,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
             if (currentUser) {
                 const usersService = authAdapter.getUsersService();
-                const uid = 'uid' in currentUser ? currentUser.uid : currentUser.id;
+                const uid = currentUser.id;
                 console.log('[AuthContext] User found, subscribing to profile for uid:', uid);
 
                 usersService.updateLastLogin(uid).catch(() => {});

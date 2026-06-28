@@ -812,7 +812,7 @@ export const DashboardPage = () => {
                 if (tc) problems.push({ class: cls.name, issue: `Конфликт учителя (${l.period} ур)` });
                 if (l.roomId) {
                     const room = rooms.find((r) => r.id === l.roomId);
-                    if (room && room.capacity < cls.studentsCount)
+                    if (room && (room.capacity || 0) < cls.studentsCount)
                         problems.push({ class: cls.name, issue: `Тесно: ${room.name} (${l.period} ур)` });
                 }
             });

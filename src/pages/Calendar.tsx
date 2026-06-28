@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useStaticData } from '../context/DataContext';
 import { Icon } from '../components/Icons';
 import { SchoolCalendar, CalendarEvent } from '../components/SchoolCalendar';
@@ -8,7 +8,7 @@ import { safeLocalStorageGet, safeLocalStorageSet } from '../utils/localStorage'
 const STORAGE_KEY = 'gym_calendar_events';
 
 export const CalendarPage = () => {
-    const { settings } = useStaticData();
+    const { settings: _settings } = useStaticData();
     const { addToast } = useToast();
     const [events, setEvents] = useState<CalendarEvent[]>([]);
     const [loading, setLoading] = useState(true);

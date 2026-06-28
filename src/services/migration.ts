@@ -16,8 +16,8 @@ export const migrateDataToSupabase = async (data: AppData, organizationId: strin
                 id: t.id,
                 organization_id: organizationId,
                 name: t.name,
-                subjects: t.subjectIds || t.subjects || [],
-                shift: t.shift || t.shifts?.[0] || null,
+                subjects: t.subjectIds || (t as any).subjects || [],
+                shift: (t as any).shift || t.shifts?.[0] || null,
                 max_periods: t.maxPeriods || 8,
                 class_teacher_of: t.classTeacherOf || null,
                 unavailable_dates: t.unavailableDates || [],
@@ -49,7 +49,7 @@ export const migrateDataToSupabase = async (data: AppData, organizationId: strin
                 organization_id: organizationId,
                 name: c.name,
                 shift: c.shift,
-                student_count: c.studentCount || c.studentsCount || 0,
+                student_count: (c as any).studentCount || c.studentsCount || 0,
                 grade: c.grade || null,
                 class_teacher_id: c.classTeacherId || null
             }))

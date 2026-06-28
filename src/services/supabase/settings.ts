@@ -1,5 +1,5 @@
 import { supabase } from '../supabase';
-import { Settings } from '../../types';
+import { Settings, BellPreset, TelegramTemplates, AdminAnnouncement, DashboardWidgetRole, DashboardWidgetId } from '../../types';
 
 const ORG_ID = 'f1bd501e-e4ee-4e9f-a657-cbd6ccee41c7';
 
@@ -78,14 +78,14 @@ function mapSettings(data: Record<string, unknown>): Settings {
         publicScheduleId: (data.public_schedule_id as string) || undefined,
         feedbackChatId: (data.feedback_chat_id as string) || undefined,
         adminTelegramChatId: (data.admin_telegram_chat_id as string) || undefined,
-        bellPresets: (data.bell_presets as unknown) || undefined,
-        semesterConfig: (data.semester_config as unknown) || undefined,
-        telegramTemplates: (data.telegram_templates as unknown) || undefined,
-        adminAnnouncement: (data.admin_announcement as unknown) || undefined,
-        substitutionDayComments: (data.substitution_day_comments as Record<string, string>) || undefined,
-        weatherApiKey: (data.weather_api_key as string) || undefined,
-        weatherCity: (data.weather_city as string) || undefined,
-        dashboardWidgetAccess: (data.dashboard_widget_access as Record<string, string[]>) || undefined,
+        bellPresets: (data.bell_presets as BellPreset[] | undefined) || undefined,
+        semesterConfig: (data.semester_config as { firstSemesterMonths: number[]; secondSemesterMonths: number[] } | undefined) || undefined,
+        telegramTemplates: (data.telegram_templates as TelegramTemplates | undefined) || undefined,
+        adminAnnouncement: (data.admin_announcement as AdminAnnouncement | undefined) || undefined,
+        substitutionDayComments: (data.substitution_day_comments as Record<string, string> | undefined) || undefined,
+        weatherApiKey: (data.weather_api_key as string | undefined) || undefined,
+        weatherCity: (data.weather_city as string | undefined) || undefined,
+        dashboardWidgetAccess: (data.dashboard_widget_access as Record<DashboardWidgetRole, DashboardWidgetId[]> | undefined) || undefined,
         schoolName: (data.school_name as string) || undefined,
         directorName: (data.director_name as string) || undefined,
         unionChairName: (data.union_chair_name as string) || undefined,

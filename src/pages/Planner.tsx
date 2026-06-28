@@ -27,12 +27,6 @@ const PRIORITY_LABELS: Record<PlannerTask['priority'], string> = {
     high: 'Высокий'
 };
 
-const STATUS_LABELS: Record<PlannerTask['status'], string> = {
-    todo: 'К выполнению',
-    'in-progress': 'В работе',
-    done: 'Готово'
-};
-
 const STORAGE_KEY = 'gym_planner_tasks';
 
 export const PlannerPage = () => {

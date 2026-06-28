@@ -37,7 +37,6 @@ export const SchoolCalendar: React.FC<SchoolCalendarProps> = ({ events, onEvents
     const [currentDate, setCurrentDate] = useState(new Date());
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
-    const [selectedDate, setSelectedDate] = useState<string>('');
 
     const [form, setForm] = useState<CalendarEvent>({
         id: '',
@@ -67,7 +66,6 @@ export const SchoolCalendar: React.FC<SchoolCalendarProps> = ({ events, onEvents
 
     const openAdd = (dateStr: string) => {
         setEditingEvent(null);
-        setSelectedDate(dateStr);
         setForm({ id: generateId(), date: dateStr, title: '', type: 'event', description: '' });
         setIsModalOpen(true);
     };

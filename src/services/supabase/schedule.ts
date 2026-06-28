@@ -1,5 +1,5 @@
 import { supabase } from '../supabase';
-import { ScheduleItem, Substitution, AbsenteeismRecord, NutritionRecord, DutyRecord } from '../../types';
+import { ScheduleItem, Substitution, AbsenteeismRecord, NutritionRecord, DutyRecord, StudentAbsence } from '../../types';
 
 export const supabaseScheduleService = {
     subscribe: (semester: 1 | 2, onNext: (items: ScheduleItem[]) => void, onError?: (error: Error) => void) => {
@@ -75,9 +75,9 @@ function mapScheduleItem(data: Record<string, unknown>): ScheduleItem {
         day: data.day as string,
         period: data.period as number,
         shift: data.shift as string,
-        classId: (data.class_id as string) || undefined,
-        subjectId: (data.subject_id as string) || undefined,
-        teacherId: (data.teacher_id as string) || undefined,
+        classId: (data.class_id as string) || '',
+        subjectId: (data.subject_id as string) || '',
+        teacherId: (data.teacher_id as string) || '',
         roomId: (data.room_id as string) || undefined,
         direction: (data.direction as string) || undefined,
         organizationId: data.organization_id as string
@@ -158,9 +158,9 @@ function mapSubstitution(data: Record<string, unknown>): Substitution {
     return {
         id: data.id as string,
         date: data.date as string,
-        scheduleItemId: (data.schedule_item_id as string) || undefined,
-        originalTeacherId: (data.original_teacher_id as string) || undefined,
-        replacementTeacherId: (data.replacement_teacher_id as string) || undefined,
+        scheduleItemId: (data.schedule_item_id as string) || '',
+        originalTeacherId: (data.original_teacher_id as string) || '',
+        replacementTeacherId: (data.replacement_teacher_id as string) || '',
         replacementRoomId: (data.replacement_room_id as string) || undefined,
         replacementClassId: (data.replacement_class_id as string) || undefined,
         replacementSubjectId: (data.replacement_subject_id as string) || undefined,
@@ -178,8 +178,8 @@ export const supabaseAbsenteeismService = {
         return (data || []).map((a: Record<string, unknown>) => ({
             id: a.id as string,
             date: a.date as string,
-            classId: (a.class_id as string) || undefined,
-            absences: (a.absences as unknown[]) || [],
+            classId: (a.class_id as string) || '',
+            absences: (a.absences as StudentAbsence[]) || [],
             presentCount: (a.present_count as number) || 0,
             absentCount: (a.absent_count as number) || 0,
             enteredBy: (a.entered_by as string) || undefined,
@@ -215,7 +215,7 @@ export const supabaseNutritionService = {
         return (data || []).map((n: Record<string, unknown>) => ({
             id: n.id as string,
             date: n.date as string,
-            classId: (n.class_id as string) || undefined,
+            classId: (n.class_id as string) || '',
             breakfastCount: (n.breakfast_count as number) || 0,
             lunchCount: (n.lunch_count as number) || 0,
             dinnerCount: (n.dinner_count as number) || 0,

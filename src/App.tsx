@@ -104,7 +104,7 @@ const Layout = () => {
             announcement?.active &&
             announcement.publishedAt &&
             profile.dismissedAppAnnouncementAt !== announcement.publishedAt &&
-            safeLocalStorageGet(`dismissedAppAnnouncement_${user.uid}`) !== announcement.publishedAt
+            safeLocalStorageGet(`dismissedAppAnnouncement_${user.id}`) !== announcement.publishedAt
         ) {
             setShowAnnouncement(true);
         }

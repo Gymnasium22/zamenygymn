@@ -402,7 +402,7 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
 
         if (!room) return warnings;
 
-        if (cls && room.capacity < cls.studentsCount) {
+        if (cls && (room.capacity || 0) < cls.studentsCount) {
             warnings.push(`⚠️ Мало мест! В классе ${cls.studentsCount} уч., а в кабинете только ${room.capacity}.`);
         }
 

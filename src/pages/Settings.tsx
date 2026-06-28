@@ -1859,7 +1859,7 @@ const AuditLogViewer: React.FC = () => {
                 const date = dt.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
                 const time = dt.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
                 const action = actionLabels[e.action] || e.action;
-                const entity = entityLabels[e.entityType] || e.entityType;
+                const entity = entityLabels[e.entityType || ''] || e.entityType || '';
                 const baseDesc = actionDescriptions[e.action] || e.action;
                 const fullDesc = [
                     baseDesc,
@@ -1981,7 +1981,7 @@ const AuditLogViewer: React.FC = () => {
                                         </span>
                                     </td>
                                     <td className="px-3 py-2 text-slate-600 dark:text-slate-300 text-xs">
-                                        {entityLabels[entry.entityType] || entry.entityType}
+                                        {entityLabels[entry.entityType || ''] || entry.entityType || ''}
                                         {entry.entityName && (
                                             <span className="text-slate-400 ml-1">«{entry.entityName}»</span>
                                         )}
