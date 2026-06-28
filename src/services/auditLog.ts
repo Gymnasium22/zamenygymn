@@ -61,12 +61,12 @@ class AuditLogService {
         if (isSupabase) {
             try {
                 await supabase.from('audit_log').insert({
-                    user_email: userEmail,
-                    user_role: userRole,
-                    action,
-                    entity_type: entityType,
-                    entity_name: entityName || '',
-                    details: details || ''
+                    organization_id: 'f1bd501e-e4ee-4e9f-a657-cbd6ccee41c7',
+                    user_email: userEmail || null,
+                    action: action,
+                    collection: entityType,
+                    target_id: entityName || null,
+                    details: details ? { info: details } : null
                 });
             } catch (e) {
                 logger.warn('Failed to write audit log to Supabase:', e);
@@ -93,16 +93,25 @@ class AuditLogService {
                     .limit(limit);
                 if (error) throw error;
                 if (data && data.length > 0) {
-                    const dbEntries = data.map((d: Record<string, unknown>) => ({
-                        id: d.id as string,
-                        timestamp: (d.created_at as string) || new Date().toISOString(),
-                        userEmail: (d.user_email as string) || 'unknown',
-                        userRole: (d.user_role as string) || 'unknown',
-                        action: (d.action as string) || 'update',
-                        entityType: (d.entity_type as string) || 'settings',
-                        entityName: (d.entity_name as string) || '',
-                        details: (d.details as string) || ''
-                    } as AuditLogEntry));
+                    const dbEntries = data.map((d: Record<string, unknown>) => {
+                        const rawDetails = d.details;
+                        let detailsStr = '';
+                        if (typeof rawDetails === 'string') {
+                            detailsStr = rawDetails;
+                        } else if (rawDetails && typeof rawDetails === 'object' && 'info' in rawDetails) {
+                            detailsStr = (rawDetails as { info?: string }).info || '';
+                        }
+                        return {
+                            id: d.id as string,
+                            timestamp: (d.created_at as string) || new Date().toISOString(),
+                            userEmail: (d.user_email as string) || 'unknown',
+                            userRole: (d.user_role as string) || 'unknown',
+                            action: (d.action as string) || 'update',
+                            entityType: (d.collection as string) || (d.entity_type as string) || 'settings',
+                            entityName: (d.target_id as string) || (d.entity_name as string) || '',
+                            details: detailsStr
+                        } as AuditLogEntry;
+                    });
                     this.writeEntries([...dbEntries].reverse());
                     return dbEntries;
                 }
@@ -148,7 +157,7 @@ class AuditLogService {
         safeLocalStorageRemove(STORAGE_KEY);
         if (isSupabase) {
             try {
-                await supabase.from('audit_log').delete().neq('id', '');
+                await supabase.from('audit_log').delete().not('id', 'is', null);
             } catch (e) {
                 logger.warn('Failed to clear Supabase audit log:', e);
             }

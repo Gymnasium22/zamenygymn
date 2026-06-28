@@ -45,7 +45,7 @@ const createAuthUser = async (email: string, password: string): Promise<string> 
 };
 
 export const getRoleDefaults = (role: UserRole) => {
-    return ROLE_DEFINITIONS.find((r) => r.id === role) || ROLE_DEFINITIONS[3];
+    return ROLE_DEFINITIONS.find((r) => r.id === role) || ROLE_DEFINITIONS[0];
 };
 
 export const usersService = {

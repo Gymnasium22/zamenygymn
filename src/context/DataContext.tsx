@@ -244,14 +244,18 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
 
     // Получаем user и role для проверки прав
     const { user, role, loading: authLoading } = useAuth();
+    const userId = user ? ('uid' in user ? user.uid : user.id) : null;
 
     // Загрузка данных
     useEffect(() => {
+        console.log('[DataContext] Loading effect triggered. initialData:', !!initialData, 'authLoading:', authLoading, 'userId:', userId);
+
         // Initialize sync queue from storage
         syncQueue.load();
 
         // 1. Если переданы начальные данные (публичный вид)
         if (initialData) {
+            console.log('[DataContext] Using initialData');
             setInternalData(initialData);
             setHistory([initialData]);
             setHistoryPointer(0);
@@ -260,7 +264,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
         }
 
         // Ждем инициализации аутентификации
-        if (authLoading) return;
+        if (authLoading) {
+            console.log('[DataContext] Waiting for auth...');
+            return;
+        }
 
         // 2. Пытаемся загрузить локальную копию сразу, чтобы пользователь что-то видел
         let localBackup: string | null = null;
@@ -280,11 +287,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
         }
 
         if (!user) {
+            console.log('[DataContext] No user, clearing data');
             setInternalData(getInitialData());
             setIsLoading(false);
             return;
         }
 
+        console.log('[DataContext] Starting data subscription...');
         setIsLoading(true);
 
         // 3. Подписываемся на Firebase
@@ -292,6 +301,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
         try {
             unsubscribe = dataProvider.subscribe(
                 (loaded) => {
+                    console.log('[DataContext] Data loaded from provider:', Object.keys(loaded));
                     setInternalData((prevData) => {
                         // Merge incoming partial data with previous data (which contains localStorage data)
                         // This prevents overwriting existing data with empty defaults if a collection fails to load
@@ -353,23 +363,28 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                     });
 
                     setIsLoading(false);
+                    console.log('[DataContext] isLoading set to false');
                 },
                 (error) => {
+                    console.error('[DataContext] Data subscription error:', error);
                     handleError.log('Failed to subscribe to data:', error);
                     // Если ошибка квоты или сети - мы уже загрузили localBackup выше, так что данные не пропадут
                     setIsLoading(false);
+                    console.log('[DataContext] isLoading set to false (error)');
                 }
             );
         } catch (error) {
+            console.error('[DataContext] Failed to initialize subscription:', error);
             handleError.log('Failed to initialize subscription:', error);
             setIsLoading(false);
             unsubscribe = undefined;
+            console.log('[DataContext] isLoading set to false (catch)');
         }
 
         return () => {
             if (unsubscribe) unsubscribe();
         };
-    }, [initialData, user, role, authLoading]);
+    }, [initialData, userId, role, authLoading]);
 
     const saveData = useCallback(
         async (newData: Partial<AppData>, addToHistory = true) => {

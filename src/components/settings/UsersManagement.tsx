@@ -172,6 +172,7 @@ export const UsersManagement = () => {
                     teacherId: form.teacherId || undefined,
                     permissions: form.permissions,
                     allowedPages: form.allowedPages,
+                    organizationId: currentProfile?.organizationId,
                     createdBy: currentUser?.uid
                 });
                 addToast({ type: 'success', title: 'Пользователь создан' });

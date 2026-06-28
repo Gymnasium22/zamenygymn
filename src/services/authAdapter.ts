@@ -7,7 +7,7 @@ import { supabaseUsersService } from './supabase/users';
 import { UserProfile } from '../types';
 
 export interface AuthAdapter {
-    getCurrentUser: () => User | { id: string; email: string | undefined } | null;
+    getCurrentUser: () => Promise<User | { id: string; email: string | undefined } | null>;
     onAuthStateChanged: (callback: (user: User | { id: string; email: string | undefined } | null) => void) => () => void;
     signIn: (email: string, password: string) => Promise<{ user: { id: string; email: string } | null; error: Error | null }>;
     signOut: () => Promise<void>;
@@ -15,7 +15,7 @@ export interface AuthAdapter {
 }
 
 export const firebaseAdapter: AuthAdapter = {
-    getCurrentUser: () => {
+    getCurrentUser: async () => {
         return firebaseAuth?.currentUser || null;
     },
     onAuthStateChanged: (callback) => {
@@ -44,16 +44,37 @@ export const firebaseAdapter: AuthAdapter = {
 };
 
 export const supabaseAdapter: AuthAdapter = {
-    getCurrentUser: () => {
-        const user = supabase.auth.getUser();
-        return user ? { id: user.data.user?.id || '', email: user.data.user?.email || '' } : null;
+    getCurrentUser: async () => {
+        const { data } = await supabase.auth.getUser();
+        return data.user ? { id: data.user.id, email: data.user.email || '' } : null;
     },
     onAuthStateChanged: (callback) => {
+        let currentUser: { id: string; email: string } | null = null;
+
+        // Immediately check current user — onAuthStateChange only fires on changes, not initial state
+        supabase.auth.getUser().then(({ data: userData }) => {
+            if (userData.user) {
+                const newUser = { id: userData.user.id, email: userData.user.email || '' };
+                currentUser = newUser;
+                callback(newUser);
+            } else {
+                currentUser = null;
+                callback(null);
+            }
+        });
+
         const { data } = supabase.auth.onAuthStateChange((event, session) => {
             if (session?.user) {
-                callback({ id: session.user.id, email: session.user.email || '' });
+                const newUser = { id: session.user.id, email: session.user.email || '' };
+                if (!currentUser || currentUser.id !== newUser.id || currentUser.email !== newUser.email) {
+                    currentUser = newUser;
+                    callback(currentUser);
+                }
             } else {
-                callback(null);
+                if (currentUser !== null) {
+                    currentUser = null;
+                    callback(null);
+                }
             }
         });
         return data.subscription.unsubscribe;

@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
-import { useData } from '../context/DataContext';
+import { useData, useStaticData, useScheduleData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { Icon } from '../components/Icons';
 import { DayOfWeek, DAYS, ScheduleItem, Shift } from '../types';

@@ -4,8 +4,9 @@ import { getRoleDefaults } from '../users';
 
 export const supabaseUsersService = {
     subscribe: (uid: string, onNext: (profile: UserProfile | null) => void, onError?: (error: Error) => void) => {
+        const channelName = `profiles_changes_${uid}_${Date.now()}`;
         const channel = supabase
-            .channel('profiles_changes')
+            .channel(channelName)
             .on(
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'profiles', filter: `id=eq.${uid}` },
@@ -15,20 +16,7 @@ export const supabaseUsersService = {
                         onNext(null);
                         return;
                     }
-                    onNext({
-                        id: data.id as string,
-                        email: data.email as string,
-                        displayName: data.display_name as string,
-                        firstName: data.first_name as string,
-                        role: data.role as UserRole,
-                        isActive: data.is_active as boolean,
-                        permissions: (data.permissions as string[]) || [],
-                        allowedPages: (data.allowed_pages as string[]) || [],
-                        teacherId: data.teacher_id as string | undefined,
-                        createdAt: data.created_at as string,
-                        createdBy: undefined,
-                        lastLoginAt: undefined
-                    });
+                    onNext(mapProfile(data));
                 }
             )
             .subscribe();
@@ -68,15 +56,16 @@ export const supabaseUsersService = {
         organizationId?: string;
         createdBy?: string;
     }): Promise<UserProfile> => {
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-            email: params.email,
-            password: params.password
+        const { data: rpcData, error: rpcError } = await supabase.rpc('create_auth_user', {
+            p_email: params.email,
+            p_password: params.password
         });
-        if (authError || !authData.user) throw authError || new Error('Failed to create user');
+        if (rpcError || !rpcData) throw rpcError || new Error('Failed to create user');
 
+        const newUserId = rpcData as string;
         const defaults = getRoleDefaults(params.role);
         const profile = {
-            id: authData.user.id,
+            id: newUserId,
             email: params.email,
             display_name: params.displayName,
             first_name: params.firstName || '',
@@ -92,7 +81,7 @@ export const supabaseUsersService = {
         if (error) throw error;
 
         return {
-            id: authData.user.id,
+            id: newUserId,
             email: params.email,
             displayName: params.displayName,
             firstName: params.firstName || '',
@@ -122,7 +111,10 @@ export const supabaseUsersService = {
         if (error) throw error;
 
         if (changes.password) {
-            const { error: pwdError } = await supabase.auth.admin.updateUserById(uid, { password: changes.password });
+            const { error: pwdError } = await supabase.rpc('update_auth_password', {
+                p_user_id: uid,
+                p_password: changes.password
+            });
             if (pwdError) throw pwdError;
         }
     },
@@ -131,7 +123,9 @@ export const supabaseUsersService = {
         const { error } = await supabase.from('profiles').delete().eq('id', uid);
         if (error) throw error;
 
-        const { error: authError } = await supabase.auth.admin.deleteUser(uid);
+        const { error: authError } = await supabase.rpc('delete_auth_user', {
+            p_user_id: uid
+        });
         if (authError) throw authError;
     },
 
@@ -146,15 +140,17 @@ export const supabaseUsersService = {
 };
 
 function mapProfile(data: Record<string, unknown>): UserProfile {
+    const role = data.role as UserRole;
+    const defaults = getRoleDefaults(role);
     return {
         id: data.id as string,
         email: data.email as string,
         displayName: data.display_name as string,
         firstName: (data.first_name as string) || '',
-        role: data.role as UserRole,
+        role,
         isActive: (data.is_active as boolean) !== false,
-        permissions: (data.permissions as string[]) || [],
-        allowedPages: (data.allowed_pages as string[]) || [],
+        permissions: (data.permissions as string[])?.length ? (data.permissions as string[]) : defaults.defaultPermissions,
+        allowedPages: (data.allowed_pages as string[])?.length ? (data.allowed_pages as string[]) : defaults.defaultPages,
         teacherId: (data.teacher_id as string) || undefined,
         createdAt: data.created_at as string,
         createdBy: undefined,

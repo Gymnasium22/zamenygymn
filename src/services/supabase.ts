@@ -5,6 +5,8 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIU
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+console.log('[Supabase] Client initialized with URL:', supabaseUrl);
+
 export type DbTables = {
   organizations: {
     id: string;
@@ -33,12 +35,15 @@ export type DbTables = {
     id: string;
     organization_id: string;
     name: string;
-    subjects: string[];
-    shift: string | null;
+    subject_ids: string[];
+    shifts: string[];
     max_periods: number;
     class_teacher_of: string | null;
     unavailable_dates: string[];
     absence_reasons: Record<string, string>;
+    birth_date: string | null;
+    telegram_chat_id: string | null;
+    order: number | null;
     created_at: string;
     updated_at: string;
   };
@@ -47,9 +52,11 @@ export type DbTables = {
     organization_id: string;
     name: string;
     shift: string;
-    student_count: number;
+    students_count: number;
     grade: string | null;
     class_teacher_id: string | null;
+    exclude_from_reports: boolean;
+    order: number | null;
     created_at: string;
     updated_at: string;
   };
@@ -57,7 +64,12 @@ export type DbTables = {
     id: string;
     organization_id: string;
     name: string;
+    color: string | null;
+    difficulty: number | null;
+    required_room_type: string | null;
+    order: number | null;
     created_at: string;
+    updated_at: string;
   };
   rooms: {
     id: string;
@@ -65,7 +77,10 @@ export type DbTables = {
     name: string;
     floor: number | null;
     capacity: number | null;
+    type: string | null;
+    order: number | null;
     created_at: string;
+    updated_at: string;
   };
   settings: {
     id: string;
@@ -83,6 +98,29 @@ export type DbTables = {
     shift1_periods: number;
     shift2_periods: number;
     max_periods: number;
+    telegram_token: string | null;
+    public_schedule_id: string | null;
+    feedback_chat_id: string | null;
+    admin_telegram_chat_id: string | null;
+    bell_presets: unknown | null;
+    semester_config: unknown | null;
+    telegram_templates: unknown | null;
+    admin_announcement: unknown | null;
+    substitution_day_comments: unknown | null;
+    weather_api_key: string | null;
+    weather_city: string | null;
+    dashboard_widget_access: unknown | null;
+    is_schedule_locked: boolean | null;
+    allow_teacher_edit: boolean | null;
+    auto_backup: boolean | null;
+    backup_time: string | null;
+    current_year: number | null;
+    director_name: string | null;
+    school_name: string | null;
+    secretary_name: string | null;
+    union_chair_name: string | null;
+    telegram_bot_name: string | null;
+    google_apps_script_url: string | null;
     created_at: string;
     updated_at: string;
   };
@@ -114,6 +152,9 @@ export type DbTables = {
     is_merger: boolean;
     lesson_absence_reason: string | null;
     refusals: string[];
+    comment: string | null;
+    day_comment: string | null;
+    is_read: boolean;
     created_at: string;
     updated_at: string;
   };
@@ -122,27 +163,38 @@ export type DbTables = {
     organization_id: string;
     date: string;
     class_id: string | null;
+    absences: unknown[];
     present_count: number;
     absent_count: number;
+    entered_by: string | null;
+    entered_at: string | null;
+    updated_at: string | null;
+    updated_by: string | null;
     created_at: string;
-    updated_at: string;
   };
   nutrition: {
     id: string;
     organization_id: string;
     date: string;
+    class_id: string | null;
     breakfast_count: number;
     lunch_count: number;
     dinner_count: number;
+    total_count: number;
+    benefit_count: number;
+    regular_count: number;
+    entered_by: string | null;
+    entered_at: string | null;
     created_at: string;
     updated_at: string;
   };
   duty: {
     id: string;
     organization_id: string;
-    date: string;
-    teachers: string[];
-    notes: string | null;
+    day: string;
+    shift: string;
+    zone_id: string | null;
+    teacher_id: string | null;
     created_at: string;
     updated_at: string;
   };
@@ -163,6 +215,9 @@ export type DbTables = {
     period: number;
     start_time: string;
     end_time: string;
+    shift: string | null;
+    day: string;
+    cancelled: boolean;
     created_at: string;
   };
 };

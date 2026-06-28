@@ -1,10 +1,10 @@
 import { supabase } from '../supabase';
-import { ScheduleItem, Substitution, Absenteeism, Nutrition, Duty } from '../../types';
+import { ScheduleItem, Substitution, AbsenteeismRecord, NutritionRecord, DutyRecord } from '../../types';
 
 export const supabaseScheduleService = {
     subscribe: (semester: 1 | 2, onNext: (items: ScheduleItem[]) => void, onError?: (error: Error) => void) => {
         const channel = supabase
-            .channel(`schedule_${semester}_changes`)
+            .channel(`schedule_${semester}_changes_${Date.now()}`)
             .on(
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'schedule_items', filter: `semester=eq.${semester}` },
@@ -28,7 +28,9 @@ export const supabaseScheduleService = {
     },
 
     create: async (item: Omit<ScheduleItem, 'id'>): Promise<ScheduleItem> => {
+        const genId = () => Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
         const { data, error } = await supabase.from('schedule_items').insert({
+            id: genId(),
             semester: item.semester,
             day: item.day,
             period: item.period,
@@ -38,7 +40,7 @@ export const supabaseScheduleService = {
             teacher_id: item.teacherId || null,
             room_id: item.roomId || null,
             direction: item.direction || null,
-            organization_id: item.organizationId
+            organization_id: item.organizationId || 'f1bd501e-e4ee-4e9f-a657-cbd6ccee41c7'
         }).select().single();
         if (error) throw error;
         return mapScheduleItem(data);
@@ -85,7 +87,7 @@ function mapScheduleItem(data: Record<string, unknown>): ScheduleItem {
 export const supabaseSubstitutionsService = {
     subscribe: (onNext: (subs: Substitution[]) => void, onError?: (error: Error) => void) => {
         const channel = supabase
-            .channel('substitutions_changes')
+            .channel(`substitutions_changes_${Date.now()}`)
             .on(
                 'postgres_changes',
                 { event: '*', schema: 'public', table: 'substitutions' },
@@ -109,7 +111,9 @@ export const supabaseSubstitutionsService = {
     },
 
     create: async (sub: Omit<Substitution, 'id'>): Promise<Substitution> => {
+        const genId = () => Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
         const { data, error } = await supabase.from('substitutions').insert({
+            id: genId(),
             date: sub.date,
             schedule_item_id: sub.scheduleItemId || null,
             original_teacher_id: sub.originalTeacherId || null,
@@ -120,7 +124,7 @@ export const supabaseSubstitutionsService = {
             is_merger: sub.isMerger || false,
             lesson_absence_reason: sub.lessonAbsenceReason || null,
             refusals: sub.refusals || [],
-            organization_id: sub.organizationId
+            organization_id: sub.organizationId || 'f1bd501e-e4ee-4e9f-a657-cbd6ccee41c7'
         }).select().single();
         if (error) throw error;
         return mapSubstitution(data);
@@ -168,54 +172,75 @@ function mapSubstitution(data: Record<string, unknown>): Substitution {
 }
 
 export const supabaseAbsenteeismService = {
-    getAll: async (): Promise<Absenteeism[]> => {
+    getAll: async (): Promise<AbsenteeismRecord[]> => {
         const { data, error } = await supabase.from('absenteeism').select('*').order('date');
         if (error) throw error;
         return (data || []).map((a: Record<string, unknown>) => ({
             id: a.id as string,
             date: a.date as string,
             classId: (a.class_id as string) || undefined,
+            absences: (a.absences as unknown[]) || [],
             presentCount: (a.present_count as number) || 0,
             absentCount: (a.absent_count as number) || 0,
+            enteredBy: (a.entered_by as string) || undefined,
+            enteredAt: (a.entered_at as string) || undefined,
+            updatedAt: (a.updated_at as string) || undefined,
+            updatedBy: (a.updated_by as string) || undefined,
             organizationId: a.organization_id as string
         }));
     },
 
-    set: async (record: Absenteeism): Promise<void> => {
+    set: async (record: AbsenteeismRecord): Promise<void> => {
         const { error } = await supabase.from('absenteeism').upsert({
             id: record.id,
             date: record.date,
             class_id: record.classId || null,
+            absences: record.absences || [],
             present_count: record.presentCount || 0,
             absent_count: record.absentCount || 0,
-            organization_id: record.organizationId,
-            updated_at: new Date().toISOString()
+            entered_by: record.enteredBy || null,
+            entered_at: record.enteredAt || null,
+            updated_at: record.updatedAt || new Date().toISOString(),
+            updated_by: record.updatedBy || null,
+            organization_id: record.organizationId
         });
         if (error) throw error;
     }
 };
 
 export const supabaseNutritionService = {
-    getAll: async (): Promise<Nutrition[]> => {
+    getAll: async (): Promise<NutritionRecord[]> => {
         const { data, error } = await supabase.from('nutrition').select('*').order('date');
         if (error) throw error;
         return (data || []).map((n: Record<string, unknown>) => ({
             id: n.id as string,
             date: n.date as string,
+            classId: (n.class_id as string) || undefined,
             breakfastCount: (n.breakfast_count as number) || 0,
             lunchCount: (n.lunch_count as number) || 0,
             dinnerCount: (n.dinner_count as number) || 0,
+            totalCount: (n.total_count as number) || 0,
+            benefitCount: (n.benefit_count as number) || 0,
+            regularCount: (n.regular_count as number) || 0,
+            enteredBy: (n.entered_by as string) || undefined,
+            enteredAt: (n.entered_at as string) || undefined,
             organizationId: n.organization_id as string
         }));
     },
 
-    set: async (record: Nutrition): Promise<void> => {
+    set: async (record: NutritionRecord): Promise<void> => {
         const { error } = await supabase.from('nutrition').upsert({
             id: record.id,
             date: record.date,
+            class_id: record.classId || null,
             breakfast_count: record.breakfastCount || 0,
             lunch_count: record.lunchCount || 0,
             dinner_count: record.dinnerCount || 0,
+            total_count: record.totalCount || 0,
+            benefit_count: record.benefitCount || 0,
+            regular_count: record.regularCount || 0,
+            entered_by: record.enteredBy || null,
+            entered_at: record.enteredAt || null,
             organization_id: record.organizationId,
             updated_at: new Date().toISOString()
         });
@@ -224,24 +249,26 @@ export const supabaseNutritionService = {
 };
 
 export const supabaseDutyService = {
-    getAll: async (): Promise<Duty[]> => {
-        const { data, error } = await supabase.from('duty').select('*').order('date');
+    getAll: async (): Promise<DutyRecord[]> => {
+        const { data, error } = await supabase.from('duty').select('*').order('day');
         if (error) throw error;
         return (data || []).map((d: Record<string, unknown>) => ({
             id: d.id as string,
-            date: d.date as string,
-            teachers: (d.teachers as string[]) || [],
-            notes: (d.notes as string) || undefined,
+            day: d.day as string,
+            shift: d.shift as string,
+            zoneId: (d.zone_id as string) || '',
+            teacherId: (d.teacher_id as string) || '',
             organizationId: d.organization_id as string
         }));
     },
 
-    set: async (record: Duty): Promise<void> => {
+    set: async (record: DutyRecord): Promise<void> => {
         const { error } = await supabase.from('duty').upsert({
             id: record.id,
-            date: record.date,
-            teachers: record.teachers || [],
-            notes: record.notes || null,
+            day: record.day,
+            shift: record.shift,
+            zone_id: record.zoneId,
+            teacher_id: record.teacherId,
             organization_id: record.organizationId,
             updated_at: new Date().toISOString()
         });

@@ -10,7 +10,7 @@ export const migrateDataToSupabase = async (data: AppData, organizationId: strin
     logger.info('Starting migration to Supabase...');
 
     // 1. Teachers
-    if (data.teachers.length > 0) {
+    if (data.teachers?.length > 0) {
         const { error } = await supabase.from('teachers').insert(
             data.teachers.map(t => ({
                 id: t.id,
@@ -29,7 +29,7 @@ export const migrateDataToSupabase = async (data: AppData, organizationId: strin
     }
 
     // 2. Subjects
-    if (data.subjects.length > 0) {
+    if (data.subjects?.length > 0) {
         const { error } = await supabase.from('subjects').insert(
             data.subjects.map(s => ({
                 id: s.id,
@@ -42,7 +42,7 @@ export const migrateDataToSupabase = async (data: AppData, organizationId: strin
     }
 
     // 3. Classes
-    if (data.classes.length > 0) {
+    if (data.classes?.length > 0) {
         const { error } = await supabase.from('classes').insert(
             data.classes.map(c => ({
                 id: c.id,
@@ -59,7 +59,7 @@ export const migrateDataToSupabase = async (data: AppData, organizationId: strin
     }
 
     // 4. Rooms
-    if (data.rooms.length > 0) {
+    if (data.rooms?.length > 0) {
         const { error } = await supabase.from('rooms').insert(
             data.rooms.map(r => ({
                 id: r.id,
@@ -74,7 +74,7 @@ export const migrateDataToSupabase = async (data: AppData, organizationId: strin
     }
 
     // 5. Schedule Items
-    const allSchedule = [...data.schedule1, ...data.schedule2];
+    const allSchedule = [...(data.schedule || []), ...(data.schedule2 || [])];
     if (allSchedule.length > 0) {
         const { error } = await supabase.from('schedule_items').insert(
             allSchedule.map(s => ({
@@ -96,7 +96,7 @@ export const migrateDataToSupabase = async (data: AppData, organizationId: strin
     }
 
     // 6. Substitutions
-    if (data.substitutions.length > 0) {
+    if (data.substitutions?.length > 0) {
         const { error } = await supabase.from('substitutions').insert(
             data.substitutions.map(s => ({
                 id: s.id,
@@ -118,7 +118,7 @@ export const migrateDataToSupabase = async (data: AppData, organizationId: strin
     }
 
     // 7. Duty
-    if (data.dutySchedule.length > 0) {
+    if (data.dutySchedule?.length > 0) {
         const { error } = await supabase.from('duty').insert(
             data.dutySchedule.map(d => ({
                 id: d.id,
@@ -133,7 +133,7 @@ export const migrateDataToSupabase = async (data: AppData, organizationId: strin
     }
 
     // 8. Nutrition
-    if (data.nutritionRecords.length > 0) {
+    if (data.nutritionRecords?.length > 0) {
         const { error } = await supabase.from('nutrition').insert(
             data.nutritionRecords.map(n => ({
                 id: n.id,
@@ -149,7 +149,7 @@ export const migrateDataToSupabase = async (data: AppData, organizationId: strin
     }
 
     // 9. Absenteeism
-    if (data.absenteeismRecords.length > 0) {
+    if (data.absenteeismRecords?.length > 0) {
         const { error } = await supabase.from('absenteeism').insert(
             data.absenteeismRecords.map(a => ({
                 id: a.id,

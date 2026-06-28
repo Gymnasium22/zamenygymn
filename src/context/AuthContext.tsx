@@ -45,7 +45,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     useEffect(() => {
         let unsubProfile: (() => void) | null = null;
 
+        console.log('[AuthContext] Starting auth state subscription');
+
         const unsubscribe = authAdapter.onAuthStateChanged(async (currentUser) => {
+            console.log('[AuthContext] Auth state changed:', currentUser ? { id: currentUser.id, email: currentUser.email } : null);
             setUser(currentUser as User | null);
 
             if (unsubProfile) {
@@ -56,12 +59,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (currentUser) {
                 const usersService = authAdapter.getUsersService();
                 const uid = 'uid' in currentUser ? currentUser.uid : currentUser.id;
+                console.log('[AuthContext] User found, subscribing to profile for uid:', uid);
 
                 usersService.updateLastLogin(uid).catch(() => {});
 
                 unsubProfile = usersService.subscribe(
                     uid,
                     async (loadedProfile) => {
+                        console.log('[AuthContext] Profile loaded:', loadedProfile);
                         if (loadedProfile && loadedProfile.isActive) {
                             setProfile(loadedProfile);
                             setRole(loadedProfile.role);
@@ -77,7 +82,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         }
                         setLoading(false);
                     },
-                    () => {
+                    (error) => {
+                        console.error('[AuthContext] Profile subscription error:', error);
                         setProfile(null);
                         setRole(null);
                         setIsBlocked(false);
@@ -85,6 +91,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     }
                 );
             } else {
+                console.log('[AuthContext] No user, setting loading false');
                 setProfile(null);
                 setRole(null);
                 setIsBlocked(false);

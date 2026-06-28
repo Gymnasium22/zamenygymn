@@ -17,8 +17,9 @@
   },
   "dependencies": {
     "@sentry/react": "^10.53.1",
-    "dompurify": "^3.2.5",
     "@supabase/supabase-js": "^2.49.4",
+    "bcryptjs": "^3.0.3",
+    "dompurify": "^3.2.5",
     "firebase": "^11.6.0",
     "html2canvas": "^1.4.1",
     "immer": "^11.1.8",

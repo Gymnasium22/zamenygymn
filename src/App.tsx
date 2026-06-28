@@ -50,12 +50,14 @@ const ProtectedRoute = ({
         return <Navigate to="/login" replace />;
     }
 
+    const firstAllowed = allowedPages[0] || 'login';
+
     if (allowedRoles && !allowedRoles.includes(role)) {
-        return <Navigate to={allowedPages.includes('schedule') ? '/schedule' : '/login'} replace />;
+        return <Navigate to={`/${firstAllowed}`} replace />;
     }
 
     if (pageId && !canViewPage(pageId)) {
-        return <Navigate to={allowedPages.includes('schedule') ? '/schedule' : '/login'} replace />;
+        return <Navigate to={`/${firstAllowed}`} replace />;
     }
 
     return <>{children}</>;
@@ -64,8 +66,8 @@ const ProtectedRoute = ({
 const HomeRedirect = () => {
     const { loading, allowedPages } = useAuth();
     if (loading) return null;
-    if (allowedPages.includes('dashboard')) return <Navigate to="/dashboard" replace />;
-    if (allowedPages.includes('schedule')) return <Navigate to="/schedule" replace />;
+    const firstPage = allowedPages[0];
+    if (firstPage) return <Navigate to={`/${firstPage}`} replace />;
     return <Navigate to="/login" replace />;
 };
 
