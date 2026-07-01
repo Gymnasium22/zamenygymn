@@ -250,7 +250,7 @@ export const dbService = {
         }
     },
 
-    save: async (data: Partial<AppData>, currentUser?: { email?: string | null } | null) => {
+    save: async (data: Partial<AppData>, currentUser?: { email?: string | null } | null, _organizationId?: string | null) => {
         if (!firestoreDB) return;
 
         const user = currentUser || auth?.currentUser;
@@ -306,7 +306,7 @@ export const dbService = {
         await Promise.all(promises);
     },
 
-    subscribe: (onNext: (data: Partial<AppData>) => void, onError: (error: Error) => void) => {
+    subscribe: (onNext: (data: Partial<AppData>) => void, onError: (error: Error) => void, _organizationId?: string | null) => {
         if (!firestoreDB) {
             return () => {};
         }

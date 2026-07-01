@@ -1,15 +1,14 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
-import { useData, useStaticData, useScheduleData } from '../context/DataContext';
+import { useStaticData, useScheduleData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { Icon } from '../components/Icons';
-import { DayOfWeek, DAYS, ScheduleItem, Shift } from '../types';
+import { DayOfWeek, DAYS, ScheduleItem, Shift, UserRole } from '../types';
 import { useNavigate, NavLink } from 'react-router-dom';
 import { Modal, useToast } from '../components/UI';
 import { getActiveSemester, formatDateISO } from '../utils/helpers';
 import { weatherService, WeatherData, ForecastItem } from '../services/weatherService';
 import { escapeMarkdown } from '../utils/escapeHtml';
 import { safeLocalStorageGet, safeLocalStorageSet } from '../utils/localStorage';
-import { migrateDataToSupabase } from '../services/migration';
 import { logger } from '../utils/logger';
 
 // Enhanced interfaces for Live Search
@@ -52,7 +51,7 @@ const DEFAULT_WIDGETS: WidgetConfig[] = [
     { id: 'substitutions', label: 'Замены', visible: true, colSpan: 1 },
     { id: 'occupancy', label: 'Штат', visible: true, colSpan: 1 },
     { id: 'conflicts', label: 'Конфликты', visible: true, colSpan: 1 },
-    { id: 'birthdays', label: 'Праздники', visible: true, colSpan: 1 },
+    { id: 'birthdays', label: 'Праздники', visible: true, colSpan: 2 },
     { id: 'notes', label: 'Заметки', visible: true, colSpan: 2 }
 ];
 
@@ -256,14 +255,14 @@ const WeatherWidget = () => {
 };
 
 export const DashboardPage = () => {
-    const { data } = useData();
     const { subjects, teachers, classes, rooms, bellSchedule, settings, privateSettings } = useStaticData();
     const { schedule, substitutions } = useScheduleData();
-    const { role, profile } = useAuth();
+    const { role, profile, organizationId } = useAuth();
     const navigate = useNavigate();
     const { addToast } = useToast();
 
-    const [notes, setNotes] = useState(safeLocalStorageGet('gym_notes') || '');
+    const notesKey = organizationId ? `gym_notes_${organizationId}` : 'gym_notes';
+    const [notes, setNotes] = useState(safeLocalStorageGet(notesKey) || '');
     const [currentDate] = useState(new Date());
     const [searchQuery, setSearchQuery] = useState('');
     const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
@@ -282,32 +281,18 @@ export const DashboardPage = () => {
     });
 
     const roleWidgetAccess = settings.dashboardWidgetAccess || {
+        superadmin: ['weather', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes'],
         admin: ['weather', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes'],
         teacher: ['weather', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes'],
         canteen: ['weather', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes']
     };
 
-    const allowedWidgets: string[] = role ? roleWidgetAccess[role as 'admin' | 'teacher' | 'canteen'] ?? [] : [];
+    const allowedWidgets: string[] = role ? roleWidgetAccess[role as UserRole] ?? [] : [];
     const filteredWidgets = widgets.filter((widget) => allowedWidgets.includes(widget.id));
     const canShowWeather = allowedWidgets.includes('weather');
     const [isWidgetModalOpen, setIsWidgetModalOpen] = useState(false);
     const [draggedWidgetId, setDraggedWidgetId] = useState<string | null>(null);
     const widgetDragTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const [migrating, setMigrating] = useState(false);
-
-    const handleMigrate = async () => {
-        if (!window.confirm('Перенести все данные из Firebase в Supabase? Это действие нельзя отменить.')) return;
-        setMigrating(true);
-        try {
-            await migrateDataToSupabase(data, 'f1bd501e-e4ee-4e9f-a657-cbd6ccee41c7');
-            addToast({ type: 'success', title: 'Готово', message: 'Данные успешно перенесены в Supabase' });
-        } catch (err) {
-            logger.error('Migration error:', err);
-            addToast({ type: 'danger', title: 'Ошибка миграции', message: String(err) });
-        } finally {
-            setMigrating(false);
-        }
-    };
 
     const handleDragStart = (e: React.DragEvent<HTMLDivElement>, id: string) => {
         setDraggedWidgetId(id);
@@ -378,7 +363,7 @@ export const DashboardPage = () => {
     };
 
     const saveNotes = () => {
-        safeLocalStorageSet('gym_notes', notes);
+        safeLocalStorageSet(notesKey, notes);
         setNotesChanged(false);
         addToast({
             type: 'success',
@@ -391,11 +376,11 @@ export const DashboardPage = () => {
     useEffect(() => {
         if (!notesChanged) return;
         const timeoutId = setTimeout(() => {
-            safeLocalStorageSet('gym_notes', notes);
+            safeLocalStorageSet(notesKey, notes);
             setNotesChanged(false);
         }, 3000);
         return () => clearTimeout(timeoutId);
-    }, [notes, notesChanged]);
+    }, [notes, notesChanged, notesKey]);
 
     // Greeting logic
     const greeting = useMemo(() => {
@@ -714,6 +699,28 @@ export const DashboardPage = () => {
             .sort((a, b) => a.diff - b.diff);
     }, [teachers]);
 
+    const upcomingCelebrations = useMemo(() => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const holidays = (settings?.calendarEvents || [])
+            .filter((ev) => ev.showInWidget !== false)
+            .map((ev) => {
+                const evDate = new Date(ev.date);
+                const next = new Date(today.getFullYear(), evDate.getMonth(), evDate.getDate());
+                if (next < today) next.setFullYear(today.getFullYear() + 1);
+                const diff = Math.ceil((next.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                return { type: 'holiday' as const, diff, title: ev.title, date: ev.date, id: ev.id };
+            })
+            .filter((ev) => ev.diff <= 30);
+        const birthdayItems = upcomingBirthdays.map((t) => ({
+            type: 'birthday' as const,
+            diff: t.diff,
+            title: t.name,
+            id: t.id
+        }));
+        return [...holidays, ...birthdayItems].sort((a, b) => a.diff - b.diff).slice(0, 5);
+    }, [settings?.calendarEvents, upcomingBirthdays]);
+
     const occupancyStats = useMemo(() => {
         const totalTeachers = teachers.length;
         const fullDayAbsenteesMap = new Map();
@@ -943,10 +950,10 @@ export const DashboardPage = () => {
                 return (
                     <div
                         key={widget.id}
-                        className="p-6 rounded-3xl flex flex-col h-full relative overflow-hidden card-hover bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700"
+                        className="p-6 flex flex-col h-full relative overflow-hidden bento-card"
                     >
                         <div className="flex items-center gap-3 mb-6">
-                            <div className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white p-3 rounded-2xl shadow-lg shadow-indigo-500/20">
+                            <div className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white p-3 rounded-2xl shadow-glow neon-glow">
                                 <Icon name="Search" size={22} />
                             </div>
                             <h3 className="font-bold text-xl text-slate-800 dark:text-white">Поиск</h3>
@@ -959,7 +966,7 @@ export const DashboardPage = () => {
                                 placeholder="Учитель, класс или кабинет..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full bg-slate-50/80 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-600 rounded-xl py-3.5 pl-11 pr-4 text-sm outline-none focus:ring-2 ring-indigo-500/50 dark:text-white transition-all placeholder:text-slate-400"
+                                className="w-full bg-white/40 dark:bg-white/5 border border-white/30 dark:border-white/10 rounded-xl py-3.5 pl-11 pr-4 text-sm outline-none focus-glow dark:text-white transition-all placeholder:text-slate-400 input-glow"
                             />
                             <Icon
                                 name="Search"
@@ -973,7 +980,7 @@ export const DashboardPage = () => {
                                 {searchResults.map((item) => (
                                     <div
                                         key={`${item.type}-${item.id}`}
-                                        className="flex items-center justify-between p-3 rounded-xl bg-white dark:bg-slate-700/50 border border-slate-100 dark:border-slate-600 hover:border-indigo-300 dark:hover:border-indigo-500 transition-colors cursor-pointer"
+                                        className="flex items-center justify-between p-3 rounded-xl glass-panel hover:border-indigo-300 dark:hover:border-indigo-500 transition-colors cursor-pointer"
                                         onClick={() => {
                                             const currentSemester = getActiveSemester(new Date(), settings) ?? 1;
                                             const targetPath = currentSemester === 2 ? '/schedule2' : '/schedule';
@@ -1049,7 +1056,7 @@ export const DashboardPage = () => {
                 return (
                     <div
                         key={widget.id}
-                        className={`p-6 rounded-3xl flex flex-col h-full card-hover relative overflow-hidden bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 ${unresolvedSubstitutions > 0 ? 'ring-2 ring-red-500/20 dark:ring-red-500/30' : ''}`}
+                        className={`p-6 bento-card ${unresolvedSubstitutions > 0 ? 'ring-2 ring-red-500/20 dark:ring-red-500/30' : ''}`}
                     >
                         {unresolvedSubstitutions > 0 && (
                             <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/10 blur-2xl -mr-10 -mt-10 rounded-full"></div>
@@ -1073,7 +1080,7 @@ export const DashboardPage = () => {
                                     </div>
                                     <button
                                         onClick={() => navigate('/substitutions')}
-                                        className="w-full py-3 bg-slate-800 dark:bg-white text-white dark:text-slate-900 rounded-xl font-bold hover:opacity-90 transition-all shadow-xl flex items-center justify-center gap-2 group"
+                                        className="w-full py-3 btn-primary btn-glow rounded-2xl font-bold flex items-center justify-center gap-2 group"
                                     >
                                         Перейти{' '}
                                         <Icon
@@ -1100,7 +1107,7 @@ export const DashboardPage = () => {
                 return (
                     <div
                         key={widget.id}
-                        className="p-6 rounded-3xl flex flex-col h-full card-hover bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700"
+                        className="p-6 flex flex-col h-full bento-card"
                     >
                         <div className="flex items-center justify-between mb-6">
                             <div className="flex items-center gap-3">
@@ -1178,7 +1185,7 @@ export const DashboardPage = () => {
                 return (
                     <div
                         key={widget.id}
-                        className="p-6 rounded-3xl flex flex-col h-full group card-hover relative bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700"
+                        className="p-6 bento-card group"
                     >
                         <div className="flex items-center justify-between mb-4">
                             <div className="flex items-center gap-3">
@@ -1217,7 +1224,7 @@ export const DashboardPage = () => {
                                     onClick={() => {
                                         if (confirm('Очистить заметки?')) {
                                             setNotes('');
-                                            safeLocalStorageSet('gym_notes', '');
+                                            safeLocalStorageSet(notesKey, '');
                                             setNotesChanged(false);
                                             addToast({ type: 'success', title: 'Заметки очищены', duration: 2000 });
                                         }
@@ -1249,7 +1256,7 @@ export const DashboardPage = () => {
                 return (
                     <div
                         key={widget.id}
-                        className="p-6 rounded-3xl h-full card-hover bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700"
+                        className="p-6 h-full bento-card"
                     >
                         <div className="flex items-center gap-3 mb-4">
                             <div className="bg-amber-100 dark:bg-amber-900/30 text-amber-600 p-2 rounded-xl">
@@ -1257,7 +1264,7 @@ export const DashboardPage = () => {
                             </div>
                             <h3 className="font-bold text-lg dark:text-white">Возможные конфликты</h3>
                         </div>
-                        <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar pr-2">
+                        <div className="space-y-2 max-h-52 overflow-y-auto custom-scrollbar pr-2">
                             {schoolStatus.type === 'vacation' ? (
                                 <div className="p-4 text-center">
                                     <div className="w-10 h-10 rounded-2xl bg-violet-100 dark:bg-violet-900/30 text-violet-500 flex items-center justify-center mx-auto mb-2">
@@ -1270,7 +1277,7 @@ export const DashboardPage = () => {
                                 problemZones.map((p) => (
                                     <div
                                         key={`${p.class}-${p.issue}`}
-                                        className="flex justify-between items-center p-3 bg-white dark:bg-dark-900/50 rounded-xl border border-slate-100 dark:border-slate-700"
+                                        className="flex justify-between items-center p-3 glass-panel rounded-xl border border-slate-100 dark:border-slate-700"
                                     >
                                         <span className="font-bold text-slate-700 dark:text-slate-200">{p.class}</span>
                                         <span className="text-xs font-bold text-amber-600 bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded-lg">
@@ -1290,34 +1297,44 @@ export const DashboardPage = () => {
                 return (
                     <div
                         key={widget.id}
-                        className="p-6 rounded-3xl h-full card-hover bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700"
+                        className="p-6 h-full bento-card"
                     >
                         <div className="flex items-center gap-3 mb-4">
                             <div className="bg-rose-100 dark:bg-rose-900/30 text-rose-600 p-2 rounded-xl">
                                 <Icon name="Gift" size={20} />
                             </div>
-                            <h3 className="font-bold text-lg dark:text-white">Ближайшие праздники</h3>
+                            <h3 className="font-bold text-lg dark:text-white">Ближайшие праздники и дни рождения</h3>
                         </div>
                         <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar pr-2">
-                            {upcomingBirthdays.length ? (
-                                upcomingBirthdays.map((t) => (
+                            {upcomingCelebrations.length ? (
+                                upcomingCelebrations.map((item) => (
                                     <div
-                                        key={t.id}
-                                        className="flex justify-between items-center p-3 bg-white dark:bg-dark-900/50 rounded-xl border border-slate-100 dark:border-slate-700"
+                                        key={`${item.type}-${item.id}`}
+                                        className="flex justify-between items-center p-3 glass-panel rounded-xl border border-slate-100 dark:border-slate-700"
                                     >
-                                        <span className="font-medium text-slate-700 dark:text-slate-300 text-sm">
-                                            {t.name}
-                                        </span>
                                         <span
-                                            className={`text-xs font-bold px-2 py-1 rounded-lg ${t.diff === 0 ? 'bg-rose-500 text-white shadow-md shadow-rose-500/30' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'}`}
+                                            className="flex-1 min-w-0 font-medium text-slate-700 dark:text-slate-300 text-sm break-words leading-snug"
+                                            title={item.title}
                                         >
-                                            {t.diff === 0 ? 'Сегодня!' : `через ${t.diff} дн.`}
+                                            {item.title}
                                         </span>
+                                        <div className="flex items-center gap-2 shrink-0">
+                                            {item.type === 'holiday' && (
+                                                <span className="text-[10px] uppercase font-bold text-indigo-600 bg-indigo-50 dark:bg-indigo-900/20 px-1.5 py-0.5 rounded">
+                                                    Праздник
+                                                </span>
+                                            )}
+                                            <span
+                                                className={`text-xs font-bold px-2 py-1 rounded-lg ${item.diff === 0 ? 'bg-rose-500 text-white shadow-md shadow-rose-500/30' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'}`}
+                                            >
+                                                {item.diff === 0 ? 'Сегодня!' : `через ${item.diff} дн.`}
+                                            </span>
+                                        </div>
                                     </div>
                                 ))
                             ) : (
                                 <div className="p-4 text-center text-slate-400 text-sm italic">
-                                    Нет дней рождения в ближайший месяц
+                                    Нет праздников и дней рождения в ближайший месяц
                                 </div>
                             )}
                         </div>
@@ -1327,7 +1344,7 @@ export const DashboardPage = () => {
                 return (
                     <div
                         key={widget.id}
-                        className="p-6 rounded-3xl h-full card-hover bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700"
+                        className="p-6 h-full bento-card"
                     >
                         <div className="flex items-center gap-3 mb-4">
                             <div className="bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 p-2 rounded-xl">
@@ -1378,7 +1395,7 @@ export const DashboardPage = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
                 <div className="lg:col-span-2 flex flex-col justify-end">
                     <h1 className="text-4xl font-black text-slate-800 dark:text-white tracking-tight mb-1 bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400">
-                        {greeting}, {profile?.firstName || profile?.displayName || (role === 'admin' ? 'Администратор' : role === 'canteen' ? 'Столовая' : 'Учитель')}!
+                        {greeting}, {profile?.firstName || profile?.displayName || (role === 'superadmin' ? 'Суперадмин' : role === 'admin' ? 'Администратор' : role === 'canteen' ? 'Столовая' : 'Учитель')}!
                     </h1>
                     <p className="text-slate-500 dark:text-slate-400 text-lg font-medium mb-4">
                         Сегодня{' '}
@@ -1584,30 +1601,6 @@ export const DashboardPage = () => {
                     </div>
                 </div>
             </Modal>
-            {role === 'admin' && (
-                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl p-6 mt-8">
-                    <h3 className="text-lg font-bold text-amber-800 dark:text-amber-400 mb-2 flex items-center gap-2">
-                        <Icon name="Database" size={20} />
-                        Миграция данных
-                    </h3>
-                    <p className="text-sm text-amber-700 dark:text-amber-300 mb-4">
-                        Перенести все данные (учителя, классы, расписание, замены) из Firebase в Supabase. 
-                        Это действие выполняется один раз.
-                    </p>
-                    <button
-                        onClick={handleMigrate}
-                        disabled={migrating}
-                        className="px-6 py-3 bg-amber-600 text-white rounded-xl font-bold hover:bg-amber-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                    >
-                        {migrating ? (
-                            <Icon name="Loader" className="animate-spin" size={18} />
-                        ) : (
-                            <Icon name="Database" size={18} />
-                        )}
-                        {migrating ? 'Перенос данных...' : 'Перенести данные в Supabase'}
-                    </button>
-                </div>
-            )}
         </div>
     );
 };

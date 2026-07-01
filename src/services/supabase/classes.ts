@@ -38,7 +38,7 @@ export const supabaseClassesService = {
             class_teacher_id: cls.classTeacherId || null,
             exclude_from_reports: cls.excludeFromReports || false,
             order: cls.order || null,
-            organization_id: cls.organizationId || 'f1bd501e-e4ee-4e9f-a657-cbd6ccee41c7'
+            organization_id: cls.organizationId || null
         }).select().single();
         if (error) throw error;
         return mapClass(data);
@@ -122,7 +122,7 @@ export const supabaseRoomsService = {
             capacity: room.capacity || null,
             type: room.type || null,
             order: room.order || null,
-            organization_id: room.organizationId || 'f1bd501e-e4ee-4e9f-a657-cbd6ccee41c7'
+            organization_id: room.organizationId || null
         }).select().single();
         if (error) throw error;
         return {

@@ -1,11 +1,11 @@
 import { supabase } from '../supabase';
 import { Settings, BellPreset, TelegramTemplates, AdminAnnouncement, DashboardWidgetRole, DashboardWidgetId } from '../../types';
 
-const ORG_ID = 'f1bd501e-e4ee-4e9f-a657-cbd6ccee41c7';
-
 export const supabaseSettingsService = {
-    get: async (): Promise<Settings | null> => {
-        const { data, error } = await supabase.from('settings').select('*').maybeSingle();
+    get: async (organizationId?: string | null): Promise<Settings | null> => {
+        let query = supabase.from('settings').select('*');
+        if (organizationId) query = query.eq('organization_id', organizationId);
+        const { data, error } = await query.maybeSingle();
         if (error) {
             if (error.code === 'PGRST116') return null;
             throw error;
@@ -14,7 +14,7 @@ export const supabaseSettingsService = {
         return mapSettings(data);
     },
 
-    update: async (settings: Partial<Settings>): Promise<void> => {
+    update: async (settings: Partial<Settings>, organizationId?: string | null): Promise<void> => {
         const updates: Record<string, unknown> = {};
         if (settings.schoolYear !== undefined) updates.school_year = settings.schoolYear;
         if (settings.semesterStart1 !== undefined) updates.semester_start_1 = settings.semesterStart1;
@@ -53,7 +53,7 @@ export const supabaseSettingsService = {
         if (settings.googleAppsScriptUrl !== undefined) updates.google_apps_script_url = settings.googleAppsScriptUrl;
         updates.updated_at = new Date().toISOString();
 
-        const { error } = await supabase.from('settings').update(updates).eq('organization_id', ORG_ID);
+        const { error } = await supabase.from('settings').update(updates).eq('organization_id', organizationId || '');
         if (error) throw error;
     }
 };
@@ -91,9 +91,9 @@ function mapSettings(data: Record<string, unknown>): Settings {
         unionChairName: (data.union_chair_name as string) || undefined,
         secretaryName: (data.secretary_name as string) || undefined,
         currentYear: (data.current_year as number) || undefined,
-        isScheduleLocked: (data.is_schedule_locked as boolean) || undefined,
-        allowTeacherEdit: (data.allow_teacher_edit as boolean) || undefined,
-        autoBackup: (data.auto_backup as boolean) || undefined,
+        isScheduleLocked: data.is_schedule_locked as boolean | undefined,
+        allowTeacherEdit: data.allow_teacher_edit as boolean | undefined,
+        autoBackup: data.auto_backup as boolean | undefined,
         backupTime: (data.backup_time as string) || undefined,
         googleAppsScriptUrl: (data.google_apps_script_url as string) || undefined,
         organizationId: data.organization_id as string

@@ -268,23 +268,23 @@ export const Modal = ({ isOpen, onClose, title, children, maxWidth = 'max-w-lg' 
             aria-modal="true"
             aria-labelledby="modal-title"
             tabIndex={-1}
-            className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/45 backdrop-blur-md p-4 animate-fade-in no-print"
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/40 backdrop-blur-md p-4 animate-fade-in no-print"
             onClick={(e) => e.target === e.currentTarget && onClose()}
         >
             <div
-                className={`bg-white/95 dark:bg-dark-800/95 backdrop-blur-xl border border-slate-200/50 dark:border-slate-700/50 rounded-3xl shadow-2xl shadow-slate-950/10 dark:shadow-black/50 w-full ${maxWidth} flex flex-col max-h-[90vh] transition-all duration-300 premium-glow-hover`}
+                className={`float-panel w-full ${maxWidth} flex flex-col max-h-[90vh] transition-all duration-300`}
             >
-                <div className="flex items-center justify-between px-6 py-5 border-b border-slate-200/50 dark:border-slate-700/50">
+                <div className="flex items-center justify-between px-6 py-5 border-b border-white/10 dark:border-white/5">
                     <h2 id="modal-title" className="text-xl font-bold text-slate-800 dark:text-white tracking-tight">{title}</h2>
                     <button
                         onClick={onClose}
-                        className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700"
+                        className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 spring-bounce"
                         aria-label="Закрыть"
                     >
                         <Icon name="X" size={20} />
                     </button>
                 </div>
-                <div className="p-6 overflow-y-auto custom-scrollbar">{children}</div>
+                <div className="p-6 overflow-y-auto custom-scrollbar-2026">{children}</div>
             </div>
         </div>
     );
@@ -407,7 +407,7 @@ export const Toast = ({ id, type, title, message, duration = 5000, onClose }: To
 
     return (
         <div
-            className={`max-w-sm md:max-w-sm w-full animate-slide-in ${isExiting ? 'animate-fade-out' : ''}`}
+            className={`max-w-sm md:max-w-sm w-full animate-slide-up-fade ${isExiting ? 'animate-fade-out' : ''}`}
             style={{
                 transform: `translateX(${swipeX}px)`,
                 transition: swipeX === 0 ? 'transform 0.3s ease' : 'none',
@@ -417,11 +417,11 @@ export const Toast = ({ id, type, title, message, duration = 5000, onClose }: To
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
         >
-            <div className={`modern-card border p-4 transition-all duration-300 ${styles.bg} ${
-                type === 'success' ? 'shadow-emerald-500/10 dark:shadow-emerald-500/20 hover:shadow-emerald-500/35 hover-glow-emerald border-emerald-200/60 dark:border-emerald-800/60' :
-                type === 'danger' ? 'shadow-red-500/10 dark:shadow-red-500/20 hover:shadow-red-500/35 hover-glow-red border-red-200/60 dark:border-red-800/60' :
-                type === 'warning' ? 'shadow-amber-500/10 dark:shadow-amber-500/20 hover:shadow-amber-500/35 hover-glow-amber border-amber-200/60 dark:border-amber-800/60' :
-                'shadow-indigo-500/10 dark:shadow-indigo-500/20 hover:shadow-indigo-500/35 hover-glow-indigo border-indigo-200/60 dark:border-indigo-800/60'
+            <div className={`float-panel border p-4 transition-all duration-300 ${styles.bg} ${
+                type === 'success' ? 'shadow-glow-success hover-glow-emerald border-emerald-200/40 dark:border-emerald-800/40' :
+                type === 'danger' ? 'shadow-glow-danger hover-glow-red border-red-200/40 dark:border-red-800/40' :
+                type === 'warning' ? 'shadow-glow-warning hover-glow-amber border-amber-200/40 dark:border-amber-800/40' :
+                'shadow-glow hover-glow-indigo border-indigo-200/40 dark:border-indigo-800/40'
             }`}>
                 <div className="flex items-start gap-3">
                     <div className={`flex-shrink-0 ${styles.icon}`}>
@@ -433,7 +433,7 @@ export const Toast = ({ id, type, title, message, duration = 5000, onClose }: To
                     </div>
                     <button
                         onClick={handleClose}
-                        className="flex-shrink-0 text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 transition-colors tactile-btn p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 min-w-[36px] min-h-[36px] flex items-center justify-center"
+                        className="flex-shrink-0 text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 transition-colors tactile-btn p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 min-w-[36px] min-h-[36px] flex items-center justify-center spring-bounce"
                         aria-label="Закрыть уведомление"
                     >
                         <Icon name="X" size={16} />
@@ -664,7 +664,7 @@ export const StatusWidget = () => {
     }, [bellSchedule, settings]);
 
     return (
-        <div className="mx-4 mt-auto mb-20 md:mb-4 p-4 rounded-2xl flex flex-col gap-3 relative overflow-hidden group">
+        <div className="glass-panel mt-auto mb-20 md:mb-4 p-4 flex flex-col gap-3 relative overflow-hidden group">
             <div className={`absolute top-0 left-0 w-1 h-full ${color}`}></div>
 
             {/* Offline indicator - only visible when offline */}
@@ -962,26 +962,22 @@ export const BottomNavigation = ({ onMenuClick, allowedPages = [] }: BottomNavPr
     }
 
     return (
-        <div className="fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-dark-800/95 backdrop-blur-xl border-t border-slate-200/80 dark:border-slate-700/80 z-40 pb-safe md:hidden transition-all duration-300 no-select safe-area-inset">
+        <div className="fixed bottom-0 left-0 right-0 bottom-nav-2026 z-40 pb-safe md:hidden transition-all duration-300 no-select safe-area-inset">
             {/* Active indicator pill background */}
-            <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent opacity-50" />
-            <div className="flex justify-around items-center h-16 sm:h-20">
+            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-indigo-500/50 to-transparent" />
+            <div className="flex justify-around items-center h-16 sm:h-20 px-2">
                 {navItems.map((item) => (
                     <NavLink
                         key={item.to}
                         to={item.to}
                         onClick={() => handleNavClick(item.to)}
                         className={({ isActive }) =>
-                            `relative flex flex-col items-center justify-center gap-1 p-1.5 sm:p-2.5 rounded-2xl transition-all duration-300 flex-1 h-full ${isActive ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'} active:scale-95`
+                            `relative flex flex-col items-center justify-center gap-1 p-2 sm:p-2.5 rounded-2xl transition-all duration-300 flex-1 h-full spring-bounce ${isActive ? 'text-indigo-600 dark:text-indigo-400 bottom-nav-active' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'}`
                         }
                     >
                         {({ isActive }) => (
                             <>
-                                {/* Active indicator dot */}
-                                {isActive && (
-                                    <span className="absolute -top-0.5 w-8 h-1 bg-indigo-500 rounded-full shadow-sm shadow-indigo-500/30" />
-                                )}
-                                <div className={`p-1.5 rounded-xl transition-all duration-300 ${isActive ? 'bg-indigo-50 dark:bg-indigo-900/20 shadow-sm' : ''}`}>
+                                <div className={`p-2 rounded-2xl transition-all duration-300 ${isActive ? 'bg-indigo-50 dark:bg-indigo-900/20 shadow-glow-sm' : ''}`}>
                                     <Icon name={item.icon} size={22} strokeWidth={2.5} className="sm:w-[26px] sm:h-[26px]" />
                                 </div>
                                 <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider leading-none">
@@ -999,9 +995,9 @@ export const BottomNavigation = ({ onMenuClick, allowedPages = [] }: BottomNavPr
                         }
                         onMenuClick();
                     }}
-                    className="relative flex flex-col items-center justify-center gap-1 p-1.5 sm:p-2.5 rounded-2xl text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 active:text-indigo-600 transition-all duration-300 flex-1 h-full active:scale-95"
+                    className="relative flex flex-col items-center justify-center gap-1 p-2 sm:p-2.5 rounded-2xl text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 active:text-indigo-600 transition-all duration-300 flex-1 h-full spring-bounce"
                 >
-                    <div className="p-1.5 rounded-xl">
+                    <div className="p-2 rounded-2xl">
                         <Icon name="Menu" size={22} strokeWidth={2.5} className="sm:w-[26px] sm:h-[26px]" />
                     </div>
                     <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider leading-none">Меню</span>
@@ -1174,11 +1170,11 @@ export const CommandPalette = ({ isOpen, onClose }: CommandPaletteProps) => {
 
     return (
         <div
-            className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh] px-4 bg-slate-900/60 backdrop-blur-sm transition-all"
+            className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh] px-4 bg-slate-900/50 backdrop-blur-md transition-all"
             onClick={(e) => e.target === e.currentTarget && onClose()}
         >
-            <div className="w-full max-w-xl bg-white dark:bg-dark-800 rounded-2xl shadow-2xl overflow-hidden animate-fade-in ring-1 ring-slate-900/5">
-                <div className="flex items-center gap-3 p-4 border-b border-slate-100 dark:border-slate-700">
+            <div className="w-full max-w-xl float-panel overflow-hidden animate-scale-in">
+                <div className="flex items-center gap-3 p-4 border-b border-white/10 dark:border-white/5">
                     <Icon name="Search" className="text-slate-400" size={20} />
                     <input
                         ref={inputRef}
@@ -1189,11 +1185,11 @@ export const CommandPalette = ({ isOpen, onClose }: CommandPaletteProps) => {
                         onChange={(e) => setQuery(e.target.value)}
                         onKeyDown={handleKeyDown}
                     />
-                    <div className="text-xs font-bold bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 px-2 py-1 rounded-md">
+                    <div className="text-xs font-bold bg-slate-100/50 dark:bg-white/5 text-slate-500 dark:text-slate-400 px-2 py-1 rounded-lg">
                         ESC
                     </div>
                 </div>
-                <div className="max-h-[300px] overflow-y-auto custom-scrollbar p-2">
+                <div className="max-h-[300px] overflow-y-auto custom-scrollbar-2026 p-2">
                     {filteredActions.length === 0 ? (
                         <div className="p-4 text-center text-slate-400 text-sm">Нет результатов</div>
                     ) : (
@@ -1201,7 +1197,7 @@ export const CommandPalette = ({ isOpen, onClose }: CommandPaletteProps) => {
                             <button
                                 key={idx}
                                 onClick={() => executeAction(action)}
-                                className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition-colors ${idx === activeIndex ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}
+                                className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all spring-bounce ${idx === activeIndex ? 'bg-indigo-50/60 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 shadow-glow-sm' : 'text-slate-600 dark:text-slate-300 hover:bg-white/50 dark:hover:bg-white/5'}`}
                             >
                                 <Icon
                                     name={action.icon}
@@ -1217,12 +1213,12 @@ export const CommandPalette = ({ isOpen, onClose }: CommandPaletteProps) => {
                                     )}
                                 </div>
                                 {action.type !== 'nav' && action.type !== 'quick_action' && (
-                                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider shrink-0 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">
+                                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider shrink-0 bg-slate-100/50 dark:bg-white/5 px-2 py-1 rounded">
                                         {action.type}
                                     </span>
                                 )}
                                 {action.type === 'quick_action' && (
-                                    <span className="text-[10px] uppercase font-bold text-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-1 rounded border border-indigo-200 dark:border-indigo-800">
+                                    <span className="text-[10px] uppercase font-bold text-indigo-500 bg-indigo-50/50 dark:bg-indigo-900/20 px-2 py-1 rounded border border-indigo-200/30 dark:border-indigo-800/30">
                                         Действие
                                     </span>
                                 )}
@@ -1230,12 +1226,12 @@ export const CommandPalette = ({ isOpen, onClose }: CommandPaletteProps) => {
                         ))
                     )}
                 </div>
-                <div className="p-2 bg-slate-50 dark:bg-slate-700/50 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-4 text-[10px] text-slate-400 font-medium px-4">
+                <div className="p-2 bg-slate-50/50 dark:bg-white/5 border-t border-white/10 dark:border-white/5 flex justify-end gap-4 text-[10px] text-slate-400 font-medium px-4">
                     <span className="flex items-center gap-1">
-                        <span className="bg-white dark:bg-slate-600 px-1 rounded shadow-sm">↵</span> выбрать
+                        <span className="bg-white dark:bg-white/10 px-1 rounded shadow-sm">↵</span> выбрать
                     </span>
                     <span className="flex items-center gap-1">
-                        <span className="bg-white dark:bg-slate-600 px-1 rounded shadow-sm">↑↓</span> навигация
+                        <span className="bg-white dark:bg-white/10 px-1 rounded shadow-sm">↑↓</span> навигация
                     </span>
                 </div>
             </div>

@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { usersService, getRoleDefaults } from '../../services/usersProvider';
+import { auditLog } from '../../services/auditLog';
 import { logger } from '../../utils/logger';
 import { useAuth } from '../../context/AuthContext';
 import { useStaticData } from '../../context/DataContext';
@@ -29,7 +30,11 @@ const ALL_PERMISSIONS: { id: Permission; label: string }[] = [
     { id: 'view_export', label: 'Видеть экспорт' },
     { id: 'view_admin', label: 'Видеть администрирование' },
     { id: 'view_settings', label: 'Видеть настройки' },
-    { id: 'manage_users', label: 'Управлять пользователями' }
+    { id: 'manage_users', label: 'Управлять пользователями' },
+    { id: 'view_calendar', label: 'Видеть календарь' },
+    { id: 'edit_calendar', label: 'Редактировать календарь' },
+    { id: 'view_planner', label: 'Видеть планер' },
+    { id: 'edit_planner', label: 'Редактировать планер' }
 ];
 
 const ALL_PAGES: { id: PageId; label: string }[] = [
@@ -60,7 +65,7 @@ const formatDate = (iso?: string) => {
 };
 
 export const UsersManagement = () => {
-    const { user: currentUser, profile: currentProfile } = useAuth();
+    const { user: currentUser, profile: currentProfile, organizationId, organizations, isSuperAdmin } = useAuth();
     const { teachers } = useStaticData();
     const { addToast } = useToast();
     const [users, setUsers] = useState<UserProfile[]>([]);
@@ -76,18 +81,21 @@ export const UsersManagement = () => {
             firstName: '',
             role: 'teacher' as UserRole,
             teacherId: '',
+            organizationId: organizationId || '',
             permissions: [] as Permission[],
             allowedPages: [] as PageId[]
         }),
-        []
+        [organizationId]
     );
     const [form, setForm] = useState(emptyForm);
     const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
+    const [filterOrganizationId, setFilterOrganizationId] = useState<string>('');
 
-    const loadUsers = async () => {
+    const loadUsers = useCallback(async () => {
         try {
             setLoading(true);
-            const list = await usersService.getAll();
+            const orgFilter = isSuperAdmin ? (filterOrganizationId || null) : organizationId;
+            const list = await usersService.getAll(orgFilter);
             setUsers(list.sort((a, b) => a.displayName.localeCompare(b.displayName)));
             setSelectedUserIds(new Set());
         } catch {
@@ -95,12 +103,11 @@ export const UsersManagement = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [organizationId, filterOrganizationId, isSuperAdmin, addToast]);
 
     useEffect(() => {
         loadUsers();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [loadUsers]);
 
     const applyRoleDefaults = (role: UserRole) => {
         const defaults = getRoleDefaults(role);
@@ -117,6 +124,7 @@ export const UsersManagement = () => {
         setForm({
             ...emptyForm,
             role: 'teacher',
+            organizationId: organizationId || '',
             permissions: [...defaults.defaultPermissions],
             allowedPages: [...defaults.defaultPages]
         });
@@ -132,6 +140,7 @@ export const UsersManagement = () => {
             firstName: u.firstName || '',
             role: u.role,
             teacherId: u.teacherId || '',
+            organizationId: u.organizationId || organizationId || '',
             permissions: u.permissions,
             allowedPages: u.allowedPages
         });
@@ -152,11 +161,21 @@ export const UsersManagement = () => {
                     displayName: form.displayName,
                     firstName: form.firstName,
                     role: form.role,
-                    teacherId: form.teacherId || undefined,
+                    teacherId: form.teacherId || null,
+                    organizationId: form.organizationId || null,
                     permissions: form.permissions,
                     allowedPages: form.allowedPages,
                     password: form.password || undefined
                 });
+                auditLog.log(
+                    currentUser?.email || 'unknown',
+                    currentProfile?.role || 'unknown',
+                    'update',
+                    'user',
+                    form.displayName || editingUser.email,
+                    `Обновлён пользователь ${editingUser.email} (роль: ${form.role})`,
+                    form.organizationId || organizationId
+                );
                 addToast({ type: 'success', title: 'Сохранено', message: 'Права пользователя обновлены' });
             } else {
                 if (!form.password || form.password.length < 6) {
@@ -169,12 +188,21 @@ export const UsersManagement = () => {
                     displayName: form.displayName,
                     firstName: form.firstName,
                     role: form.role,
-                    teacherId: form.teacherId || undefined,
+                    teacherId: form.teacherId || null,
                     permissions: form.permissions,
                     allowedPages: form.allowedPages,
-                    organizationId: currentProfile?.organizationId,
+                    organizationId: form.organizationId || organizationId,
                     createdBy: currentUser?.id
                 });
+                auditLog.log(
+                    currentUser?.email || 'unknown',
+                    currentProfile?.role || 'unknown',
+                    'create',
+                    'user',
+                    form.displayName || form.email,
+                    `Создан пользователь ${form.email} (роль: ${form.role})`,
+                    form.organizationId || organizationId
+                );
                 addToast({ type: 'success', title: 'Пользователь создан' });
             }
             closeModal();
@@ -192,6 +220,15 @@ export const UsersManagement = () => {
         }
         try {
             await usersService.setActive(u.id, !u.isActive);
+            auditLog.log(
+                currentUser?.email || 'unknown',
+                currentProfile?.role || 'unknown',
+                'update',
+                'user',
+                u.displayName || u.email,
+                `Пользователь ${u.email} ${u.isActive ? 'заблокирован' : 'активирован'}`,
+                u.organizationId || organizationId
+            );
             await loadUsers();
             addToast({
                 type: 'success',
@@ -211,6 +248,15 @@ export const UsersManagement = () => {
         if (!window.confirm(`Удалить пользователя ${u.displayName}?`)) return;
         try {
             await usersService.delete(u.id);
+            auditLog.log(
+                currentUser?.email || 'unknown',
+                currentProfile?.role || 'unknown',
+                'delete',
+                'user',
+                u.displayName || u.email,
+                `Удалён пользователь ${u.email}`,
+                u.organizationId || organizationId
+            );
             await loadUsers();
             addToast({ type: 'success', title: 'Пользователь удалён' });
         } catch {
@@ -289,7 +335,7 @@ export const UsersManagement = () => {
         }
     };
 
-    if (currentProfile?.role !== 'admin') {
+    if (currentProfile?.role !== 'admin' && !isSuperAdmin) {
         return (
             <div className="flex flex-col items-center justify-center py-12 text-slate-500">
                 <Icon name="Shield" size={48} className="mb-4" />
@@ -316,6 +362,24 @@ export const UsersManagement = () => {
                     Добавить пользователя
                 </button>
             </div>
+
+            {isSuperAdmin && (
+                <div className="flex items-center gap-3">
+                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Организация:</label>
+                    <select
+                        value={filterOrganizationId}
+                        onChange={(e) => setFilterOrganizationId(e.target.value)}
+                        className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-dark-700 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                    >
+                        <option value="">Все организации</option>
+                        {organizations.map((o) => (
+                            <option key={o.id} value={o.id}>
+                                {o.name}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            )}
 
             {loading ? (
                 <div className="text-center py-12 text-slate-500">Загрузка...</div>
@@ -373,6 +437,9 @@ export const UsersManagement = () => {
                                         </th>
                                         <th className="px-4 py-3 font-semibold">Пользователь</th>
                                         <th className="px-4 py-3 font-semibold">Роль</th>
+                                        {isSuperAdmin && (
+                                            <th className="px-4 py-3 font-semibold">Организация</th>
+                                        )}
                                         <th className="px-4 py-3 font-semibold">Разрешения</th>
                                         <th className="px-4 py-3 font-semibold">Разделы</th>
                                         <th className="px-4 py-3 font-semibold">Статус</th>
@@ -406,6 +473,11 @@ export const UsersManagement = () => {
                                                     {ROLE_DEFINITIONS.find((r) => r.id === u.role)?.name || u.role}
                                                 </span>
                                             </td>
+                                            {isSuperAdmin && (
+                                                <td className="px-4 py-3 text-xs text-slate-500">
+                                                    {organizations.find((o) => o.id === u.organizationId)?.name || '—'}
+                                                </td>
+                                            )}
                                             <td className="px-4 py-3">
                                                 <div className="text-xs text-slate-500">{u.permissions.length} прав</div>
                                             </td>
@@ -543,6 +615,24 @@ export const UsersManagement = () => {
                                 Применить права роли
                             </button>
                         </div>
+
+                        {isSuperAdmin && (
+                            <div className="md:col-span-2">
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Организация</label>
+                                <select
+                                    value={form.organizationId}
+                                    onChange={(e) => setForm((prev) => ({ ...prev, organizationId: e.target.value }))}
+                                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-dark-700 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                >
+                                    <option value="">— Все организации —</option>
+                                    {organizations.map((o) => (
+                                        <option key={o.id} value={o.id}>
+                                            {o.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
 
                         <div className="md:col-span-2">
                             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Привязка к учителю (необязательно)</label>

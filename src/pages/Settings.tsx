@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { useStaticData, useScheduleData } from '../context/DataContext';
+import { useStaticData, useScheduleData, useData } from '../context/DataContext';
+import { useAuth } from '../context/AuthContext';
 import { Icon } from '../components/Icons';
 import { DateInput } from '../components/DateInput';
 import { useToast, Modal } from '../components/UI';
@@ -12,14 +13,13 @@ import {
     AppData,
     DashboardWidgetId,
     DashboardWidgetRole,
-    StaticAppData,
-    ScheduleAndSubstitutionData
+    CalendarEvent,
 } from '../types';
 import { INITIAL_DATA, getInitialData } from '../constants';
 import { formatDateEuropean, formatDateISO, generateId } from '../utils/helpers';
 import { auditLog } from '../services/auditLog';
 import { logger } from '../utils/logger';
-import { safeLocalStorageGet } from '../utils/localStorage';
+import { safeLocalStorageGet, safeLocalStorageRemove } from '../utils/localStorage';
 import { stripDangerousKeys } from '../utils/safeMerge';
 import { formatAnnouncement } from '../utils/announcementFormat';
 import { SemesterConfig } from '../components/settings/SemesterConfig';
@@ -27,6 +27,7 @@ import { TelegramTemplateEditor } from '../components/settings/TelegramTemplateE
 import { dbService } from '../services/db';
 import { AppDataImportSchema, AppDataImport } from '../utils/importSchema';
 import { UsersManagement } from '../components/settings/UsersManagement';
+import { OrganizationsManagement } from '../components/settings/OrganizationsManagement';
 import { ArchiveYearSection } from '../components/settings/ArchiveYearSection';
 
 type SettingsSection =
@@ -36,7 +37,8 @@ type SettingsSection =
     | 'notifications'
     | 'widgets'
     | 'system'
-    | 'users';
+    | 'users'
+    | 'organizations';
 
 const SECTIONS: { id: SettingsSection; label: string; icon: string }[] = [
     { id: 'integrations', label: 'Интеграции', icon: 'Plug' },
@@ -45,7 +47,8 @@ const SECTIONS: { id: SettingsSection; label: string; icon: string }[] = [
     { id: 'notifications', label: 'Уведомления', icon: 'MessageSquare' },
     { id: 'widgets', label: 'Виджеты', icon: 'Layout' },
     { id: 'system', label: 'Система', icon: 'Database' },
-    { id: 'users', label: 'Пользователи', icon: 'Users' }
+    { id: 'users', label: 'Пользователи', icon: 'Users' },
+    { id: 'organizations', label: 'Организации', icon: 'Building2' }
 ];
 
 // --- Helper Components ---
@@ -169,14 +172,167 @@ const ConfirmModal: React.FC<{
     );
 };
 
+// --- Calendar Events Editor ---
+
+const CalendarEventsEditor: React.FC<{
+    events: CalendarEvent[];
+    onChange: (events: CalendarEvent[]) => void;
+}> = ({ events, onChange }) => {
+    const [form, setForm] = useState<CalendarEvent>({
+        id: '',
+        date: '',
+        title: '',
+        type: 'holiday',
+        description: '',
+        showInWidget: true
+    });
+
+    const handleAdd = () => {
+        if (!form.date || !form.title.trim()) return;
+        onChange([...events, { ...form, id: generateId() }]);
+        setForm({ id: '', date: '', title: '', type: 'holiday', description: '', showInWidget: true });
+    };
+
+    const handleRemove = (id: string) => {
+        onChange(events.filter((e) => e.id !== id));
+    };
+
+    const typeOptions: { value: CalendarEvent['type']; label: string }[] = [
+        { value: 'holiday', label: 'Каникулы/выходной' },
+        { value: 'celebration', label: 'Праздник' },
+        { value: 'exam', label: 'Экзамен/контрольная' },
+        { value: 'meeting', label: 'Собрание' },
+        { value: 'event', label: 'Мероприятие' },
+        { value: 'other', label: 'Другое' }
+    ];
+
+    const sorted = useMemo(
+        () => [...events].sort((a, b) => a.date.localeCompare(b.date) || a.title.localeCompare(b.title)),
+        [events]
+    );
+
+    return (
+        <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
+                <div className="sm:col-span-3">
+                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Дата</label>
+                    <input
+                        type="date"
+                        value={form.date}
+                        onChange={(e) => setForm({ ...form, date: e.target.value })}
+                        className="w-full border border-slate-200 dark:border-slate-600 p-2.5 rounded-xl text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500"
+                    />
+                </div>
+                <div className="sm:col-span-4">
+                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Название</label>
+                    <input
+                        type="text"
+                        value={form.title}
+                        onChange={(e) => setForm({ ...form, title: e.target.value })}
+                        placeholder="Например: Осенняя каникула"
+                        className="w-full border border-slate-200 dark:border-slate-600 p-2.5 rounded-xl text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500"
+                    />
+                </div>
+                <div className="sm:col-span-2">
+                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Тип</label>
+                    <select
+                        value={form.type}
+                        onChange={(e) => setForm({ ...form, type: e.target.value as CalendarEvent['type'] })}
+                        className="w-full border border-slate-200 dark:border-slate-600 p-2.5 rounded-xl text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500"
+                    >
+                        {typeOptions.map((o) => (
+                            <option key={o.value} value={o.value}>
+                                {o.label}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+                <div className="sm:col-span-1 flex items-end pb-3">
+                    <label className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300 cursor-pointer" title="Показывать на рабочем столе">
+                        <input
+                            type="checkbox"
+                            checked={form.showInWidget !== false}
+                            onChange={(e) => setForm({ ...form, showInWidget: e.target.checked })}
+                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <Icon name="Monitor" size={16} />
+                    </label>
+                </div>
+                <div className="sm:col-span-2">
+                    <button
+                        type="button"
+                        onClick={handleAdd}
+                        disabled={!form.date || !form.title.trim()}
+                        className="w-full px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-300 dark:disabled:bg-slate-600 text-white rounded-xl text-sm font-bold transition flex items-center justify-center gap-2"
+                    >
+                        <Icon name="Plus" size={16} /> Добавить
+                    </button>
+                </div>
+            </div>
+
+            {sorted.length === 0 ? (
+                <p className="text-sm text-slate-400">Нет добавленных праздников или событий.</p>
+            ) : (
+                <div className="border border-slate-100 dark:border-slate-700 rounded-xl overflow-hidden">
+                    <table className="w-full text-sm">
+                        <thead className="bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                            <tr>
+                                <th className="text-left px-3 py-2 text-xs font-bold">Дата</th>
+                                <th className="text-left px-3 py-2 text-xs font-bold">Название</th>
+                                <th className="text-left px-3 py-2 text-xs font-bold">Тип</th>
+                                <th className="text-left px-3 py-2 text-xs font-bold">Описание</th>
+                                <th className="px-3 py-2 text-xs font-bold text-center">На столе</th>
+                                <th className="px-3 py-2 text-xs font-bold text-right">Действие</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                            {sorted.map((ev) => (
+                                <tr key={ev.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                                    <td className="px-3 py-2 whitespace-nowrap text-slate-600 dark:text-slate-300">
+                                        {new Date(ev.date).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })}
+                                    </td>
+                                    <td className="px-3 py-2 text-slate-700 dark:text-slate-200 font-medium">{ev.title}</td>
+                                    <td className="px-3 py-2">
+                                        <span className="text-[10px] px-1.5 py-0.5 rounded border bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+                                            {typeOptions.find((o) => o.value === ev.type)?.label || ev.type}
+                                        </span>
+                                    </td>
+                                    <td className="px-3 py-2 text-slate-400 dark:text-slate-500 max-w-[200px] truncate" title={ev.description}>
+                                        {ev.description || '—'}
+                                    </td>
+                                    <td className="px-3 py-2 text-center">
+                                        {ev.showInWidget !== false && (
+                                            <Icon name="Monitor" size={16} className="mx-auto text-indigo-500" title="Показывается на рабочем столе" />
+                                        )}
+                                    </td>
+                                    <td className="px-3 py-2 text-right">
+                                        <button
+                                            onClick={() => handleRemove(ev.id)}
+                                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                                            title="Удалить"
+                                        >
+                                            <Icon name="Trash2" size={16} />
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+        </div>
+    );
+};
+
 // --- Main Component ---
 
-const DASHBOARD_WIDGET_ROLES: DashboardWidgetRole[] = ['admin', 'teacher', 'canteen'];
+const DASHBOARD_WIDGET_ROLES: DashboardWidgetRole[] = ['admin', 'teacher', 'canteen', 'superadmin'];
 
 const DEFAULT_DASHBOARD_WIDGET_ACCESS: Record<DashboardWidgetRole, DashboardWidgetId[]> = {
     admin: ['weather', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes'],
     teacher: ['weather', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes'],
-    canteen: ['weather', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes']
+    canteen: ['weather', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes'],
+    superadmin: ['weather', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes']
 };
 
 const DASHBOARD_WIDGETS: { id: DashboardWidgetId; label: string }[] = [
@@ -206,14 +362,17 @@ export const SettingsPage = () => {
         schedule1,
         schedule2,
         substitutions,
-        saveScheduleData,
         dutySchedule,
         nutritionRecords,
         absenteeismRecords
     } = useScheduleData();
+    const { saveData } = useData();
     const { addToast } = useToast();
+    const { role } = useAuth();
 
-
+    const visibleSections = role === 'superadmin'
+        ? SECTIONS
+        : SECTIONS.filter((s) => s.id !== 'organizations');
 
     const [activeSection, setActiveSection] = useState<SettingsSection>('integrations');
     const [isSavingSection, setIsSavingSection] = useState<SettingsSection | null>(null);
@@ -285,6 +444,55 @@ export const SettingsPage = () => {
         if (!d.teachers?.length && !d.schedule?.length && !d.schedule2?.length) {
             errors.push('Файл не содержит распознаваемых данных (teachers/schedule/schedule2)');
         }
+
+        // Referential integrity checks (prevents FK violations in Supabase)
+        const classIds = new Set((d.classes || []).map((c) => c.id));
+        const teacherIds = new Set((d.teachers || []).map((t) => t.id));
+        const roomIds = new Set((d.rooms || []).map((r) => r.id));
+        const roomByName = new Map((d.rooms || []).map((r) => [r.name, r.id]));
+        const scheduleItemIds = new Set([
+            ...(d.schedule || []).map((s) => s.id),
+            ...(d.schedule2 || []).map((s) => s.id)
+        ]);
+
+        (d.schedule || []).forEach((item, index) => {
+            if (item.classId && !classIds.has(item.classId)) {
+                errors.push(`schedule[${index}]: classId "${item.classId}" не найден в classes`);
+            }
+            if (item.teacherId && !teacherIds.has(item.teacherId)) {
+                errors.push(`schedule[${index}]: teacherId "${item.teacherId}" не найден в teachers`);
+            }
+            if (item.roomId && !roomIds.has(item.roomId) && !roomByName.has(item.roomId)) {
+                errors.push(`schedule[${index}]: roomId "${item.roomId}" не найден в rooms`);
+            }
+        });
+        (d.schedule2 || []).forEach((item, index) => {
+            if (item.classId && !classIds.has(item.classId)) {
+                errors.push(`schedule2[${index}]: classId "${item.classId}" не найден в classes`);
+            }
+            if (item.teacherId && !teacherIds.has(item.teacherId)) {
+                errors.push(`schedule2[${index}]: teacherId "${item.teacherId}" не найден в teachers`);
+            }
+            if (item.roomId && !roomIds.has(item.roomId) && !roomByName.has(item.roomId)) {
+                errors.push(`schedule2[${index}]: roomId "${item.roomId}" не найден в rooms`);
+            }
+        });
+        (d.substitutions || []).forEach((sub, index) => {
+            if (sub.scheduleItemId && !scheduleItemIds.has(sub.scheduleItemId)) {
+                errors.push(`substitutions[${index}]: scheduleItemId "${sub.scheduleItemId}" не найден в schedule/schedule2`);
+            }
+            if (sub.originalTeacherId && !teacherIds.has(sub.originalTeacherId)) {
+                errors.push(`substitutions[${index}]: originalTeacherId "${sub.originalTeacherId}" не найден в teachers`);
+            }
+            if (
+                sub.replacementTeacherId &&
+                !['conducted', 'cancelled'].includes(sub.replacementTeacherId) &&
+                !teacherIds.has(sub.replacementTeacherId)
+            ) {
+                errors.push(`substitutions[${index}]: replacementTeacherId "${sub.replacementTeacherId}" не найден в teachers`);
+            }
+        });
+
         return errors;
     };
 
@@ -296,6 +504,57 @@ export const SettingsPage = () => {
             try {
                 const rawJson = JSON.parse(ev.target?.result as string);
                 const json = stripDangerousKeys(rawJson) as AppDataImport;
+
+                const rawScheduleCount = (json.schedule?.length || 0) + (json.schedule2?.length || 0);
+                const rawSubstitutionCount = json.substitutions?.length || 0;
+
+                // Normalize legacy Firebase data before validation:
+                // - old backups often stored room name/number as roomId instead of room.id
+                // - some schedule items may reference deleted classes
+                // - some substitutions may reference deleted schedule items/teachers
+                const classIds = new Set((json.classes || []).map((c) => c.id));
+                const roomIds = new Set((json.rooms || []).map((r) => r.id));
+                const roomByName = new Map((json.rooms || []).map((r) => [r.name, r.id]));
+                const teacherIds = new Set((json.teachers || []).map((t) => t.id));
+
+                const normalizeSchedule = (items: typeof json.schedule): typeof json.schedule => {
+                    if (!items) return undefined;
+                    return items
+                        .map((item) => {
+                            if (item.roomId && !roomIds.has(item.roomId) && roomByName.has(item.roomId)) {
+                                return { ...item, roomId: roomByName.get(item.roomId)! };
+                            }
+                            return item;
+                        })
+                        .filter((item) => !item.classId || classIds.has(item.classId)) as typeof json.schedule;
+                };
+
+                json.schedule = normalizeSchedule(json.schedule);
+                json.schedule2 = normalizeSchedule(json.schedule2);
+
+                const scheduleItemIds = new Set([
+                    ...(json.schedule || []).map((s) => s.id),
+                    ...(json.schedule2 || []).map((s) => s.id)
+                ]);
+
+                json.substitutions = (json.substitutions || []).filter((sub) => {
+                    if (sub.scheduleItemId && !scheduleItemIds.has(sub.scheduleItemId)) return false;
+                    if (sub.originalTeacherId && !teacherIds.has(sub.originalTeacherId)) return false;
+                    if (
+                        sub.replacementTeacherId &&
+                        !['conducted', 'cancelled'].includes(sub.replacementTeacherId) &&
+                        !teacherIds.has(sub.replacementTeacherId)
+                    ) {
+                        return false;
+                    }
+                    return true;
+                }) as typeof json.substitutions;
+
+                const normalizedScheduleCount = (json.schedule?.length || 0) + (json.schedule2?.length || 0);
+                const normalizedSubstitutionCount = json.substitutions?.length || 0;
+                const skippedSchedule = rawScheduleCount - normalizedScheduleCount;
+                const skippedSubstitutions = rawSubstitutionCount - normalizedSubstitutionCount;
+
                 const validationErrors = validateImportData(json);
                 if (validationErrors.length > 0) {
                     addToast({
@@ -321,11 +580,29 @@ export const SettingsPage = () => {
                         nutritionRecords: (json.nutritionRecords as unknown as AppData['nutritionRecords']) || [],
                         absenteeismRecords: (json.absenteeismRecords as unknown as AppData['absenteeismRecords']) || [],
                         bellSchedule: (json.bellSchedule as AppData['bellSchedule']) || initial.bellSchedule,
-                        settings: { ...initial.settings, ...(json.settings || {}) }
+                        settings: { ...settings, ...(json.settings || {}) }
                     };
-                    await saveStaticData(mergedData as Partial<StaticAppData>);
-                    await saveScheduleData(mergedData as Partial<ScheduleAndSubstitutionData>);
-                    addToast({ type: 'success', title: 'Успешно', message: 'База данных успешно восстановлена!' });
+                    try {
+                        // Save everything in one operation so the provider can enforce the correct
+                        // dependency order (reference tables → schedule items → substitutions).
+                        await saveData(mergedData);
+                        if (skippedSchedule > 0 || skippedSubstitutions > 0) {
+                            addToast({
+                                type: 'warning',
+                                title: 'Импорт выполнен с потерями',
+                                message: `База восстановлена, но пропущено ${skippedSchedule} строк расписания и ${skippedSubstitutions} замен из-за устаревших ссылок.`
+                            });
+                        } else {
+                            addToast({ type: 'success', title: 'Успешно', message: 'База данных успешно восстановлена!' });
+                        }
+                    } catch (error) {
+                        logger.error('Full import failed:', error);
+                        addToast({
+                            type: 'danger',
+                            title: 'Импорт не выполнен',
+                            message: 'Произошла ошибка при сохранении данных. Проверьте файл и попробуйте снова.'
+                        });
+                    }
                 }
             } catch {
                 addToast({ type: 'danger', title: 'Ошибка', message: 'Ошибка чтения файла.' });
@@ -395,6 +672,10 @@ export const SettingsPage = () => {
     const [allowTeacherEdit, setAllowTeacherEdit] = useState(false);
     const [autoBackup, setAutoBackup] = useState(false);
     const [backupTime, setBackupTime] = useState('02:00');
+    const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
+
+    // System
+    const [sessionTimeoutMinutes, setSessionTimeoutMinutes] = useState(30);
 
     // Notifications
     const [templates, setTemplates] = useState<TelegramTemplates>({
@@ -441,6 +722,8 @@ export const SettingsPage = () => {
         setAllowTeacherEdit(settings.allowTeacherEdit || false);
         setAutoBackup(settings.autoBackup || false);
         setBackupTime(settings.backupTime || '02:00');
+        setCalendarEvents(settings.calendarEvents || []);
+        setSessionTimeoutMinutes(settings.sessionTimeoutMinutes || 30);
         setTemplates(
             settings.telegramTemplates || {
                 summary: '⚡️ **ЗАМЕНЫ НА {{date}}** ⚡️\n\n{{content}}',
@@ -462,14 +745,18 @@ export const SettingsPage = () => {
                 publishedAt: ''
             }
         );
-        setDashboardWidgetAccess(settings.dashboardWidgetAccess || DEFAULT_DASHBOARD_WIDGET_ACCESS);
+        setDashboardWidgetAccess(
+            settings.dashboardWidgetAccess
+                ? { ...DEFAULT_DASHBOARD_WIDGET_ACCESS, ...settings.dashboardWidgetAccess }
+                : DEFAULT_DASHBOARD_WIDGET_ACCESS
+        );
     }, [settings, privateSettings]);
 
     useEffect(() => {
         if (!settings) return;
         setWidgetAccessDirty(
             JSON.stringify(dashboardWidgetAccess) !==
-                JSON.stringify(settings.dashboardWidgetAccess || DEFAULT_DASHBOARD_WIDGET_ACCESS)
+                JSON.stringify({ ...DEFAULT_DASHBOARD_WIDGET_ACCESS, ...(settings.dashboardWidgetAccess || {}) })
         );
     }, [dashboardWidgetAccess, settings]);
 
@@ -509,8 +796,16 @@ export const SettingsPage = () => {
                 JSON.stringify([...origSem.secondSemesterMonths].sort());
         const lockChanged = (settings.isScheduleLocked || false) !== isScheduleLocked;
         const teacherEditChanged = (settings.allowTeacherEdit || false) !== allowTeacherEdit;
-        return semChanged || lockChanged || teacherEditChanged;
-    }, [semesterConfig, settings, isScheduleLocked, allowTeacherEdit]);
+        const eventsChanged =
+            JSON.stringify((settings.calendarEvents || []).slice().sort((a, b) => a.date.localeCompare(b.date) || a.title.localeCompare(b.title))) !==
+            JSON.stringify(calendarEvents.slice().sort((a, b) => a.date.localeCompare(b.date) || a.title.localeCompare(b.title)));
+        return semChanged || lockChanged || teacherEditChanged || eventsChanged;
+    }, [semesterConfig, settings, isScheduleLocked, allowTeacherEdit, calendarEvents]);
+
+    const systemDirty = useMemo(() => {
+        if (!settings) return false;
+        return (settings.sessionTimeoutMinutes || 30) !== sessionTimeoutMinutes;
+    }, [settings, sessionTimeoutMinutes]);
 
     const notificationsDirty = useMemo(() => {
         if (!settings) return false;
@@ -590,7 +885,8 @@ export const SettingsPage = () => {
                     ...settings,
                     semesterConfig,
                     isScheduleLocked,
-                    allowTeacherEdit
+                    allowTeacherEdit,
+                    calendarEvents
                 }
             });
             addToast({ type: 'success', title: 'Сохранено', message: 'Настройки расписания обновлены' });
@@ -599,7 +895,24 @@ export const SettingsPage = () => {
         } finally {
             setIsSavingSection(null);
         }
-    }, [settings, semesterConfig, isScheduleLocked, allowTeacherEdit, saveStaticData, addToast]);
+    }, [settings, semesterConfig, isScheduleLocked, allowTeacherEdit, calendarEvents, saveStaticData, addToast]);
+
+    const saveSystem = useCallback(async () => {
+        setIsSavingSection('system');
+        try {
+            await saveStaticData({
+                settings: {
+                    ...settings,
+                    sessionTimeoutMinutes
+                }
+            });
+            addToast({ type: 'success', title: 'Сохранено', message: 'Системные настройки обновлены' });
+        } catch {
+            addToast({ type: 'danger', title: 'Ошибка', message: 'Не удалось сохранить' });
+        } finally {
+            setIsSavingSection(null);
+        }
+    }, [settings, sessionTimeoutMinutes, saveStaticData, addToast]);
 
     const saveNotifications = useCallback(async () => {
         setIsSavingSection('notifications');
@@ -746,7 +1059,7 @@ export const SettingsPage = () => {
     }
 
     return (
-        <div className="h-full flex flex-col max-w-6xl mx-auto w-full">
+        <div className="h-full flex flex-col max-w-7xl mx-auto w-full">
             <div className="shrink-0 mb-4">
                 <h1 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
                     <Icon name="Settings" className="text-indigo-600 dark:text-indigo-400" />
@@ -762,13 +1075,14 @@ export const SettingsPage = () => {
                 <aside className="lg:w-64 shrink-0 overflow-y-auto overflow-x-hidden lg:overflow-x-visible">
                     <div className="lg:sticky lg:top-0">
                         <nav className="flex flex-wrap lg:flex-col gap-2 pb-2 lg:pb-0">
-                            {SECTIONS.map((section) => {
+                            {visibleSections.map((section) => {
                                 const isActive = activeSection === section.id;
                                 const hasDirty =
                                     (section.id === 'integrations' && integrationsDirty) ||
                                     (section.id === 'institution' && institutionDirty) ||
                                     (section.id === 'schedule' && scheduleDirty) ||
-                                    (section.id === 'notifications' && notificationsDirty);
+                                    (section.id === 'notifications' && notificationsDirty) ||
+                                    (section.id === 'system' && systemDirty);
                                 return (
                                     <button
                                         key={section.id}
@@ -1071,6 +1385,17 @@ export const SettingsPage = () => {
                                         </div>
                                     </label>
                                 </div>
+
+                                <div className="pt-4 border-t border-slate-100 dark:border-slate-700">
+                                    <h4 className="font-bold text-sm text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2">
+                                        <Icon name="Gift" size={16} />
+                                        Праздники и события
+                                    </h4>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+                                        Отображаются в школьном календаре и на виджете рабочего стола.
+                                    </p>
+                                    <CalendarEventsEditor events={calendarEvents} onChange={setCalendarEvents} />
+                                </div>
                             </div>
                         </SectionCard>
                     )}
@@ -1348,6 +1673,12 @@ export const SettingsPage = () => {
                         </div>
                     )}
 
+                    {activeSection === 'organizations' && (
+                        <div className="bg-white dark:bg-dark-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm p-6">
+                            <OrganizationsManagement />
+                        </div>
+                    )}
+
                     {activeSection === 'system' && (
                         <div className="space-y-6">
                             <ArchiveYearSection />
@@ -1553,6 +1884,60 @@ export const SettingsPage = () => {
                             </div>
 
                             <div className="bg-white dark:bg-dark-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm p-6">
+                                <div className="flex items-center justify-between gap-3 mb-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                                            <Icon name="Clock" size={20} />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-slate-800 dark:text-white text-base">
+                                                Безопасность сессии
+                                            </h3>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400">
+                                                Автоматический выход при бездействии
+                                            </p>
+                                        </div>
+                                    </div>
+                                    {systemDirty && (
+                                        <span className="shrink-0 inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded-lg border border-amber-100 dark:border-amber-900">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                            Изменено
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                                    <div className="flex-1">
+                                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">
+                                            Таймаут бездействия, мин
+                                        </label>
+                                        <input
+                                            type="number"
+                                            min={1}
+                                            max={120}
+                                            value={sessionTimeoutMinutes}
+                                            onChange={(e) => setSessionTimeoutMinutes(Math.max(1, Math.min(120, Number(e.target.value) || 1)))}
+                                            className="w-full sm:w-40 border border-slate-200 dark:border-slate-600 p-2.5 rounded-xl text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500"
+                                        />
+                                        <p className="text-[11px] text-slate-400 mt-1">
+                                            Через указанное время неактивности пользователь будет автоматически разлогинен.
+                                        </p>
+                                    </div>
+                                    <button
+                                        onClick={saveSystem}
+                                        disabled={!systemDirty || isSavingSection === 'system'}
+                                        className={`px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 transition shrink-0 ${
+                                            systemDirty && isSavingSection !== 'system'
+                                                ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                                                : 'bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed'
+                                        }`}
+                                    >
+                                        <Icon name={isSavingSection === 'system' ? 'Loader' : 'Save'} size={16} className={isSavingSection === 'system' ? 'animate-spin' : ''} />
+                                        {isSavingSection === 'system' ? 'Сохранение...' : 'Сохранить'}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="bg-white dark:bg-dark-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm p-6">
                                 <div className="flex items-center gap-3 mb-4">
                                     <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
                                         <Icon name="FileText" size={20} />
@@ -1589,6 +1974,36 @@ export const SettingsPage = () => {
                                 >
                                     <Icon name="RotateCcw" size={16} />
                                     Сбросить к значениям по умолчанию
+                                </button>
+                            </div>
+
+                            <div className="bg-white dark:bg-dark-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm p-6">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className="w-10 h-10 rounded-xl bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 flex items-center justify-center shrink-0">
+                                        <Icon name="HardDrive" size={20} />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-bold text-slate-800 dark:text-white text-base">
+                                            Локальный кэш
+                                        </h3>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                                            Очистка устаревших данных из браузера
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        if (window.confirm('Очистить локальный кэш? Данные в облаке останутся, но после очистки потребуется повторная загрузка.')) {
+                                            safeLocalStorageRemove('gym_data_local_backup_v2');
+                                            safeLocalStorageRemove('gym_sync_queue_backup');
+                                            safeLocalStorageRemove('gym_calendar_events');
+                                            addToast({ type: 'success', title: 'Кэш очищен', message: 'Локальные данные удалены' });
+                                        }
+                                    }}
+                                    className="px-4 py-2.5 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-400 rounded-xl font-bold text-sm hover:bg-orange-100 dark:hover:bg-orange-900/40 transition flex items-center gap-2 border border-orange-100 dark:border-orange-900"
+                                >
+                                    <Icon name="Trash2" size={16} />
+                                    Очистить локальный кэш
                                 </button>
                             </div>
                         </div>
@@ -1771,19 +2186,23 @@ const BackupControls: React.FC<{
 const AuditLogViewer: React.FC = () => {
     const [entries, setEntries] = useState<AuditLogEntry[]>([]);
     const [isLoading, setIsLoading] = useState(false);
+    const [viewOrganizationId, setViewOrganizationId] = useState<string>('');
     const { addToast } = useToast();
+    const { organizationId, organizations, isSuperAdmin } = useAuth();
+
+    const effectiveOrgFilter = isSuperAdmin ? (viewOrganizationId || null) : organizationId;
 
     const fetchEntries = useCallback(async () => {
         setIsLoading(true);
         try {
-            const logs = await auditLog.getEntries(100);
+            const logs = await auditLog.getEntries(100, effectiveOrgFilter);
             setEntries(logs);
         } catch (e) {
             logger.error(e);
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    }, [effectiveOrgFilter]);
 
     useEffect(() => {
         fetchEntries();
@@ -1809,7 +2228,9 @@ const AuditLogViewer: React.FC = () => {
         bells: 'Звонки',
         duty: 'Дежурство',
         nutrition: 'Питание',
-        absenteeism: 'Пропуски'
+        absenteeism: 'Пропуски',
+        user: 'Пользователь',
+        organization: 'Организация'
     };
 
     const actionDescriptions: Record<string, string> = {
@@ -1826,7 +2247,7 @@ const AuditLogViewer: React.FC = () => {
     const handleExportJson = async () => {
         setIsLoading(true);
         try {
-            const all = await auditLog.getEntries(200);
+            const all = await auditLog.getEntries(200, effectiveOrgFilter);
             const blob = new Blob([JSON.stringify(all, null, 2)], { type: 'application/json' });
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
@@ -1847,7 +2268,7 @@ const AuditLogViewer: React.FC = () => {
     const handleExportExcel = async () => {
         setIsLoading(true);
         try {
-            const all = await auditLog.getEntries(200);
+            const all = await auditLog.getEntries(200, effectiveOrgFilter);
             if (all.length === 0) {
                 addToast({ type: 'warning', title: 'Журнал пуст', message: 'Нет данных для экспорта' });
                 return;
@@ -1891,7 +2312,7 @@ const AuditLogViewer: React.FC = () => {
         if (!window.confirm('Очистить весь журнал действий? Это действие необратимо.')) return;
         setIsLoading(true);
         try {
-            await auditLog.clear();
+            await auditLog.clear(effectiveOrgFilter);
             setEntries([]);
             addToast({ type: 'success', title: 'Журнал очищен', message: 'Все записи удалены' });
         } catch {
@@ -1933,6 +2354,23 @@ const AuditLogViewer: React.FC = () => {
                     <Icon name="Trash2" size={12} /> Очистить журнал
                 </button>
             </div>
+            {isSuperAdmin && (
+                <div className="flex items-center gap-3 mb-3">
+                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Организация:</label>
+                    <select
+                        value={viewOrganizationId}
+                        onChange={(e) => setViewOrganizationId(e.target.value)}
+                        className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-dark-700 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                    >
+                        <option value="">Все организации</option>
+                        {organizations.map((o) => (
+                            <option key={o.id} value={o.id}>
+                                {o.name}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            )}
             <div className="max-h-64 overflow-y-auto custom-scrollbar border border-slate-100 dark:border-slate-700 rounded-xl relative">
                 {isLoading && entries.length === 0 ? (
                     <div className="p-12 text-center text-sm text-slate-400 flex flex-col items-center justify-center">
@@ -1950,6 +2388,9 @@ const AuditLogViewer: React.FC = () => {
                             <tr>
                                 <th className="text-left px-3 py-2 text-xs font-bold text-slate-500 dark:text-slate-400 whitespace-nowrap">Дата/Время</th>
                                 <th className="text-left px-3 py-2 text-xs font-bold text-slate-500 dark:text-slate-400">Пользователь</th>
+                                {isSuperAdmin && (
+                                    <th className="text-left px-3 py-2 text-xs font-bold text-slate-500 dark:text-slate-400">Организация</th>
+                                )}
                                 <th className="text-left px-3 py-2 text-xs font-bold text-slate-500 dark:text-slate-400">Действие</th>
                                 <th className="text-left px-3 py-2 text-xs font-bold text-slate-500 dark:text-slate-400">Объект</th>
                                 <th className="text-left px-3 py-2 text-xs font-bold text-slate-500 dark:text-slate-400">Подробности</th>
@@ -1967,6 +2408,11 @@ const AuditLogViewer: React.FC = () => {
                                     <td className="px-3 py-2 text-slate-600 dark:text-slate-300 truncate max-w-[120px] text-xs" title={entry.userEmail}>
                                         {entry.userEmail}
                                     </td>
+                                    {isSuperAdmin && (
+                                        <td className="px-3 py-2 text-slate-500 dark:text-slate-400 text-xs truncate max-w-[120px]">
+                                            {organizations.find((o) => o.id === entry.organizationId)?.name || '—'}
+                                        </td>
+                                    )}
                                     <td className="px-3 py-2">
                                         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap ${
                                             entry.action === 'delete'
