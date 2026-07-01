@@ -46,6 +46,11 @@ const DataMetaContext = createContext<DataMetaContextType | undefined>(undefined
 
 const LOCAL_STORAGE_KEY = 'gym_data_local_backup_v2';
 const PERSISTENT_QUEUE_KEY = 'gym_sync_queue_backup';
+const getLocalStorageKey = (organizationId: string | null | undefined) =>
+    organizationId ? `${LOCAL_STORAGE_KEY}_${organizationId}` : LOCAL_STORAGE_KEY;
+const getQueueKey = (organizationId: string | null | undefined) =>
+    organizationId ? `${PERSISTENT_QUEUE_KEY}_${organizationId}` : PERSISTENT_QUEUE_KEY;
+
 
 // Вспомогательные функции для безопасной работы с localStorage
 const isLocalStorageAvailable = (): boolean => {
@@ -69,8 +74,8 @@ const syncQueue = {
     }>,
     isProcessing: false,
 
-    load: () => {
-        const stored = safeLocalStorageGet(PERSISTENT_QUEUE_KEY);
+    load: (queueKey?: string) => {
+        const stored = safeLocalStorageGet(queueKey || PERSISTENT_QUEUE_KEY);
         if (stored) {
             try {
                 const parsed = JSON.parse(stored);
@@ -83,15 +88,15 @@ const syncQueue = {
         }
     },
 
-    save: () => {
+    save: (queueKey?: string) => {
         try {
-            safeLocalStorageSet(PERSISTENT_QUEUE_KEY, JSON.stringify(syncQueue.items));
+            safeLocalStorageSet(queueKey || PERSISTENT_QUEUE_KEY, JSON.stringify(syncQueue.items));
         } catch (e) {
             logger.warn('Failed to save sync queue', e);
         }
     },
 
-    add: (data: Partial<AppData>) => {
+    add: (data: Partial<AppData>, queueKey?: string) => {
         const MAX_QUEUE_SIZE = 50;
         if (syncQueue.items.length >= MAX_QUEUE_SIZE) {
             const dropped = syncQueue.items.length - MAX_QUEUE_SIZE + 1;
@@ -105,10 +110,10 @@ const syncQueue = {
             timestamp: Date.now(),
             retryCount: 0
         });
-        syncQueue.save();
+        syncQueue.save(queueKey);
     },
 
-    process: async (dataProvider: { save: (data: Partial<AppData>, user?: { email?: string | null } | null) => Promise<void> }, user: { email?: string | null }) => {
+    process: async (dataProvider: { save: (data: Partial<AppData>, user?: { email?: string | null } | null, organizationId?: string | null) => Promise<void> }, user: { email?: string | null }, organizationId?: string | null) => {
         if (syncQueue.isProcessing || !navigator.onLine) return;
 
         syncQueue.isProcessing = true;
@@ -119,7 +124,7 @@ const syncQueue = {
                 if (!navigator.onLine) break; // Останавливаемся, если сеть пропала
 
                 try {
-                    await dataProvider.save(item.data, user);
+                    await dataProvider.save(item.data, user, organizationId);
                     itemsToRemove.push(item.id);
                 } catch (error: unknown) {
                     item.retryCount++;
@@ -140,13 +145,13 @@ const syncQueue = {
         } finally {
             if (itemsToRemove.length > 0) {
                 syncQueue.items = syncQueue.items.filter((item) => !itemsToRemove.includes(item.id));
-                syncQueue.save();
+                syncQueue.save(getQueueKey(organizationId));
             }
             syncQueue.isProcessing = false;
 
             if (syncQueue.items.length > 0 && navigator.onLine) {
                 // Если остались элементы и сеть есть, попробуем снова через 5 секунд
-                setTimeout(() => syncQueue.process(dataProvider, user), 5000);
+                setTimeout(() => syncQueue.process(dataProvider, user, organizationId), 5000);
             }
         }
     }
@@ -201,7 +206,7 @@ const handleError = {
         );
     },
 
-    firebaseOffline: (error: unknown, context: string, data: Partial<AppData>) => {
+    firebaseOffline: (error: unknown, context: string, data: Partial<AppData>, organizationId?: string | null) => {
         // Для мобильных устройств показываем более мягкое сообщение
         const isMobile = window.innerWidth < 768;
         const message = isMobile
@@ -217,7 +222,7 @@ const handleError = {
         );
 
         // Добавляем в очередь синхронизации
-        syncQueue.add(data);
+        syncQueue.add(data, getQueueKey(organizationId));
     }
 };
 
@@ -242,7 +247,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
     historyPointerRef.current = historyPointer;
 
     // Получаем user и role для проверки прав
-    const { user, role, loading: authLoading } = useAuth();
+    const { user, role, loading: authLoading, organizationId } = useAuth();
     const userId = user?.id ?? null;
 
     // Загрузка данных
@@ -250,7 +255,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
         console.log('[DataContext] Loading effect triggered. initialData:', !!initialData, 'authLoading:', authLoading, 'userId:', userId);
 
         // Initialize sync queue from storage
-        syncQueue.load();
+        syncQueue.load(getQueueKey(organizationId));
 
         // 1. Если переданы начальные данные (публичный вид)
         if (initialData) {
@@ -268,10 +273,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
             return;
         }
 
+        if (isSupabase && !organizationId) {
+            console.log('[DataContext] Waiting for organization...');
+            return;
+        }
+
         // 2. Пытаемся загрузить локальную копию сразу, чтобы пользователь что-то видел
         let localBackup: string | null = null;
         if (isLocalStorageAvailable()) {
-            localBackup = safeLocalStorageGet(LOCAL_STORAGE_KEY);
+            localBackup = safeLocalStorageGet(getLocalStorageKey(organizationId));
             if (localBackup) {
                 try {
                     const parsed = JSON.parse(localBackup);
@@ -335,19 +345,21 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                                 ...fixedData.privateSettings
                             };
 
-                        // Apply pending changes on top of Firebase data
-                        // This ensures that local changes are not overwritten by stale server data
+                        // Apply pending changes on top of server data ONLY for fields not returned by the server
+                        // This prevents stale sync-queue items from overwriting fresher server data on reload
                         if (syncQueue.items.length > 0) {
                             syncQueue.items.forEach((item) => {
-                                // Shallow merge of top-level keys (e.g. absenteeismRecords)
-                                // This assumes that the pending change contains the FULL array for that key
-                                Object.assign(fixedData, item.data);
+                                Object.keys(item.data).forEach((key) => {
+                                    if ((loaded as Record<string, unknown>)[key] === undefined) {
+                                        (fixedData as Record<string, unknown>)[key] = (item.data as Record<string, unknown>)[key];
+                                    }
+                                });
                             });
                         }
 
                         // Обновляем локальный бэкап актуальными данными из облака
                         if (isLocalStorageAvailable()) {
-                            safeLocalStorageSet(LOCAL_STORAGE_KEY, JSON.stringify(fixedData));
+                            safeLocalStorageSet(getLocalStorageKey(organizationId), JSON.stringify(fixedData));
                         }
 
                         // Update history inside the callback to access the latest state
@@ -370,7 +382,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                     // Если ошибка квоты или сети - мы уже загрузили localBackup выше, так что данные не пропадут
                     setIsLoading(false);
                     console.log('[DataContext] isLoading set to false (error)');
-                }
+                },
+                organizationId
             );
         } catch (error) {
             console.error('[DataContext] Failed to initialize subscription:', error);
@@ -383,7 +396,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
         return () => {
             if (unsubscribe) unsubscribe();
         };
-    }, [initialData, userId, role, authLoading]);
+    }, [initialData, userId, user, role, authLoading, organizationId, dataProvider]);
 
     const saveData = useCallback(
         async (newData: Partial<AppData>, addToHistory = true) => {
@@ -406,7 +419,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
 
                 // 2. Всегда сохраняем в LocalStorage как резерв
                 if (isLocalStorageAvailable()) {
-                    safeLocalStorageSet(LOCAL_STORAGE_KEY, JSON.stringify(mergedData));
+                    safeLocalStorageSet(getLocalStorageKey(organizationId), JSON.stringify(mergedData));
                 }
 
                 // 2.5. Оповещаем другие вкладки
@@ -419,11 +432,38 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                 // 3. Пробуем отправить в облако (только для авторизованных и не для публичных данных)
                 if (!initialData && user) {
                     try {
-                        await dataProvider.save(newData, user);
+                        await dataProvider.save(newData, user, organizationId);
                     } catch (dbError: unknown) {
-                        // При ошибке Firestore добавляем в очередь синхронизации вместо отката
-                        handleError.firebaseOffline(dbError, 'сохранения данных', newData);
-                        // НЕ откатываем интерфейс - данные остались в localStorage и будут синхронизированы позже
+                        const err = dbError as { code?: string; details?: string; message?: string };
+                        const isDataError =
+                            err.code === '23503' ||
+                            err.code === '23505' ||
+                            err.code === 'PGRST204' ||
+                            err.message?.includes('Could not find') ||
+                            err.message?.includes('Conflict') ||
+                            err.message?.includes('violates foreign key');
+                        if (isDataError) {
+                            handleError.log('Data validation error (not queued):', dbError);
+                            const isSchemaError = err.code === 'PGRST204' || err.message?.includes('Could not find');
+                            window.dispatchEvent(
+                                new CustomEvent('app-toast', {
+                                    detail: {
+                                        type: 'danger',
+                                        title: 'Ошибка сохранения',
+                                        message: isSchemaError
+                                            ? 'В базе данных отсутствуют необходимые колонки. Выполните SQL-миграцию из supabase/migrations/20260629190000_add_settings_columns.sql и перезагрузите страницу.'
+                                            : 'Данные содержат конфликт или нарушение целостности. Проверьте связанные записи (классы, расписание) и попробуйте снова.'
+                                    }
+                                })
+                            );
+                            // Пробрасываем ошибку целостности данных, чтобы вызывающий код мог остановиться
+                            // и не продолжал цепочку зависимых сохранений (например, импорт schedule → substitutions).
+                            throw dbError;
+                        } else {
+                            // При ошибке Firestore добавляем в очередь синхронизации вместо отката
+                            handleError.firebaseOffline(dbError, 'сохранения данных', newData, organizationId);
+                            // НЕ откатываем интерфейс - данные остались в localStorage и будут синхронизированы позже
+                        }
                     }
                 }
 
@@ -444,7 +484,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                                 'update',
                                 entityMap[key],
                                 key,
-                                `Изменено ${key}`
+                                `Изменено ${key}`,
+                                organizationId
                             );
                         }
                     });
@@ -478,20 +519,20 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                 setIsSaving(false);
             }
         },
-        [user, role, initialData]
+        [user, role, initialData, organizationId, dataProvider]
     );
 
     // Автоматическая синхронизация при восстановлении сети
     useEffect(() => {
         const handleOnline = () => {
             if (syncQueue.items.length > 0 && user && !initialData) {
-                syncQueue.process(dataProvider, user);
+                syncQueue.process(dataProvider, user, organizationId);
             }
         };
 
         window.addEventListener('online', handleOnline);
         return () => window.removeEventListener('online', handleOnline);
-    }, [user, role, initialData, dataProvider]);
+    }, [user, role, initialData, dataProvider, organizationId]);
 
     // BroadcastChannel: синхронизация между вкладками
     useEffect(() => {
@@ -523,18 +564,18 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
             historyPointerRef.current = prev - 1;
             // Сохраняем локально
             if (isLocalStorageAvailable()) {
-                safeLocalStorageSet(LOCAL_STORAGE_KEY, JSON.stringify(prevData));
+                safeLocalStorageSet(getLocalStorageKey(organizationId), JSON.stringify(prevData));
             }
 
             if (!initialData && user) {
                 try {
-                    dataProvider.save(prevData, user).catch((e) => handleError.firebase(e, 'отмены изменений'));
+                    dataProvider.save(prevData, user, organizationId).catch((e) => handleError.firebase(e, 'отмены изменений'));
                 } catch (e) {
                     handleError.firebase(e, 'отмены изменений');
                 }
             }
         }
-    }, [initialData, user]);
+    }, [initialData, user, organizationId, dataProvider]);
 
     const redo = useCallback(async () => {
         const prev = historyPointerRef.current;
@@ -546,18 +587,18 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
             historyPointerRef.current = prev + 1;
             // Сохраняем локально
             if (isLocalStorageAvailable()) {
-                safeLocalStorageSet(LOCAL_STORAGE_KEY, JSON.stringify(nextData));
+                safeLocalStorageSet(getLocalStorageKey(organizationId), JSON.stringify(nextData));
             }
 
             if (!initialData && user) {
                 try {
-                    dataProvider.save(nextData, user).catch((e) => handleError.firebase(e, 'повтора изменений'));
+                    dataProvider.save(nextData, user, organizationId).catch((e) => handleError.firebase(e, 'повтора изменений'));
                 } catch (e) {
                     handleError.firebase(e, 'повтора изменений');
                 }
             }
         }
-    }, [initialData, user]);
+    }, [initialData, user, organizationId, dataProvider]);
 
     const resetData = useCallback(async () => {
         await saveData(getInitialData());

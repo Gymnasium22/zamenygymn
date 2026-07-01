@@ -38,7 +38,7 @@ export const supabaseTeachersService = {
             class_teacher_of: teacher.classTeacherOf || null,
             unavailable_dates: teacher.unavailableDates || [],
             absence_reasons: teacher.absenceReasons || {},
-            organization_id: teacher.organizationId || 'f1bd501e-e4ee-4e9f-a657-cbd6ccee41c7'
+            organization_id: teacher.organizationId || null
         }).select().single();
         if (error) throw error;
         return mapTeacher(data);
@@ -128,7 +128,7 @@ export const supabaseSubjectsService = {
             difficulty: subject.difficulty || null,
             required_room_type: subject.requiredRoomType || null,
             order: subject.order || null,
-            organization_id: subject.organizationId || 'f1bd501e-e4ee-4e9f-a657-cbd6ccee41c7'
+            organization_id: subject.organizationId || null
         }).select().single();
         if (error) throw error;
         return {

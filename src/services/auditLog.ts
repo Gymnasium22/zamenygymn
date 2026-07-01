@@ -39,7 +39,8 @@ class AuditLogService {
         action: AuditLogEntry['action'],
         entityType: AuditLogEntry['entityType'],
         entityName?: string,
-        details?: string
+        details?: string,
+        organizationId?: string | null
     ) {
         const entry: AuditLogEntry = {
             id: generateId(),
@@ -61,7 +62,7 @@ class AuditLogService {
         if (isSupabase) {
             try {
                 await supabase.from('audit_log').insert({
-                    organization_id: 'f1bd501e-e4ee-4e9f-a657-cbd6ccee41c7',
+                    organization_id: organizationId || null,
                     user_email: userEmail || null,
                     action: action,
                     collection: entityType,
@@ -83,14 +84,16 @@ class AuditLogService {
         }
     }
 
-    async getEntries(limit = 100): Promise<AuditLogEntry[]> {
+    async getEntries(limit = 100, organizationId?: string | null): Promise<AuditLogEntry[]> {
         if (isSupabase) {
             try {
-                const { data, error } = await supabase
+                let query = supabase
                     .from('audit_log')
                     .select('*')
                     .order('created_at', { ascending: false })
                     .limit(limit);
+                if (organizationId) query = query.eq('organization_id', organizationId);
+                const { data, error } = await query;
                 if (error) throw error;
                 if (data && data.length > 0) {
                     const dbEntries = data.map((d: Record<string, unknown>) => {
@@ -153,13 +156,15 @@ class AuditLogService {
         return this.readEntries().slice(-limit).reverse();
     }
 
-    async clear() {
+    async clear(organizationId?: string | null) {
         safeLocalStorageRemove(STORAGE_KEY);
         if (isSupabase) {
-            try {
-                await supabase.from('audit_log').delete().not('id', 'is', null);
-            } catch (e) {
-                logger.warn('Failed to clear Supabase audit log:', e);
+            let query = supabase.from('audit_log').delete();
+            if (organizationId) query = query.eq('organization_id', organizationId);
+            const { error } = await query;
+            if (error) {
+                logger.warn('Failed to clear Supabase audit log:', error);
+                throw error;
             }
         } else if (firestoreDB) {
             try {
@@ -173,6 +178,7 @@ class AuditLogService {
             } catch (e) {
                 if (!isPermissionDenied(e)) {
                     logger.warn('Failed to clear Firestore audit log:', e);
+                    throw e;
                 }
             }
         }

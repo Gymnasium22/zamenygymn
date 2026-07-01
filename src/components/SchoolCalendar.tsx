@@ -2,17 +2,11 @@ import React, { useState, useMemo } from 'react';
 import { Icon } from './Icons';
 import { Modal } from './UI';
 import { generateId } from '../utils/helpers';
-
-export interface CalendarEvent {
-    id: string;
-    date: string; // YYYY-MM-DD
-    title: string;
-    type: 'holiday' | 'exam' | 'meeting' | 'event' | 'other';
-    description?: string;
-}
+import { CalendarEvent } from '../types';
 
 const EVENT_COLORS: Record<CalendarEvent['type'], string> = {
     holiday: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800',
+    celebration: 'bg-pink-100 text-pink-800 border-pink-200 dark:bg-pink-900/30 dark:text-pink-300 dark:border-pink-800',
     exam: 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800',
     meeting: 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800',
     event: 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800',
@@ -21,6 +15,7 @@ const EVENT_COLORS: Record<CalendarEvent['type'], string> = {
 
 const EVENT_LABELS: Record<CalendarEvent['type'], string> = {
     holiday: 'Каникулы/выходной',
+    celebration: 'Праздник',
     exam: 'Экзамен/контрольная',
     meeting: 'Собрание',
     event: 'Мероприятие',
@@ -43,7 +38,8 @@ export const SchoolCalendar: React.FC<SchoolCalendarProps> = ({ events, onEvents
         date: '',
         title: '',
         type: 'event',
-        description: ''
+        description: '',
+        showInWidget: true
     });
 
     const year = currentDate.getFullYear();
@@ -66,7 +62,7 @@ export const SchoolCalendar: React.FC<SchoolCalendarProps> = ({ events, onEvents
 
     const openAdd = (dateStr: string) => {
         setEditingEvent(null);
-        setForm({ id: generateId(), date: dateStr, title: '', type: 'event', description: '' });
+        setForm({ id: generateId(), date: dateStr, title: '', type: 'event', description: '', showInWidget: true });
         setIsModalOpen(true);
     };
 
@@ -122,9 +118,15 @@ export const SchoolCalendar: React.FC<SchoolCalendarProps> = ({ events, onEvents
         return dateStr === `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
     };
 
+    const isWeekend = (dateStr: string) => {
+        const d = new Date(dateStr);
+        const day = d.getDay();
+        return day === 0 || day === 6;
+    };
+
     return (
-        <div className="space-y-4">
-            <div className="flex items-center justify-between">
+        <div className="h-full flex flex-col gap-4">
+            <div className="flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-3">
                     <button onClick={prevMonth} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition">
                         <Icon name="ArrowRight" size={18} className="rotate-180" />
@@ -141,35 +143,40 @@ export const SchoolCalendar: React.FC<SchoolCalendarProps> = ({ events, onEvents
                 </button>
             </div>
 
-            <div className="grid grid-cols-7 gap-1">
+            <div className="grid grid-cols-7 grid-rows-6 gap-1 flex-1 min-h-0">
                 {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((d) => (
-                    <div key={d} className="text-center text-xs font-bold text-slate-400 dark:text-slate-500 py-2 uppercase">
+                    <div key={d} className="text-center text-xs font-bold text-slate-400 dark:text-slate-500 py-1 uppercase">
                         {d}
                     </div>
                 ))}
                 {calendarDays.map((day, i) => {
                     const dayEvents = eventsByDate.get(day.dateStr) || [];
+                    const weekend = isWeekend(day.dateStr);
                     return (
                         <div
                             key={i}
                             onClick={() => !readOnly && day.isCurrentMonth && openAdd(day.dateStr)}
-                            className={`min-h-[80px] p-1.5 rounded-xl border transition-all cursor-pointer ${
+                            title={`${day.dateStr}${dayEvents.length ? ` • ${dayEvents.length} событий` : ''}`}
+                            className={`min-h-0 p-1.5 rounded-xl border transition-all cursor-pointer overflow-hidden flex flex-col ${
                                 day.isCurrentMonth
-                                    ? 'bg-white dark:bg-dark-800 border-slate-100 dark:border-slate-700 hover:border-indigo-200 dark:hover:border-indigo-700'
+                                    ? weekend
+                                        ? 'bg-rose-50/50 dark:bg-rose-900/10 border-rose-100 dark:border-rose-900/30 hover:border-rose-200 dark:hover:border-rose-800'
+                                        : 'bg-white dark:bg-dark-800 border-slate-100 dark:border-slate-700 hover:border-indigo-200 dark:hover:border-indigo-700'
                                     : 'bg-slate-50/50 dark:bg-slate-800/30 border-slate-50 dark:border-slate-800 opacity-50'
                             } ${isToday(day.dateStr) ? 'ring-2 ring-indigo-500 ring-offset-1' : ''}`}
                         >
-                            <div className={`text-sm font-bold mb-1 ${isToday(day.dateStr) ? 'text-indigo-600' : 'text-slate-700 dark:text-slate-300'}`}>
+                            <div className={`text-sm font-bold mb-0.5 shrink-0 ${isToday(day.dateStr) ? 'text-indigo-600' : weekend && day.isCurrentMonth ? 'text-rose-500 dark:text-rose-400' : 'text-slate-700 dark:text-slate-300'}`}>
                                 {day.date}
                             </div>
-                            <div className="space-y-1">
+                            <div className="flex-1 overflow-hidden space-y-1 min-h-0">
                                 {dayEvents.slice(0, 3).map((ev) => (
                                     <div
                                         key={ev.id}
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            !readOnly && openEdit(ev);
+                                            if (!readOnly) openEdit(ev);
                                         }}
+                                        title={ev.title}
                                         className={`text-[10px] px-1.5 py-0.5 rounded border truncate cursor-pointer ${EVENT_COLORS[ev.type]}`}
                                     >
                                         {ev.title}
@@ -184,7 +191,7 @@ export const SchoolCalendar: React.FC<SchoolCalendarProps> = ({ events, onEvents
                 })}
             </div>
 
-            <div className="flex flex-wrap gap-3 pt-2">
+            <div className="flex flex-wrap gap-3 pt-2 shrink-0">
                 {Object.entries(EVENT_LABELS).map(([type, label]) => (
                     <div key={type} className="flex items-center gap-1.5">
                         <div className={`w-3 h-3 rounded border ${EVENT_COLORS[type as CalendarEvent['type']]}`} />
@@ -245,6 +252,15 @@ export const SchoolCalendar: React.FC<SchoolCalendarProps> = ({ events, onEvents
                             placeholder="Дополнительная информация..."
                         />
                     </div>
+                    <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 cursor-pointer">
+                        <input
+                            type="checkbox"
+                            checked={form.showInWidget !== false}
+                            onChange={(e) => setForm({ ...form, showInWidget: e.target.checked })}
+                            className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                        Показывать на рабочем столе
+                    </label>
                     <div className="flex gap-3 pt-2">
                         {editingEvent && (
                             <button

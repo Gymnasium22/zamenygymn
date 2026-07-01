@@ -69,6 +69,7 @@ export const usersService = {
                     permissions: data.permissions || [],
                     allowedPages: data.allowedPages || [],
                     teacherId: data.teacherId || undefined,
+                    organizationId: data.organizationId || undefined,
                     createdAt: data.createdAt?.toDate?.().toISOString() || data.createdAt,
                     createdBy: data.createdBy,
                     lastLoginAt: data.lastLoginAt?.toDate?.().toISOString() || data.lastLoginAt
@@ -81,7 +82,7 @@ export const usersService = {
         );
     },
 
-    getAll: async (): Promise<UserProfile[]> => {
+    getAll: async (_organizationId?: string | null): Promise<UserProfile[]> => {
         const db = getFirestore();
         const snapshot = await getDocs(collection(db, COLLECTION_NAME));
         return snapshot.docs.map((d) => {
@@ -96,6 +97,7 @@ export const usersService = {
                 permissions: data.permissions || [],
                 allowedPages: data.allowedPages || [],
                 teacherId: data.teacherId || undefined,
+                organizationId: data.organizationId || undefined,
                 createdAt: data.createdAt?.toDate?.().toISOString() || data.createdAt,
                 createdBy: data.createdBy,
                 lastLoginAt: data.lastLoginAt?.toDate?.().toISOString() || data.lastLoginAt
@@ -118,6 +120,7 @@ export const usersService = {
             permissions: data.permissions || [],
             allowedPages: data.allowedPages || [],
             teacherId: data.teacherId || undefined,
+            organizationId: data.organizationId || undefined,
             createdAt: data.createdAt?.toDate?.().toISOString() || data.createdAt,
             createdBy: data.createdBy,
             lastLoginAt: data.lastLoginAt?.toDate?.().toISOString() || data.lastLoginAt
@@ -132,7 +135,8 @@ export const usersService = {
         role: UserRole;
         permissions?: Permission[];
         allowedPages?: PageId[];
-        teacherId?: string;
+        teacherId?: string | null;
+        organizationId?: string | null;
         createdBy?: string;
     }): Promise<UserProfile> => {
         const db = getFirestore();
@@ -149,6 +153,7 @@ export const usersService = {
             permissions: params.permissions ?? defaults.defaultPermissions,
             allowedPages: params.allowedPages ?? defaults.defaultPages,
             teacherId: params.teacherId,
+            organizationId: params.organizationId,
             createdAt: new Date().toISOString(),
             createdBy: params.createdBy
         };
@@ -163,7 +168,7 @@ export const usersService = {
 
     update: async (
         uid: string,
-        changes: Partial<Omit<UserProfile, 'id' | 'email'>> & { password?: string; firstName?: string }
+        changes: Partial<Omit<UserProfile, 'id' | 'email'>> & { password?: string; firstName?: string; teacherId?: string | null }
     ): Promise<void> => {
         const auth = getAuth();
         const db = getFirestore();

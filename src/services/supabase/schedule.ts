@@ -40,7 +40,7 @@ export const supabaseScheduleService = {
             teacher_id: item.teacherId || null,
             room_id: item.roomId || null,
             direction: item.direction || null,
-            organization_id: item.organizationId || 'f1bd501e-e4ee-4e9f-a657-cbd6ccee41c7'
+            organization_id: item.organizationId || null
         }).select().single();
         if (error) throw error;
         return mapScheduleItem(data);
@@ -124,7 +124,7 @@ export const supabaseSubstitutionsService = {
             is_merger: sub.isMerger || false,
             lesson_absence_reason: sub.lessonAbsenceReason || null,
             refusals: sub.refusals || [],
-            organization_id: sub.organizationId || 'f1bd501e-e4ee-4e9f-a657-cbd6ccee41c7'
+            organization_id: sub.organizationId || null
         }).select().single();
         if (error) throw error;
         return mapSubstitution(data);

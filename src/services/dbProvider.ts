@@ -1,4 +1,4 @@
-const DB_PROVIDER = import.meta.env.VITE_DB_PROVIDER || 'firebase';
+const DB_PROVIDER = import.meta.env.VITE_DB_PROVIDER || 'supabase';
 
 console.log('[DB Provider] DB_PROVIDER:', DB_PROVIDER);
 

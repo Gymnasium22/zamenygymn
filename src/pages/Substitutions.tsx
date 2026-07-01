@@ -1279,20 +1279,18 @@ export const SubstitutionsPage = () => {
                             {filteredTeachersList.length > 20 ? (
                                 <VirtualList
                                     items={filteredTeachersList}
-                                    itemHeight={72}
+                                    itemHeight={92}
                                     containerHeight={400}
                                     renderItem={(t) => (
-                                        <div className="py-1">
-                                            <TeacherCard
-                                                teacher={t}
-                                                isAbsent={t.unavailableDates.includes(selectedDate)}
-                                                absenceReason={t.absenceReasons ? t.absenceReasons[selectedDate] : ''}
-                                                selectedDate={selectedDate}
-                                                onOpenAbsenceModal={openAbsenceModal}
-                                                onRemoveAbsence={removeAbsence}
-                                                onDragStart={handleDragStart}
-                                            />
-                                        </div>
+                                        <TeacherCard
+                                            teacher={t}
+                                            isAbsent={t.unavailableDates.includes(selectedDate)}
+                                            absenceReason={t.absenceReasons ? t.absenceReasons[selectedDate] : ''}
+                                            selectedDate={selectedDate}
+                                            onOpenAbsenceModal={openAbsenceModal}
+                                            onRemoveAbsence={removeAbsence}
+                                            onDragStart={handleDragStart}
+                                        />
                                     )}
                                 />
                             ) : (

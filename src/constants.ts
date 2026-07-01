@@ -130,6 +130,7 @@ export const INITIAL_DATA: AppData = {
         },
         substitutionDayComments: {},
         dashboardWidgetAccess: {
+            superadmin: ['weather', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes'],
             admin: ['weather', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes'],
             teacher: ['weather', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes'],
             canteen: ['weather', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes']
@@ -137,7 +138,9 @@ export const INITIAL_DATA: AppData = {
         isScheduleLocked: false,
         allowTeacherEdit: false,
         autoBackup: false,
-        backupTime: '02:00'
+        backupTime: '02:00',
+        sessionTimeoutMinutes: 30,
+        calendarEvents: []
     },
     privateSettings: {
         telegramToken: '',
@@ -147,6 +150,59 @@ export const INITIAL_DATA: AppData = {
 
 
 export const ROLE_DEFINITIONS: RoleDefinition[] = [
+    {
+        id: 'superadmin',
+        name: 'Суперадминистратор',
+        description: 'Полный доступ ко всем организациям и системным настройкам',
+        defaultPermissions: [
+            'view_dashboard',
+            'view_schedule',
+            'edit_schedule',
+            'view_substitutions',
+            'edit_substitutions',
+            'view_duty',
+            'edit_duty',
+            'view_nutrition',
+            'edit_nutrition',
+            'view_absenteeism',
+            'edit_absenteeism',
+            'view_bells',
+            'edit_bells',
+            'view_directory',
+            'edit_directory',
+            'view_reports',
+            'view_export',
+            'view_admin',
+            'view_calendar',
+            'edit_calendar',
+            'view_planner',
+            'edit_planner',
+            'view_settings',
+            'manage_users',
+            'manage_organizations',
+            'view_global_audit_log'
+        ],
+        defaultPages: [
+            'dashboard',
+            'schedule',
+            'schedule2',
+            'substitutions',
+            'duty',
+            'nutrition',
+            'absenteeism',
+            'bells',
+            'directory',
+            'reports',
+            'export',
+            'admin',
+            'calendar',
+            'planner',
+            'settings',
+            'users',
+            'organizations',
+            'archive'
+        ]
+    },
     {
         id: 'admin',
         name: 'Администратор',

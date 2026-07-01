@@ -26,7 +26,6 @@ import { isSupabase } from './dbProvider';
 import { supabase } from './supabase';
 
 const ARCHIVE_VERSION = '1.0' as const;
-const ORG_ID = 'f1bd501e-e4ee-4e9f-a657-cbd6ccee41c7';
 
 const COLLECTIONS = {
     SCHEDULE_1: 'schedule_sem1',
@@ -115,18 +114,20 @@ const mapAbsenteeismRecord = (raw: Record<string, unknown>): AbsenteeismRecord =
     organizationId: raw.organization_id as string
 });
 
-const supabaseFetchAll = async <T>(table: string, columns: string = '*', mapper?: (raw: Record<string, unknown>) => T): Promise<T[]> => {
-    const { data, error } = await supabase.from(table).select(columns);
+const supabaseFetchAll = async <T>(table: string, columns: string = '*', mapper?: (raw: Record<string, unknown>) => T, organizationId?: string | null): Promise<T[]> => {
+    let query = supabase.from(table).select(columns);
+    if (organizationId) query = query.eq('organization_id', organizationId);
+    const { data, error } = await query;
     if (error) {
         logger.error(`Failed to fetch ${table}:`, error);
         throw new Error(`Не удалось прочитать таблицу ${table}`);
     }
     if (!mapper) return (data || []) as T[];
-    return (data || []).map((d) => mapper(d as any));
+    return (data || []).map((d) => mapper(d as unknown as Record<string, unknown>));
 };
 
-const supabaseDeleteAll = async (table: string): Promise<void> => {
-    const { error } = await supabase.from(table).delete().neq('id', '');
+const supabaseDeleteAll = async (table: string, organizationId: string): Promise<void> => {
+    const { error } = await supabase.from(table).delete().eq('organization_id', organizationId);
     if (error) {
         logger.error(`Failed to clear ${table}:`, error);
         throw new Error(`Не удалось очистить таблицу ${table}`);
@@ -134,16 +135,16 @@ const supabaseDeleteAll = async (table: string): Promise<void> => {
 };
 
 export const archiveService = {
-    buildArchive: async (data: AppData, yearLabel: string): Promise<AcademicYearArchive> => {
+    buildArchive: async (data: AppData, yearLabel: string, organizationId?: string | null): Promise<AcademicYearArchive> => {
         let allSubstitutions: Substitution[] = [];
         let allNutrition: NutritionRecord[] = [];
         let allAbsenteeism: AbsenteeismRecord[] = [];
 
         if (isSupabase) {
             [allSubstitutions, allNutrition, allAbsenteeism] = await Promise.all([
-                supabaseFetchAll<Substitution>('substitutions', '*', mapSubstitution).catch(() => []),
-                supabaseFetchAll<NutritionRecord>('nutrition', '*', mapNutritionRecord).catch(() => []),
-                supabaseFetchAll<AbsenteeismRecord>('absenteeism', '*', mapAbsenteeismRecord).catch(() => [])
+                supabaseFetchAll<Substitution>('substitutions', '*', mapSubstitution, organizationId).catch(() => []),
+                supabaseFetchAll<NutritionRecord>('nutrition', '*', mapNutritionRecord, organizationId).catch(() => []),
+                supabaseFetchAll<AbsenteeismRecord>('absenteeism', '*', mapAbsenteeismRecord, organizationId).catch(() => [])
             ]);
         } else {
             [allSubstitutions, allNutrition, allAbsenteeism] = await Promise.all([
@@ -223,6 +224,11 @@ export const archiveService = {
             version: ARCHIVE_VERSION,
             archivedAt: new Date().toISOString(),
             yearLabel,
+            settingsSnapshot: {
+                calendarEvents: data.settings.calendarEvents,
+                sessionTimeoutMinutes: data.settings.sessionTimeoutMinutes,
+                substitutionDayComments: data.settings.substitutionDayComments || {}
+            },
             staticSnapshot: {
                 teachers: data.teachers.map((t) => ({ id: t.id, name: t.name })),
                 subjects: data.subjects.map((s) => ({ id: s.id, name: s.name })),
@@ -256,8 +262,10 @@ export const archiveService = {
         URL.revokeObjectURL(url);
     },
 
-    clearAnnualCollections: async () => {
+    clearAnnualCollections: async (organizationId?: string | null) => {
         if (isSupabase) {
+            const orgId = organizationId || '';
+            if (!orgId) throw new Error('organizationId is required to clear annual collections');
             // Delete in order to respect FK constraints: substitutions → schedule_items
             const tablesToClear = [
                 'substitutions',
@@ -267,10 +275,10 @@ export const archiveService = {
                 'absenteeism'
             ];
             for (const table of tablesToClear) {
-                await supabaseDeleteAll(table);
+                await supabaseDeleteAll(table, orgId);
             }
             // Clear substitution day comments in settings
-            await supabase.from('settings').update({ substitution_day_comments: {} }).eq('organization_id', ORG_ID);
+            await supabase.from('settings').update({ substitution_day_comments: {} }).eq('organization_id', orgId);
             dbService.clearCache();
         } else {
             if (!firestoreDB) throw new Error('База данных не инициализирована');
@@ -304,15 +312,18 @@ export const archiveService = {
         }
     },
 
-    getCounts: async () => {
+    getCounts: async (organizationId?: string | null) => {
         if (isSupabase) {
+            const baseFilters: { column: string; value: unknown }[] = organizationId
+                ? [{ column: 'organization_id', value: organizationId }]
+                : [];
             const [schedule1, schedule2, substitutions, duty, nutrition, absenteeism] = await Promise.all([
-                supabaseCount('schedule_items', [{ column: 'semester', value: 1 }]),
-                supabaseCount('schedule_items', [{ column: 'semester', value: 2 }]),
-                supabaseCount('substitutions'),
-                supabaseCount('duty'),
-                supabaseCount('nutrition'),
-                supabaseCount('absenteeism')
+                supabaseCount('schedule_items', [...baseFilters, { column: 'semester', value: 1 }]),
+                supabaseCount('schedule_items', [...baseFilters, { column: 'semester', value: 2 }]),
+                supabaseCount('substitutions', baseFilters),
+                supabaseCount('duty', baseFilters),
+                supabaseCount('nutrition', baseFilters),
+                supabaseCount('absenteeism', baseFilters)
             ]);
             return {
                 schedule1,

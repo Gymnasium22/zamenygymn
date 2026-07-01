@@ -3,6 +3,7 @@ import { Icon } from '../components/Icons';
 import { useToast } from '../components/UI';
 import { safeLocalStorageGet, safeLocalStorageSet } from '../utils/localStorage';
 import { generateId } from '../utils/helpers';
+import { useAuth } from '../context/AuthContext';
 
 interface PlannerTask {
     id: string;
@@ -31,6 +32,8 @@ const STORAGE_KEY = 'gym_planner_tasks';
 
 export const PlannerPage = () => {
     const { addToast } = useToast();
+    const { organizationId } = useAuth();
+    const storageKey = organizationId ? `${STORAGE_KEY}_${organizationId}` : STORAGE_KEY;
     const [tasks, setTasks] = useState<PlannerTask[]>([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState<PlannerTask['status'] | 'all'>('all');
@@ -45,7 +48,7 @@ export const PlannerPage = () => {
     });
 
     useEffect(() => {
-        const stored = safeLocalStorageGet(STORAGE_KEY);
+        const stored = safeLocalStorageGet(storageKey);
         if (stored) {
             try {
                 const parsed = JSON.parse(stored);
@@ -55,11 +58,11 @@ export const PlannerPage = () => {
             }
         }
         setLoading(false);
-    }, []);
+    }, [storageKey]);
 
     const saveTasks = (newTasks: PlannerTask[]) => {
         setTasks(newTasks);
-        safeLocalStorageSet(STORAGE_KEY, JSON.stringify(newTasks));
+        safeLocalStorageSet(storageKey, JSON.stringify(newTasks));
     };
 
     const openAdd = () => {

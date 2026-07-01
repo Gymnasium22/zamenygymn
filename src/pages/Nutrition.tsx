@@ -14,7 +14,7 @@ export const NutritionPage = () => {
     const { role, user, hasPermission } = useAuth();
     const { addToast } = useToast();
 
-    const isAdmin = role === 'admin';
+    const isAdmin = role === 'admin' || role === 'superadmin';
     const isCanteen = role === 'canteen';
     const canEditNutrition = hasPermission('edit_nutrition');
 

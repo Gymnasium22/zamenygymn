@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Icon } from '../Icons';
 import { Modal, useToast } from '../UI';
 import { useData } from '../../context/DataContext';
+import { useAuth } from '../../context/AuthContext';
 import { archiveService } from '../../services/archiveService';
 import { logger } from '../../utils/logger';
 
@@ -39,6 +40,7 @@ const COUNT_LABELS: { key: keyof Counts; label: string }[] = [
 
 export const ArchiveYearSection = () => {
     const { data, saveData } = useData();
+    const { organizationId } = useAuth();
     const { addToast } = useToast();
     const [counts, setCounts] = useState<Counts | null>(null);
     const [loadingCounts, setLoadingCounts] = useState(false);
@@ -61,7 +63,7 @@ export const ArchiveYearSection = () => {
     const loadCounts = async () => {
         setLoadingCounts(true);
         try {
-            const c = await archiveService.getCounts();
+            const c = await archiveService.getCounts(organizationId);
             setCounts(c);
         } catch (error) {
             logger.error('Failed to load archive counts', error);
@@ -72,7 +74,8 @@ export const ArchiveYearSection = () => {
 
     useEffect(() => {
         loadCounts();
-    }, []);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [organizationId]);
 
     const openModal = () => {
         setYearLabel(yearLabelFromEnd(currentYearEnd));
@@ -98,9 +101,9 @@ export const ArchiveYearSection = () => {
 
         setIsProcessing(true);
         try {
-            const archive = await archiveService.buildArchive(data, yearLabel.trim());
+            const archive = await archiveService.buildArchive(data, yearLabel.trim(), organizationId);
             archiveService.downloadArchive(archive);
-            await archiveService.clearAnnualCollections();
+            await archiveService.clearAnnualCollections(organizationId);
             await saveData({
                 schedule: [],
                 schedule2: [],

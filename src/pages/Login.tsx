@@ -13,6 +13,7 @@ export const LoginPage = () => {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const [submitted, setSubmitted] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
 
     useEffect(() => {
         if (!authLoading && role) {
@@ -28,15 +29,16 @@ export const LoginPage = () => {
     }, [authLoading, user, isBlocked]);
 
     useEffect(() => {
-        if (submitted && !authLoading && !role) {
+        if (submitted && !loading && !authLoading && !role) {
             if (isBlocked) {
                 setError('Ваш аккаунт заблокирован. Обратитесь к администратору.');
             } else {
                 setError('Не удалось получить права доступа. Проверьте, что пользователь создан в настройках.');
             }
             setSubmitted(false);
+            setLoading(false);
         }
-    }, [submitted, authLoading, role, isBlocked]);
+    }, [submitted, loading, authLoading, role, isBlocked]);
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -69,26 +71,26 @@ export const LoginPage = () => {
     };
 
     return (
-        <div className="!min-h-screen mesh-gradient-bg flex items-center justify-center p-4 relative overflow-hidden">
+        <div className="!min-h-screen mesh-gradient-bg noise-overlay flex items-center justify-center p-4 relative overflow-hidden animate-page-in">
             {/* Background Decorations */}
-            <div className="absolute top-20 left-20 w-72 h-72 bg-purple-400 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob"></div>
-            <div className="absolute top-20 right-20 w-72 h-72 bg-indigo-400 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000"></div>
-            <div className="absolute -bottom-20 left-1/2 w-96 h-96 bg-pink-400 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-4000"></div>
+            <div className="absolute top-20 left-20 w-72 h-72 bg-purple-400 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-float"></div>
+            <div className="absolute top-20 right-20 w-72 h-72 bg-indigo-400 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-float" style={{ animationDelay: '2s' }}></div>
+            <div className="absolute -bottom-20 left-1/2 w-96 h-96 bg-pink-400 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-float" style={{ animationDelay: '4s' }}></div>
 
-            <div className="rounded-3xl shadow-2xl max-w-md w-full p-8 transition-all relative z-10 bg-white/60 dark:bg-slate-800/60 border border-white/20 dark:border-slate-700 backdrop-blur-md">
+            <div className="float-panel rounded-3xl max-w-md w-full p-8 relative z-10 spotlight-card">
                 <div className="text-center mb-8">
-                    <div className="inline-flex p-4 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl text-white shadow-lg shadow-indigo-500/30 mb-4 transform hover:scale-105 transition-transform duration-300">
+                    <div className="inline-flex p-4 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl text-white shadow-glow mb-4 spring-bounce">
                         <Icon name="GraduationCap" size={48} />
                     </div>
-                    <h1 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight mb-2">
-                        Гимназия Pro22
+                    <h1 className="display-large text-slate-800 dark:text-white mb-2">
+                        Управление учреждением
                     </h1>
                     <p className="text-slate-500 dark:text-slate-300 font-medium">Вход в систему</p>
                 </div>
 
-                <form onSubmit={handleLogin} className="space-y-5 animate-fade-in">
+                <form onSubmit={handleLogin} className="space-y-5 animate-slide-up-fade">
                     <div>
-                        <label className="block text-xs font-bold uppercase text-slate-500 dark:text-slate-400 mb-2 ml-1">
+                        <label className="block text-xs font-bold uppercase text-slate-500 dark:text-slate-400 mb-2 ml-1 tracking-wider">
                             Email
                         </label>
                         <div className="relative">
@@ -99,7 +101,7 @@ export const LoginPage = () => {
                                 autoComplete="email"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50/50 dark:bg-slate-700/50 dark:text-white outline-none focus:ring-2 ring-indigo-500/50 transition-all font-medium"
+                                className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200/60 dark:border-white/10 bg-white/50 dark:bg-white/5 dark:text-white outline-none focus-glow transition-all font-medium input-glow"
                                 placeholder="Введите email"
                                 autoFocus
                                 required
@@ -108,26 +110,35 @@ export const LoginPage = () => {
                     </div>
 
                     <div>
-                        <label className="block text-xs font-bold uppercase text-slate-500 dark:text-slate-400 mb-2 ml-1">
+                        <label className="block text-xs font-bold uppercase text-slate-500 dark:text-slate-400 mb-2 ml-1 tracking-wider">
                             Пароль
                         </label>
                         <div className="relative">
                             <Icon name="Briefcase" className="absolute left-4 top-3.5 text-slate-400" size={18} />
                             <input
-                                type="password"
+                                type={showPassword ? 'text' : 'password'}
                                 inputMode="text"
                                 autoComplete="current-password"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50/50 dark:bg-slate-700/50 dark:text-white outline-none focus:ring-2 ring-indigo-500/50 transition-all font-medium"
+                                className="w-full pl-11 pr-11 py-3 rounded-xl border border-slate-200/60 dark:border-white/10 bg-white/50 dark:bg-white/5 dark:text-white outline-none focus-glow transition-all font-medium input-glow"
                                 placeholder="Введите пароль"
                                 required
                             />
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword((v) => !v)}
+                                className="absolute right-3 top-3 p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                                aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
+                                tabIndex={-1}
+                            >
+                                <Icon name={showPassword ? 'EyeOff' : 'Eye'} size={18} />
+                            </button>
                         </div>
                     </div>
 
                     {error && (
-                        <div className="text-red-500 text-sm font-bold text-center bg-red-50 dark:bg-red-900/20 p-3 rounded-xl border border-red-100 dark:border-red-900/50 animate-shake">
+                        <div className="text-red-500 text-sm font-bold text-center bg-red-50/50 dark:bg-red-900/20 p-3 rounded-xl border border-red-100/50 dark:border-red-900/30 animate-shake">
                             {error}
                         </div>
                     )}
@@ -135,7 +146,7 @@ export const LoginPage = () => {
                     <button
                         type="submit"
                         disabled={loading || authLoading || (submitted && !role)}
-                        className="w-full py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-xl font-bold hover:shadow-lg hover:shadow-indigo-500/30 transition-all active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                        className="btn-primary btn-glow w-full py-4 rounded-2xl font-bold flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                     >
                         {loading || authLoading || (submitted && !role) ? (
                             <Icon name="Loader" className="animate-spin" size={20} />
@@ -148,7 +159,7 @@ export const LoginPage = () => {
             </div>
 
             <div className="absolute bottom-6 text-center w-full text-slate-400 dark:text-slate-500 text-xs font-medium">
-                &copy; {new Date().getFullYear()} Гимназия Pro22. Все права защищены.
+                &copy; {new Date().getFullYear()} Управление учреждением. Все права защищены.
             </div>
         </div>
     );

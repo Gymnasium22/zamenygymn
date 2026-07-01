@@ -32,7 +32,9 @@ interface ReportHeaderProps {
     dayComment?: string;
 }
 
-const ReportHeader = ({ exportDate, dayComment }: ReportHeaderProps) => (
+const ReportHeader = ({ exportDate, dayComment }: ReportHeaderProps) => {
+    const { settings } = useStaticData();
+    return (
     <div className="border-b-2 border-slate-800 pb-4 mb-6">
         <div className="flex justify-between items-end gap-4">
             <div>
@@ -40,7 +42,7 @@ const ReportHeader = ({ exportDate, dayComment }: ReportHeaderProps) => (
                     Замена Учителей
                 </h1>
                 <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">
-                    Гимназия №22 • Официальный документ
+                    {settings?.schoolName || 'Учреждение образования'} • Официальный документ
                 </p>
             </div>
             <div className="text-right">
@@ -56,7 +58,8 @@ const ReportHeader = ({ exportDate, dayComment }: ReportHeaderProps) => (
         </div>
         {dayComment && <div className="mt-3 text-xs text-slate-600 max-w-3xl">{dayComment}</div>}
     </div>
-);
+    );
+};
 
 const ReportFooter = () => (
     <div className="mt-8 pt-4 border-t border-slate-100 flex justify-between items-end text-[10px] text-slate-400">
@@ -383,9 +386,9 @@ export const ExportPage = () => {
                     <td colspan="10" class="doc-right">УТВЕРЖДАЮ</td>
                 </tr>
                 <tr>
-                    <td colspan="10" class="doc-left">Председатель ПК ${escapeHtml(settings?.schoolName || 'ГУО "Гимназия №22 г.Минска"')}</td>
+                    <td colspan="10" class="doc-left">Председатель ПК ${escapeHtml(settings?.schoolName || 'УО')}</td>
                     <td colspan="17"></td>
-                    <td colspan="10" class="doc-right">Директор ${escapeHtml(settings?.schoolName || 'ГУО "Гимназия №22 г.Минска"')}</td>
+                    <td colspan="10" class="doc-right">Директор ${escapeHtml(settings?.schoolName || 'УО')}</td>
                 </tr>
                 <tr>
                     <td colspan="10" class="doc-left">____________________ ${escapeHtml(settings?.unionChairName || 'Ю.Г.Миханова')}</td>
@@ -541,9 +544,9 @@ export const ExportPage = () => {
                     <td colspan="10" class="doc-right">УТВЕРЖДАЮ</td>
                 </tr>
                 <tr>
-                    <td colspan="10" class="doc-left">Председатель ПК ${settings?.schoolName || 'ГУО "Гимназия №22 г.Минска"'}</td>
+                    <td colspan="10" class="doc-left">Председатель ПК ${settings?.schoolName || 'УО'}</td>
                     <td colspan="17"></td>
-                    <td colspan="10" class="doc-right">Директор ${settings?.schoolName || 'ГУО "Гимназия №22 г.Минска"'}</td>
+                    <td colspan="10" class="doc-right">Директор ${settings?.schoolName || 'УО'}</td>
                 </tr>
                 <tr>
                     <td colspan="10" class="doc-left">____________________ ${settings?.unionChairName || 'Ю.Г.Миханова'}</td>

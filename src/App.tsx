@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { HashRouter, Routes, Route, Navigate, NavLink, Outlet, useSearchParams, useLocation } from 'react-router-dom';
 import { DataProvider, useStaticData, StaticDataProvider, ScheduleDataProvider } from './context/DataContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -83,12 +83,12 @@ const Layout = () => {
     const [sessionWarning, setSessionWarning] = useState(false);
     const [themePreset, setThemePreset] = useState(() => safeLocalStorageGet('theme-preset') || 'default');
     const { isLoading, settings } = useStaticData();
-    const { logout, user, profile, loading: authLoading, allowedPages, canViewPage } = useAuth();
+    const { logout, user, profile, loading: authLoading, allowedPages, canViewPage, organizationId, organizations, isSuperAdmin, switchOrganization } = useAuth();
     const location = useLocation();
     useAutoBackup();
 
     useSessionTimeout({
-        timeoutMinutes: 30,
+        timeoutMinutes: settings?.sessionTimeoutMinutes || 30,
         warningMinutes: 2,
         onWarning: () => setSessionWarning(true),
         onTimeout: () => {
@@ -163,11 +163,31 @@ const Layout = () => {
         return () => mq.removeEventListener('change', handleChange);
     }, []);
 
+    // 2026 Spotlight Cursor Effect — attach after layout mounts (post loading spinner)
+    const spotlightRef = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        const container = spotlightRef.current;
+        if (!container || isLoading) return;
+        const handleMouseMove = (e: MouseEvent) => {
+            const rect = container.getBoundingClientRect();
+            const x = ((e.clientX - rect.left) / rect.width) * 100;
+            const y = ((e.clientY - rect.top) / rect.height) * 100;
+            container.style.setProperty('--spotlight-x', `${x}%`);
+            container.style.setProperty('--spotlight-y', `${y}%`);
+        };
+        container.addEventListener('mousemove', handleMouseMove);
+        return () => container.removeEventListener('mousemove', handleMouseMove);
+    }, [isLoading]);
+
     useEffect(() => {
         if (theme === 'dark') document.documentElement.classList.add('dark');
         else document.documentElement.classList.remove('dark');
         safeLocalStorageSet('theme', theme);
     }, [theme]);
+
+
+    const currentOrganization = organizations.find((o) => o.id === organizationId);
+    const organizationName = currentOrganization?.name || settings?.schoolName || 'Управление учреждением';
 
     if (isLoading)
         return (
@@ -199,7 +219,10 @@ const Layout = () => {
     const filteredMenuItems = menuItems.filter((item) => canViewPage(item.pageId));
 
     return (
-        <div className="flex h-screen bg-slate-50 dark:bg-dark-950 overflow-hidden transition-colors duration-300 mesh-gradient-bg">
+        <div
+            ref={spotlightRef}
+            className="spotlight-container flex h-screen bg-slate-50 dark:bg-dark-950 overflow-hidden transition-colors duration-300 mesh-gradient-bg noise-overlay"
+        >
             {isMobileMenuOpen && (
                 <div
                     className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 lg:hidden"
@@ -209,16 +232,16 @@ const Layout = () => {
 
             {/* Sidebar - hidden on mobile unless opened via menu */}
             <aside
-                className={`fixed lg:static inset-y-0 left-0 z-50 w-64 lg:w-64 bg-white/80 dark:bg-dark-800/90 backdrop-blur-xl border-r border-slate-200/50 dark:border-slate-700/50 transform transition-transform duration-300 ease-in-out ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} no-print shadow-2xl lg:shadow-none overflow-hidden`}
+                className={`fixed lg:static inset-y-0 left-0 z-50 w-64 lg:w-64 sidebar-2026 transform transition-transform duration-300 ease-in-out ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} no-print overflow-hidden relative`}
             >
                 <div className="h-full flex flex-col relative">
-                    <div className="p-5 flex items-center gap-3 border-b border-slate-100 dark:border-slate-700 pt-6">
-                        <div className="bg-indigo-600 p-2.5 rounded-xl text-white relative shadow-lg shadow-indigo-200 dark:shadow-none transition-colors duration-500">
+                    <div className="p-5 flex items-center gap-3 border-b border-white/20 dark:border-white/5 pt-6">
+                        <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-2.5 rounded-2xl text-white relative shadow-lg shadow-indigo-500/30 dark:shadow-none transition-colors duration-500 neon-glow">
                             <Icon name="GraduationCap" size={24} />
                         </div>
                         <div>
-                            <h1 className="text-lg font-black text-slate-800 dark:text-white">Гимназия Pro22</h1>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase">Управление V2.0</p>
+                            <h1 className="text-lg font-black text-slate-800 dark:text-white tracking-tight truncate max-w-[140px]" title={organizationName}>{organizationName}</h1>
+                            <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Управление V2.0</p>
                         </div>
                     </div>
 
@@ -229,10 +252,10 @@ const Layout = () => {
                                 to={item.to}
                                 onClick={() => setIsMobileMenuOpen(false)}
                                 className={({ isActive }) => `
-                                    group flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-semibold transition-all relative tactile-btn
+                                    group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all relative tactile-btn spring-bounce
                                     ${isActive
-                                        ? 'bg-indigo-50/80 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-400 shadow-sm border border-indigo-100/50 dark:border-indigo-900/30'
-                                        : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/30 hover:text-slate-700 dark:hover:text-slate-300 border border-transparent'
+                                        ? 'bg-white/60 dark:bg-white/5 text-indigo-700 dark:text-indigo-300 shadow-sm border border-indigo-200/40 dark:border-indigo-500/20'
+                                        : 'text-slate-600 dark:text-slate-400 hover:bg-white/40 dark:hover:bg-white/5 hover:text-slate-800 dark:hover:text-slate-200 border border-transparent'
                                     }
                                 `}
                             >
@@ -254,11 +277,26 @@ const Layout = () => {
                     </nav>
 
                     {/* Динамический StatusWidget — расположен выше панели пользователя/тем */}
-                    <div className="hidden lg:block mb-2">
+                    <div className="hidden lg:block mb-2 px-3">
                         <StatusWidget />
                     </div>
 
-                    <div className="p-3 border-t border-slate-100 dark:border-slate-700 space-y-2">
+
+                        {isSuperAdmin && organizations.length > 0 && (
+                            <div className="px-3 mb-2">
+                                <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1 px-2">Организация</label>
+                                <select
+                                    value={organizationId || ''}
+                                    onChange={(e) => switchOrganization(e.target.value || null)}
+                                    className="w-full px-3 py-2 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-dark-700 text-slate-700 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500"
+                                >
+                                    {organizations.map((o) => (
+                                        <option key={o.id} value={o.id}>{o.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+                    <div className="p-3 border-t border-white/20 dark:border-white/5 space-y-2">
                         <div className="flex items-center justify-between px-2">
                             <div
                                 title={user?.email || 'Гость'}
@@ -268,7 +306,7 @@ const Layout = () => {
                             </div>
                             <button
                                 onClick={logout}
-                                className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 text-slate-400 hover:text-red-500 rounded-lg transition-colors"
+                                className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 text-slate-400 hover:text-red-500 rounded-xl transition-colors spring-bounce"
                                 title="Выйти"
                             >
                                 <Icon name="LogOut" size={16} />
@@ -277,17 +315,17 @@ const Layout = () => {
                         <div className="grid grid-cols-2 gap-2">
                             <button
                                 onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-                                className="flex items-center justify-center gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:text-indigo-600 transition-all border border-slate-100 dark:border-slate-600 active:scale-95 shadow-sm"
+                                className="flex items-center justify-center gap-2 p-2.5 rounded-xl bg-white/50 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all border border-white/30 dark:border-white/5 active:scale-95 shadow-sm btn-glow"
                                 title="Сменить тему"
                             >
                                 {theme === 'light' ? <Icon name="Moon" size={18} /> : <Icon name="Sun" size={18} />}
                             </button>
                             <button
                                 onClick={() => setCompact((c) => !c)}
-                                className={`flex items-center justify-center gap-2 p-2.5 rounded-xl transition-all border active:scale-95 shadow-sm ${
+                                className={`flex items-center justify-center gap-2 p-2.5 rounded-xl transition-all border active:scale-95 shadow-sm btn-glow ${
                                     compact
-                                        ? 'bg-indigo-50 text-indigo-600 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-400 dark:border-indigo-700'
-                                        : 'bg-slate-50 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:text-indigo-600 border-slate-100 dark:border-slate-600'
+                                        ? 'bg-indigo-50/80 text-indigo-600 border-indigo-200/50 dark:bg-indigo-900/20 dark:text-indigo-400 dark:border-indigo-700/30'
+                                        : 'bg-white/50 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:text-indigo-600 border-white/30 dark:border-white/5'
                                 }`}
                                 title="Компактный режим"
                             >
@@ -306,7 +344,7 @@ const Layout = () => {
                                     key={t.id}
                                     onClick={() => setThemePreset(t.id)}
                                     className={`w-6 h-6 rounded-full ${t.color} transition-all ${
-                                        themePreset === t.id ? 'ring-2 ring-offset-2 ring-slate-400 scale-110' : 'opacity-60 hover:opacity-100'
+                                        themePreset === t.id ? 'ring-2 ring-offset-2 ring-slate-300 dark:ring-slate-500 scale-110 shadow-glow' : 'opacity-60 hover:opacity-100'
                                     }`}
                                     title={t.id === 'default' ? 'Классика' : t.id === 'ocean' ? 'Океан' : t.id === 'forest' ? 'Лес' : t.id === 'sunset' ? 'Закат' : 'Роза'}
                                 />
@@ -316,18 +354,16 @@ const Layout = () => {
                 </div>
             </aside>
 
-            <main className="flex-1 flex flex-col min-w-0 bg-transparent relative">
-                <header className="lg:hidden p-4 flex items-center gap-3 bg-white/80 dark:bg-dark-800/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-700 no-print sticky top-0 z-30">
-                    <span className="font-bold text-slate-800 dark:text-white text-lg">Гимназия Pro22</span>
+            <main className="flex-1 flex flex-col min-w-0 bg-transparent relative z-10">
+                <header className="lg:hidden p-4 flex items-center gap-3 glass-panel border-b border-white/20 dark:border-white/5 no-print sticky top-0 z-30">
+                    <span className="font-bold text-slate-800 dark:text-white text-lg tracking-tight truncate" title={organizationName}>{organizationName}</span>
                 </header>
 
-                <div key={location.pathname} className="flex-1 overflow-auto lg:overflow-auto p-4 lg:p-8 pb-24 lg:pb-8 custom-scrollbar relative animate-page-in">
+                <div key={location.pathname} className="flex-1 overflow-auto lg:overflow-auto p-4 lg:p-8 pb-24 lg:pb-8 custom-scrollbar-2026 relative animate-page-in">
                     {/* Mobile-only pull-to-refresh wrapper */}
                     <div className="lg:hidden h-full">
                         <PullToRefresh
                             onRefresh={async () => {
-                                // Force re-render by triggering a small delay
-                                // Firebase syncs automatically, this is for UX feedback
                                 await new Promise((r) => setTimeout(r, 800));
                             }}
                         >
@@ -351,15 +387,15 @@ const Layout = () => {
             )}
             {sessionWarning && (
                 <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-fade-in">
-                    <div className="bg-white dark:bg-dark-800 rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center">
-                        <Icon name="Clock" size={48} className="mx-auto mb-4 text-amber-500" />
+                    <div className="float-panel rounded-3xl w-full max-w-sm p-6 text-center">
+                        <Icon name="Clock" size={48} className="mx-auto mb-4 text-amber-500 animate-pulse-glow" />
                         <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-2">Сессия истекает</h3>
                         <p className="text-sm text-slate-600 dark:text-slate-300 mb-6">
-                            Вы неактивны более 28 минут. Через 2 минуты произойдёт автоматический выход.
+                            Вы неактивны более {Math.max(1, (settings?.sessionTimeoutMinutes || 30) - 2)} минут. Через 2 минуты произойдёт автоматический выход.
                         </p>
                         <button
                             onClick={() => setSessionWarning(false)}
-                            className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-colors"
+                            className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-2xl font-bold transition-all shadow-glow active:scale-95"
                         >
                             Продолжить работу
                         </button>
@@ -431,7 +467,7 @@ const PublicLayout = () => {
                                 </div>
                                 <div>
                                     <h1 className="font-black text-slate-800 dark:text-white text-lg leading-none">
-                                        Гимназия №22
+                                        {publicData?.settings?.schoolName || 'Расписание'}
                                     </h1>
                                     <p className="text-xs font-bold text-slate-400 uppercase">Публичное расписание</p>
                                 </div>

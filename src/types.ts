@@ -148,7 +148,7 @@ export type DashboardWidgetId =
     | 'birthdays'
     | 'notes';
 
-export type DashboardWidgetRole = 'admin' | 'teacher' | 'canteen';
+export type DashboardWidgetRole = 'superadmin' | 'admin' | 'teacher' | 'canteen';
 
 export interface Settings {
     id?: string; // Supabase row id
@@ -193,6 +193,8 @@ export interface Settings {
     shift2Periods?: number | null;
     maxPeriods?: number | null;
     googleAppsScriptUrl?: string | null;
+    sessionTimeoutMinutes?: number;
+    calendarEvents?: CalendarEvent[];
 }
 
 export interface PrivateSettings {
@@ -300,6 +302,11 @@ export interface AcademicYearArchive {
     archivedAt: string;
     yearLabel: string;
     appVersion?: string;
+    settingsSnapshot: {
+        calendarEvents?: CalendarEvent[];
+        sessionTimeoutMinutes?: number;
+        substitutionDayComments?: Record<string, string>;
+    };
     staticSnapshot: {
         teachers: { id: string; name: string }[];
         subjects: { id: string; name: string }[];
@@ -353,13 +360,22 @@ export interface AppData extends StaticAppData {
     privateSettings: PrivateSettings; // New
 }
 
+export interface CalendarEvent {
+    id: string;
+    date: string; // YYYY-MM-DD
+    title: string;
+    type: 'holiday' | 'celebration' | 'exam' | 'meeting' | 'event' | 'other';
+    description?: string;
+    showInWidget?: boolean;
+}
+
 export interface AuditLogEntry {
     id: string;
     timestamp: string; // ISO Date
     userEmail: string;
     userRole?: string;
     action: 'create' | 'update' | 'delete' | 'import' | 'export' | 'apply';
-    entityType?: 'schedule' | 'substitution' | 'teacher' | 'class' | 'room' | 'subject' | 'settings' | 'bells' | 'duty' | 'nutrition' | 'absenteeism';
+    entityType?: 'schedule' | 'substitution' | 'teacher' | 'class' | 'room' | 'subject' | 'settings' | 'bells' | 'duty' | 'nutrition' | 'absenteeism' | 'user' | 'organization';
     entityName?: string;
     details?: string;
     organizationId?: string;
@@ -385,7 +401,7 @@ export const ROOM_TYPES = [
 
 // --- USER MANAGEMENT TYPES ---
 
-export type UserRole = 'admin' | 'teacher' | 'canteen';
+export type UserRole = 'superadmin' | 'admin' | 'teacher' | 'canteen';
 
 export type PageId =
     | 'dashboard'
@@ -404,6 +420,7 @@ export type PageId =
     | 'planner'
     | 'settings'
     | 'users'
+    | 'organizations'
     | 'archive';
 
 export type Permission =
@@ -430,7 +447,22 @@ export type Permission =
     | 'view_planner'
     | 'edit_planner'
     | 'view_settings'
-    | 'manage_users';
+    | 'manage_users'
+    | 'manage_organizations'
+    | 'view_global_audit_log';
+
+export interface Organization {
+    id: string;
+    name: string;
+    type?: string;
+    city?: string;
+    address?: string;
+    contactEmail?: string;
+    logoUrl?: string;
+    isActive?: boolean;
+    createdAt?: string;
+    updatedAt?: string;
+}
 
 export interface UserProfile {
     id: string;
@@ -441,8 +473,8 @@ export interface UserProfile {
     isActive: boolean;
     permissions: Permission[];
     allowedPages: PageId[];
-    teacherId?: string; // Привязка к учителю из справочника
-    organizationId?: string;
+    teacherId?: string | null; // Привязка к учителю из справочника
+    organizationId?: string | null;
     createdAt?: string;
     createdBy?: string;
     lastLoginAt?: string;

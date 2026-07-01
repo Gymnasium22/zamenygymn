@@ -29,8 +29,10 @@ export const supabaseUsersService = {
         };
     },
 
-    getAll: async (): Promise<UserProfile[]> => {
-        const { data, error } = await supabase.from('profiles').select('*').order('display_name');
+    getAll: async (organizationId?: string | null): Promise<UserProfile[]> => {
+        let query = supabase.from('profiles').select('*').order('display_name');
+        if (organizationId) query = query.eq('organization_id', organizationId);
+        const { data, error } = await query;
         if (error) throw error;
         return (data || []).map(mapProfile);
     },
@@ -52,8 +54,8 @@ export const supabaseUsersService = {
         role: UserRole;
         permissions?: Permission[];
         allowedPages?: PageId[];
-        teacherId?: string;
-        organizationId?: string;
+        teacherId?: string | null;
+        organizationId?: string | null;
         createdBy?: string;
     }): Promise<UserProfile> => {
         const { data: rpcData, error: rpcError } = await supabase.rpc('create_auth_user', {
@@ -89,13 +91,14 @@ export const supabaseUsersService = {
             isActive: true,
             permissions: params.permissions ?? defaults.defaultPermissions,
             allowedPages: params.allowedPages ?? defaults.defaultPages,
-            teacherId: params.teacherId
+            teacherId: params.teacherId,
+            organizationId: params.organizationId
         };
     },
 
     update: async (
         uid: string,
-        changes: Partial<Omit<UserProfile, 'id' | 'email'>> & { password?: string; firstName?: string }
+        changes: Partial<Omit<UserProfile, 'id' | 'email'>> & { password?: string; firstName?: string; teacherId?: string | null; organizationId?: string | null }
     ): Promise<void> => {
         const updates: Record<string, unknown> = {};
         if (changes.displayName !== undefined) updates.display_name = changes.displayName;
@@ -105,6 +108,7 @@ export const supabaseUsersService = {
         if (changes.permissions !== undefined) updates.permissions = changes.permissions;
         if (changes.allowedPages !== undefined) updates.allowed_pages = changes.allowedPages;
         if (changes.teacherId !== undefined) updates.teacher_id = changes.teacherId || null;
+        if (changes.organizationId !== undefined) updates.organization_id = changes.organizationId || null;
         updates.updated_at = new Date().toISOString();
 
         const { error } = await supabase.from('profiles').update(updates).eq('id', uid);
@@ -151,7 +155,8 @@ function mapProfile(data: Record<string, unknown>): UserProfile {
         isActive: (data.is_active as boolean) !== false,
         permissions: ((data.permissions as string[])?.length ? (data.permissions as Permission[]) : defaults.defaultPermissions) || [],
         allowedPages: ((data.allowed_pages as string[])?.length ? (data.allowed_pages as PageId[]) : defaults.defaultPages) || [],
-        teacherId: (data.teacher_id as string) || undefined,
+        teacherId: (data.teacher_id as string | null | undefined) || undefined,
+        organizationId: (data.organization_id as string | null | undefined) || undefined,
         createdAt: data.created_at as string,
         createdBy: undefined,
         lastLoginAt: undefined

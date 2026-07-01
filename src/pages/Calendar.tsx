@@ -1,35 +1,50 @@
 import { useState, useEffect } from 'react';
 import { useStaticData } from '../context/DataContext';
+import { useAuth } from '../context/AuthContext';
 import { Icon } from '../components/Icons';
-import { SchoolCalendar, CalendarEvent } from '../components/SchoolCalendar';
+import { SchoolCalendar } from '../components/SchoolCalendar';
 import { useToast } from '../components/UI';
 import { safeLocalStorageGet, safeLocalStorageSet } from '../utils/localStorage';
+import { CalendarEvent } from '../types';
 
 const STORAGE_KEY = 'gym_calendar_events';
 
 export const CalendarPage = () => {
-    const { settings: _settings } = useStaticData();
+    const { settings, saveStaticData } = useStaticData();
+    const { hasPermission, organizationId } = useAuth();
     const { addToast } = useToast();
+    const storageKey = organizationId ? `${STORAGE_KEY}_${organizationId}` : STORAGE_KEY;
     const [events, setEvents] = useState<CalendarEvent[]>([]);
     const [loading, setLoading] = useState(true);
 
+    const canEdit = hasPermission('edit_calendar');
+
     useEffect(() => {
-        const stored = safeLocalStorageGet(STORAGE_KEY);
-        if (stored) {
-            try {
-                const parsed = JSON.parse(stored);
-                if (Array.isArray(parsed)) setEvents(parsed);
-            } catch {
-                // ignore
+        if (settings?.calendarEvents && settings.calendarEvents.length > 0) {
+            setEvents(settings.calendarEvents);
+        } else {
+            const stored = safeLocalStorageGet(storageKey);
+            if (stored) {
+                try {
+                    const parsed = JSON.parse(stored);
+                    if (Array.isArray(parsed)) setEvents(parsed);
+                } catch {
+                    // ignore
+                }
             }
         }
         setLoading(false);
-    }, []);
+    }, [settings?.calendarEvents, storageKey]);
 
-    const handleEventsChange = (newEvents: CalendarEvent[]) => {
+    const handleEventsChange = async (newEvents: CalendarEvent[]) => {
         setEvents(newEvents);
-        safeLocalStorageSet(STORAGE_KEY, JSON.stringify(newEvents));
-        addToast({ type: 'success', title: 'Сохранено', message: 'Календарь обновлён' });
+        safeLocalStorageSet(storageKey, JSON.stringify(newEvents));
+        try {
+            await saveStaticData({ settings: { ...settings, calendarEvents: newEvents } });
+            addToast({ type: 'success', title: 'Сохранено', message: 'Календарь обновлён' });
+        } catch {
+            addToast({ type: 'danger', title: 'Ошибка', message: 'Не удалось сохранить в облако' });
+        }
     };
 
     const exportEvents = () => {
@@ -49,7 +64,10 @@ export const CalendarPage = () => {
                 const parsed = JSON.parse(e.target?.result as string);
                 if (Array.isArray(parsed)) {
                     setEvents(parsed);
-                    safeLocalStorageSet(STORAGE_KEY, JSON.stringify(parsed));
+                    safeLocalStorageSet(storageKey, JSON.stringify(parsed));
+                    saveStaticData({ settings: { ...settings, calendarEvents: parsed } }).catch(() => {
+                        addToast({ type: 'danger', title: 'Ошибка', message: 'Не удалось сохранить импорт в облако' });
+                    });
                     addToast({ type: 'success', title: 'Импорт', message: 'События загружены' });
                 }
             } catch {
@@ -68,7 +86,7 @@ export const CalendarPage = () => {
     }
 
     return (
-        <div className="h-full flex flex-col max-w-5xl mx-auto w-full">
+        <div className="h-full flex flex-col w-full">
             <div className="shrink-0 mb-4">
                 <div className="flex items-center justify-between">
                     <div>
@@ -103,8 +121,8 @@ export const CalendarPage = () => {
                     </div>
                 </div>
             </div>
-            <div className="flex-1 overflow-auto">
-                <SchoolCalendar events={events} onEventsChange={handleEventsChange} />
+            <div className="flex-1 overflow-hidden min-h-0">
+                <SchoolCalendar events={events} onEventsChange={canEdit ? handleEventsChange : undefined} readOnly={!canEdit} />
             </div>
         </div>
     );

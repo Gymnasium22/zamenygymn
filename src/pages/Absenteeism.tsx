@@ -16,7 +16,7 @@ export const AbsenteeismPage = () => {
     const { addToast } = useToast();
 
     // Check permissions - only teacher and admin can access
-    const isAdmin = role === 'admin';
+    const isAdmin = role === 'admin' || role === 'superadmin';
     const isTeacher = role === 'teacher';
 
     const [selectedDate, setSelectedDate] = useState(formatDateISO());
