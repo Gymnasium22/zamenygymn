@@ -51,6 +51,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [isBlocked, setIsBlocked] = useState(false);
 
     const isSuperAdmin = role === 'superadmin';
+    const normalizeAllowedPages = useCallback((loadedProfile: UserProfile) => {
+        const nextPages = [...(loadedProfile.allowedPages || [])];
+        if ((loadedProfile.role === 'admin' || loadedProfile.role === 'superadmin') && !nextPages.includes('archive')) {
+            nextPages.push('archive');
+        }
+        return nextPages;
+    }, []);
 
     const loadOrganizations = useCallback(async () => {
         try {
@@ -155,7 +162,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     async (loadedProfile) => {
                         console.log('[AuthContext] Profile loaded:', loadedProfile);
                         if (loadedProfile && loadedProfile.isActive) {
-                            setProfile(loadedProfile);
+                            setProfile({
+                                ...loadedProfile,
+                                allowedPages: normalizeAllowedPages(loadedProfile)
+                            });
                             setRole(loadedProfile.role);
                             setIsBlocked(false);
                             await resolveOrganizationId(loadedProfile);
@@ -196,7 +206,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             unsubscribe();
             if (unsubProfile) unsubProfile();
         };
-    }, [resolveOrganizationId]);
+    }, [normalizeAllowedPages, resolveOrganizationId]);
 
     const logout = async () => {
         await authAdapter.signOut();

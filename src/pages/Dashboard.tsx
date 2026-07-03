@@ -102,7 +102,8 @@ const WeatherWidget = () => {
         if (code.startsWith('01')) return 'Sun';
         if (code.startsWith('02') || code.startsWith('03') || code.startsWith('04')) return 'Cloud';
         if (code.startsWith('09') || code.startsWith('10')) return 'CloudRain';
-        if (code.startsWith('11')) return 'Snowflake';
+        if (code.startsWith('11')) return 'Zap'; // thunderstorm
+        if (code.startsWith('13')) return 'Snowflake'; // snow
         if (code.startsWith('50')) return 'Wind';
         return 'Cloud';
     };
@@ -161,8 +162,28 @@ const WeatherWidget = () => {
             );
         }
         
-        // Snow
+        // Thunderstorm
         if (code.startsWith('11')) {
+            return (
+                <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                    {[...Array(4)].map((_, i) => (
+                        <div 
+                            key={i} 
+                            className="rain-streak opacity-80" 
+                            style={{ 
+                                left: `${20 + i * 20}%`, 
+                                animationDelay: `${i * 0.25}s`,
+                                animationDuration: `${0.7 + i * 0.1}s` 
+                            }} 
+                        />
+                    ))}
+                    <div className="absolute top-6 right-8 w-8 h-8 bg-yellow-300/40 rounded-full blur-md animate-pulse" />
+                </div>
+            );
+        }
+        
+        // Snow
+        if (code.startsWith('13')) {
             return (
                 <div className="absolute inset-0 overflow-hidden pointer-events-none">
                     {[...Array(6)].map((_, i) => (
@@ -343,6 +364,11 @@ export const DashboardPage = () => {
     const [isSendingFeedback, setIsSendingFeedback] = useState(false);
 
     // Debounce search query
+    useEffect(() => {
+        setNotes(safeLocalStorageGet(notesKey) || '');
+        setNotesChanged(false);
+    }, [notesKey]);
+
     useEffect(() => {
         const timer = setTimeout(() => {
             setDebouncedSearchQuery(searchQuery);
@@ -949,7 +975,6 @@ export const DashboardPage = () => {
             case 'search':
                 return (
                     <div
-                        key={widget.id}
                         className="p-6 flex flex-col h-full relative overflow-hidden bento-card"
                     >
                         <div className="flex items-center gap-3 mb-6">
@@ -1055,7 +1080,6 @@ export const DashboardPage = () => {
             case 'substitutions':
                 return (
                     <div
-                        key={widget.id}
                         className={`p-6 bento-card ${unresolvedSubstitutions > 0 ? 'ring-2 ring-red-500/20 dark:ring-red-500/30' : ''}`}
                     >
                         {unresolvedSubstitutions > 0 && (
@@ -1106,7 +1130,6 @@ export const DashboardPage = () => {
             case 'occupancy':
                 return (
                     <div
-                        key={widget.id}
                         className="p-6 flex flex-col h-full bento-card"
                     >
                         <div className="flex items-center justify-between mb-6">
@@ -1184,7 +1207,6 @@ export const DashboardPage = () => {
             case 'notes':
                 return (
                     <div
-                        key={widget.id}
                         className="p-6 bento-card group"
                     >
                         <div className="flex items-center justify-between mb-4">
@@ -1255,7 +1277,6 @@ export const DashboardPage = () => {
             case 'conflicts':
                 return (
                     <div
-                        key={widget.id}
                         className="p-6 h-full bento-card"
                     >
                         <div className="flex items-center gap-3 mb-4">
@@ -1296,7 +1317,6 @@ export const DashboardPage = () => {
             case 'birthdays':
                 return (
                     <div
-                        key={widget.id}
                         className="p-6 h-full bento-card"
                     >
                         <div className="flex items-center gap-3 mb-4">
@@ -1343,7 +1363,6 @@ export const DashboardPage = () => {
             case 'kpi':
                 return (
                     <div
-                        key={widget.id}
                         className="p-6 h-full bento-card"
                     >
                         <div className="flex items-center gap-3 mb-4">

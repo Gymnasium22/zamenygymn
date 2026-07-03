@@ -32,8 +32,9 @@ const STORAGE_KEY = 'gym_planner_tasks';
 
 export const PlannerPage = () => {
     const { addToast } = useToast();
-    const { organizationId } = useAuth();
+    const { organizationId, hasPermission } = useAuth();
     const storageKey = organizationId ? `${STORAGE_KEY}_${organizationId}` : STORAGE_KEY;
+    const canEditPlanner = hasPermission('edit_planner');
     const [tasks, setTasks] = useState<PlannerTask[]>([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState<PlannerTask['status'] | 'all'>('all');
@@ -61,17 +62,23 @@ export const PlannerPage = () => {
     }, [storageKey]);
 
     const saveTasks = (newTasks: PlannerTask[]) => {
+        if (!canEditPlanner) {
+            addToast({ type: 'warning', title: 'Нет прав', message: 'Планер открыт только для просмотра' });
+            return;
+        }
         setTasks(newTasks);
         safeLocalStorageSet(storageKey, JSON.stringify(newTasks));
     };
 
     const openAdd = () => {
+        if (!canEditPlanner) return;
         setEditingTask(null);
         setForm({ title: '', description: '', priority: 'medium', status: 'todo', deadline: '' });
         setIsModalOpen(true);
     };
 
     const openEdit = (task: PlannerTask) => {
+        if (!canEditPlanner) return;
         setEditingTask(task);
         setForm({ ...task });
         setIsModalOpen(true);
@@ -79,6 +86,7 @@ export const PlannerPage = () => {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        if (!canEditPlanner) return;
         if (!form.title?.trim()) return;
 
         const newTask: PlannerTask = {
@@ -102,12 +110,14 @@ export const PlannerPage = () => {
     };
 
     const handleDelete = (id: string) => {
+        if (!canEditPlanner) return;
         if (!window.confirm('Удалить задачу?')) return;
         saveTasks(tasks.filter((t) => t.id !== id));
         addToast({ type: 'success', title: 'Удалено', message: 'Задача удалена' });
     };
 
     const toggleStatus = (task: PlannerTask) => {
+        if (!canEditPlanner) return;
         const nextStatus: Record<PlannerTask['status'], PlannerTask['status']> = {
             todo: 'in-progress',
             'in-progress': 'done',
@@ -164,13 +174,15 @@ export const PlannerPage = () => {
                             Задачи, дедлайны и приоритеты
                         </p>
                     </div>
-                    <button
-                        onClick={openAdd}
-                        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium transition flex items-center gap-2"
-                    >
-                        <Icon name="Plus" size={18} />
-                        Новая задача
-                    </button>
+                    {canEditPlanner && (
+                        <button
+                            onClick={openAdd}
+                            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-medium transition flex items-center gap-2"
+                        >
+                            <Icon name="Plus" size={18} />
+                            Новая задача
+                        </button>
+                    )}
                 </div>
 
                 <div className="grid grid-cols-3 gap-3 mb-4">
@@ -231,6 +243,7 @@ export const PlannerPage = () => {
                             <div className="flex items-start gap-3">
                                 <button
                                     onClick={() => toggleStatus(task)}
+                                    disabled={!canEditPlanner}
                                     className={`mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
                                         task.status === 'done'
                                             ? 'bg-emerald-500 border-emerald-500 text-white'
@@ -266,20 +279,22 @@ export const PlannerPage = () => {
                                         </div>
                                     )}
                                 </div>
-                                <div className="flex items-center gap-1">
-                                    <button
-                                        onClick={() => openEdit(task)}
-                                        className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition"
-                                    >
-                                        <Icon name="Edit2" size={14} />
-                                    </button>
-                                    <button
-                                        onClick={() => handleDelete(task.id)}
-                                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
-                                    >
-                                        <Icon name="Trash2" size={14} />
-                                    </button>
-                                </div>
+                                {canEditPlanner && (
+                                    <div className="flex items-center gap-1">
+                                        <button
+                                            onClick={() => openEdit(task)}
+                                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition"
+                                        >
+                                            <Icon name="Edit2" size={14} />
+                                        </button>
+                                        <button
+                                            onClick={() => handleDelete(task.id)}
+                                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                                        >
+                                            <Icon name="Trash2" size={14} />
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     ))

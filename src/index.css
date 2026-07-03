@@ -262,30 +262,29 @@ body {
 
 /* Modern Card Component */
 .modern-card {
-    @apply bg-white dark:bg-dark-800 rounded-2xl shadow-lg;
-    @apply border border-slate-200/50 dark:border-slate-700/50;
-    @apply backdrop-blur-xl bg-white/80 dark:bg-dark-800/80;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    @apply bg-white dark:bg-dark-800 rounded-xl shadow-sm;
+    @apply border border-slate-200/70 dark:border-slate-700/70;
+    @apply backdrop-blur-md bg-white/90 dark:bg-dark-800/90;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 
 .modern-card:hover {
-    @apply shadow-xl scale-[1.02] border-indigo-200 dark:border-indigo-700;
-    transform: translateY(-4px) scale(1.02);
+    @apply shadow-md border-indigo-200 dark:border-indigo-700;
+    transform: translateY(-1px);
 }
 
 /* Enhanced Button Styles */
 .btn-primary {
-    @apply bg-gradient-to-r from-primary-600 to-purple-600 hover:from-primary-700 hover:to-purple-700;
-    @apply text-white font-semibold px-6 py-3 rounded-xl shadow-lg;
-    @apply transform transition-all duration-200 active:scale-95;
-    @apply hover:shadow-xl hover:-translate-y-0.5;
+    @apply bg-primary-600 hover:bg-primary-700;
+    @apply text-white font-semibold px-6 py-3 rounded-xl shadow-sm;
+    @apply transition-colors duration-200 active:scale-95;
 }
 
 .btn-secondary {
-    @apply bg-white dark:bg-dark-800 border-2 border-slate-200 dark:border-slate-600;
-    @apply hover:border-primary-300 dark:hover:border-primary-500;
+    @apply bg-slate-50 dark:bg-dark-800 border border-slate-200 dark:border-slate-600;
+    @apply hover:bg-slate-100 dark:hover:bg-slate-700;
     @apply text-slate-700 dark:text-slate-200 font-medium px-6 py-3 rounded-xl;
-    @apply transition-all duration-200 active:scale-95;
+    @apply transition-colors duration-200 active:scale-95;
 }
 
 .btn-success {
@@ -890,6 +889,28 @@ table thead th {
     .dark .mobile-table-scroll::after {
         background: linear-gradient(to right, transparent, rgba(255,255,255,0.06));
     }
+
+    .bottom-nav-2026 {
+        box-shadow: 0 -1px 8px rgba(0, 0, 0, 0.05);
+    }
+
+    .bottom-nav-2026 a {
+        min-height: 2.75rem;
+        padding-top: 0.35rem;
+        padding-bottom: 0.35rem;
+    }
+
+    .sidebar-2026 {
+        box-shadow: none;
+    }
+
+    .mobile-header-compact h1 {
+        font-size: 1.125rem;
+    }
+
+    .modern-card {
+        border-radius: 0.875rem;
+    }
 }
 
 /* Card holiday highlight styles removed */
@@ -1237,69 +1258,66 @@ html {
 
 /* Enhanced Glass Panel */
 .glass-panel {
-    background: rgba(255, 255, 255, 0.65);
-    backdrop-filter: blur(24px) saturate(1.8);
-    -webkit-backdrop-filter: blur(24px) saturate(1.8);
-    border: 1px solid rgba(255, 255, 255, 0.5);
-    border-radius: 20px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(255, 255, 255, 0.4) inset;
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(14px) saturate(1.2);
+    -webkit-backdrop-filter: blur(14px) saturate(1.2);
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    border-radius: 16px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
 }
 .dark .glass-panel {
-    background: rgba(15, 23, 42, 0.65);
+    background: rgba(15, 23, 42, 0.8);
     border: 1px solid rgba(255, 255, 255, 0.06);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.22);
 }
 
 /* Float Panel — elevated glass */
 .float-panel {
-    background: rgba(255, 255, 255, 0.8);
-    backdrop-filter: blur(32px) saturate(1.6);
-    -webkit-backdrop-filter: blur(32px) saturate(1.6);
-    border: 1px solid rgba(255, 255, 255, 0.6);
-    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(14px) saturate(1.2);
+    -webkit-backdrop-filter: blur(14px) saturate(1.2);
+    border: 1px solid rgba(255, 255, 255, 0.56);
+    border-radius: 16px;
     box-shadow:
-        0 24px 64px rgba(0, 0, 0, 0.08),
-        0 8px 24px rgba(0, 0, 0, 0.04),
-        0 0 0 1px rgba(255, 255, 255, 0.5) inset;
-    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        0 8px 24px rgba(0, 0, 0, 0.06),
+        0 0 0 1px rgba(255, 255, 255, 0.35) inset;
+    transition: box-shadow 0.25s ease, transform 0.25s ease;
 }
 .dark .float-panel {
-    background: rgba(15, 23, 42, 0.75);
+    background: rgba(15, 23, 42, 0.85);
     border: 1px solid rgba(255, 255, 255, 0.08);
     box-shadow:
-        0 24px 64px rgba(0, 0, 0, 0.25),
-        0 8px 24px rgba(0, 0, 0, 0.15),
+        0 8px 24px rgba(0, 0, 0, 0.18),
         0 0 0 1px rgba(255, 255, 255, 0.05) inset;
 }
 .float-panel:hover {
-    transform: translateY(-2px);
+    transform: translateY(-1px);
     box-shadow:
-        0 32px 80px rgba(0, 0, 0, 0.1),
-        0 12px 32px rgba(0, 0, 0, 0.06),
-        0 0 0 1px rgba(255, 255, 255, 0.6) inset;
+        0 12px 28px rgba(0, 0, 0, 0.08),
+        0 0 0 1px rgba(255, 255, 255, 0.45) inset;
 }
 
 /* Bento Card — minimal, floating */
 .bento-card {
-    background: rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(20px) saturate(1.5);
-    -webkit-backdrop-filter: blur(20px) saturate(1.5);
+    background: rgba(255, 255, 255, 0.82);
+    backdrop-filter: blur(12px) saturate(1.1);
+    -webkit-backdrop-filter: blur(12px) saturate(1.1);
     border: 1px solid rgba(255, 255, 255, 0.4);
-    border-radius: 20px;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.04), 0 0 0 1px rgba(0,0,0,0.03);
-    transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    border-radius: 16px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03), 0 4px 10px rgba(0,0,0,0.04);
+    transition: box-shadow 0.25s ease, transform 0.25s ease;
 }
 .dark .bento-card {
-    background: rgba(30, 41, 59, 0.6);
+    background: rgba(30, 41, 59, 0.74);
     border: 1px solid rgba(255, 255, 255, 0.05);
-    box-shadow: 0 1px 2px rgba(0,0,0,0.1), 0 4px 12px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.1);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.08), 0 4px 10px rgba(0,0,0,0.08);
 }
 .bento-card:hover {
-    transform: translateY(-4px) scale(1.01);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08), 0 16px 48px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.04);
+    transform: translateY(-1px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.08);
 }
 .dark .bento-card:hover {
-    box-shadow: 0 4px 12px rgba(0,0,0,0.2), 0 16px 48px rgba(0,0,0,0.15), 0 0 0 1px rgba(255,255,255,0.06);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.18);
 }
 
 /* Spotlight Card — interactive glow on hover */
@@ -1479,30 +1497,30 @@ html {
 
 /* Sidebar 2026 Enhancement */
 .sidebar-2026 {
-    background: rgba(255, 255, 255, 0.75);
-    backdrop-filter: blur(32px) saturate(1.6);
-    -webkit-backdrop-filter: blur(32px) saturate(1.6);
+    background: rgba(255, 255, 255, 0.82);
+    backdrop-filter: blur(14px) saturate(1.2);
+    -webkit-backdrop-filter: blur(14px) saturate(1.2);
     border-right: 1px solid rgba(255, 255, 255, 0.4);
-    box-shadow: 8px 0 32px rgba(0,0,0,0.04);
+    box-shadow: 4px 0 16px rgba(0,0,0,0.04);
 }
 .dark .sidebar-2026 {
-    background: rgba(15, 23, 42, 0.7);
+    background: rgba(15, 23, 42, 0.82);
     border-right: 1px solid rgba(255, 255, 255, 0.05);
-    box-shadow: 8px 0 32px rgba(0,0,0,0.15);
+    box-shadow: 4px 0 16px rgba(0,0,0,0.14);
 }
 
 /* Bottom Nav 2026 */
 .bottom-nav-2026 {
-    background: rgba(255, 255, 255, 0.85);
-    backdrop-filter: blur(24px) saturate(1.8);
-    -webkit-backdrop-filter: blur(24px) saturate(1.8);
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(14px) saturate(1.2);
+    -webkit-backdrop-filter: blur(14px) saturate(1.2);
     border-top: 1px solid rgba(255, 255, 255, 0.4);
-    box-shadow: 0 -4px 24px rgba(0,0,0,0.06);
+    box-shadow: 0 -2px 12px rgba(0,0,0,0.05);
 }
 .dark .bottom-nav-2026 {
-    background: rgba(15, 23, 42, 0.85);
+    background: rgba(15, 23, 42, 0.92);
     border-top: 1px solid rgba(255, 255, 255, 0.05);
-    box-shadow: 0 -4px 24px rgba(0,0,0,0.2);
+    box-shadow: 0 -2px 12px rgba(0,0,0,0.18);
 }
 
 /* Active bottom nav item glow */

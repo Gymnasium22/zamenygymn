@@ -157,7 +157,6 @@ class AuditLogService {
     }
 
     async clear(organizationId?: string | null) {
-        safeLocalStorageRemove(STORAGE_KEY);
         if (isSupabase) {
             let query = supabase.from('audit_log').delete();
             if (organizationId) query = query.eq('organization_id', organizationId);
@@ -176,12 +175,11 @@ class AuditLogService {
                 });
                 await batch.commit();
             } catch (e) {
-                if (!isPermissionDenied(e)) {
-                    logger.warn('Failed to clear Firestore audit log:', e);
-                    throw e;
-                }
+                logger.warn('Failed to clear Firestore audit log:', e);
+                throw e;
             }
         }
+        safeLocalStorageRemove(STORAGE_KEY);
     }
 
     exportJson(): string {

@@ -1,6 +1,4 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { authAdapter } from '../services/authAdapter';
-import { logger } from '../utils/logger';
 
 interface UseSessionTimeoutOptions {
     timeoutMinutes?: number;
@@ -17,27 +15,20 @@ export const useSessionTimeout = ({
 }: UseSessionTimeoutOptions = {}) => {
     const lastActivityRef = useRef(Date.now());
     const warningShownRef = useRef(false);
+    const timedOutRef = useRef(false);
     const timerRef = useRef<ReturnType<typeof setInterval>>();
 
     const resetTimer = useCallback(() => {
         lastActivityRef.current = Date.now();
         warningShownRef.current = false;
+        timedOutRef.current = false;
     }, []);
-
-    const logout = useCallback(async () => {
-        try {
-            await authAdapter.signOut();
-            onTimeout?.();
-        } catch (e) {
-            logger.error('Auto-logout error:', e);
-        }
-    }, [onTimeout]);
 
     useEffect(() => {
         const timeoutMs = timeoutMinutes * 60 * 1000;
         const warningMs = warningMinutes * 60 * 1000;
 
-        const events = ['mousedown', 'keydown', 'touchstart', 'scroll', 'click', 'mousemove'];
+        const events = ['mousedown', 'keydown', 'touchstart', 'scroll', 'click'];
 
         const activityHandler = () => {
             resetTimer();
@@ -50,15 +41,16 @@ export const useSessionTimeout = ({
         timerRef.current = setInterval(() => {
             const inactive = Date.now() - lastActivityRef.current;
 
-            if (inactive >= timeoutMs - warningMs && !warningShownRef.current) {
+            if (inactive >= timeoutMs - warningMs && !warningShownRef.current && !timedOutRef.current) {
                 warningShownRef.current = true;
                 onWarning?.();
             }
 
-            if (inactive >= timeoutMs) {
-                logout();
+            if (inactive >= timeoutMs && !timedOutRef.current) {
+                timedOutRef.current = true;
+                onTimeout?.();
             }
-        }, 1000);
+        }, 30000);
 
         return () => {
             events.forEach((event) => {
@@ -66,7 +58,7 @@ export const useSessionTimeout = ({
             });
             if (timerRef.current) clearInterval(timerRef.current);
         };
-    }, [timeoutMinutes, warningMinutes, resetTimer, logout, onWarning]);
+    }, [timeoutMinutes, warningMinutes, resetTimer, onWarning, onTimeout]);
 
     return { resetTimer };
 };

@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { HashRouter, Routes, Route, Navigate, NavLink, Outlet, useSearchParams, useLocation } from 'react-router-dom';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { HashRouter, Routes, Route, Navigate, NavLink, useSearchParams, useLocation, useOutlet } from 'react-router-dom';
+import useMedia from 'use-media';
 import { DataProvider, useStaticData, StaticDataProvider, ScheduleDataProvider } from './context/DataContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Icon } from './components/Icons';
@@ -87,14 +88,17 @@ const Layout = () => {
     const location = useLocation();
     useAutoBackup();
 
-    useSessionTimeout({
+    const handleSessionWarning = useCallback(() => setSessionWarning(true), []);
+    const handleSessionTimeout = useCallback(() => {
+        setSessionWarning(false);
+        logout();
+    }, [logout]);
+
+    const { resetTimer } = useSessionTimeout({
         timeoutMinutes: settings?.sessionTimeoutMinutes || 30,
         warningMinutes: 2,
-        onWarning: () => setSessionWarning(true),
-        onTimeout: () => {
-            setSessionWarning(false);
-            logout();
-        }
+        onWarning: handleSessionWarning,
+        onTimeout: handleSessionTimeout
     });
 
     useEffect(() => {
@@ -356,24 +360,18 @@ const Layout = () => {
 
             <main className="flex-1 flex flex-col min-w-0 bg-transparent relative z-10">
                 <header className="lg:hidden p-4 flex items-center gap-3 glass-panel border-b border-white/20 dark:border-white/5 no-print sticky top-0 z-30">
-                    <span className="font-bold text-slate-800 dark:text-white text-lg tracking-tight truncate" title={organizationName}>{organizationName}</span>
+                    <button
+                        onClick={() => setIsMobileMenuOpen(true)}
+                        className="p-2 rounded-xl text-slate-500 dark:text-slate-400 hover:bg-white/40 dark:hover:bg-white/5 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
+                        aria-label="Открыть меню"
+                    >
+                        <Icon name="Menu" size={22} />
+                    </button>
+                    <span className="font-bold text-slate-800 dark:text-white text-lg tracking-tight truncate flex-1" title={organizationName}>{organizationName}</span>
                 </header>
 
                 <div key={location.pathname} className="flex-1 overflow-auto lg:overflow-auto p-4 lg:p-8 pb-24 lg:pb-8 custom-scrollbar-2026 relative animate-page-in">
-                    {/* Mobile-only pull-to-refresh wrapper */}
-                    <div className="lg:hidden h-full">
-                        <PullToRefresh
-                            onRefresh={async () => {
-                                await new Promise((r) => setTimeout(r, 800));
-                            }}
-                        >
-                            <Outlet />
-                        </PullToRefresh>
-                    </div>
-                    {/* Desktop: no pull-to-refresh */}
-                    <div className="hidden lg:block h-full">
-                        <Outlet />
-                    </div>
+                    <MainContent />
                 </div>
 
                 <BottomNavigation onMenuClick={() => setIsMobileMenuOpen(true)} allowedPages={allowedPages} />
@@ -394,7 +392,10 @@ const Layout = () => {
                             Вы неактивны более {Math.max(1, (settings?.sessionTimeoutMinutes || 30) - 2)} минут. Через 2 минуты произойдёт автоматический выход.
                         </p>
                         <button
-                            onClick={() => setSessionWarning(false)}
+                            onClick={() => {
+                                setSessionWarning(false);
+                                resetTimer();
+                            }}
                             className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-2xl font-bold transition-all shadow-glow active:scale-95"
                         >
                             Продолжить работу
@@ -516,8 +517,22 @@ export default function App() {
                                                     </ProtectedRoute>
                                                 }
                                             />
-                                            <Route path="schedule" element={<SchedulePageWrapper semester={1} />} />
-                                            <Route path="schedule2" element={<SchedulePageWrapper semester={2} />} />
+                                            <Route
+                                                path="schedule"
+                                                element={
+                                                    <ProtectedRoute pageId="schedule">
+                                                        <SchedulePageWrapper semester={1} />
+                                                    </ProtectedRoute>
+                                                }
+                                            />
+                                            <Route
+                                                path="schedule2"
+                                                element={
+                                                    <ProtectedRoute pageId="schedule2">
+                                                        <SchedulePageWrapper semester={2} />
+                                                    </ProtectedRoute>
+                                                }
+                                            />
                                             <Route
                                                 path="substitutions"
                                                 element={
@@ -617,7 +632,7 @@ export default function App() {
                                             <Route
                                                 path="archive"
                                                 element={
-                                                    <ProtectedRoute allowedRoles={['admin']} pageId="archive">
+                                                    <ProtectedRoute allowedRoles={['superadmin', 'admin']} pageId="archive">
                                                         <ArchivePage />
                                                     </ProtectedRoute>
                                                 }
@@ -634,6 +649,26 @@ export default function App() {
         </ToastProvider>
     );
 }
+
+/** Один экземпляр Outlet — pull-to-refresh только на мобильных */
+const MainContent = () => {
+    const outlet = useOutlet();
+    const isDesktop = useMedia('(min-width: 1024px)');
+
+    const handleRefresh = useCallback(async () => {
+        window.location.reload();
+    }, []);
+
+    if (isDesktop) {
+        return <>{outlet}</>;
+    }
+
+    return (
+        <div className="h-full">
+            <PullToRefresh onRefresh={handleRefresh}>{outlet}</PullToRefresh>
+        </div>
+    );
+};
 
 const SchedulePageWrapper = ({ semester = 1 }: { semester?: 1 | 2 }) => {
     const { role, hasPermission } = useAuth();

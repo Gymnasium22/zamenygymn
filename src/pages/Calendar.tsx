@@ -37,6 +37,10 @@ export const CalendarPage = () => {
     }, [settings?.calendarEvents, storageKey]);
 
     const handleEventsChange = async (newEvents: CalendarEvent[]) => {
+        if (!canEdit) {
+            addToast({ type: 'warning', title: 'Нет прав', message: 'Календарь открыт только для просмотра' });
+            return;
+        }
         setEvents(newEvents);
         safeLocalStorageSet(storageKey, JSON.stringify(newEvents));
         try {
@@ -58,6 +62,10 @@ export const CalendarPage = () => {
     };
 
     const importEvents = (file: File) => {
+        if (!canEdit) {
+            addToast({ type: 'warning', title: 'Нет прав', message: 'Импорт календаря доступен только редакторам' });
+            return;
+        }
         const reader = new FileReader();
         reader.onload = (e) => {
             try {
@@ -99,19 +107,23 @@ export const CalendarPage = () => {
                         </p>
                     </div>
                     <div className="flex items-center gap-2">
-                        <input
-                            type="file"
-                            accept=".json"
-                            onChange={(e) => e.target.files?.[0] && importEvents(e.target.files[0])}
-                            className="hidden"
-                            id="calendar-import"
-                        />
-                        <label
-                            htmlFor="calendar-import"
-                            className="px-3 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition cursor-pointer"
-                        >
-                            Импорт
-                        </label>
+                        {canEdit && (
+                            <>
+                                <input
+                                    type="file"
+                                    accept=".json"
+                                    onChange={(e) => e.target.files?.[0] && importEvents(e.target.files[0])}
+                                    className="hidden"
+                                    id="calendar-import"
+                                />
+                                <label
+                                    htmlFor="calendar-import"
+                                    className="px-3 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition cursor-pointer"
+                                >
+                                    Импорт
+                                </label>
+                            </>
+                        )}
                         <button
                             onClick={exportEvents}
                             className="px-3 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-400 rounded-xl transition"

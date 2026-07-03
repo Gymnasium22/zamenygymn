@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useRef, useMemo, useCallback, createContext, useContext, ReactNode, useId } from 'react';
 import { Icon } from './Icons';
 import { useStaticData, useScheduleData } from '../context/DataContext';
-import { DayOfWeek, Shift } from '../types';
+import { DayOfWeek, PageId, Shift } from '../types';
 import { generateId, getActiveSemester } from '../utils/helpers';
 import { NavLink, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 interface ToastData {
     id: string;
@@ -188,6 +189,9 @@ interface ToastProps {
     onClose: (id: string) => void;
 }
 
+// Глобальный Set открытых модалок для корректной блокировки скролла
+const activeModals = new Set<string>();
+
 export const Modal = ({ isOpen, onClose, title, children, maxWidth = 'max-w-lg' }: ModalProps) => {
     const modalRef = useRef<HTMLDivElement>(null);
     const previousActiveElement = useRef<HTMLElement | null>(null);
@@ -290,8 +294,6 @@ export const Modal = ({ isOpen, onClose, title, children, maxWidth = 'max-w-lg' 
     );
 };
 
-// Глобальный Set открытых модалок для корректной блокировки скролла
-const activeModals = new Set<string>();
 
 export const Toast = ({ id, type, title, message, duration = 5000, onClose }: ToastProps) => {
     const [isVisible, setIsVisible] = useState(true);
@@ -463,6 +465,8 @@ export const ContextMenu = ({ x, y, onClose, actions }: ContextMenuProps) => {
     const ref = useRef<HTMLDivElement>(null);
     const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
     const [activeIndex, setActiveIndex] = useState(0);
+    const activeIndexRef = useRef(activeIndex);
+    activeIndexRef.current = activeIndex;
 
     useEffect(() => {
         if (x === null || y === null) return;
@@ -487,7 +491,7 @@ export const ContextMenu = ({ x, y, onClose, actions }: ContextMenuProps) => {
                 setActiveIndex((i) => Math.max(i - 1, 0));
             } else if (e.key === 'Enter') {
                 e.preventDefault();
-                actions[activeIndex]?.onClick();
+                actions[activeIndexRef.current]?.onClick();
                 onClose();
             }
         };
@@ -499,7 +503,7 @@ export const ContextMenu = ({ x, y, onClose, actions }: ContextMenuProps) => {
             window.removeEventListener('click', handleClick, true);
             document.removeEventListener('keydown', handleKey);
         };
-    }, [x, y, onClose, actions, activeIndex]);
+    }, [x, y, onClose, actions]);
 
     useEffect(() => {
         buttonRefs.current[activeIndex]?.focus();
@@ -927,17 +931,26 @@ export const BarChart = ({ items, max, barClassName = 'bg-indigo-500' }: BarChar
 
 interface BottomNavProps {
     onMenuClick: () => void;
-    allowedPages?: import('../types').PageId[];
+    allowedPages?: PageId[];
 }
 
 export const BottomNavigation = ({ onMenuClick, allowedPages = [] }: BottomNavProps) => {
     const { settings } = useStaticData();
-    const canView = (page: import('../types').PageId) => allowedPages.includes(page);
+    const canView = (page: PageId) => allowedPages.includes(page);
     const navigate = useNavigate();
 
     // Determine current semester for schedule navigation
     const currentSemester = getActiveSemester(new Date(), settings) ?? 1;
-    const schedulePath = currentSemester === 2 ? '/schedule2' : '/schedule';
+    const canViewSchedule1 = canView('schedule');
+    const canViewSchedule2 = canView('schedule2');
+    const schedulePath =
+        currentSemester === 2
+            ? canViewSchedule2
+                ? '/schedule2'
+                : '/schedule'
+            : canViewSchedule1
+              ? '/schedule'
+              : '/schedule2';
 
     const handleNavClick = (path: string) => {
         // Haptic feedback for mobile (2026 standard)
@@ -951,7 +964,7 @@ export const BottomNavigation = ({ onMenuClick, allowedPages = [] }: BottomNavPr
     if (canView('dashboard')) {
         navItems.push({ to: '/dashboard', icon: 'Home', label: 'Рабочий', shortLabel: 'Главная' });
     }
-    if (canView('schedule') || canView('schedule2')) {
+    if (canViewSchedule1 || canViewSchedule2) {
         navItems.push({ to: schedulePath, icon: 'Calendar', label: 'Расписание', shortLabel: 'Распис.' });
     }
     if (canView('nutrition')) {
@@ -1032,6 +1045,9 @@ export const CommandPalette = ({ isOpen, onClose }: CommandPaletteProps) => {
     const [activeIndex, setActiveIndex] = useState(0);
     const inputRef = useRef<HTMLInputElement>(null);
 
+    // Get allowed pages from auth context
+    const { allowedPages } = useAuth();
+
     // Group actions
     const filteredActions = useMemo(() => {
         if (!isOpen) return [];
@@ -1039,22 +1055,28 @@ export const CommandPalette = ({ isOpen, onClose }: CommandPaletteProps) => {
 
         const actions: Action[] = [];
 
-        // Navigation Actions
-        const navItems = [
-            { label: 'Рабочий стол', icon: 'Home', path: '/dashboard' },
-            { label: 'Расписание 1 пол.', icon: 'Calendar', path: '/schedule' },
-            { label: 'Расписание 2 пол.', icon: 'Calendar', path: '/schedule2' },
-            { label: 'Замены', icon: 'Repeat', path: '/substitutions' },
-            { label: 'Дежурство', icon: 'Shield', path: '/duty' },
-            { label: 'Питание', icon: 'Coffee', path: '/nutrition' },
-            { label: 'Пропуски', icon: 'UserX', path: '/absenteeism' },
-            { label: 'Звонки', icon: 'Bell', path: '/bells' },
-            { label: 'Справочники', icon: 'BookOpen', path: '/directory' },
-            { label: 'Отчёты', icon: 'BarChart2', path: '/reports' },
-            { label: 'Экспорт', icon: 'Download', path: '/export' },
-            { label: 'Администрация', icon: 'Users', path: '/admin' },
-            { label: 'Настройки', icon: 'Settings', path: '/settings' }
+        // Navigation Actions — фильтруем по правам доступа пользователя
+        const allNavItems: Array<{ label: string; icon: string; path: string; pageId: PageId }> = [
+            { label: 'Рабочий стол', icon: 'Home', path: '/dashboard', pageId: 'dashboard' },
+            { label: 'Расписание 1 пол.', icon: 'Calendar', path: '/schedule', pageId: 'schedule' },
+            { label: 'Расписание 2 пол.', icon: 'Calendar', path: '/schedule2', pageId: 'schedule2' },
+            { label: 'Замены', icon: 'Repeat', path: '/substitutions', pageId: 'substitutions' },
+            { label: 'Дежурство', icon: 'Shield', path: '/duty', pageId: 'duty' },
+            { label: 'Питание', icon: 'Coffee', path: '/nutrition', pageId: 'nutrition' },
+            { label: 'Пропуски', icon: 'UserX', path: '/absenteeism', pageId: 'absenteeism' },
+            { label: 'Звонки', icon: 'Bell', path: '/bells', pageId: 'bells' },
+            { label: 'Справочники', icon: 'BookOpen', path: '/directory', pageId: 'directory' },
+            { label: 'Отчёты', icon: 'BarChart2', path: '/reports', pageId: 'reports' },
+            { label: 'Экспорт', icon: 'Download', path: '/export', pageId: 'export' },
+            { label: 'Администрация', icon: 'Users', path: '/admin', pageId: 'admin' },
+            { label: 'Календарь', icon: 'Calendar', path: '/calendar', pageId: 'calendar' },
+            { label: 'Планер', icon: 'CheckSquare', path: '/planner', pageId: 'planner' },
+            { label: 'Архив', icon: 'Archive', path: '/archive', pageId: 'archive' },
+            { label: 'Настройки', icon: 'Settings', path: '/settings', pageId: 'settings' }
         ];
+        const canOpen = (pageId: PageId) => allowedPages.includes(pageId);
+        const canOpenAnySchedule = canOpen('schedule') || canOpen('schedule2');
+        const navItems = allNavItems.filter((item) => canOpen(item.pageId));
         navItems.forEach((item) => {
             if (!q || item.label.toLowerCase().includes(q)) {
                 actions.push({ type: 'nav', label: item.label, icon: item.icon, path: item.path });
@@ -1063,57 +1085,61 @@ export const CommandPalette = ({ isOpen, onClose }: CommandPaletteProps) => {
 
         if (q) {
             // Smart quick actions
-            if (['замена', 'заменить', 'поменять'].some(k => k.includes(q) || q.includes(k))) {
+            if (canOpen('substitutions') && ['замена', 'заменить', 'поменять'].some(k => k.includes(q) || q.includes(k))) {
                 actions.push({ type: 'nav', label: 'Создать новую замену', subtitle: 'Перейти в редактор замен', icon: 'PlusCircle', path: '/substitutions' });
             }
-            if (['болеет', 'пропуск', 'отсутствует'].some(k => k.includes(q) || q.includes(k))) {
+            if (canOpen('absenteeism') && ['болеет', 'пропуск', 'отсутствует'].some(k => k.includes(q) || q.includes(k))) {
                 actions.push({ type: 'nav', label: 'Отметить отсутствие', subtitle: 'Перейти в журнал пропусков', icon: 'UserX', path: '/absenteeism' });
             }
 
             // Teachers
-            teachers.forEach((t) => {
-                const nameMatch = t.name.toLowerCase().includes(q);
-                if (nameMatch) {
-                    actions.push({ type: 'teacher', label: t.name, subtitle: 'Открыть расписание учителя', icon: 'User', id: t.id });
-                    
-                    // Generate smart context actions for the teacher if query is highly specific
-                    if (q.length > 3) {
-                        actions.push({ type: 'quick_action', label: `Отметить отсутствие: ${t.name}`, subtitle: 'Быстрый переход в пропуски', icon: 'UserMinus', path: `/absenteeism?teacherId=${t.id}` });
+            if (canOpenAnySchedule) {
+                teachers.forEach((t) => {
+                    const nameMatch = t.name.toLowerCase().includes(q);
+                    if (nameMatch) {
+                        actions.push({ type: 'teacher', label: t.name, subtitle: 'Открыть расписание учителя', icon: 'User', id: t.id });
+
+                        // Generate smart context actions for the teacher if query is highly specific
+                        if (canOpen('absenteeism') && q.length > 3) {
+                            actions.push({ type: 'quick_action', label: `Отметить отсутствие: ${t.name}`, subtitle: 'Быстрый переход в пропуски', icon: 'UserMinus', path: `/absenteeism?teacherId=${t.id}` });
+                        }
                     }
-                }
-            });
-            // Classes
-            classes.forEach((c) => {
-                if (c.name.toLowerCase().includes(q)) {
-                    actions.push({ type: 'class', label: c.name, subtitle: `${c.shift} смена`, icon: 'GraduationCap', id: c.id });
-                }
-            });
-            // Subjects
-            subjects.forEach((s) => {
-                if (s.name.toLowerCase().includes(q)) {
-                    actions.push({ type: 'subject', label: s.name, subtitle: 'Предмет', icon: 'BookOpen', id: s.id });
-                }
-            });
-            // Rooms
-            rooms.forEach((r) => {
-                if (r.name.toLowerCase().includes(q) || r.type?.toLowerCase().includes(q)) {
-                    actions.push({ type: 'room', label: `Кабинет ${r.name}`, subtitle: r.type || 'Учебный класс', icon: 'MapPin', id: r.id });
-                }
-            });
+                });
+                // Classes
+                classes.forEach((c) => {
+                    if (c.name.toLowerCase().includes(q)) {
+                        actions.push({ type: 'class', label: c.name, subtitle: `${c.shift} смена`, icon: 'GraduationCap', id: c.id });
+                    }
+                });
+                // Subjects
+                subjects.forEach((s) => {
+                    if (s.name.toLowerCase().includes(q)) {
+                        actions.push({ type: 'subject', label: s.name, subtitle: 'Предмет', icon: 'BookOpen', id: s.id });
+                    }
+                });
+                // Rooms
+                rooms.forEach((r) => {
+                    if (r.name.toLowerCase().includes(q) || r.type?.toLowerCase().includes(q)) {
+                        actions.push({ type: 'room', label: `Кабинет ${r.name}`, subtitle: r.type || 'Учебный класс', icon: 'MapPin', id: r.id });
+                    }
+                });
+            }
             // Substitutions by date
-            const today = new Date().toISOString().split('T')[0];
-            substitutions.forEach((s) => {
-                if (s.date.includes(q) || s.date === today) {
-                    const t = teachers.find((x) => x.id === s.originalTeacherId);
-                    if (t && actions.filter((a) => a.type === 'sub').length < 3) {
-                        actions.push({ type: 'sub', label: `Замена ${s.date}`, subtitle: `Вместо: ${t.name}`, icon: 'Repeat', id: s.date });
+            if (canOpen('substitutions')) {
+                const today = new Date().toISOString().split('T')[0];
+                substitutions.forEach((s) => {
+                    if (s.date.includes(q) || s.date === today) {
+                        const t = teachers.find((x) => x.id === s.originalTeacherId);
+                        if (t && actions.filter((a) => a.type === 'sub').length < 3) {
+                            actions.push({ type: 'sub', label: `Замена ${s.date}`, subtitle: `Вместо: ${t.name}`, icon: 'Repeat', id: s.date });
+                        }
                     }
-                }
-            });
+                });
+            }
         }
 
         return actions.slice(0, 15);
-    }, [query, teachers, classes, subjects, rooms, substitutions, isOpen]);
+    }, [query, teachers, classes, subjects, rooms, substitutions, isOpen, allowedPages]);
 
     useEffect(() => {
         if (isOpen) {
@@ -1133,9 +1159,11 @@ export const CommandPalette = ({ isOpen, onClose }: CommandPaletteProps) => {
     const handleKeyDown = (e: React.KeyboardEvent) => {
         if (e.key === 'ArrowDown') {
             e.preventDefault();
+            if (filteredActions.length === 0) return;
             setActiveIndex((prev) => (prev + 1) % filteredActions.length);
         } else if (e.key === 'ArrowUp') {
             e.preventDefault();
+            if (filteredActions.length === 0) return;
             setActiveIndex((prev) => (prev - 1 + filteredActions.length) % filteredActions.length);
         } else if (e.key === 'Enter') {
             e.preventDefault();
@@ -1148,16 +1176,17 @@ export const CommandPalette = ({ isOpen, onClose }: CommandPaletteProps) => {
     };
 
     const executeAction = (action: Action) => {
+        const scheduleBasePath = allowedPages.includes('schedule') ? '/schedule' : '/schedule2';
         if (action.type === 'nav') {
             if (action.path) navigate(action.path);
         } else if (action.type === 'teacher') {
-            navigate(`/schedule?view=teacher&id=${action.id}`);
+            navigate(`${scheduleBasePath}?view=teacher&id=${action.id}`);
         } else if (action.type === 'class') {
-            navigate(`/schedule?view=class&id=${action.id}`);
+            navigate(`${scheduleBasePath}?view=class&id=${action.id}`);
         } else if (action.type === 'subject') {
-            navigate(`/schedule?view=subject&id=${action.id}`);
+            navigate(`${scheduleBasePath}?view=subject&id=${action.id}`);
         } else if (action.type === 'room') {
-            navigate(`/schedule?view=room&id=${action.id}`);
+            navigate(`${scheduleBasePath}?view=room&id=${action.id}`);
         } else if (action.type === 'sub') {
             navigate(`/substitutions?date=${action.id}`);
         } else if (action.type === 'quick_action') {

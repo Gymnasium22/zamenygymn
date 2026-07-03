@@ -6,12 +6,15 @@ import { Modal, StaggerContainer, useToast } from '../components/UI';
 import { Shift, ROOM_TYPES, Teacher, Subject, ClassEntity, Room } from '../types';
 import { formatDateEuropean } from '../utils/helpers';
 import { generateId } from '../utils/helpers';
+import { useAuth } from '../context/AuthContext';
 
 type DirectoryTabId = 'teachers' | 'subjects' | 'classes' | 'rooms';
 
 export const DirectoryPage = () => {
     const { subjects, teachers, classes, rooms, saveStaticData } = useStaticData();
     const { addToast } = useToast();
+    const { hasPermission } = useAuth();
+    const canEditDirectory = hasPermission('edit_directory');
 
     const [activeTab, setActiveTab] = useState<DirectoryTabId>('teachers');
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -25,6 +28,7 @@ export const DirectoryPage = () => {
     const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
 
     const openModal = (id?: string) => {
+        if (!canEditDirectory) return;
         setEditingId(id || null);
         if (activeTab === 'teachers') {
             setTeacherForm(
@@ -56,6 +60,10 @@ export const DirectoryPage = () => {
     };
 
     const handleSave = async () => {
+        if (!canEditDirectory) {
+            addToast({ type: 'warning', title: 'Нет прав', message: 'Справочники открыты только для просмотра' });
+            return;
+        }
         const configMap = {
             teachers: { list: teachers, form: teacherForm, key: 'teachers' as const },
             subjects: { list: subjects, form: subjectForm, key: 'subjects' as const },
@@ -90,6 +98,7 @@ export const DirectoryPage = () => {
     };
 
     const handleDelete = async (id: string) => {
+        if (!canEditDirectory) return;
         if (!window.confirm('Удалить запись?')) return;
 
         try {
@@ -124,6 +133,7 @@ export const DirectoryPage = () => {
     };
 
     const onDrop = async (_e: React.DragEvent, index: number) => {
+        if (!canEditDirectory) return;
         if (draggedIdx === null || draggedIdx === index) return;
 
         const reorderWithUpdate = <T extends { order?: number }>(items: T[]) => {
@@ -178,12 +188,14 @@ export const DirectoryPage = () => {
                         </button>
                     ))}
                 </div>
-                <button
-                    onClick={() => openModal()}
-                    className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-3 rounded-xl hover:bg-indigo-700 transition shadow-lg shadow-indigo-200 dark:shadow-none font-semibold"
-                >
-                    <Icon name="Plus" size={20} /> Добавить
-                </button>
+                {canEditDirectory && (
+                    <button
+                        onClick={() => openModal()}
+                        className="btn-primary btn-touch flex items-center gap-2 px-5 py-2.5 text-sm"
+                    >
+                        <Icon name="Plus" size={18} /> Добавить
+                    </button>
+                )}
             </div>
 
             <div className="flex-1 overflow-y-auto pb-20 custom-scrollbar pr-2">
@@ -192,11 +204,11 @@ export const DirectoryPage = () => {
                         {teachers.map((t, i) => (
                             <div
                                 key={t.id}
-                                draggable
-                                onDragStart={(e) => onDragStart(e, i)}
-                                onDragOver={onDragOver}
-                                onDrop={(e) => onDrop(e, i)}
-                                className="bg-white dark:bg-dark-800 p-5 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm hover:shadow-md transition-all group flex flex-col cursor-grab active:cursor-grabbing"
+                                draggable={canEditDirectory}
+                                onDragStart={canEditDirectory ? (e) => onDragStart(e, i) : undefined}
+                                onDragOver={canEditDirectory ? onDragOver : undefined}
+                                onDrop={canEditDirectory ? (e) => onDrop(e, i) : undefined}
+                                className={`modern-card p-4 group flex flex-col ${canEditDirectory ? 'cursor-grab active:cursor-grabbing' : ''}`}
                             >
                                 <div className="flex justify-between items-start mb-2">
                                     <div className="flex items-center gap-3">
@@ -209,6 +221,7 @@ export const DirectoryPage = () => {
                                             {t.name}
                                         </div>
                                     </div>
+                                    {canEditDirectory && (
                                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                         <button
                                             onClick={() => openModal(t.id)}
@@ -223,6 +236,7 @@ export const DirectoryPage = () => {
                                             <Icon name="Trash2" size={16} />
                                         </button>
                                     </div>
+                                    )}
                                 </div>
                                 <div className="text-xs text-slate-500 mb-2">
                                     {t.birthDate ? `ДР: ${formatDateEuropean(t.birthDate)}` : ''}
@@ -263,11 +277,11 @@ export const DirectoryPage = () => {
                         {subjects.map((s, i) => (
                             <div
                                 key={s.id}
-                                draggable
-                                onDragStart={(e) => onDragStart(e, i)}
-                                onDragOver={onDragOver}
-                                onDrop={(e) => onDrop(e, i)}
-                                className="bg-white dark:bg-dark-800 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm flex items-center justify-between group cursor-grab active:cursor-grabbing border-l-4"
+                                draggable={canEditDirectory}
+                                onDragStart={canEditDirectory ? (e) => onDragStart(e, i) : undefined}
+                                onDragOver={canEditDirectory ? onDragOver : undefined}
+                                onDrop={canEditDirectory ? (e) => onDrop(e, i) : undefined}
+                                className={`modern-card p-4 flex items-center justify-between group border-l-4 ${canEditDirectory ? 'cursor-grab active:cursor-grabbing' : ''}`}
                                 style={{ borderLeftColor: s.color }}
                             >
                                 <div className="flex items-center gap-3">
@@ -283,6 +297,7 @@ export const DirectoryPage = () => {
                                         </div>
                                     </div>
                                 </div>
+                                {canEditDirectory && (
                                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <button
                                         onClick={() => openModal(s.id)}
@@ -297,6 +312,7 @@ export const DirectoryPage = () => {
                                         <Icon name="Trash2" size={16} />
                                     </button>
                                 </div>
+                                )}
                             </div>
                         ))}
                     </StaggerContainer>
@@ -307,15 +323,15 @@ export const DirectoryPage = () => {
                         {classes.map((c, i) => (
                             <div
                                 key={c.id}
-                                draggable
-                                onDragStart={(e) => onDragStart(e, i)}
-                                onDragOver={onDragOver}
-                                onDrop={(e) => onDrop(e, i)}
-                                className={`bg-white dark:bg-dark-800 p-4 rounded-2xl border ${
+                                draggable={canEditDirectory}
+                                onDragStart={canEditDirectory ? (e) => onDragStart(e, i) : undefined}
+                                onDragOver={canEditDirectory ? onDragOver : undefined}
+                                onDrop={canEditDirectory ? (e) => onDrop(e, i) : undefined}
+                                className={`modern-card p-4 border ${
                                     c.excludeFromReports
                                         ? 'border-dashed border-slate-300 bg-slate-50'
                                         : 'border-slate-100'
-                                } dark:border-slate-700 shadow-sm text-center group hover:shadow-md transition-all relative cursor-grab active:cursor-grabbing`}
+                                } dark:border-slate-700 text-center group transition-all relative ${canEditDirectory ? 'cursor-grab active:cursor-grabbing' : ''}`}
                             >
                                 <div className="absolute left-2 top-2 text-slate-300 dark:text-slate-600">
                                     <Icon name="GripVertical" size={14} />
@@ -342,6 +358,7 @@ export const DirectoryPage = () => {
                                         Исключен
                                     </div>
                                 )}
+                                {canEditDirectory && (
                                 <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <button
                                         onClick={() => openModal(c.id)}
@@ -356,6 +373,7 @@ export const DirectoryPage = () => {
                                         <Icon name="Trash2" size={14} />
                                     </button>
                                 </div>
+                                )}
                             </div>
                         ))}
                     </StaggerContainer>
@@ -366,11 +384,13 @@ export const DirectoryPage = () => {
                         {rooms.map((r, i) => (
                             <div
                                 key={r.id}
-                                draggable
-                                onDragStart={(e) => onDragStart(e, i)}
-                                onDragOver={onDragOver}
-                                onDrop={(e) => onDrop(e, i)}
-                                className="bg-white dark:bg-dark-800 p-4 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm flex items-center justify-between group cursor-grab active:cursor-grabbing"
+                                draggable={canEditDirectory}
+                                onDragStart={canEditDirectory ? (e) => onDragStart(e, i) : undefined}
+                                onDragOver={canEditDirectory ? onDragOver : undefined}
+                                onDrop={canEditDirectory ? (e) => onDrop(e, i) : undefined}
+                                className={`modern-card p-4 flex items-center justify-between group border-l-4 ${
+                                    canEditDirectory ? 'cursor-grab active:cursor-grabbing' : ''
+                                }`}
                             >
                                 <div className="flex items-center gap-3">
                                     <Icon
@@ -388,7 +408,8 @@ export const DirectoryPage = () => {
                                         </div>
                                     </div>
                                 </div>
-                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                {canEditDirectory && (
+                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <button
                                         onClick={() => openModal(r.id)}
                                         className="p-1.5 text-slate-600 dark:text-slate-300 hover:text-indigo-600"
@@ -401,7 +422,8 @@ export const DirectoryPage = () => {
                                     >
                                         <Icon name="Trash2" size={16} />
                                     </button>
-                                </div>
+                                    </div>
+                                )}
                             </div>
                         ))}
                     </StaggerContainer>

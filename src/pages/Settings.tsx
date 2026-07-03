@@ -2191,6 +2191,7 @@ const AuditLogViewer: React.FC = () => {
     const { organizationId, organizations, isSuperAdmin } = useAuth();
 
     const effectiveOrgFilter = isSuperAdmin ? (viewOrganizationId || null) : organizationId;
+    const clearOrgFilter = isSuperAdmin ? (viewOrganizationId || organizationId || null) : organizationId;
 
     const fetchEntries = useCallback(async () => {
         setIsLoading(true);
@@ -2312,7 +2313,7 @@ const AuditLogViewer: React.FC = () => {
         if (!window.confirm('Очистить весь журнал действий? Это действие необратимо.')) return;
         setIsLoading(true);
         try {
-            await auditLog.clear(effectiveOrgFilter);
+            await auditLog.clear(clearOrgFilter);
             setEntries([]);
             addToast({ type: 'success', title: 'Журнал очищен', message: 'Все записи удалены' });
         } catch {
@@ -2444,3 +2445,4 @@ const AuditLogViewer: React.FC = () => {
         </div>
     );
 };
+

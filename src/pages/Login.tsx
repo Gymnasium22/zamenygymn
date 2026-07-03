@@ -17,6 +17,8 @@ export const LoginPage = () => {
 
     useEffect(() => {
         if (!authLoading && role) {
+            setLoading(false);
+            setSubmitted(false);
             const firstPage = allowedPages[0] || 'dashboard';
             navigate(`/${firstPage}`);
         }
@@ -114,7 +116,7 @@ export const LoginPage = () => {
                             Пароль
                         </label>
                         <div className="relative">
-                            <Icon name="Briefcase" className="absolute left-4 top-3.5 text-slate-400" size={18} />
+                            <Icon name="Lock" className="absolute left-4 top-3.5 text-slate-400" size={18} />
                             <input
                                 type={showPassword ? 'text' : 'password'}
                                 inputMode="text"
