@@ -70,6 +70,7 @@ export interface ScheduleItem {
     semester?: number;
     direction?: string; // Group or profile
     organizationId?: string;
+    academicYear?: number; // Year when this schedule was created (e.g., 2026)
 }
 
 export interface Substitution {

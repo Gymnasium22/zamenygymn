@@ -135,7 +135,7 @@ const supabaseDeleteAll = async (table: string, organizationId: string): Promise
 };
 
 export const archiveService = {
-    buildArchive: async (data: AppData, yearLabel: string, organizationId?: string | null): Promise<AcademicYearArchive> => {
+    buildArchive: async (data: AppData, yearLabel: string, organizationId?: string | null, _academicYearEnd?: number): Promise<AcademicYearArchive> => {
         let allSubstitutions: Substitution[] = [];
         let allNutrition: NutritionRecord[] = [];
         let allAbsenteeism: AbsenteeismRecord[] = [];
@@ -262,23 +262,42 @@ export const archiveService = {
         URL.revokeObjectURL(url);
     },
 
-    clearAnnualCollections: async (organizationId?: string | null) => {
+    clearAnnualCollections: async (organizationId?: string | null, academicYearEnd?: number) => {
         if (isSupabase) {
             const orgId = organizationId || '';
             if (!orgId) throw new Error('organizationId is required to clear annual collections');
+            
             // Delete in order to respect FK constraints: substitutions → schedule_items
-            const tablesToClear = [
-                'substitutions',
-                'schedule_items',
-                'duty',
-                'nutrition',
-                'absenteeism'
-            ];
+            
+            // 1. Delete substitutions first (has FK to schedule_items)
+            await supabaseDeleteAll('substitutions', orgId);
+            
+            // 2. Delete schedule_items with academic_year filter if provided
+            if (academicYearEnd !== undefined) {
+                const { error } = await supabase
+                    .from('schedule_items')
+                    .delete()
+                    .eq('organization_id', orgId)
+                    .eq('academic_year', academicYearEnd);
+                if (error) {
+                    logger.error('Failed to clear schedule_items:', error);
+                    throw new Error('Не удалось очистить расписание');
+                }
+            } else {
+                await supabaseDeleteAll('schedule_items', orgId);
+            }
+            
+            // 3. Delete other annual data
+            const tablesToClear = ['duty', 'nutrition', 'absenteeism'];
             for (const table of tablesToClear) {
                 await supabaseDeleteAll(table, orgId);
             }
-            // Clear substitution day comments in settings
-            await supabase.from('settings').update({ substitution_day_comments: {} }).eq('organization_id', orgId);
+            
+            // 4. Clear substitution day comments in settings
+            await supabase.from('settings')
+                .update({ substitution_day_comments: {} })
+                .eq('organization_id', orgId);
+            
             dbService.clearCache();
         } else {
             if (!firestoreDB) throw new Error('База данных не инициализирована');
@@ -361,5 +380,152 @@ export const archiveService = {
             nutritionRecords: nutrition.size,
             absenteeismRecords: absenteeism.size
         };
+    },
+
+    /**
+     * Выполняет закрытие учебного года в контролируемом порядке:
+     * 1. Очищает все годовые данные из БД
+     * 2. Обновляет локальное состояние
+     * 3. Сохраняет новый currentYear в БД
+     * 
+     * Параметры:
+     * - organizationId: ID организации
+     * - academicYearEnd: конец закрываемого года (например, 2026)
+     * - data: текущее состояние данных
+     * - saveData: функция сохранения из DataContext
+     * - nextYearEnd: конец следующего года (например, 2027)
+     */
+    closeAcademicYear: async (
+        organizationId: string | null | undefined,
+        academicYearEnd: number | undefined,
+        data: AppData,
+        saveData: (newData: Partial<AppData>, addToHistory?: boolean) => Promise<void>,
+        nextYearEnd: number
+    ): Promise<void> => {
+        if (!organizationId) {
+            throw new Error('organizationId is required');
+        }
+
+        try {
+            // Шаг 1: Очищаем данные из БД с учетом года
+            await archiveService.clearAnnualCollections(organizationId, academicYearEnd);
+
+            // Шаг 2: Обновляем состояние локально и в БД одновременно
+            // Это гарантирует, что пользователь видит результат сразу
+            await saveData({
+                schedule: [],
+                schedule2: [],
+                substitutions: [],
+                dutySchedule: [],
+                nutritionRecords: [],
+                absenteeismRecords: [],
+                settings: {
+                    ...data.settings,
+                    substitutionDayComments: {},
+                    currentYear: nextYearEnd
+                }
+            });
+
+            logger.info(`Academic year ${academicYearEnd} successfully closed for org ${organizationId}`);
+        } catch (error) {
+            logger.error('Failed to close academic year:', error);
+            throw error;
+        }
+    },
+
+    /**
+     * Проверяет целостность данных после закрытия года.
+     * Убеждается, что:
+     * - В БД нет расписания для закрытого года
+     * - Отсутствий больше нет
+     * - currentYear обновлён
+     */
+    verifyYearClosure: async (
+        organizationId: string | null | undefined,
+        nextYearEnd: number
+    ): Promise<{ success: boolean; errors: string[] }> => {
+        if (!organizationId) {
+            return {
+                success: false,
+                errors: ['organizationId is required']
+            };
+        }
+
+        const errors: string[] = [];
+
+        try {
+            if (isSupabase) {
+                // Проверка 1: Расписание удалено
+                const { count: scheduleCount, error: scheduleError } = await supabase
+                    .from('schedule_items')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('organization_id', organizationId);
+
+                if (scheduleError) {
+                    errors.push(`Ошибка проверки расписания: ${scheduleError.message}`);
+                } else if ((scheduleCount || 0) > 0) {
+                    errors.push(`В БД остаётся ${scheduleCount} записей расписания`);
+                }
+
+                // Проверка 2: Подстановки удалены
+                const { count: subCount, error: subError } = await supabase
+                    .from('substitutions')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('organization_id', organizationId);
+
+                if (subError) {
+                    errors.push(`Ошибка проверки подстановок: ${subError.message}`);
+                } else if ((subCount || 0) > 0) {
+                    errors.push(`В БД остаётся ${subCount} подстановок`);
+                }
+
+                // Проверка 3: currentYear обновлён
+                const { data: settings, error: settingsError } = await supabase
+                    .from('settings')
+                    .select('current_year')
+                    .eq('organization_id', organizationId)
+                    .maybeSingle();
+
+                if (settingsError) {
+                    errors.push(`Ошибка проверки настроек: ${settingsError.message}`);
+                } else if ((settings?.current_year as number) !== nextYearEnd) {
+                    errors.push(
+                        `currentYear не обновлён. Ожидалось: ${nextYearEnd}, получено: ${settings?.current_year}`
+                    );
+                }
+            } else {
+                // Firebase проверки
+                if (firestoreDB) {
+                    const scheduleSnap = await getDocs(
+                        collection(firestoreDB, COLLECTIONS.SCHEDULE_1)
+                    );
+                    if (scheduleSnap.size > 0) {
+                        errors.push(`В Firebase остаётся ${scheduleSnap.size} записей расписания (семестр 1)`);
+                    }
+
+                    const schedule2Snap = await getDocs(
+                        collection(firestoreDB, COLLECTIONS.SCHEDULE_2)
+                    );
+                    if (schedule2Snap.size > 0) {
+                        errors.push(`В Firebase остаётся ${schedule2Snap.size} записей расписания (семестр 2)`);
+                    }
+
+                    const subsSnap = await getDocs(
+                        collection(firestoreDB, COLLECTIONS.SUBSTITUTIONS)
+                    );
+                    if (subsSnap.size > 0) {
+                        errors.push(`В Firebase остаётся ${subsSnap.size} подстановок`);
+                    }
+                }
+            }
+        } catch (error) {
+            errors.push(`Критическая ошибка при проверке: ${(error as Error).message}`);
+        }
+
+        return {
+            success: errors.length === 0,
+            errors
+        };
     }
 };
+

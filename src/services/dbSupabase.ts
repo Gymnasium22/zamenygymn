@@ -325,12 +325,15 @@ export const supabaseDbService = {
         const teacherIds = new Set((data.teachers || []).map((t) => t.id).filter(Boolean));
         const roomIds = new Set((data.rooms || []).map((r) => r.id).filter(Boolean));
         const hasReferenceTables = !!(data.classes || data.subjects || data.teachers || data.rooms);
+        const currentYear = data.settings?.currentYear || new Date().getFullYear();
 
         const mapScheduleItem = (item: ScheduleItem, semester: number) => {
             const obj = toSnakeCase(item as unknown as Record<string, unknown>);
             if (!obj.id) obj.id = genId();
             if (!obj.organization_id) obj.organization_id = orgId;
             obj.semester = semester;
+            // Если academicYear не установлен, используем currentYear
+            if (!obj.academic_year) obj.academic_year = currentYear;
             return obj;
         };
 

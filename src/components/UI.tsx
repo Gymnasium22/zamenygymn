@@ -272,23 +272,23 @@ export const Modal = ({ isOpen, onClose, title, children, maxWidth = 'max-w-lg' 
             aria-modal="true"
             aria-labelledby="modal-title"
             tabIndex={-1}
-            className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/40 backdrop-blur-md p-4 animate-fade-in no-print"
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/35 backdrop-blur-sm p-3 md:p-4 animate-fade-in no-print"
             onClick={(e) => e.target === e.currentTarget && onClose()}
         >
             <div
-                className={`float-panel w-full ${maxWidth} flex flex-col max-h-[90vh] transition-all duration-300`}
+                className={`float-panel w-full ${maxWidth} flex flex-col max-h-[86vh] transition-all duration-300`}
             >
-                <div className="flex items-center justify-between px-6 py-5 border-b border-white/10 dark:border-white/5">
-                    <h2 id="modal-title" className="text-xl font-bold text-slate-800 dark:text-white tracking-tight">{title}</h2>
+                <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200/70 dark:border-slate-700/70">
+                    <h2 id="modal-title" className="text-lg md:text-xl font-semibold text-slate-800 dark:text-white tracking-tight">{title}</h2>
                     <button
                         onClick={onClose}
-                        className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 spring-bounce"
+                        className="btn-secondary !px-2 !py-2 text-slate-500 hover:text-slate-700 dark:text-slate-300 dark:hover:text-white"
                         aria-label="Закрыть"
                     >
                         <Icon name="X" size={20} />
                     </button>
                 </div>
-                <div className="p-6 overflow-y-auto custom-scrollbar-2026">{children}</div>
+                <div className="p-5 md:p-6 overflow-y-auto custom-scrollbar-2026">{children}</div>
             </div>
         </div>
     );
@@ -409,7 +409,7 @@ export const Toast = ({ id, type, title, message, duration = 5000, onClose }: To
 
     return (
         <div
-            className={`max-w-sm md:max-w-sm w-full animate-slide-up-fade ${isExiting ? 'animate-fade-out' : ''}`}
+            className={`max-w-sm md:max-w-xs w-full animate-slide-up-fade ${isExiting ? 'animate-fade-out' : ''}`}
             style={{
                 transform: `translateX(${swipeX}px)`,
                 transition: swipeX === 0 ? 'transform 0.3s ease' : 'none',
@@ -420,10 +420,10 @@ export const Toast = ({ id, type, title, message, duration = 5000, onClose }: To
             onTouchEnd={handleTouchEnd}
         >
             <div className={`float-panel border p-4 transition-all duration-300 ${styles.bg} ${
-                type === 'success' ? 'shadow-glow-success hover-glow-emerald border-emerald-200/40 dark:border-emerald-800/40' :
-                type === 'danger' ? 'shadow-glow-danger hover-glow-red border-red-200/40 dark:border-red-800/40' :
-                type === 'warning' ? 'shadow-glow-warning hover-glow-amber border-amber-200/40 dark:border-amber-800/40' :
-                'shadow-glow hover-glow-indigo border-indigo-200/40 dark:border-indigo-800/40'
+                type === 'success' ? 'border-emerald-200/70 dark:border-emerald-800/50' :
+                type === 'danger' ? 'border-red-200/70 dark:border-red-800/50' :
+                type === 'warning' ? 'border-amber-200/70 dark:border-amber-800/50' :
+                'border-indigo-200/70 dark:border-indigo-800/50'
             }`}>
                 <div className="flex items-start gap-3">
                     <div className={`flex-shrink-0 ${styles.icon}`}>
@@ -435,7 +435,7 @@ export const Toast = ({ id, type, title, message, duration = 5000, onClose }: To
                     </div>
                     <button
                         onClick={handleClose}
-                        className="flex-shrink-0 text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 transition-colors tactile-btn p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 min-w-[36px] min-h-[36px] flex items-center justify-center spring-bounce"
+                        className="flex-shrink-0 text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 transition-colors p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/5 min-w-[36px] min-h-[36px] flex items-center justify-center"
                         aria-label="Закрыть уведомление"
                     >
                         <Icon name="X" size={16} />
@@ -978,22 +978,22 @@ export const BottomNavigation = ({ onMenuClick, allowedPages = [] }: BottomNavPr
         <div className="fixed bottom-0 left-0 right-0 bottom-nav-2026 z-40 pb-safe md:hidden transition-all duration-300 no-select safe-area-inset">
             {/* Active indicator pill background */}
             <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-indigo-500/50 to-transparent" />
-            <div className="flex justify-around items-center h-16 sm:h-20 px-2">
+            <div className="flex justify-around items-center h-14 sm:h-16 px-2">
                 {navItems.map((item) => (
                     <NavLink
                         key={item.to}
                         to={item.to}
                         onClick={() => handleNavClick(item.to)}
                         className={({ isActive }) =>
-                            `relative flex flex-col items-center justify-center gap-1 p-2 sm:p-2.5 rounded-2xl transition-all duration-300 flex-1 h-full spring-bounce ${isActive ? 'text-indigo-600 dark:text-indigo-400 bottom-nav-active' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'}`
+                            `relative flex flex-col items-center justify-center gap-0.5 p-1.5 sm:p-2 rounded-xl transition-all duration-300 flex-1 h-full ${isActive ? 'text-indigo-600 dark:text-indigo-400 bottom-nav-active' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'}`
                         }
                     >
                         {({ isActive }) => (
                             <>
-                                <div className={`p-2 rounded-2xl transition-all duration-300 ${isActive ? 'bg-indigo-50 dark:bg-indigo-900/20 shadow-glow-sm' : ''}`}>
-                                    <Icon name={item.icon} size={22} strokeWidth={2.5} className="sm:w-[26px] sm:h-[26px]" />
+                                <div className={`p-1.5 rounded-xl transition-all duration-300 ${isActive ? 'bg-indigo-50 dark:bg-indigo-900/20' : ''}`}>
+                                    <Icon name={item.icon} size={20} strokeWidth={2.25} className="sm:w-[22px] sm:h-[22px]" />
                                 </div>
-                                <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider leading-none">
+                                <span className="text-[10px] font-semibold uppercase tracking-wider leading-none">
                                     {item.shortLabel}
                                 </span>
                             </>
@@ -1008,12 +1008,12 @@ export const BottomNavigation = ({ onMenuClick, allowedPages = [] }: BottomNavPr
                         }
                         onMenuClick();
                     }}
-                    className="relative flex flex-col items-center justify-center gap-1 p-2 sm:p-2.5 rounded-2xl text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 active:text-indigo-600 transition-all duration-300 flex-1 h-full spring-bounce"
+                    className="relative flex flex-col items-center justify-center gap-0.5 p-1.5 sm:p-2 rounded-xl text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 active:text-indigo-600 transition-all duration-300 flex-1 h-full"
                 >
-                    <div className="p-2 rounded-2xl">
-                        <Icon name="Menu" size={22} strokeWidth={2.5} className="sm:w-[26px] sm:h-[26px]" />
+                    <div className="p-1.5 rounded-xl">
+                        <Icon name="Menu" size={20} strokeWidth={2.25} className="sm:w-[22px] sm:h-[22px]" />
                     </div>
-                    <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider leading-none">Меню</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-wider leading-none">Меню</span>
                 </button>
             </div>
         </div>
@@ -1199,16 +1199,16 @@ export const CommandPalette = ({ isOpen, onClose }: CommandPaletteProps) => {
 
     return (
         <div
-            className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh] px-4 bg-slate-900/50 backdrop-blur-md transition-all"
+            className="fixed inset-0 z-[100] flex items-start justify-center pt-[12vh] px-4 bg-slate-900/45 backdrop-blur-sm transition-all"
             onClick={(e) => e.target === e.currentTarget && onClose()}
         >
             <div className="w-full max-w-xl float-panel overflow-hidden animate-scale-in">
-                <div className="flex items-center gap-3 p-4 border-b border-white/10 dark:border-white/5">
+                <div className="flex items-center gap-3 p-4 border-b border-slate-200/70 dark:border-slate-700/70">
                     <Icon name="Search" className="text-slate-400" size={20} />
                     <input
                         ref={inputRef}
                         inputMode="search"
-                        className="flex-1 bg-transparent outline-none text-lg text-slate-800 dark:text-white placeholder:text-slate-400"
+                        className="flex-1 bg-transparent outline-none text-base text-slate-800 dark:text-white placeholder:text-slate-400"
                         placeholder="Куда перейти? Или кого найти..."
                         value={query}
                         onChange={(e) => setQuery(e.target.value)}
@@ -1220,13 +1220,13 @@ export const CommandPalette = ({ isOpen, onClose }: CommandPaletteProps) => {
                 </div>
                 <div className="max-h-[300px] overflow-y-auto custom-scrollbar-2026 p-2">
                     {filteredActions.length === 0 ? (
-                        <div className="p-4 text-center text-slate-400 text-sm">Нет результатов</div>
+                        <div className="ui-empty-state m-2">Нет результатов</div>
                     ) : (
                         filteredActions.map((action, idx) => (
                             <button
                                 key={idx}
                                 onClick={() => executeAction(action)}
-                                className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all spring-bounce ${idx === activeIndex ? 'bg-indigo-50/60 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 shadow-glow-sm' : 'text-slate-600 dark:text-slate-300 hover:bg-white/50 dark:hover:bg-white/5'}`}
+                                className={`ui-list-row w-full text-left ${idx === activeIndex ? 'bg-indigo-50/70 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-700' : 'text-slate-600 dark:text-slate-300'}`}
                             >
                                 <Icon
                                     name={action.icon}
@@ -1242,12 +1242,12 @@ export const CommandPalette = ({ isOpen, onClose }: CommandPaletteProps) => {
                                     )}
                                 </div>
                                 {action.type !== 'nav' && action.type !== 'quick_action' && (
-                                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider shrink-0 bg-slate-100/50 dark:bg-white/5 px-2 py-1 rounded">
+                                    <span className="ui-chip shrink-0 uppercase tracking-wider">
                                         {action.type}
                                     </span>
                                 )}
                                 {action.type === 'quick_action' && (
-                                    <span className="text-[10px] uppercase font-bold text-indigo-500 bg-indigo-50/50 dark:bg-indigo-900/20 px-2 py-1 rounded border border-indigo-200/30 dark:border-indigo-800/30">
+                                    <span className="ui-chip shrink-0 uppercase tracking-wider bg-indigo-50 text-indigo-600 dark:bg-indigo-900/20 dark:text-indigo-300">
                                         Действие
                                     </span>
                                 )}
@@ -1255,7 +1255,7 @@ export const CommandPalette = ({ isOpen, onClose }: CommandPaletteProps) => {
                         ))
                     )}
                 </div>
-                <div className="p-2 bg-slate-50/50 dark:bg-white/5 border-t border-white/10 dark:border-white/5 flex justify-end gap-4 text-[10px] text-slate-400 font-medium px-4">
+                <div className="p-2 bg-slate-50/60 dark:bg-white/5 border-t border-slate-200/70 dark:border-slate-700/70 flex justify-end gap-4 text-[10px] text-slate-400 font-medium px-4">
                     <span className="flex items-center gap-1">
                         <span className="bg-white dark:bg-white/10 px-1 rounded shadow-sm">↵</span> выбрать
                     </span>

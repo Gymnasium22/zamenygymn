@@ -78,6 +78,15 @@ export const ArchiveYearSection = () => {
     }, [organizationId]);
 
     const openModal = () => {
+        // Валидация: organizationId обязателен
+        if (!organizationId) {
+            addToast({
+                type: 'danger',
+                title: 'Ошибка',
+                message: 'Не удалось определить организацию. Пожалуйста, переподключитесь.'
+            });
+            return;
+        }
         setYearLabel(yearLabelFromEnd(currentYearEnd));
         setFileSavedConfirmed(false);
         setIsModalOpen(true);
@@ -90,6 +99,16 @@ export const ArchiveYearSection = () => {
     };
 
     const handleCloseYear = async () => {
+        // Двойная проверка organizationId перед критической операцией
+        if (!organizationId) {
+            addToast({
+                type: 'danger',
+                title: 'Ошибка',
+                message: 'Организация не определена. Операция отменена.'
+            });
+            return;
+        }
+
         if (!navigator.onLine) {
             addToast({
                 type: 'warning',
@@ -101,22 +120,29 @@ export const ArchiveYearSection = () => {
 
         setIsProcessing(true);
         try {
-            const archive = await archiveService.buildArchive(data, yearLabel.trim(), organizationId);
+            // Шаг 1: Создание архива текущего года
+            const archive = await archiveService.buildArchive(data, yearLabel.trim(), organizationId, currentYearEnd);
+            
+            // Шаг 2: Загрузка архива на клиент
             archiveService.downloadArchive(archive);
-            await archiveService.clearAnnualCollections(organizationId);
-            await saveData({
-                schedule: [],
-                schedule2: [],
-                substitutions: [],
-                dutySchedule: [],
-                nutritionRecords: [],
-                absenteeismRecords: [],
-                settings: {
-                    ...data.settings,
-                    substitutionDayComments: {},
-                    currentYear: nextYearEnd
-                }
-            });
+            
+            // Шаг 3: Очистка и сохранение в одной операции (как одна транзакция с точки зрения пользователя)
+            await archiveService.closeAcademicYear(
+                organizationId,
+                currentYearEnd,
+                data,
+                saveData,
+                nextYearEnd
+            );
+            
+            // Шаг 4: Верификация целостности
+            const integrityCheck = await archiveService.verifyYearClosure(organizationId, nextYearEnd);
+            if (!integrityCheck.success) {
+                throw new Error(
+                    `Ошибка целостности данных после закрытия: ${integrityCheck.errors.join(', ')}`
+                );
+            }
+            
             setCounts({
                 schedule1: 0,
                 schedule2: 0,
@@ -129,15 +155,15 @@ export const ArchiveYearSection = () => {
             addToast({
                 type: 'success',
                 title: 'Учебный год закрыт',
-                message: `Архив ${archive.yearLabel} сохранён и загружен. Текущий учебный год изменён на ${yearLabelFromEnd(nextYearEnd)}.`
+                message: `Архив ${archive.yearLabel} сохранён. Учебный год обновлён на ${yearLabelFromEnd(nextYearEnd)}.`
             });
         } catch (error) {
             logger.error('Failed to close academic year', error);
             addToast({
                 type: 'danger',
-                title: 'Ошибка',
+                title: 'Ошибка при закрытии года',
                 message:
-                    (error as Error).message || 'Не удалось закрыть учебный год. Данные не были удалены.'
+                    (error as Error).message || 'Не удалось закрыть учебный год. Проверьте наличие интернета и повторите.'
             });
         } finally {
             setIsProcessing(false);

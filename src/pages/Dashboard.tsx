@@ -974,14 +974,12 @@ export const DashboardPage = () => {
         switch (widget.id) {
             case 'search':
                 return (
-                    <div
-                        className="p-6 flex flex-col h-full relative overflow-hidden bento-card"
-                    >
-                        <div className="flex items-center gap-3 mb-6">
-                            <div className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white p-3 rounded-2xl shadow-glow neon-glow">
+                    <div className="p-5 flex flex-col h-full relative overflow-hidden bento-card">
+                        <div className="flex items-center gap-3 mb-5">
+                            <div className="bg-indigo-600 text-white p-3 rounded-2xl">
                                 <Icon name="Search" size={22} />
                             </div>
-                            <h3 className="font-bold text-xl text-slate-800 dark:text-white">Поиск</h3>
+                            <h3 className="font-semibold text-lg text-slate-800 dark:text-white">Поиск</h3>
                         </div>
 
                         <div className="relative mb-4">
@@ -991,7 +989,7 @@ export const DashboardPage = () => {
                                 placeholder="Учитель, класс или кабинет..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full bg-white/40 dark:bg-white/5 border border-white/30 dark:border-white/10 rounded-xl py-3.5 pl-11 pr-4 text-sm outline-none focus-glow dark:text-white transition-all placeholder:text-slate-400 input-glow"
+                                className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl py-3 pl-11 pr-4 text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 dark:text-white transition-colors placeholder:text-slate-400"
                             />
                             <Icon
                                 name="Search"
@@ -1005,7 +1003,7 @@ export const DashboardPage = () => {
                                 {searchResults.map((item) => (
                                     <div
                                         key={`${item.type}-${item.id}`}
-                                        className="flex items-center justify-between p-3 rounded-xl glass-panel hover:border-indigo-300 dark:hover:border-indigo-500 transition-colors cursor-pointer"
+                                        className="ui-list-row cursor-pointer"
                                         onClick={() => {
                                             const currentSemester = getActiveSemester(new Date(), settings) ?? 1;
                                             const targetPath = currentSemester === 2 ? '/schedule2' : '/schedule';
@@ -1080,18 +1078,18 @@ export const DashboardPage = () => {
             case 'substitutions':
                 return (
                     <div
-                        className={`p-6 bento-card ${unresolvedSubstitutions > 0 ? 'ring-2 ring-red-500/20 dark:ring-red-500/30' : ''}`}
+                        className={`p-5 bento-card ${unresolvedSubstitutions > 0 ? 'ring-1 ring-red-500/20 dark:ring-red-500/30' : ''}`}
                     >
                         {unresolvedSubstitutions > 0 && (
                             <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/10 blur-2xl -mr-10 -mt-10 rounded-full"></div>
                         )}
                         <div className="flex items-center gap-3 mb-4 relative z-10">
                             <div
-                                className={`p-3 rounded-2xl shadow-lg ${unresolvedSubstitutions > 0 ? 'bg-gradient-to-br from-red-500 to-orange-600 text-white shadow-red-500/30' : 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-emerald-500/30'}`}
+                                className={`p-3 rounded-2xl text-white ${unresolvedSubstitutions > 0 ? 'bg-red-500' : 'bg-emerald-600'}`}
                             >
                                 <Icon name={unresolvedSubstitutions > 0 ? 'AlertTriangle' : 'CheckCircle'} size={22} />
                             </div>
-                            <h3 className="font-bold text-xl dark:text-white">Замены</h3>
+                            <h3 className="font-semibold text-lg dark:text-white">Замены</h3>
                         </div>
                         <div className="flex-1 flex flex-col items-center justify-center text-center relative z-10">
                             {unresolvedSubstitutions > 0 ? (
@@ -1104,7 +1102,7 @@ export const DashboardPage = () => {
                                     </div>
                                     <button
                                         onClick={() => navigate('/substitutions')}
-                                        className="w-full py-3 btn-primary btn-glow rounded-2xl font-bold flex items-center justify-center gap-2 group"
+                                        className="w-full py-3 btn-primary rounded-2xl font-semibold flex items-center justify-center gap-2 group"
                                     >
                                         Перейти{' '}
                                         <Icon
@@ -1130,18 +1128,18 @@ export const DashboardPage = () => {
             case 'occupancy':
                 return (
                     <div
-                        className="p-6 flex flex-col h-full bento-card"
+                        className="p-5 flex flex-col h-full bento-card"
                     >
                         <div className="flex items-center justify-between mb-6">
                             <div className="flex items-center gap-3">
-                                <div className="bg-gradient-to-br from-blue-500 to-cyan-500 text-white p-3 rounded-2xl shadow-lg shadow-blue-500/20">
+                                <div className="bg-blue-600 text-white p-3 rounded-2xl">
                                     <Icon name="PieChart" size={22} />
                                 </div>
-                                <h3 className="font-bold text-xl dark:text-white">Штат</h3>
+                                <h3 className="font-semibold text-lg dark:text-white">Штат</h3>
                             </div>
                             <button
                                 onClick={() => setShowAbsentList(!showAbsentList)}
-                                className="p-2.5 text-slate-400 hover:text-indigo-600 bg-white dark:bg-slate-700/50 rounded-xl transition-all hover:shadow-md"
+                                className="btn-secondary p-2.5 text-slate-500 hover:text-indigo-600"
                                 title={showAbsentList ? 'Показать график' : 'Список отсутствующих'}
                             >
                                 <Icon name={showAbsentList ? 'PieChart' : 'List'} size={20} />
@@ -1155,7 +1153,7 @@ export const DashboardPage = () => {
                                         {occupancyStats.absentTeachersList.map((t) => (
                                             <div
                                                 key={t.id}
-                                                className="flex justify-between items-center text-sm p-2 rounded-lg bg-slate-50 dark:bg-slate-800/50"
+                                                className="ui-list-row text-sm"
                                             >
                                                 <span className="font-bold text-slate-700 dark:text-slate-300 truncate pr-2">
                                                     {t.name}
@@ -1413,25 +1411,26 @@ export const DashboardPage = () => {
             {/* NEW Header Layout */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
                 <div className="lg:col-span-2 flex flex-col justify-end">
-                    <h1 className="text-4xl font-black text-slate-800 dark:text-white tracking-tight mb-1 bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-purple-600 dark:from-indigo-400 dark:to-purple-400">
+                    <h1 className="text-3xl lg:text-4xl font-semibold text-slate-800 dark:text-white tracking-tight mb-1">
                         {greeting}, {profile?.firstName || profile?.displayName || (role === 'superadmin' ? 'Суперадмин' : role === 'admin' ? 'Администратор' : role === 'canteen' ? 'Столовая' : 'Учитель')}!
                     </h1>
-                    <p className="text-slate-500 dark:text-slate-400 text-lg font-medium mb-4">
+                    <p className="text-slate-500 dark:text-slate-400 text-base md:text-lg font-medium mb-4">
                         Сегодня{' '}
                         {currentDate.toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' })}
                     </p>
 
-                    <div className="flex gap-3">
+                    <div className="flex flex-wrap gap-2">
                         <button
                             onClick={() => setIsWidgetModalOpen(true)}
-                            className="flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl font-bold hover:shadow-lg transition-all text-sm border border-slate-200 dark:border-slate-700"
+                            className="btn-secondary flex items-center gap-2 px-4 py-2 text-sm"
                             title="Настроить рабочий стол"
                         >
                             <Icon name="Settings" size={18} />
+                            <span>Настроить</span>
                         </button>
                         <button
                             onClick={() => setIsFeedbackModalOpen(true)}
-                            className="flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl font-bold hover:shadow-lg transition-all text-sm border border-slate-200 dark:border-slate-700"
+                            className="btn-primary flex items-center gap-2 px-4 py-2 text-sm"
                         >
                             <Icon name="Send" size={18} /> Обратная связь
                         </button>
@@ -1439,7 +1438,7 @@ export const DashboardPage = () => {
 
                     {/* Admin Broadcast */}
                     {settings?.adminAnnouncement?.active && (
-                        <div className="mt-6 bg-amber-100 dark:bg-amber-900/30 border-l-4 border-amber-500 p-4 rounded-r-xl shadow-sm">
+                        <div className="mt-6 modern-card p-4 border-l-4 border-amber-500 bg-amber-50/80 dark:bg-amber-900/20">
                             <div className="flex items-start gap-4">
                                 <div className="text-amber-600 dark:text-amber-400 shrink-0 mt-1">
                                     <Icon name="Bell" size={20} />
@@ -1469,7 +1468,7 @@ export const DashboardPage = () => {
 
             {/* Vacation Banner */}
             {schoolStatus.type === 'vacation' && (
-                <div className="bg-gradient-to-r from-violet-500/10 via-indigo-500/10 to-sky-500/10 dark:from-violet-900/30 dark:via-indigo-900/30 dark:to-sky-900/30 border border-indigo-200 dark:border-indigo-800 rounded-2xl p-5 animate-fade-in flex items-center gap-5">
+                <div className="modern-card border-l-4 border-violet-500 p-5 animate-fade-in flex items-center gap-5 bg-violet-50/70 dark:bg-violet-900/20">
                     <div className="w-12 h-12 shrink-0 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/30">
                         <Icon name="Sun" size={24} />
                     </div>
@@ -1489,9 +1488,9 @@ export const DashboardPage = () => {
 
             {/* Soft Notifications */}
             {role === 'admin' && unresolvedSubstitutions > 0 && (
-                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-2xl p-4 animate-fade-in">
+                <div className="modern-card border-l-4 border-amber-500 bg-amber-50/70 dark:bg-amber-900/20 p-4 animate-fade-in">
                     <div className="flex items-center gap-3">
-                        <div className="bg-amber-500 text-white p-2 rounded-xl">
+                        <div className="bg-amber-500 text-white p-2 rounded-lg">
                             <Icon name="AlertTriangle" size={20} />
                         </div>
                         <div className="flex-1">
@@ -1501,10 +1500,7 @@ export const DashboardPage = () => {
                                 внимания
                             </h3>
                         </div>
-                        <NavLink
-                            to="/substitutions"
-                            className="px-4 py-2 bg-amber-500 text-white rounded-xl font-semibold hover:bg-amber-600 transition-colors text-sm"
-                        >
+                        <NavLink to="/substitutions" className="btn-primary px-4 py-2 text-sm">
                             Посмотреть
                         </NavLink>
                     </div>
@@ -1512,7 +1508,7 @@ export const DashboardPage = () => {
             )}
 
             {/* Dashboard widgets - Drag and Drop Grid Layout */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
                 {filteredWidgets.filter((w) => w.visible).map((widget) => (
                     <div
                         key={widget.id}
