@@ -138,14 +138,48 @@ export const supabaseUsersService = {
         if (error) throw error;
     },
 
-    updateLastLogin: async (): Promise<void> => {
-        return Promise.resolve();
+    updateLastLogin: async (uid?: string): Promise<void> => {
+        if (!uid) return;
+        try {
+            await supabase
+                .from('profiles')
+                .update({ last_login_at: new Date().toISOString() })
+                .eq('id', uid);
+        } catch {
+            // non-critical — column may be missing in older schemas
+        }
     }
 };
 
+function coerceStringArray(raw: unknown): string[] {
+    if (Array.isArray(raw)) {
+        return raw.filter((v): v is string => typeof v === 'string' && v.length > 0);
+    }
+    if (typeof raw === 'string' && raw.trim()) {
+        try {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+                return parsed.filter((v): v is string => typeof v === 'string' && v.length > 0);
+            }
+        } catch {
+            return raw
+                .split(',')
+                .map((s) => s.trim())
+                .filter(Boolean);
+        }
+    }
+    return [];
+}
+
 function mapProfile(data: Record<string, unknown>): UserProfile {
-    const role = data.role as UserRole;
+    const role = (String(data.role || 'teacher').trim().toLowerCase() || 'teacher') as UserRole;
     const defaults = getRoleDefaults(role);
+    const permissionsFromDb = coerceStringArray(data.permissions) as Permission[];
+    const pagesFromDb = coerceStringArray(data.allowed_pages) as PageId[];
+    // Пустой список в БД → дефолты роли; иначе только то, что задал суперадмин (можно снять «Архив»)
+    const allowedPages =
+        pagesFromDb.length > 0 ? [...pagesFromDb] : [...(defaults.defaultPages || [])];
+
     return {
         id: data.id as string,
         email: data.email as string,
@@ -153,8 +187,8 @@ function mapProfile(data: Record<string, unknown>): UserProfile {
         firstName: (data.first_name as string) || '',
         role,
         isActive: (data.is_active as boolean) !== false,
-        permissions: ((data.permissions as string[])?.length ? (data.permissions as Permission[]) : defaults.defaultPermissions) || [],
-        allowedPages: ((data.allowed_pages as string[])?.length ? (data.allowed_pages as PageId[]) : defaults.defaultPages) || [],
+        permissions: permissionsFromDb.length ? permissionsFromDb : defaults.defaultPermissions,
+        allowedPages,
         teacherId: (data.teacher_id as string | null | undefined) || undefined,
         organizationId: (data.organization_id as string | null | undefined) || undefined,
         createdAt: data.created_at as string,

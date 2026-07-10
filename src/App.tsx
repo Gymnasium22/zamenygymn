@@ -33,6 +33,33 @@ import { useSessionTimeout } from './hooks/useSessionTimeout';
 import { safeLocalStorageGet, safeLocalStorageSet } from './utils/localStorage';
 import { logger } from './utils/logger';
 
+/** Страницы с реальными маршрутами (не settings-табы users/organizations). */
+const NAVIGABLE_PAGE_IDS: PageId[] = [
+    'dashboard',
+    'schedule',
+    'schedule2',
+    'substitutions',
+    'duty',
+    'nutrition',
+    'absenteeism',
+    'bells',
+    'directory',
+    'reports',
+    'export',
+    'admin',
+    'calendar',
+    'planner',
+    'settings',
+    'archive'
+];
+
+const getSafeHomePath = (allowedPages: PageId[], role: string | null): string => {
+    const fromList = allowedPages.find((p) => NAVIGABLE_PAGE_IDS.includes(p));
+    if (fromList) return `/${fromList}`;
+    if (role === 'superadmin' || role === 'admin') return '/dashboard';
+    return '/login';
+};
+
 const ProtectedRoute = ({
     children,
     allowedRoles,
@@ -51,25 +78,25 @@ const ProtectedRoute = ({
         return <Navigate to="/login" replace />;
     }
 
-    const firstAllowed = allowedPages[0] || 'login';
+    const fallback = getSafeHomePath(allowedPages, role);
 
     if (allowedRoles && !allowedRoles.includes(role)) {
-        return <Navigate to={`/${firstAllowed}`} replace />;
+        return <Navigate to={fallback} replace />;
     }
 
+    // pageId: доступ по списку страниц пользователя (суперадмин — всегда true в canViewPage)
     if (pageId && !canViewPage(pageId)) {
-        return <Navigate to={`/${firstAllowed}`} replace />;
+        return <Navigate to={fallback} replace />;
     }
 
     return <>{children}</>;
 };
 
 const HomeRedirect = () => {
-    const { loading, allowedPages } = useAuth();
+    const { loading, allowedPages, role } = useAuth();
     if (loading) return null;
-    const firstPage = allowedPages[0];
-    if (firstPage) return <Navigate to={`/${firstPage}`} replace />;
-    return <Navigate to="/login" replace />;
+    if (!role) return <Navigate to="/login" replace />;
+    return <Navigate to={getSafeHomePath(allowedPages, role)} replace />;
 };
 
 const Layout = () => {
@@ -632,7 +659,7 @@ export default function App() {
                                             <Route
                                                 path="archive"
                                                 element={
-                                                    <ProtectedRoute allowedRoles={['superadmin', 'admin']} pageId="archive">
+                                                    <ProtectedRoute pageId="archive">
                                                         <ArchivePage />
                                                     </ProtectedRoute>
                                                 }

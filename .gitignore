@@ -40,6 +40,9 @@ AUDIT-REPORT.md
 # Temporary scripts and service account keys (never commit)
 scripts/
 
+# Supabase CLI local link cache (never commit)
+supabase/.temp/
+
 # Internal docs
 MOBILE-IMPROVEMENTS.md
 PWA-SETUP.md

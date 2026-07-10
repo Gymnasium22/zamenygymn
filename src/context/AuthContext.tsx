@@ -51,13 +51,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [isBlocked, setIsBlocked] = useState(false);
 
     const isSuperAdmin = role === 'superadmin';
-    const normalizeAllowedPages = useCallback((loadedProfile: UserProfile) => {
-        const nextPages = [...(loadedProfile.allowedPages || [])];
-        if ((loadedProfile.role === 'admin' || loadedProfile.role === 'superadmin') && !nextPages.includes('archive')) {
-            nextPages.push('archive');
+
+    /** Приводит allowed_pages из БД к массиву PageId (jsonb / string / null). */
+    const coercePageList = useCallback((raw: unknown): PageId[] => {
+        if (Array.isArray(raw)) {
+            return raw.filter((p): p is PageId => typeof p === 'string' && p.length > 0) as PageId[];
         }
-        return nextPages;
+        if (typeof raw === 'string' && raw.trim()) {
+            try {
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed)) {
+                    return parsed.filter((p): p is PageId => typeof p === 'string' && p.length > 0) as PageId[];
+                }
+            } catch {
+                return raw
+                    .split(',')
+                    .map((s) => s.trim())
+                    .filter(Boolean) as PageId[];
+            }
+        }
+        return [];
     }, []);
+
+    const normalizeAllowedPages = useCallback(
+        (loadedProfile: UserProfile) => {
+            // Список страниц берём из профиля (управляется суперадмином в «Пользователи»).
+            // Суперадмину «Архив» всегда доступен через canViewPage, даже если галочка снята в БД.
+            return coercePageList(loadedProfile.allowedPages);
+        },
+        [coercePageList]
+    );
 
     const loadOrganizations = useCallback(async () => {
         try {
@@ -131,9 +154,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const canViewPage = useCallback(
         (pageId: PageId) => {
-            return profile?.isActive === true && profile.allowedPages.includes(pageId);
+            if (!profile || profile.isActive !== true) return false;
+            // Суперадмин видит все разделы (включая Архив) — скрыть у себя нельзя
+            if (profile.role === 'superadmin') return true;
+            // У остальных (admin, teacher, canteen) — только галочки «Страницы» в профиле
+            const pages = normalizeAllowedPages(profile);
+            return pages.includes(pageId);
         },
-        [profile]
+        [profile, normalizeAllowedPages]
     );
 
     useEffect(() => {
