@@ -4,7 +4,7 @@ import useMedia from 'use-media';
 import { DataProvider, useStaticData, StaticDataProvider, ScheduleDataProvider } from './context/DataContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Icon } from './components/Icons';
-import { StatusWidget, BottomNavigation, ToastProvider, CommandPalette } from './components/UI';
+import { StatusWidget, BottomNavigation, ToastProvider, CommandPalette, Modal } from './components/UI';
 import { AnnouncementModal } from './components/AnnouncementModal';
 import { PullToRefresh } from './components/PullToRefresh';
 import { DashboardPage } from './pages/Dashboard';
@@ -142,6 +142,7 @@ const loadMenuOrder = (): PageId[] => {
 const Layout = () => {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isCommandOpen, setIsCommandOpen] = useState(false);
+    const [isAppearanceOpen, setIsAppearanceOpen] = useState(false);
     const [theme, setTheme] = useState(() => {
         const saved = safeLocalStorageGet('theme');
         if (saved === 'light' || saved === 'dark') return saved;
@@ -504,63 +505,141 @@ const Layout = () => {
                         <StatusWidget />
                     </div>
 
-                    <div className="p-3 border-t border-white/20 dark:border-white/5 space-y-2">
-                        <div className="flex items-center justify-between px-2">
+                    <div className="p-3 border-t border-white/20 dark:border-white/5">
+                        <div className="flex items-center gap-1.5 px-1">
                             <div
                                 title={user?.email || 'Гость'}
-                                className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase truncate max-w-[120px]"
+                                className="flex-1 min-w-0 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase truncate px-1"
                             >
                                 {user ? user.email || 'Гость' : 'Гость'}
                             </div>
                             <button
+                                type="button"
+                                onClick={() => setIsAppearanceOpen(true)}
+                                className="p-2 rounded-xl text-slate-400 hover:text-indigo-600 hover:bg-white/50 dark:hover:bg-white/5 transition-colors shrink-0"
+                                title="Оформление"
+                                aria-label="Оформление: тема, цвет, компактный режим"
+                            >
+                                <Icon name="Settings" size={16} />
+                            </button>
+                            <button
+                                type="button"
                                 onClick={logout}
-                                className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/20 text-slate-400 hover:text-red-500 rounded-xl transition-colors spring-bounce"
+                                className="p-2 rounded-xl text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors shrink-0"
                                 title="Выйти"
+                                aria-label="Выйти"
                             >
                                 <Icon name="LogOut" size={16} />
                             </button>
                         </div>
-                        <div className="grid grid-cols-2 gap-2">
-                            <button
-                                onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-                                className="flex items-center justify-center gap-2 p-2.5 rounded-xl bg-white/50 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-all border border-white/30 dark:border-white/5 active:scale-95 shadow-sm btn-glow"
-                                title="Сменить тему"
-                            >
-                                {theme === 'light' ? <Icon name="Moon" size={18} /> : <Icon name="Sun" size={18} />}
-                            </button>
-                            <button
-                                onClick={() => setCompact((c) => !c)}
-                                className={`flex items-center justify-center gap-2 p-2.5 rounded-xl transition-all border active:scale-95 shadow-sm btn-glow ${
-                                    compact
-                                        ? 'bg-indigo-50/80 text-indigo-600 border-indigo-200/50 dark:bg-indigo-900/20 dark:text-indigo-400 dark:border-indigo-700/30'
-                                        : 'bg-white/50 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:text-indigo-600 border-white/30 dark:border-white/5'
-                                }`}
-                                title="Компактный режим"
-                            >
-                                <Icon name="Columns" size={18} />
-                            </button>
-                        </div>
-                        <div className="flex items-center justify-center gap-2">
-                            {[
-                                { id: 'default', color: 'bg-gradient-to-br from-indigo-500 to-purple-600' },
-                                { id: 'ocean', color: 'bg-gradient-to-br from-sky-500 to-cyan-500' },
-                                { id: 'forest', color: 'bg-gradient-to-br from-emerald-500 to-lime-500' },
-                                { id: 'sunset', color: 'bg-gradient-to-br from-amber-500 to-orange-500' },
-                                { id: 'rose', color: 'bg-gradient-to-br from-rose-500 to-pink-500' }
-                            ].map((t) => (
-                                <button
-                                    key={t.id}
-                                    onClick={() => setThemePreset(t.id)}
-                                    className={`w-6 h-6 rounded-full ${t.color} transition-all ${
-                                        themePreset === t.id ? 'ring-2 ring-offset-2 ring-slate-300 dark:ring-slate-500 scale-110 shadow-glow' : 'opacity-60 hover:opacity-100'
-                                    }`}
-                                    title={t.id === 'default' ? 'Классика' : t.id === 'ocean' ? 'Океан' : t.id === 'forest' ? 'Лес' : t.id === 'sunset' ? 'Закат' : 'Роза'}
-                                />
-                            ))}
-                        </div>
                     </div>
                 </div>
             </aside>
+
+            <Modal
+                isOpen={isAppearanceOpen}
+                onClose={() => setIsAppearanceOpen(false)}
+                title="Оформление"
+                maxWidth="max-w-sm"
+            >
+                <div className="space-y-5">
+                    <div>
+                        <div className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
+                            Тема
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setTheme('light')}
+                                className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold border transition ${
+                                    theme === 'light'
+                                        ? 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-700'
+                                        : 'bg-white/50 dark:bg-white/5 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-600 hover:border-indigo-300'
+                                }`}
+                            >
+                                <Icon name="Sun" size={18} /> Светлая
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setTheme('dark')}
+                                className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold border transition ${
+                                    theme === 'dark'
+                                        ? 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-700'
+                                        : 'bg-white/50 dark:bg-white/5 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-600 hover:border-indigo-300'
+                                }`}
+                            >
+                                <Icon name="Moon" size={18} /> Тёмная
+                            </button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
+                            Плотность
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setCompact((c) => !c)}
+                            className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold border transition ${
+                                compact
+                                    ? 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-700'
+                                    : 'bg-white/50 dark:bg-white/5 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-600'
+                            }`}
+                        >
+                            <span className="flex items-center gap-2">
+                                <Icon name="Columns" size={18} />
+                                Компактный режим
+                            </span>
+                            <span className="text-[11px] font-bold opacity-70">{compact ? 'Вкл' : 'Выкл'}</span>
+                        </button>
+                    </div>
+
+                    <div>
+                        <div className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
+                            Цвет приложения
+                        </div>
+                        <div className="flex items-center justify-center gap-3 flex-wrap">
+                            {[
+                                { id: 'default', color: 'bg-gradient-to-br from-indigo-500 to-purple-600', label: 'Классика' },
+                                { id: 'ocean', color: 'bg-gradient-to-br from-sky-500 to-cyan-500', label: 'Океан' },
+                                { id: 'forest', color: 'bg-gradient-to-br from-emerald-500 to-lime-500', label: 'Лес' },
+                                { id: 'sunset', color: 'bg-gradient-to-br from-amber-500 to-orange-500', label: 'Закат' },
+                                { id: 'rose', color: 'bg-gradient-to-br from-rose-500 to-pink-500', label: 'Роза' }
+                            ].map((t) => (
+                                <button
+                                    key={t.id}
+                                    type="button"
+                                    onClick={() => setThemePreset(t.id)}
+                                    className={`w-9 h-9 rounded-full ${t.color} transition-all ${
+                                        themePreset === t.id
+                                            ? 'ring-2 ring-offset-2 ring-slate-400 dark:ring-slate-400 scale-110 shadow-md'
+                                            : 'opacity-70 hover:opacity-100'
+                                    }`}
+                                    title={t.label}
+                                    aria-label={t.label}
+                                />
+                            ))}
+                        </div>
+                        <p className="text-center text-[11px] text-slate-400 mt-2">
+                            {[
+                                { id: 'default', label: 'Классика' },
+                                { id: 'ocean', label: 'Океан' },
+                                { id: 'forest', label: 'Лес' },
+                                { id: 'sunset', label: 'Закат' },
+                                { id: 'rose', label: 'Роза' }
+                            ].find((t) => t.id === themePreset)?.label || 'Классика'}
+                        </p>
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={() => setIsAppearanceOpen(false)}
+                        className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold transition"
+                    >
+                        Готово
+                    </button>
+                </div>
+            </Modal>
 
             <main className="flex-1 flex flex-col min-w-0 bg-transparent relative z-10">
                 <header className="lg:hidden p-4 flex items-center gap-3 glass-panel border-b border-white/20 dark:border-white/5 no-print sticky top-0 z-30">
