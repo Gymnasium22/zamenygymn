@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { useStaticData, useScheduleData } from '../context/DataContext';
 import { Icon } from '../components/Icons';
 import { DateInput } from '../components/DateInput';
-import { Modal, useToast } from '../components/UI';
+import { Modal, useToast, EmptyState } from '../components/UI';
 import { DAYS, ScheduleItem, ClassEntity, Substitution, SubstitutionParams } from '../types';
 import {
     formatDateISO,
@@ -1397,15 +1397,20 @@ export const SubstitutionsPage = () => {
                             />
                         ))}
                         {(activeTab === 'pending' ? pendingLessons : resolvedLessons).length === 0 && (
-                            <div className="h-full flex flex-col items-center justify-center text-slate-400">
-                                <Icon
-                                    name={activeTab === 'pending' ? 'CheckCircle' : 'List'}
-                                    size={64}
-                                    className="mb-4 text-slate-200 dark:text-slate-700"
+                            <div className="p-4">
+                                <EmptyState
+                                    icon={activeTab === 'pending' ? 'CheckCircle' : 'Repeat'}
+                                    title={
+                                        activeTab === 'pending'
+                                            ? 'Все уроки обработаны'
+                                            : 'На сегодня замен нет'
+                                    }
+                                    description={
+                                        activeTab === 'pending'
+                                            ? 'Нет уроков, требующих назначения замены.'
+                                            : 'Когда появятся отсутствия учителей, замены отобразятся здесь.'
+                                    }
                                 />
-                                <p className="text-lg font-medium">
-                                    {activeTab === 'pending' ? 'Все уроки обработаны!' : 'Нет назначенных замен'}
-                                </p>
                             </div>
                         )}
                     </div>

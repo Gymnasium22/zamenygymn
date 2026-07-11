@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Icon } from '../components/Icons';
+import { EmptyState } from '../components/UI';
 import {
     AcademicYearArchive,
     ArchivedScheduleItem,
@@ -38,8 +39,55 @@ const sortByDayAndPeriod = (a: ArchivedScheduleItem, b: ArchivedScheduleItem) =>
 
 const matchesSearch = (item: unknown, query: string): boolean => {
     if (!query) return true;
-    const q = query.toLowerCase();
+    const q = query.toLowerCase().trim();
+    if (!q) return true;
+    // Явный поиск по учителю / классу (имена в архиве)
+    const rec = item as Record<string, unknown>;
+    const teacherFields = [
+        rec.teacherName,
+        rec.originalTeacherName,
+        rec.replacementTeacherName
+    ]
+        .filter(Boolean)
+        .map(String)
+        .join(' ')
+        .toLowerCase();
+    const classFields = [rec.className, rec.replacementClassName]
+        .filter(Boolean)
+        .map(String)
+        .join(' ')
+        .toLowerCase();
+    if (teacherFields.includes(q) || classFields.includes(q)) return true;
+    // Общий поиск по всем полям
     return JSON.stringify(item).toLowerCase().includes(q);
+};
+
+const matchesTeacherClass = (
+    item: unknown,
+    teacherQ: string,
+    classQ: string
+): boolean => {
+    const t = teacherQ.toLowerCase().trim();
+    const c = classQ.toLowerCase().trim();
+    if (!t && !c) return true;
+    const rec = item as Record<string, unknown>;
+    const teacherFields = [
+        rec.teacherName,
+        rec.originalTeacherName,
+        rec.replacementTeacherName
+    ]
+        .filter(Boolean)
+        .map(String)
+        .join(' ')
+        .toLowerCase();
+    const classFields = [rec.className, rec.replacementClassName]
+        .filter(Boolean)
+        .map(String)
+        .join(' ')
+        .toLowerCase();
+    if (t && !teacherFields.includes(t)) return false;
+    if (c && !classFields.includes(c)) return false;
+    return true;
 };
 
 const StatCard = ({ label, value, icon }: { label: string; value: number; icon: string }) => (
@@ -61,13 +109,21 @@ const SectionHeader = ({
     activeTab,
     onTabChange,
     search,
-    onSearchChange
+    onSearchChange,
+    teacherFilter,
+    onTeacherFilterChange,
+    classFilter,
+    onClassFilterChange
 }: {
     archive: AcademicYearArchive;
     activeTab: TabId;
     onTabChange: (tab: TabId) => void;
     search: string;
     onSearchChange: (v: string) => void;
+    teacherFilter: string;
+    onTeacherFilterChange: (v: string) => void;
+    classFilter: string;
+    onClassFilterChange: (v: string) => void;
 }) => (
     <div className="space-y-4 mb-4">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -79,19 +135,49 @@ const SectionHeader = ({
                     Создан {formatDateEuropean(new Date(archive.archivedAt))}
                 </p>
             </div>
-            <div className="relative">
-                <Icon
-                    name="Search"
-                    size={18}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                />
-                <input
-                    type="text"
-                    value={search}
-                    onChange={(e) => onSearchChange(e.target.value)}
-                    placeholder="Поиск..."
-                    className="w-full lg:w-64 pl-9 pr-4 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-dark-700 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-                />
+            <div className="flex flex-col sm:flex-row flex-wrap gap-2 w-full lg:w-auto">
+                <div className="relative">
+                    <Icon
+                        name="User"
+                        size={16}
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                    />
+                    <input
+                        type="text"
+                        value={teacherFilter}
+                        onChange={(e) => onTeacherFilterChange(e.target.value)}
+                        placeholder="Учитель..."
+                        className="w-full sm:w-40 pl-9 pr-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-dark-700 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                    />
+                </div>
+                <div className="relative">
+                    <Icon
+                        name="GraduationCap"
+                        size={16}
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                    />
+                    <input
+                        type="text"
+                        value={classFilter}
+                        onChange={(e) => onClassFilterChange(e.target.value)}
+                        placeholder="Класс..."
+                        className="w-full sm:w-36 pl-9 pr-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-dark-700 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                    />
+                </div>
+                <div className="relative">
+                    <Icon
+                        name="Search"
+                        size={16}
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                    />
+                    <input
+                        type="text"
+                        value={search}
+                        onChange={(e) => onSearchChange(e.target.value)}
+                        placeholder="Общий поиск..."
+                        className="w-full sm:w-44 pl-9 pr-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-dark-700 text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+                    />
+                </div>
             </div>
         </div>
 
@@ -367,6 +453,8 @@ export const ArchivePage = () => {
     const [error, setError] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<TabId>('schedule1');
     const [search, setSearch] = useState('');
+    const [teacherFilter, setTeacherFilter] = useState('');
+    const [classFilter, setClassFilter] = useState('');
 
     const handleFileChange = (file: File | null) => {
         setError(null);
@@ -391,32 +479,35 @@ export const ArchivePage = () => {
         reader.readAsText(file);
     };
 
+    const passFilters = (item: unknown) =>
+        matchesSearch(item, search) && matchesTeacherClass(item, teacherFilter, classFilter);
+
     const filteredItems = useMemo(() => {
         if (!archive) return [];
-        const q = search.toLowerCase();
         switch (activeTab) {
             case 'schedule1':
-                return archive.schedule1.filter((i) => matchesSearch(i, q)).sort(sortByDayAndPeriod);
+                return archive.schedule1.filter(passFilters).sort(sortByDayAndPeriod);
             case 'schedule2':
-                return archive.schedule2.filter((i) => matchesSearch(i, q)).sort(sortByDayAndPeriod);
+                return archive.schedule2.filter(passFilters).sort(sortByDayAndPeriod);
             case 'substitutions':
                 return archive.substitutions
-                    .filter((i) => matchesSearch(i, q))
+                    .filter(passFilters)
                     .sort((a, b) => b.date.localeCompare(a.date));
             case 'duty':
-                return archive.dutySchedule.filter((i) => matchesSearch(i, q));
+                return archive.dutySchedule.filter(passFilters);
             case 'nutrition':
                 return archive.nutritionRecords
-                    .filter((i) => matchesSearch(i, q))
+                    .filter(passFilters)
                     .sort((a, b) => b.date.localeCompare(a.date));
             case 'absenteeism':
                 return archive.absenteeismRecords
-                    .filter((i) => matchesSearch(i, q))
+                    .filter(passFilters)
                     .sort((a, b) => b.date.localeCompare(a.date));
             default:
                 return [];
         }
-    }, [archive, activeTab, search]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [archive, activeTab, search, teacherFilter, classFilter]);
 
     return (
         <div className="space-y-6">
@@ -443,18 +534,16 @@ export const ArchivePage = () => {
             </div>
 
             {!archive && !error && (
-                <div className="bg-white dark:bg-dark-800 rounded-2xl border border-dashed border-slate-300 dark:border-slate-600 p-12 text-center">
-                    <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center mx-auto mb-4">
-                        <Icon name="Archive" size={32} className="text-slate-400" />
-                    </div>
-                    <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-1">
-                        Архив не загружен
-                    </h3>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">
-                        Нажмите «Загрузить архив» и выберите файл вида{' '}
-                        <code className="bg-slate-100 dark:bg-slate-700 px-1 py-0.5 rounded">archive_YYYY-YYYY.json</code>
-                    </p>
-                </div>
+                <EmptyState
+                    icon="Archive"
+                    title="Архив не загружен"
+                    description="Загрузите JSON-файл учебного года (archive_YYYY-YYYY.json), чтобы просмотреть расписание, замены и журналы."
+                    actionLabel="Выбрать файл"
+                    onAction={() => {
+                        const input = document.querySelector<HTMLInputElement>('input[type=file][accept*="json"]');
+                        input?.click();
+                    }}
+                />
             )}
 
             {error && (
@@ -485,6 +574,10 @@ export const ArchivePage = () => {
                             onTabChange={setActiveTab}
                             search={search}
                             onSearchChange={setSearch}
+                            teacherFilter={teacherFilter}
+                            onTeacherFilterChange={setTeacherFilter}
+                            classFilter={classFilter}
+                            onClassFilterChange={setClassFilter}
                         />
 
                         {activeTab === 'schedule1' && <ScheduleTable items={filteredItems as ArchivedScheduleItem[]} />}

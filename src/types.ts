@@ -141,6 +141,7 @@ export interface AppAnnouncement {
 
 export type DashboardWidgetId =
     | 'weather'
+    | 'today'
     | 'kpi'
     | 'search'
     | 'substitutions'
@@ -196,6 +197,10 @@ export interface Settings {
     googleAppsScriptUrl?: string | null;
     sessionTimeoutMinutes?: number;
     calendarEvents?: CalendarEvent[];
+    /** Блокировка ввода питания после указанного времени (для не-админов) */
+    nutritionLockEnabled?: boolean;
+    /** Время блокировки в формате HH:MM, например "10:00" */
+    nutritionLockTime?: string;
 }
 
 export interface PrivateSettings {

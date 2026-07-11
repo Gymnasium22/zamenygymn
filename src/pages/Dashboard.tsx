@@ -32,7 +32,9 @@ interface AbsentTeacher {
 
 interface ProblemZone {
     class: string;
+    classId?: string;
     issue: string;
+    day?: string;
 }
 
 interface WidgetConfig {
@@ -45,22 +47,25 @@ interface WidgetConfig {
 
 // Weather interfaces moved to weatherService.ts
 
+/** Компактный дефолт: почти всё 1 колонка, «Сегодня» на 2 — меньше прокрутки */
 const DEFAULT_WIDGETS: WidgetConfig[] = [
+    { id: 'today', label: 'Сегодня', visible: true, colSpan: 2 },
     { id: 'kpi', label: 'KPI', visible: true, colSpan: 1 },
     { id: 'search', label: 'Поиск', visible: true, colSpan: 1 },
     { id: 'substitutions', label: 'Замены', visible: true, colSpan: 1 },
     { id: 'occupancy', label: 'Штат', visible: true, colSpan: 1 },
     { id: 'conflicts', label: 'Конфликты', visible: true, colSpan: 1 },
-    { id: 'birthdays', label: 'Праздники', visible: true, colSpan: 2 },
-    { id: 'notes', label: 'Заметки', visible: true, colSpan: 2 }
+    { id: 'birthdays', label: 'Праздники', visible: true, colSpan: 1 },
+    { id: 'notes', label: 'Заметки', visible: false, colSpan: 1 }
 ];
+
+const WIDGETS_STORAGE_KEY = 'gym_dashboard_widgets_v5';
 
 const WeatherWidget = () => {
     const { settings, privateSettings } = useStaticData();
     const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
     const [forecastData, setForecastData] = useState<ForecastItem[]>([]);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
 
     const apiKey = privateSettings.weatherApiKey || settings.weatherApiKey;
     const city = settings.weatherCity || 'Minsk,BY';
@@ -68,20 +73,16 @@ const WeatherWidget = () => {
     useEffect(() => {
         const controller = new AbortController();
         const fetchWeather = async () => {
-            if (!apiKey) {
-                setLoading(false);
-                return;
-            }
-
             try {
-                const data = await weatherService.getWeather(apiKey, city, controller.signal);
+                // Без ключа — Open-Meteo; с ключом — OpenWeather, fallback Open-Meteo
+                const data = await weatherService.getWeather(apiKey || null, city, controller.signal);
                 setWeatherData(data.current);
                 setForecastData(data.forecast);
-                setLoading(false);
             } catch (err) {
                 if ((err as Error).name === 'AbortError') return;
                 logger.error(err);
-                setError('Ошибка загрузки погоды');
+                setWeatherData(null);
+            } finally {
                 setLoading(false);
             }
         };
@@ -90,13 +91,9 @@ const WeatherWidget = () => {
         return () => controller.abort();
     }, [apiKey, city]);
 
-    if (!apiKey) {
-        return <div className="h-full min-h-[140px] rounded-3xl bg-slate-100 dark:bg-slate-700/50 flex items-center justify-center text-slate-400 dark:text-slate-500 text-sm font-medium gap-2"><Icon name="Settings" size={16} /> API ключ погоды не настроен</div>;
-    }
-
+    // Нет данных — скрываем виджет (не пугаем «ошибкой API»)
     if (loading) return <div className="h-32 w-full bg-slate-100 dark:bg-slate-800 rounded-3xl animate-pulse"></div>;
-    if (error) return <div className="h-full min-h-[140px] rounded-3xl bg-slate-200 dark:bg-slate-700/50 flex items-center justify-center text-red-500 text-sm font-medium gap-2"><Icon name="AlertTriangle" size={18} /> Не удалось загрузить погоду</div>;
-    if (!weatherData) return <div className="h-full min-h-[140px] rounded-3xl bg-slate-100 dark:bg-slate-800 rounded-3xl animate-pulse"></div>;
+    if (!weatherData) return null;
 
     const getWeatherIcon = (code: string) => {
         if (code.startsWith('01')) return 'Sun';
@@ -292,27 +289,46 @@ export const DashboardPage = () => {
     const [notesChanged, setNotesChanged] = useState(false);
 
     const [widgets, setWidgets] = useState<WidgetConfig[]>(() => {
-        const saved = safeLocalStorageGet('gym_dashboard_widgets_v4');
-        if (!saved) return DEFAULT_WIDGETS;
+        const saved = safeLocalStorageGet(WIDGETS_STORAGE_KEY);
+        if (!saved) return DEFAULT_WIDGETS.map((w) => ({ ...w }));
         try {
             return JSON.parse(saved);
         } catch {
-            return DEFAULT_WIDGETS;
+            return DEFAULT_WIDGETS.map((w) => ({ ...w }));
         }
     });
 
     const roleWidgetAccess = settings.dashboardWidgetAccess || {
-        superadmin: ['weather', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes'],
-        admin: ['weather', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes'],
-        teacher: ['weather', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes'],
-        canteen: ['weather', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes']
+        superadmin: ['weather', 'today', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes'],
+        admin: ['weather', 'today', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes'],
+        teacher: ['weather', 'today', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes'],
+        canteen: ['weather', 'today', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes']
     };
 
     const allowedWidgets: string[] = role ? roleWidgetAccess[role as UserRole] ?? [] : [];
-    const filteredWidgets = widgets.filter((widget) => allowedWidgets.includes(widget.id));
+    // Мержим сохранённый порядок с новыми виджетами (например «today»)
+    const mergedWidgets = useMemo(() => {
+        const byId = new Map(widgets.map((w) => [w.id, w]));
+        DEFAULT_WIDGETS.forEach((d) => {
+            if (!byId.has(d.id)) byId.set(d.id, { ...d });
+        });
+        // Сохраняем пользовательский порядок + добавляем новые в конец
+        const ordered: WidgetConfig[] = [];
+        widgets.forEach((w) => {
+            const cur = byId.get(w.id);
+            if (cur) ordered.push(cur);
+        });
+        DEFAULT_WIDGETS.forEach((d) => {
+            if (!ordered.some((w) => w.id === d.id)) ordered.push(byId.get(d.id)!);
+        });
+        return ordered;
+    }, [widgets]);
+
+    const filteredWidgets = mergedWidgets.filter((widget) => allowedWidgets.includes(widget.id));
     const canShowWeather = allowedWidgets.includes('weather');
     const [isWidgetModalOpen, setIsWidgetModalOpen] = useState(false);
     const [draggedWidgetId, setDraggedWidgetId] = useState<string | null>(null);
+    const [notesCollapsed, setNotesCollapsed] = useState(false);
     const widgetDragTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const handleDragStart = (e: React.DragEvent<HTMLDivElement>, id: string) => {
@@ -336,7 +352,7 @@ export const DashboardPage = () => {
         setDraggedWidgetId(null);
         if (e.target instanceof HTMLElement) {
             e.target.style.opacity = '1';
-            safeLocalStorageSet('gym_dashboard_widgets_v4', JSON.stringify(widgets));
+            safeLocalStorageSet(WIDGETS_STORAGE_KEY, JSON.stringify(widgets));
         }
     };
 
@@ -831,8 +847,15 @@ export const DashboardPage = () => {
         const checkableClasses = classes.filter((c) => !c.excludeFromReports);
         checkableClasses.forEach((cls) => {
             const lessons = schedule.filter((s) => s.classId === cls.id && s.day === nextDayName);
-            if (lessons.length === 0) problems.push({ class: cls.name, issue: `Нет уроков на ${nextDayName}` });
-            else if (lessons.length < 4) problems.push({ class: cls.name, issue: `Мало уроков (${lessons.length})` });
+            if (lessons.length === 0)
+                problems.push({ class: cls.name, classId: cls.id, issue: `Нет уроков на ${nextDayName}`, day: nextDayName });
+            else if (lessons.length < 4)
+                problems.push({
+                    class: cls.name,
+                    classId: cls.id,
+                    issue: `Мало уроков (${lessons.length})`,
+                    day: nextDayName
+                });
             lessons.forEach((l) => {
                 const tc = schedule.some(
                     (s) =>
@@ -842,11 +865,22 @@ export const DashboardPage = () => {
                         s.shift === l.shift &&
                         s.teacherId === l.teacherId
                 );
-                if (tc) problems.push({ class: cls.name, issue: `Конфликт учителя (${l.period} ур)` });
+                if (tc)
+                    problems.push({
+                        class: cls.name,
+                        classId: cls.id,
+                        issue: `Конфликт учителя (${l.period} ур)`,
+                        day: nextDayName
+                    });
                 if (l.roomId) {
                     const room = rooms.find((r) => r.id === l.roomId);
                     if (room && (room.capacity || 0) < cls.studentsCount)
-                        problems.push({ class: cls.name, issue: `Тесно: ${room.name} (${l.period} ур)` });
+                        problems.push({
+                            class: cls.name,
+                            classId: cls.id,
+                            issue: `Тесно: ${room.name} (${l.period} ур)`,
+                            day: nextDayName
+                        });
                 }
             });
         });
@@ -920,51 +954,97 @@ export const DashboardPage = () => {
     };
 
     const handleWidgetToggle = (id: string) => {
-        const newWidgets = widgets.map((w) => (w.id === id ? { ...w, visible: !w.visible } : w));
-        setWidgets(newWidgets);
+        setWidgets((prev) => {
+            const base = prev.length ? [...prev] : [...DEFAULT_WIDGETS];
+            DEFAULT_WIDGETS.forEach((d) => {
+                if (!base.some((w) => w.id === d.id)) base.push({ ...d });
+            });
+            const next = base.map((w) => (w.id === id ? { ...w, visible: !w.visible } : w));
+            safeLocalStorageSet(WIDGETS_STORAGE_KEY, JSON.stringify(next));
+            return next;
+        });
     };
 
     const handleWidgetReorder = (id: string, direction: 'up' | 'down') => {
-        const index = widgets.findIndex((w) => w.id === id);
-        if (index === -1) return;
-        const newWidgets = [...widgets];
-        if (direction === 'up' && index > 0) {
-            [newWidgets[index], newWidgets[index - 1]] = [newWidgets[index - 1], newWidgets[index]];
-        } else if (direction === 'down' && index < newWidgets.length - 1) {
-            [newWidgets[index], newWidgets[index + 1]] = [newWidgets[index + 1], newWidgets[index]];
-        }
-        setWidgets(newWidgets);
-    };
-
-    const handleWidgetResize = (id: string) => {
         setWidgets((prev) => {
-            const newWidgets = prev.map(w => {
-                if (w.id === id) {
-                    const currentSpan = w.colSpan || 1;
-                    // Cycle through 1, 2, 3, 4
-                    const nextSpan = currentSpan >= 4 ? 1 : currentSpan + 1;
-                    return { ...w, colSpan: nextSpan };
-                }
-                return w;
+            const base = prev.length ? [...prev] : [...DEFAULT_WIDGETS];
+            DEFAULT_WIDGETS.forEach((d) => {
+                if (!base.some((w) => w.id === d.id)) base.push({ ...d });
             });
-            safeLocalStorageSet('gym_dashboard_widgets_v4', JSON.stringify(newWidgets));
+            const index = base.findIndex((w) => w.id === id);
+            if (index === -1) return base;
+            const newWidgets = [...base];
+            if (direction === 'up' && index > 0) {
+                [newWidgets[index], newWidgets[index - 1]] = [newWidgets[index - 1], newWidgets[index]];
+            } else if (direction === 'down' && index < newWidgets.length - 1) {
+                [newWidgets[index], newWidgets[index + 1]] = [newWidgets[index + 1], newWidgets[index]];
+            }
+            safeLocalStorageSet(WIDGETS_STORAGE_KEY, JSON.stringify(newWidgets));
             return newWidgets;
         });
     };
 
+    const handleWidgetResize = (id: string) => {
+        setWidgets((prev) => {
+            const base = prev.length ? prev : DEFAULT_WIDGETS;
+            // Гарантируем наличие всех дефолтных виджетов
+            const map = new Map(base.map((w) => [w.id, w]));
+            DEFAULT_WIDGETS.forEach((d) => {
+                if (!map.has(d.id)) map.set(d.id, { ...d });
+            });
+            const newWidgets = Array.from(map.values()).map((w) => {
+                if (w.id === id) {
+                    const currentSpan = w.colSpan || 1;
+                    // Цикл 1 → 2 → 4 → 1
+                    const nextSpan = currentSpan >= 4 ? 1 : currentSpan === 1 ? 2 : 4;
+                    return { ...w, colSpan: nextSpan };
+                }
+                return w;
+            });
+            // Сохраняем порядок как в prev + новые
+            const ordered: WidgetConfig[] = [];
+            base.forEach((w) => {
+                const u = newWidgets.find((x) => x.id === w.id);
+                if (u) ordered.push(u);
+            });
+            newWidgets.forEach((w) => {
+                if (!ordered.some((x) => x.id === w.id)) ordered.push(w);
+            });
+            safeLocalStorageSet(WIDGETS_STORAGE_KEY, JSON.stringify(ordered));
+            return ordered;
+        });
+    };
+
+    const openConflictInSchedule = (p: ProblemZone) => {
+        const params = new URLSearchParams();
+        params.set('view', 'class');
+        if (p.classId) params.set('id', p.classId);
+        if (p.day) params.set('day', p.day);
+        navigate(`/schedule?${params.toString()}`);
+    };
+
     const getColSpanClass = (span: number = 1) => {
-        switch(span) {
-            case 4: return 'md:col-span-2 lg:col-span-4';
-            case 3: return 'md:col-span-2 lg:col-span-3';
-            case 2: return 'md:col-span-2 lg:col-span-2';
-            case 1: 
-            default: return 'col-span-1';
+        switch (span) {
+            case 4:
+                return 'md:col-span-2 lg:col-span-4';
+            case 2:
+                return 'md:col-span-2 lg:col-span-2';
+            case 1:
+            default:
+                return 'col-span-1';
         }
     };
 
     const saveWidgets = () => {
-        safeLocalStorageSet('gym_dashboard_widgets_v4', JSON.stringify(widgets));
+        safeLocalStorageSet(WIDGETS_STORAGE_KEY, JSON.stringify(widgets));
         setIsWidgetModalOpen(false);
+    };
+
+    const resetWidgetsLayout = () => {
+        const fresh = DEFAULT_WIDGETS.map((w) => ({ ...w }));
+        setWidgets(fresh);
+        safeLocalStorageSet(WIDGETS_STORAGE_KEY, JSON.stringify(fresh));
+        addToast({ type: 'success', title: 'Сброшено', message: 'Компактная раскладка виджетов' });
     };
 
     // --- Render Widgets Helper ---
@@ -972,6 +1052,81 @@ export const DashboardPage = () => {
         if (!widget.visible) return null;
 
         switch (widget.id) {
+            case 'today': {
+                const todaySubsCount = substitutions.filter((s) => s.date === todayStr).length;
+                const absentNames = occupancyStats.absentTeachersList.slice(0, 4);
+                const lessonHint =
+                    schoolStatus.type === 'lesson' && schoolStatus.bell
+                        ? `${schoolStatus.bell.period} урок · ${schoolStatus.bell.start}–${schoolStatus.bell.end}`
+                        : schoolStatus.label;
+                return (
+                    <div className="p-4 h-full bento-card bg-gradient-to-br from-indigo-50 to-white dark:from-indigo-950/40 dark:to-dark-800 border border-indigo-100 dark:border-indigo-900/40">
+                        <div className="flex items-center gap-2.5 mb-3">
+                            <div className="bg-indigo-600 text-white p-2 rounded-xl shadow-md shadow-indigo-500/20">
+                                <Icon name="Clock" size={18} />
+                            </div>
+                            <div className="min-w-0">
+                                <h3 className="font-bold text-base text-slate-800 dark:text-white">Сегодня</h3>
+                                <p className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-300 truncate">{lessonHint}</p>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-3 gap-1.5 mb-3">
+                            <div className="rounded-lg bg-white/80 dark:bg-slate-800/80 p-2 text-center border border-slate-100 dark:border-slate-700">
+                                <div className="text-xl font-black text-slate-800 dark:text-white">{kpiData.todayLessons}</div>
+                                <div className="text-[9px] font-bold uppercase text-slate-400">уроков</div>
+                            </div>
+                            <NavLink
+                                to="/substitutions"
+                                className="rounded-lg bg-white/80 dark:bg-slate-800/80 p-2 text-center border border-slate-100 dark:border-slate-700 hover:border-amber-300 transition"
+                            >
+                                <div className="text-xl font-black text-amber-600">{todaySubsCount}</div>
+                                <div className="text-[9px] font-bold uppercase text-slate-400">замен</div>
+                            </NavLink>
+                            <button
+                                type="button"
+                                onClick={() => setShowAbsentList(true)}
+                                className="rounded-lg bg-white/80 dark:bg-slate-800/80 p-2 text-center border border-slate-100 dark:border-slate-700 hover:border-rose-300 transition"
+                            >
+                                <div className="text-xl font-black text-rose-600">{occupancyStats.absentCount}</div>
+                                <div className="text-[9px] font-bold uppercase text-slate-400">нет</div>
+                            </button>
+                        </div>
+                        {absentNames.length > 0 ? (
+                            <div className="space-y-1 max-h-24 overflow-y-auto custom-scrollbar">
+                                {absentNames.slice(0, 3).map((t) => (
+                                    <div
+                                        key={t.id}
+                                        className="flex justify-between gap-2 text-xs px-2 py-1 rounded-md bg-white/60 dark:bg-slate-800/50"
+                                    >
+                                        <span className="font-medium text-slate-700 dark:text-slate-200 truncate">{t.name}</span>
+                                        <span className="text-[10px] text-slate-400 shrink-0">{t.displayReason}</span>
+                                    </div>
+                                ))}
+                                {occupancyStats.absentCount > 3 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowAbsentList(true)}
+                                        className="text-[11px] font-bold text-indigo-600 hover:underline"
+                                    >
+                                        Ещё {occupancyStats.absentCount - 3}…
+                                    </button>
+                                )}
+                            </div>
+                        ) : (
+                            <p className="text-xs text-slate-400 italic">Все на месте</p>
+                        )}
+                        {unresolvedSubstitutions > 0 && (
+                            <NavLink
+                                to="/substitutions"
+                                className="mt-2 flex items-center gap-1.5 text-xs font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 px-2.5 py-1.5 rounded-lg"
+                            >
+                                <Icon name="AlertTriangle" size={14} />
+                                {unresolvedSubstitutions} без назначения
+                            </NavLink>
+                        )}
+                    </div>
+                );
+            }
             case 'search':
                 return (
                     <div className="p-5 flex flex-col h-full relative overflow-hidden bento-card">
@@ -1078,10 +1233,10 @@ export const DashboardPage = () => {
             case 'substitutions':
                 return (
                     <div
-                        className={`p-5 bento-card ${unresolvedSubstitutions > 0 ? 'ring-1 ring-red-500/20 dark:ring-red-500/30' : ''}`}
+                        className={`p-5 flex flex-col h-full min-h-[220px] relative bento-card ${unresolvedSubstitutions > 0 ? 'ring-1 ring-red-500/20 dark:ring-red-500/30' : ''}`}
                     >
                         {unresolvedSubstitutions > 0 && (
-                            <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/10 blur-2xl -mr-10 -mt-10 rounded-full"></div>
+                            <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/10 blur-2xl -mr-10 -mt-10 rounded-full pointer-events-none"></div>
                         )}
                         <div className="flex items-center gap-3 mb-4 relative z-10">
                             <div
@@ -1091,13 +1246,13 @@ export const DashboardPage = () => {
                             </div>
                             <h3 className="font-semibold text-lg dark:text-white">Замены</h3>
                         </div>
-                        <div className="flex-1 flex flex-col items-center justify-center text-center relative z-10">
+                        <div className="flex-1 flex flex-col items-center justify-center text-center relative z-10 min-h-[120px]">
                             {unresolvedSubstitutions > 0 ? (
                                 <>
-                                    <div className="text-6xl font-black text-slate-800 dark:text-white mb-2 tracking-tighter">
+                                    <div className="text-5xl sm:text-6xl font-black text-slate-800 dark:text-white mb-2 tracking-tighter">
                                         {unresolvedSubstitutions}
                                     </div>
-                                    <div className="text-sm font-bold text-red-500 uppercase tracking-wider mb-6">
+                                    <div className="text-sm font-bold text-red-500 uppercase tracking-wider mb-4">
                                         Требуют внимания
                                     </div>
                                     <button
@@ -1114,8 +1269,8 @@ export const DashboardPage = () => {
                                 </>
                             ) : (
                                 <>
-                                    <div className="text-slate-200 dark:text-slate-700 mb-4 transform scale-125 opacity-50">
-                                        <Icon name="CheckCircle" size={64} />
+                                    <div className="text-slate-200 dark:text-slate-700 mb-3 opacity-50">
+                                        <Icon name="CheckCircle" size={56} />
                                     </div>
                                     <p className="text-base font-medium text-slate-500 dark:text-slate-400">
                                         Все замены разрешены
@@ -1214,7 +1369,15 @@ export const DashboardPage = () => {
                                 </div>
                                 <h3 className="font-bold text-xl dark:text-white">Заметки</h3>
                             </div>
-                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="flex gap-1">
+                                <button
+                                    type="button"
+                                    onClick={() => setNotesCollapsed((c) => !c)}
+                                    className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg"
+                                    title={notesCollapsed ? 'Развернуть' : 'Свернуть'}
+                                >
+                                    <Icon name={notesCollapsed ? 'Rows' : 'Columns'} size={16} />
+                                </button>
                                 <button
                                     onClick={saveNotes}
                                     disabled={!notesChanged}
@@ -1255,21 +1418,27 @@ export const DashboardPage = () => {
                                 </button>
                             </div>
                         </div>
-                        <div className="relative flex-1 bg-yellow-50/50 dark:bg-slate-800/50 rounded-2xl p-1">
-                            <textarea
-                                inputMode="text"
-                                className="w-full h-full p-4 bg-transparent border-none outline-none font-medium text-slate-700 dark:text-slate-200 resize-none text-sm leading-relaxed"
-                                placeholder="Напишите что-нибудь..."
-                                value={notes}
-                                onChange={(e) => handleNotesChange(e.target.value)}
-                                maxLength={10000}
-                            />
-                            {notesChanged && (
-                                <div className="absolute bottom-3 right-3 text-[10px] font-bold uppercase tracking-widest text-amber-600 animate-pulse flex items-center gap-1 bg-white dark:bg-slate-800 px-2 py-1 rounded-full shadow-sm">
-                                    <Icon name="Clock" size={10} /> Не сохранено
-                                </div>
-                            )}
-                        </div>
+                        {notesCollapsed ? (
+                            <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2 px-1">
+                                {notes.trim() || 'Нет заметок — нажмите, чтобы развернуть'}
+                            </p>
+                        ) : (
+                            <div className="relative flex-1 min-h-[140px] bg-yellow-50/50 dark:bg-slate-800/50 rounded-2xl p-1">
+                                <textarea
+                                    inputMode="text"
+                                    className="w-full h-36 p-4 bg-transparent border-none outline-none font-medium text-slate-700 dark:text-slate-200 resize-none text-sm leading-relaxed"
+                                    placeholder="Напишите что-нибудь..."
+                                    value={notes}
+                                    onChange={(e) => handleNotesChange(e.target.value)}
+                                    maxLength={10000}
+                                />
+                                {notesChanged && (
+                                    <div className="absolute bottom-3 right-3 text-[10px] font-bold uppercase tracking-widest text-amber-600 animate-pulse flex items-center gap-1 bg-white dark:bg-slate-800 px-2 py-1 rounded-full shadow-sm">
+                                        <Icon name="Clock" size={10} /> Не сохранено
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 );
             case 'conflicts':
@@ -1281,7 +1450,10 @@ export const DashboardPage = () => {
                             <div className="bg-amber-100 dark:bg-amber-900/30 text-amber-600 p-2 rounded-xl">
                                 <Icon name="AlertTriangle" size={20} />
                             </div>
-                            <h3 className="font-bold text-lg dark:text-white">Возможные конфликты</h3>
+                            <div className="flex-1">
+                                <h3 className="font-bold text-lg dark:text-white">Возможные конфликты</h3>
+                                <p className="text-[10px] text-slate-400 font-medium">Нажмите строку → расписание класса</p>
+                            </div>
                         </div>
                         <div className="space-y-2 max-h-52 overflow-y-auto custom-scrollbar pr-2">
                             {schoolStatus.type === 'vacation' ? (
@@ -1294,15 +1466,17 @@ export const DashboardPage = () => {
                                 </div>
                             ) : problemZones.length ? (
                                 problemZones.map((p) => (
-                                    <div
+                                    <button
+                                        type="button"
                                         key={`${p.class}-${p.issue}`}
-                                        className="flex justify-between items-center p-3 glass-panel rounded-xl border border-slate-100 dark:border-slate-700"
+                                        onClick={() => openConflictInSchedule(p)}
+                                        className="w-full flex justify-between items-center gap-2 p-3 glass-panel rounded-xl border border-slate-100 dark:border-slate-700 hover:border-amber-300 dark:hover:border-amber-600 hover:bg-amber-50/50 dark:hover:bg-amber-900/10 transition text-left"
                                     >
                                         <span className="font-bold text-slate-700 dark:text-slate-200">{p.class}</span>
-                                        <span className="text-xs font-bold text-amber-600 bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded-lg">
+                                        <span className="text-xs font-bold text-amber-600 bg-amber-50 dark:bg-amber-900/20 px-2 py-1 rounded-lg shrink-0">
                                             {p.issue}
                                         </span>
-                                    </div>
+                                    </button>
                                 ))
                             ) : (
                                 <div className="p-4 text-center text-slate-400 text-sm italic">
@@ -1507,8 +1681,8 @@ export const DashboardPage = () => {
                 </div>
             )}
 
-            {/* Dashboard widgets - Drag and Drop Grid Layout */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+            {/* Dashboard widgets — плотная сетка, виджеты не раздувают страницу */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 auto-rows-min">
                 {filteredWidgets.filter((w) => w.visible).map((widget) => (
                     <div
                         key={widget.id}
@@ -1516,13 +1690,16 @@ export const DashboardPage = () => {
                         onDragStart={(e) => handleDragStart(e, widget.id)}
                         onDragEnd={handleDragEnd}
                         onDragOver={(e) => handleDragOver(e, widget.id)}
-                        className={`cursor-grab active:cursor-grabbing transition-all relative group ${draggedWidgetId === widget.id ? 'scale-95 z-50' : ''} ${getColSpanClass(widget.colSpan)}`}
+                        className={`cursor-grab active:cursor-grabbing transition-all relative group min-h-0 ${draggedWidgetId === widget.id ? 'scale-95 z-50' : ''} ${getColSpanClass(widget.colSpan)}`}
                     >
-                        <div className="absolute top-4 right-4 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="absolute top-4 right-4 z-20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                            <span className="text-[10px] font-bold text-slate-400 bg-white/90 dark:bg-slate-800 px-1.5 py-0.5 rounded">
+                                ×{widget.colSpan || 1}
+                            </span>
                             <button
                                 onClick={(e) => { e.stopPropagation(); handleWidgetResize(widget.id); }}
                                 className="p-1.5 bg-slate-100 dark:bg-slate-700/80 backdrop-blur rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900 text-slate-500 hover:text-indigo-600 transition-colors shadow-sm"
-                                title="Изменить размер виджета"
+                                title="Ширина: 1 → 2 → 4 колонки"
                             >
                                 <Icon name="Maximize2" size={14} />
                             </button>
@@ -1569,25 +1746,34 @@ export const DashboardPage = () => {
                 title="Настройка рабочего стола"
             >
                 <div className="space-y-4">
-                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-                        Включите нужные виджеты и настройте их порядок.
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                        Включите нужные виджеты. Ширина: кнопка ⤢ на карточке (1 → 2 → 4). Лучше не ставить всё на ×4 — страница станет длинной.
                     </p>
-                    <div className="space-y-2 max-h-[60vh] overflow-y-auto custom-scrollbar pr-2">
+                    <div className="space-y-2 max-h-[50vh] overflow-y-auto custom-scrollbar pr-2">
                         {filteredWidgets.map((widget, idx) => (
                             <div
                                 key={widget.id}
                                 className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-700 rounded-xl border border-slate-200 dark:border-slate-600"
                             >
-                                <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-3 min-w-0">
                                     <input
                                         type="checkbox"
                                         checked={widget.visible}
                                         onChange={() => handleWidgetToggle(widget.id)}
-                                        className="w-5 h-5 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                                        className="w-5 h-5 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer shrink-0"
                                     />
-                                    <span className="font-bold text-slate-700 dark:text-white">{widget.label}</span>
+                                    <span className="font-bold text-slate-700 dark:text-white truncate">{widget.label}</span>
+                                    <span className="text-[10px] font-bold text-slate-400 shrink-0">×{widget.colSpan || 1}</span>
                                 </div>
-                                <div className="flex gap-1">
+                                <div className="flex gap-1 shrink-0">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleWidgetResize(widget.id)}
+                                        className="p-1.5 text-slate-400 hover:text-indigo-600"
+                                        title="Сменить ширину"
+                                    >
+                                        <Icon name="Maximize2" size={16} />
+                                    </button>
                                     <button
                                         onClick={() => handleWidgetReorder(widget.id, 'up')}
                                         disabled={idx === 0}
@@ -1606,7 +1792,14 @@ export const DashboardPage = () => {
                             </div>
                         ))}
                     </div>
-                    <div className="flex justify-end pt-4">
+                    <div className="flex flex-wrap justify-between gap-2 pt-2">
+                        <button
+                            type="button"
+                            onClick={resetWidgetsLayout}
+                            className="px-4 py-2 text-sm font-bold text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700"
+                        >
+                            Сбросить к компактному
+                        </button>
                         <button
                             onClick={saveWidgets}
                             className="px-6 py-2 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition"

@@ -4,13 +4,24 @@ import { Modal } from './UI';
 import { generateId } from '../utils/helpers';
 import { CalendarEvent } from '../types';
 
+/** Фон + текст чипа события */
 const EVENT_COLORS: Record<CalendarEvent['type'], string> = {
-    holiday: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-300 dark:border-red-800',
-    celebration: 'bg-pink-100 text-pink-800 border-pink-200 dark:bg-pink-900/30 dark:text-pink-300 dark:border-pink-800',
-    exam: 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800',
-    meeting: 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800',
-    event: 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:border-purple-800',
-    other: 'bg-slate-100 text-slate-800 border-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600'
+    holiday: 'bg-red-500 text-white border-red-600 shadow-sm shadow-red-500/20',
+    celebration: 'bg-pink-500 text-white border-pink-600 shadow-sm shadow-pink-500/20',
+    exam: 'bg-amber-500 text-white border-amber-600 shadow-sm shadow-amber-500/20',
+    meeting: 'bg-sky-500 text-white border-sky-600 shadow-sm shadow-sky-500/20',
+    event: 'bg-violet-500 text-white border-violet-600 shadow-sm shadow-violet-500/20',
+    other: 'bg-slate-500 text-white border-slate-600 shadow-sm'
+};
+
+/** Точка-легенда / полоска */
+const EVENT_DOT: Record<CalendarEvent['type'], string> = {
+    holiday: 'bg-red-500',
+    celebration: 'bg-pink-500',
+    exam: 'bg-amber-500',
+    meeting: 'bg-sky-500',
+    event: 'bg-violet-500',
+    other: 'bg-slate-500'
 };
 
 const EVENT_LABELS: Record<CalendarEvent['type'], string> = {
@@ -169,19 +180,22 @@ export const SchoolCalendar: React.FC<SchoolCalendarProps> = ({ events, onEvents
                                 {day.date}
                             </div>
                             <div className="flex-1 overflow-hidden space-y-1 min-h-0">
-                                {dayEvents.slice(0, 3).map((ev) => (
-                                    <div
-                                        key={ev.id}
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            if (!readOnly) openEdit(ev);
-                                        }}
-                                        title={ev.title}
-                                        className={`text-[10px] px-1.5 py-0.5 rounded border truncate cursor-pointer ${EVENT_COLORS[ev.type]}`}
-                                    >
-                                        {ev.title}
-                                    </div>
-                                ))}
+                                {dayEvents.slice(0, 3).map((ev) => {
+                                    const t = ev.type in EVENT_COLORS ? ev.type : 'other';
+                                    return (
+                                        <div
+                                            key={ev.id}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (!readOnly) openEdit(ev);
+                                            }}
+                                            title={`${EVENT_LABELS[t]}: ${ev.title}`}
+                                            className={`text-[10px] px-1.5 py-0.5 rounded-md border truncate cursor-pointer font-semibold ${EVENT_COLORS[t]}`}
+                                        >
+                                            {ev.title}
+                                        </div>
+                                    );
+                                })}
                                 {dayEvents.length > 3 && (
                                     <div className="text-[10px] text-slate-400 dark:text-slate-500 px-1.5">+{dayEvents.length - 3}</div>
                                 )}
@@ -191,11 +205,12 @@ export const SchoolCalendar: React.FC<SchoolCalendarProps> = ({ events, onEvents
                 })}
             </div>
 
-            <div className="flex flex-wrap gap-3 pt-2 shrink-0">
+            <div className="flex flex-wrap gap-3 pt-2 shrink-0 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700">
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 w-full sm:w-auto sm:mr-1">Типы:</span>
                 {Object.entries(EVENT_LABELS).map(([type, label]) => (
                     <div key={type} className="flex items-center gap-1.5">
-                        <div className={`w-3 h-3 rounded border ${EVENT_COLORS[type as CalendarEvent['type']]}`} />
-                        <span className="text-xs text-slate-500 dark:text-slate-400">{label}</span>
+                        <div className={`w-3 h-3 rounded-full ${EVENT_DOT[type as CalendarEvent['type']]}`} />
+                        <span className="text-xs font-medium text-slate-600 dark:text-slate-300">{label}</span>
                     </div>
                 ))}
             </div>

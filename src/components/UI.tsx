@@ -929,15 +929,79 @@ export const BarChart = ({ items, max, barClassName = 'bg-indigo-500' }: BarChar
     );
 };
 
+/** Единый пустой экран: иконка + текст + действие */
+export const EmptyState = ({
+    icon = 'Clipboard',
+    title,
+    description,
+    actionLabel,
+    onAction,
+    actionTo
+}: {
+    icon?: string;
+    title: string;
+    description?: string;
+    actionLabel?: string;
+    onAction?: () => void;
+    actionTo?: string;
+}) => (
+    <div className="bg-white dark:bg-dark-800 rounded-2xl border border-dashed border-slate-300 dark:border-slate-600 p-10 sm:p-12 text-center">
+        <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center mx-auto mb-4">
+            <Icon name={icon} size={32} className="text-slate-400" />
+        </div>
+        <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-1">{title}</h3>
+        {description && (
+            <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto mb-4">{description}</p>
+        )}
+        {actionLabel && actionTo && (
+            <NavLink
+                to={actionTo}
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm transition"
+            >
+                {actionLabel}
+            </NavLink>
+        )}
+        {actionLabel && onAction && !actionTo && (
+            <button
+                type="button"
+                onClick={onAction}
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm transition"
+            >
+                {actionLabel}
+            </button>
+        )}
+    </div>
+);
+
 interface BottomNavProps {
     onMenuClick: () => void;
     allowedPages?: PageId[];
 }
 
+const MORE_NAV_ITEMS: { to: string; icon: string; label: string; pageId: PageId }[] = [
+    { to: '/dashboard', icon: 'Home', label: 'Рабочий стол', pageId: 'dashboard' },
+    { to: '/schedule', icon: 'Calendar', label: '1 полугодие', pageId: 'schedule' },
+    { to: '/schedule2', icon: 'Calendar', label: '2 полугодие', pageId: 'schedule2' },
+    { to: '/duty', icon: 'Shield', label: 'Дежурство', pageId: 'duty' },
+    { to: '/substitutions', icon: 'Repeat', label: 'Замены', pageId: 'substitutions' },
+    { to: '/nutrition', icon: 'Coffee', label: 'Питание', pageId: 'nutrition' },
+    { to: '/absenteeism', icon: 'UserX', label: 'Пропуски', pageId: 'absenteeism' },
+    { to: '/bells', icon: 'Bell', label: 'Звонки', pageId: 'bells' },
+    { to: '/directory', icon: 'BookOpen', label: 'Справочники', pageId: 'directory' },
+    { to: '/reports', icon: 'BarChart2', label: 'Отчёты', pageId: 'reports' },
+    { to: '/export', icon: 'Download', label: 'Экспорт', pageId: 'export' },
+    { to: '/admin', icon: 'Users', label: 'Администрация', pageId: 'admin' },
+    { to: '/calendar', icon: 'Calendar', label: 'Календарь', pageId: 'calendar' },
+    { to: '/planner', icon: 'CheckSquare', label: 'Планер', pageId: 'planner' },
+    { to: '/settings', icon: 'Settings', label: 'Настройки', pageId: 'settings' },
+    { to: '/archive', icon: 'Archive', label: 'Архив', pageId: 'archive' }
+];
+
 export const BottomNavigation = ({ onMenuClick, allowedPages = [] }: BottomNavProps) => {
     const { settings } = useStaticData();
     const canView = (page: PageId) => allowedPages.includes(page);
     const navigate = useNavigate();
+    const [moreOpen, setMoreOpen] = useState(false);
 
     // Determine current semester for schedule navigation
     const currentSemester = getActiveSemester(new Date(), settings) ?? 1;
@@ -958,6 +1022,7 @@ export const BottomNavigation = ({ onMenuClick, allowedPages = [] }: BottomNavPr
             navigator.vibrate(8);
         }
         navigate(path);
+        setMoreOpen(false);
     };
 
     const navItems: { to: string; icon: string; label: string; shortLabel: string }[] = [];
@@ -967,56 +1032,108 @@ export const BottomNavigation = ({ onMenuClick, allowedPages = [] }: BottomNavPr
     if (canViewSchedule1 || canViewSchedule2) {
         navItems.push({ to: schedulePath, icon: 'Calendar', label: 'Расписание', shortLabel: 'Распис.' });
     }
-    if (canView('nutrition')) {
-        navItems.push({ to: '/nutrition', icon: 'Coffee', label: 'Питание', shortLabel: 'Питание' });
-    }
     if (canView('substitutions')) {
         navItems.push({ to: '/substitutions', icon: 'Repeat', label: 'Замены', shortLabel: 'Замены' });
     }
+    // Максимум 3 быстрых + «Ещё»
+    const quickItems = navItems.slice(0, 3);
+    const moreItems = MORE_NAV_ITEMS.filter((i) => canView(i.pageId));
 
     return (
-        <div className="fixed bottom-0 left-0 right-0 bottom-nav-2026 z-40 pb-safe md:hidden transition-all duration-300 no-select safe-area-inset">
-            {/* Active indicator pill background */}
-            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-indigo-500/50 to-transparent" />
-            <div className="flex justify-around items-center h-14 sm:h-16 px-2">
-                {navItems.map((item) => (
-                    <NavLink
-                        key={item.to}
-                        to={item.to}
-                        onClick={() => handleNavClick(item.to)}
-                        className={({ isActive }) =>
-                            `relative flex flex-col items-center justify-center gap-0.5 p-1.5 sm:p-2 rounded-xl transition-all duration-300 flex-1 h-full ${isActive ? 'text-indigo-600 dark:text-indigo-400 bottom-nav-active' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'}`
-                        }
-                    >
-                        {({ isActive }) => (
-                            <>
-                                <div className={`p-1.5 rounded-xl transition-all duration-300 ${isActive ? 'bg-indigo-50 dark:bg-indigo-900/20' : ''}`}>
-                                    <Icon name={item.icon} size={20} strokeWidth={2.25} className="sm:w-[22px] sm:h-[22px]" />
-                                </div>
-                                <span className="text-[10px] font-semibold uppercase tracking-wider leading-none">
-                                    {item.shortLabel}
-                                </span>
-                            </>
-                        )}
-                    </NavLink>
-                ))}
-
-                <button
-                    onClick={() => {
-                        if (typeof navigator !== 'undefined' && navigator.vibrate) {
-                            navigator.vibrate(8);
-                        }
-                        onMenuClick();
-                    }}
-                    className="relative flex flex-col items-center justify-center gap-0.5 p-1.5 sm:p-2 rounded-xl text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 active:text-indigo-600 transition-all duration-300 flex-1 h-full"
-                >
-                    <div className="p-1.5 rounded-xl">
-                        <Icon name="Menu" size={20} strokeWidth={2.25} className="sm:w-[22px] sm:h-[22px]" />
+        <>
+            {moreOpen && (
+                <div className="fixed inset-0 z-[45] md:hidden" role="dialog" aria-label="Все разделы">
+                    <button
+                        type="button"
+                        className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+                        aria-label="Закрыть"
+                        onClick={() => setMoreOpen(false)}
+                    />
+                    <div className="absolute bottom-16 left-2 right-2 max-h-[70vh] overflow-y-auto rounded-2xl bg-white dark:bg-dark-800 border border-slate-200 dark:border-slate-700 shadow-2xl p-3 pb-4 animate-fade-in">
+                        <div className="flex items-center justify-between px-2 mb-2">
+                            <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Все разделы</span>
+                            <button
+                                type="button"
+                                onClick={() => setMoreOpen(false)}
+                                className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700"
+                            >
+                                <Icon name="X" size={18} />
+                            </button>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2">
+                            {moreItems.map((item) => (
+                                <button
+                                    key={item.to}
+                                    type="button"
+                                    onClick={() => handleNavClick(item.to)}
+                                    className="flex flex-col items-center gap-1.5 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/80 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 text-slate-700 dark:text-slate-200 transition"
+                                >
+                                    <Icon name={item.icon} size={20} className="text-indigo-600 dark:text-indigo-400" />
+                                    <span className="text-[10px] font-semibold text-center leading-tight">{item.label}</span>
+                                </button>
+                            ))}
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setMoreOpen(false);
+                                onMenuClick();
+                            }}
+                            className="mt-3 w-full py-2.5 text-sm font-bold text-indigo-600 dark:text-indigo-400 rounded-xl border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/20"
+                        >
+                            Открыть боковое меню
+                        </button>
                     </div>
-                    <span className="text-[10px] font-semibold uppercase tracking-wider leading-none">Меню</span>
-                </button>
+                </div>
+            )}
+
+            <div className="fixed bottom-0 left-0 right-0 bottom-nav-2026 z-40 pb-safe md:hidden transition-all duration-300 no-select safe-area-inset">
+                <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-indigo-500/50 to-transparent" />
+                <div className="flex justify-around items-center h-14 sm:h-16 px-2">
+                    {quickItems.map((item) => (
+                        <NavLink
+                            key={item.to}
+                            to={item.to}
+                            onClick={() => handleNavClick(item.to)}
+                            className={({ isActive }) =>
+                                `relative flex flex-col items-center justify-center gap-0.5 p-1.5 sm:p-2 rounded-xl transition-all duration-300 flex-1 h-full ${isActive ? 'text-indigo-600 dark:text-indigo-400 bottom-nav-active' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'}`
+                            }
+                        >
+                            {({ isActive }) => (
+                                <>
+                                    <div className={`p-1.5 rounded-xl transition-all duration-300 ${isActive ? 'bg-indigo-50 dark:bg-indigo-900/20' : ''}`}>
+                                        <Icon name={item.icon} size={20} strokeWidth={2.25} className="sm:w-[22px] sm:h-[22px]" />
+                                    </div>
+                                    <span className="text-[10px] font-semibold uppercase tracking-wider leading-none">
+                                        {item.shortLabel}
+                                    </span>
+                                </>
+                            )}
+                        </NavLink>
+                    ))}
+
+                    <button
+                        type="button"
+                        onClick={() => {
+                            if (typeof navigator !== 'undefined' && navigator.vibrate) {
+                                navigator.vibrate(8);
+                            }
+                            setMoreOpen((o) => !o);
+                        }}
+                        className={`relative flex flex-col items-center justify-center gap-0.5 p-1.5 sm:p-2 rounded-xl transition-all duration-300 flex-1 h-full ${
+                            moreOpen
+                                ? 'text-indigo-600 dark:text-indigo-400'
+                                : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'
+                        }`}
+                    >
+                        <div className={`p-1.5 rounded-xl ${moreOpen ? 'bg-indigo-50 dark:bg-indigo-900/20' : ''}`}>
+                            <Icon name="List" size={20} strokeWidth={2.25} className="sm:w-[22px] sm:h-[22px]" />
+                        </div>
+                        <span className="text-[10px] font-semibold uppercase tracking-wider leading-none">Ещё</span>
+                    </button>
+                </div>
             </div>
-        </div>
+        </>
     );
 };
 
@@ -1046,7 +1163,7 @@ export const CommandPalette = ({ isOpen, onClose }: CommandPaletteProps) => {
     const inputRef = useRef<HTMLInputElement>(null);
 
     // Get allowed pages from auth context
-    const { allowedPages } = useAuth();
+    const { allowedPages, canViewPage } = useAuth();
 
     // Group actions
     const filteredActions = useMemo(() => {
@@ -1058,10 +1175,10 @@ export const CommandPalette = ({ isOpen, onClose }: CommandPaletteProps) => {
         // Navigation Actions — фильтруем по правам доступа пользователя
         const allNavItems: Array<{ label: string; icon: string; path: string; pageId: PageId }> = [
             { label: 'Рабочий стол', icon: 'Home', path: '/dashboard', pageId: 'dashboard' },
-            { label: 'Расписание 1 пол.', icon: 'Calendar', path: '/schedule', pageId: 'schedule' },
-            { label: 'Расписание 2 пол.', icon: 'Calendar', path: '/schedule2', pageId: 'schedule2' },
-            { label: 'Замены', icon: 'Repeat', path: '/substitutions', pageId: 'substitutions' },
+            { label: '1 полугодие', icon: 'Calendar', path: '/schedule', pageId: 'schedule' },
+            { label: '2 полугодие', icon: 'Calendar', path: '/schedule2', pageId: 'schedule2' },
             { label: 'Дежурство', icon: 'Shield', path: '/duty', pageId: 'duty' },
+            { label: 'Замены', icon: 'Repeat', path: '/substitutions', pageId: 'substitutions' },
             { label: 'Питание', icon: 'Coffee', path: '/nutrition', pageId: 'nutrition' },
             { label: 'Пропуски', icon: 'UserX', path: '/absenteeism', pageId: 'absenteeism' },
             { label: 'Звонки', icon: 'Bell', path: '/bells', pageId: 'bells' },
@@ -1074,7 +1191,7 @@ export const CommandPalette = ({ isOpen, onClose }: CommandPaletteProps) => {
             { label: 'Архив', icon: 'Archive', path: '/archive', pageId: 'archive' },
             { label: 'Настройки', icon: 'Settings', path: '/settings', pageId: 'settings' }
         ];
-        const canOpen = (pageId: PageId) => allowedPages.includes(pageId);
+        const canOpen = (pageId: PageId) => canViewPage(pageId);
         const canOpenAnySchedule = canOpen('schedule') || canOpen('schedule2');
         const navItems = allNavItems.filter((item) => canOpen(item.pageId));
         navItems.forEach((item) => {
@@ -1139,7 +1256,7 @@ export const CommandPalette = ({ isOpen, onClose }: CommandPaletteProps) => {
         }
 
         return actions.slice(0, 15);
-    }, [query, teachers, classes, subjects, rooms, substitutions, isOpen, allowedPages]);
+    }, [query, teachers, classes, subjects, rooms, substitutions, isOpen, canViewPage]);
 
     useEffect(() => {
         if (isOpen) {
@@ -1199,10 +1316,12 @@ export const CommandPalette = ({ isOpen, onClose }: CommandPaletteProps) => {
 
     return (
         <div
+            data-overlay="command-palette"
             className="fixed inset-0 z-[100] flex items-start justify-center pt-[12vh] px-4 bg-slate-900/45 backdrop-blur-sm transition-all"
+            style={{ position: 'fixed' }}
             onClick={(e) => e.target === e.currentTarget && onClose()}
         >
-            <div className="w-full max-w-xl float-panel overflow-hidden animate-scale-in">
+            <div className="w-full max-w-xl float-panel overflow-hidden animate-scale-in mx-auto">
                 <div className="flex items-center gap-3 p-4 border-b border-slate-200/70 dark:border-slate-700/70">
                     <Icon name="Search" className="text-slate-400" size={20} />
                     <input

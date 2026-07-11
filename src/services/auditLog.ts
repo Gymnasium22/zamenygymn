@@ -156,14 +156,50 @@ class AuditLogService {
         return this.readEntries().slice(-limit).reverse();
     }
 
+    /**
+     * Очистка журнала.
+     * @param organizationId — если задан, удаляем только эту организацию.
+     *   Если null/undefined — все записи (нужен фильтр для PostgREST, иначе delete не сработает).
+     */
     async clear(organizationId?: string | null) {
         if (isSupabase) {
-            let query = supabase.from('audit_log').delete();
-            if (organizationId) query = query.eq('organization_id', organizationId);
-            const { error } = await query;
-            if (error) {
-                logger.warn('Failed to clear Supabase audit log:', error);
-                throw error;
+            // PostgREST запрещает DELETE без WHERE — всегда нужен фильтр.
+            // Также многие записи могли писаться с organization_id = null.
+            if (organizationId) {
+                const { error: errOrg } = await supabase
+                    .from('audit_log')
+                    .delete()
+                    .eq('organization_id', organizationId);
+                if (errOrg) {
+                    logger.warn('Failed to clear org audit log:', errOrg);
+                    throw errOrg;
+                }
+                // Записи без org (старые / без привязки) — не трогаем при очистке одной org
+            } else {
+                // Удалить всё: фильтр «created_at не в будущем» покрывает все реальные строки
+                const { error: errAll } = await supabase
+                    .from('audit_log')
+                    .delete()
+                    .lte('created_at', new Date(Date.now() + 86400000).toISOString());
+                if (errAll) {
+                    // fallback: по id is not null
+                    const { error: err2 } = await supabase.from('audit_log').delete().not('id', 'is', null);
+                    if (err2) {
+                        logger.warn('Failed to clear all audit log:', err2);
+                        throw err2;
+                    }
+                }
+            }
+
+            // Проверка: остались ли строки
+            let check = supabase.from('audit_log').select('id', { count: 'exact', head: true });
+            if (organizationId) check = check.eq('organization_id', organizationId);
+            const { count, error: countErr } = await check;
+            if (!countErr && count && count > 0) {
+                logger.warn(`Audit log clear: still ${count} rows in Supabase (RLS?)`);
+                throw new Error(
+                    `В облаке осталось ${count} записей. Возможно, нет прав на удаление (RLS). Обратитесь к суперадмину или проверьте политики audit_log.`
+                );
             }
         } else if (firestoreDB) {
             try {

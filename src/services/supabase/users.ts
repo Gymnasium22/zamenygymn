@@ -138,16 +138,10 @@ export const supabaseUsersService = {
         if (error) throw error;
     },
 
-    updateLastLogin: async (uid?: string): Promise<void> => {
-        if (!uid) return;
-        try {
-            await supabase
-                .from('profiles')
-                .update({ last_login_at: new Date().toISOString() })
-                .eq('id', uid);
-        } catch {
-            // non-critical — column may be missing in older schemas
-        }
+    updateLastLogin: async (_uid?: string): Promise<void> => {
+        // В схеме profiles нет last_login_at — не дергаем API (иначе 400).
+        // При появлении колонки можно вернуть update.
+        return;
     }
 };
 
@@ -174,11 +168,17 @@ function coerceStringArray(raw: unknown): string[] {
 function mapProfile(data: Record<string, unknown>): UserProfile {
     const role = (String(data.role || 'teacher').trim().toLowerCase() || 'teacher') as UserRole;
     const defaults = getRoleDefaults(role);
-    const permissionsFromDb = coerceStringArray(data.permissions) as Permission[];
-    const pagesFromDb = coerceStringArray(data.allowed_pages) as PageId[];
-    // Пустой список в БД → дефолты роли; иначе только то, что задал суперадмин (можно снять «Архив»)
+    // null/undefined → дефолты роли; явный [] или список → как в БД (не подменять обратно дефолтами)
+    const permissionsRaw = data.permissions;
+    const pagesRaw = data.allowed_pages;
+    const permissions =
+        permissionsRaw == null
+            ? defaults.defaultPermissions
+            : (coerceStringArray(permissionsRaw) as Permission[]);
     const allowedPages =
-        pagesFromDb.length > 0 ? [...pagesFromDb] : [...(defaults.defaultPages || [])];
+        pagesRaw == null
+            ? [...(defaults.defaultPages || [])]
+            : (coerceStringArray(pagesRaw) as PageId[]);
 
     return {
         id: data.id as string,
@@ -187,7 +187,7 @@ function mapProfile(data: Record<string, unknown>): UserProfile {
         firstName: (data.first_name as string) || '',
         role,
         isActive: (data.is_active as boolean) !== false,
-        permissions: permissionsFromDb.length ? permissionsFromDb : defaults.defaultPermissions,
+        permissions,
         allowedPages,
         teacherId: (data.teacher_id as string | null | undefined) || undefined,
         organizationId: (data.organization_id as string | null | undefined) || undefined,

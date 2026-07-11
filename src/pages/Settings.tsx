@@ -329,14 +329,15 @@ const CalendarEventsEditor: React.FC<{
 const DASHBOARD_WIDGET_ROLES: DashboardWidgetRole[] = ['admin', 'teacher', 'canteen', 'superadmin'];
 
 const DEFAULT_DASHBOARD_WIDGET_ACCESS: Record<DashboardWidgetRole, DashboardWidgetId[]> = {
-    admin: ['weather', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes'],
-    teacher: ['weather', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes'],
-    canteen: ['weather', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes'],
-    superadmin: ['weather', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes']
+    admin: ['weather', 'today', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes'],
+    teacher: ['weather', 'today', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes'],
+    canteen: ['weather', 'today', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes'],
+    superadmin: ['weather', 'today', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes']
 };
 
 const DASHBOARD_WIDGETS: { id: DashboardWidgetId; label: string }[] = [
     { id: 'weather', label: 'Погода' },
+    { id: 'today', label: 'Сегодня' },
     { id: 'kpi', label: 'KPI' },
     { id: 'search', label: 'Поиск' },
     { id: 'substitutions', label: 'Замены' },
@@ -676,6 +677,8 @@ export const SettingsPage = () => {
 
     // System
     const [sessionTimeoutMinutes, setSessionTimeoutMinutes] = useState(30);
+    const [nutritionLockEnabled, setNutritionLockEnabled] = useState(false);
+    const [nutritionLockTime, setNutritionLockTime] = useState('10:00');
 
     // Notifications
     const [templates, setTemplates] = useState<TelegramTemplates>({
@@ -724,6 +727,8 @@ export const SettingsPage = () => {
         setBackupTime(settings.backupTime || '02:00');
         setCalendarEvents(settings.calendarEvents || []);
         setSessionTimeoutMinutes(settings.sessionTimeoutMinutes || 30);
+        setNutritionLockEnabled(settings.nutritionLockEnabled === true);
+        setNutritionLockTime(settings.nutritionLockTime || '10:00');
         setTemplates(
             settings.telegramTemplates || {
                 summary: '⚡️ **ЗАМЕНЫ НА {{date}}** ⚡️\n\n{{content}}',
@@ -804,8 +809,12 @@ export const SettingsPage = () => {
 
     const systemDirty = useMemo(() => {
         if (!settings) return false;
-        return (settings.sessionTimeoutMinutes || 30) !== sessionTimeoutMinutes;
-    }, [settings, sessionTimeoutMinutes]);
+        return (
+            (settings.sessionTimeoutMinutes || 30) !== sessionTimeoutMinutes ||
+            (settings.nutritionLockEnabled === true) !== nutritionLockEnabled ||
+            (settings.nutritionLockTime || '10:00') !== nutritionLockTime
+        );
+    }, [settings, sessionTimeoutMinutes, nutritionLockEnabled, nutritionLockTime]);
 
     const notificationsDirty = useMemo(() => {
         if (!settings) return false;
@@ -903,16 +912,22 @@ export const SettingsPage = () => {
             await saveStaticData({
                 settings: {
                     ...settings,
-                    sessionTimeoutMinutes
+                    sessionTimeoutMinutes,
+                    nutritionLockEnabled,
+                    nutritionLockTime
                 }
             });
             addToast({ type: 'success', title: 'Сохранено', message: 'Системные настройки обновлены' });
         } catch {
-            addToast({ type: 'danger', title: 'Ошибка', message: 'Не удалось сохранить' });
+            addToast({
+                type: 'danger',
+                title: 'Ошибка',
+                message: 'Не удалось сохранить. Проверьте интернет. Если блокировка питания — выполните SQL-миграцию nutrition_lock.'
+            });
         } finally {
             setIsSavingSection(null);
         }
-    }, [settings, sessionTimeoutMinutes, saveStaticData, addToast]);
+    }, [settings, sessionTimeoutMinutes, nutritionLockEnabled, nutritionLockTime, saveStaticData, addToast]);
 
     const saveNotifications = useCallback(async () => {
         setIsSavingSection('notifications');
@@ -1935,6 +1950,47 @@ export const SettingsPage = () => {
                                         {isSavingSection === 'system' ? 'Сохранение...' : 'Сохранить'}
                                     </button>
                                 </div>
+
+                                <div className="mt-6 pt-5 border-t border-slate-100 dark:border-slate-700">
+                                    <div className="flex items-center gap-3 mb-3">
+                                        <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                                            <Icon name="Coffee" size={20} />
+                                        </div>
+                                        <div>
+                                            <h3 className="font-bold text-slate-800 dark:text-white text-base">
+                                                Блокировка питания
+                                            </h3>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400">
+                                                После указанного времени дня нельзя менять данные (админ всегда может)
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-col sm:flex-row sm:items-end gap-4">
+                                        <label className="flex items-center gap-2 cursor-pointer select-none">
+                                            <input
+                                                type="checkbox"
+                                                checked={nutritionLockEnabled}
+                                                onChange={(e) => setNutritionLockEnabled(e.target.checked)}
+                                                className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500"
+                                            />
+                                            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                                                Включить блокировку
+                                            </span>
+                                        </label>
+                                        <div>
+                                            <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">
+                                                Время (после него день закрыт)
+                                            </label>
+                                            <input
+                                                type="time"
+                                                value={nutritionLockTime}
+                                                onChange={(e) => setNutritionLockTime(e.target.value || '10:00')}
+                                                disabled={!nutritionLockEnabled}
+                                                className="w-full sm:w-40 border border-slate-200 dark:border-slate-600 p-2.5 rounded-xl text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500 disabled:opacity-50"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
                             <div className="bg-white dark:bg-dark-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm p-6">
@@ -2190,8 +2246,14 @@ const AuditLogViewer: React.FC = () => {
     const { addToast } = useToast();
     const { organizationId, organizations, isSuperAdmin } = useAuth();
 
+    // null = все организации (только для суперадмина при пустом фильтре)
     const effectiveOrgFilter = isSuperAdmin ? (viewOrganizationId || null) : organizationId;
-    const clearOrgFilter = isSuperAdmin ? (viewOrganizationId || organizationId || null) : organizationId;
+    // Очистка: если смотрим «все» — чистим все; если выбрана org — только её
+    const clearOrgFilter = isSuperAdmin
+        ? viewOrganizationId
+            ? viewOrganizationId
+            : null
+        : organizationId;
 
     const fetchEntries = useCallback(async () => {
         setIsLoading(true);
@@ -2310,14 +2372,34 @@ const AuditLogViewer: React.FC = () => {
     };
 
     const handleClear = async () => {
-        if (!window.confirm('Очистить весь журнал действий? Это действие необратимо.')) return;
+        const scope =
+            clearOrgFilter == null
+                ? 'все записи во всех организациях'
+                : `записи выбранной организации`;
+        if (!window.confirm(`Очистить журнал (${scope})? Это действие необратимо.`)) return;
         setIsLoading(true);
         try {
             await auditLog.clear(clearOrgFilter);
             setEntries([]);
-            addToast({ type: 'success', title: 'Журнал очищен', message: 'Все записи удалены' });
-        } catch {
-            addToast({ type: 'danger', title: 'Ошибка', message: 'Не удалось очистить журнал' });
+            // Перечитать из облака — убедиться, что удалилось
+            const remaining = await auditLog.getEntries(20, effectiveOrgFilter);
+            if (remaining.length > 0) {
+                setEntries(remaining);
+                addToast({
+                    type: 'warning',
+                    title: 'Частично очищено',
+                    message: `В облаке ещё ${remaining.length}+ записей. Проверьте права RLS на таблицу audit_log (DELETE для admin/superadmin).`
+                });
+            } else {
+                addToast({ type: 'success', title: 'Журнал очищен', message: 'Записи удалены из облака и с устройства' });
+            }
+        } catch (e) {
+            addToast({
+                type: 'danger',
+                title: 'Ошибка очистки',
+                message: (e as Error).message || 'Не удалось очистить журнал в облаке'
+            });
+            await fetchEntries();
         } finally {
             setIsLoading(false);
         }

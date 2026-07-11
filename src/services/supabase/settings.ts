@@ -51,6 +51,10 @@ export const supabaseSettingsService = {
         if (settings.autoBackup !== undefined) updates.auto_backup = settings.autoBackup;
         if (settings.backupTime !== undefined) updates.backup_time = settings.backupTime;
         if (settings.googleAppsScriptUrl !== undefined) updates.google_apps_script_url = settings.googleAppsScriptUrl;
+        if (settings.sessionTimeoutMinutes !== undefined) updates.session_timeout_minutes = settings.sessionTimeoutMinutes;
+        if (settings.calendarEvents !== undefined) updates.calendar_events = settings.calendarEvents;
+        if (settings.nutritionLockEnabled !== undefined) updates.nutrition_lock_enabled = settings.nutritionLockEnabled;
+        if (settings.nutritionLockTime !== undefined) updates.nutrition_lock_time = settings.nutritionLockTime;
         updates.updated_at = new Date().toISOString();
 
         const { error } = await supabase.from('settings').update(updates).eq('organization_id', organizationId || '');
@@ -96,6 +100,10 @@ function mapSettings(data: Record<string, unknown>): Settings {
         autoBackup: data.auto_backup as boolean | undefined,
         backupTime: (data.backup_time as string) || undefined,
         googleAppsScriptUrl: (data.google_apps_script_url as string) || undefined,
+        sessionTimeoutMinutes: (data.session_timeout_minutes as number) || undefined,
+        calendarEvents: (data.calendar_events as Settings['calendarEvents']) || undefined,
+        nutritionLockEnabled: data.nutrition_lock_enabled as boolean | undefined,
+        nutritionLockTime: (data.nutrition_lock_time as string) || undefined,
         organizationId: data.organization_id as string
     };
 }

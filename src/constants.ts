@@ -130,17 +130,19 @@ export const INITIAL_DATA: AppData = {
         },
         substitutionDayComments: {},
         dashboardWidgetAccess: {
-            superadmin: ['weather', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes'],
-            admin: ['weather', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes'],
-            teacher: ['weather', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes'],
-            canteen: ['weather', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes']
+            superadmin: ['weather', 'today', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes'],
+            admin: ['weather', 'today', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes'],
+            teacher: ['weather', 'today', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes'],
+            canteen: ['weather', 'today', 'kpi', 'search', 'substitutions', 'occupancy', 'conflicts', 'birthdays', 'notes']
         },
         isScheduleLocked: false,
         allowTeacherEdit: false,
         autoBackup: false,
         backupTime: '02:00',
         sessionTimeoutMinutes: 30,
-        calendarEvents: []
+        calendarEvents: [],
+        nutritionLockEnabled: false,
+        nutritionLockTime: '10:00'
     },
     privateSettings: {
         telegramToken: '',

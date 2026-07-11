@@ -272,16 +272,23 @@ export const archiveService = {
             // 1. Delete substitutions first (has FK to schedule_items)
             await supabaseDeleteAll('substitutions', orgId);
             
-            // 2. Delete schedule_items with academic_year filter if provided
+            // 2. Расписание: academic_year у большинства строк ещё не заполнен (null).
+            //    Если фильтр по году ничего не удалил — очищаем всё расписание организации.
             if (academicYearEnd !== undefined) {
-                const { error } = await supabase
+                const { error, count } = await supabase
                     .from('schedule_items')
-                    .delete()
+                    .delete({ count: 'exact' })
                     .eq('organization_id', orgId)
                     .eq('academic_year', academicYearEnd);
                 if (error) {
-                    logger.error('Failed to clear schedule_items:', error);
+                    logger.error('Failed to clear schedule_items by year:', error);
                     throw new Error('Не удалось очистить расписание');
+                }
+                if (!count || count === 0) {
+                    logger.info(
+                        `No schedule_items with academic_year=${academicYearEnd}; clearing all for org`
+                    );
+                    await supabaseDeleteAll('schedule_items', orgId);
                 }
             } else {
                 await supabaseDeleteAll('schedule_items', orgId);

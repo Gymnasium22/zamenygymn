@@ -37,6 +37,8 @@ interface AuthContextType {
     canViewPage: (pageId: PageId) => boolean;
     switchOrganization: (id: string | null) => void;
     refreshOrganizations: () => Promise<Organization[]>;
+    /** Перечитать профиль из БД (после правки себя в «Пользователи») */
+    refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -75,8 +77,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const normalizeAllowedPages = useCallback(
         (loadedProfile: UserProfile) => {
-            // Список страниц берём из профиля (управляется суперадмином в «Пользователи»).
-            // Суперадмину «Архив» всегда доступен через canViewPage, даже если галочка снята в БД.
+            // Список страниц из профиля (галочки в «Пользователи») — без принудительного bypass.
             return coercePageList(loadedProfile.allowedPages);
         },
         [coercePageList]
@@ -137,6 +138,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         [loadOrganizations]
     );
 
+    const applyProfile = useCallback(
+        async (loadedProfile: UserProfile | null) => {
+            if (loadedProfile && loadedProfile.isActive) {
+                const normalized = {
+                    ...loadedProfile,
+                    allowedPages: normalizeAllowedPages(loadedProfile)
+                };
+                setProfile(normalized);
+                setRole(loadedProfile.role);
+                setIsBlocked(false);
+                await resolveOrganizationId(loadedProfile);
+            } else if (loadedProfile && !loadedProfile.isActive) {
+                setProfile(null);
+                setRole(null);
+                setIsBlocked(true);
+                setCurrentOrganizationId(null);
+            } else {
+                setProfile(null);
+                setRole(null);
+                setIsBlocked(false);
+                setCurrentOrganizationId(null);
+            }
+        },
+        [normalizeAllowedPages, resolveOrganizationId]
+    );
+
+    const refreshProfile = useCallback(async () => {
+        const uid = user?.id;
+        if (!uid) return;
+        try {
+            const usersService = authAdapter.getUsersService();
+            const loaded = await usersService.getById(uid);
+            await applyProfile(loaded);
+        } catch (e) {
+            console.error('[AuthContext] refreshProfile failed:', e);
+        }
+    }, [user?.id, applyProfile]);
+
     const switchOrganization = useCallback(
         (id: string | null) => {
             setCurrentOrganizationId(id);
@@ -155,9 +194,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const canViewPage = useCallback(
         (pageId: PageId) => {
             if (!profile || profile.isActive !== true) return false;
-            // Суперадмин видит все разделы (включая Архив) — скрыть у себя нельзя
-            if (profile.role === 'superadmin') return true;
-            // У остальных (admin, teacher, canteen) — только галочки «Страницы» в профиле
+            // Все роли, включая superadmin — только по галочкам «Страницы» в профиле
             const pages = normalizeAllowedPages(profile);
             return pages.includes(pageId);
         },
@@ -189,25 +226,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     uid,
                     async (loadedProfile) => {
                         console.log('[AuthContext] Profile loaded:', loadedProfile);
-                        if (loadedProfile && loadedProfile.isActive) {
-                            setProfile({
-                                ...loadedProfile,
-                                allowedPages: normalizeAllowedPages(loadedProfile)
-                            });
-                            setRole(loadedProfile.role);
-                            setIsBlocked(false);
-                            await resolveOrganizationId(loadedProfile);
-                        } else if (loadedProfile && !loadedProfile.isActive) {
-                            setProfile(null);
-                            setRole(null);
-                            setIsBlocked(true);
-                            setCurrentOrganizationId(null);
-                        } else {
-                            setProfile(null);
-                            setRole(null);
-                            setIsBlocked(false);
-                            setCurrentOrganizationId(null);
-                        }
+                        await applyProfile(loadedProfile);
                         setLoading(false);
                     },
                     (error) => {
@@ -234,7 +253,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             unsubscribe();
             if (unsubProfile) unsubProfile();
         };
-    }, [normalizeAllowedPages, resolveOrganizationId]);
+    }, [applyProfile]);
 
     const logout = async () => {
         await authAdapter.signOut();
@@ -262,7 +281,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 hasPermission,
                 canViewPage,
                 switchOrganization,
-                refreshOrganizations: loadOrganizations
+                refreshOrganizations: loadOrganizations,
+                refreshProfile
             }}
         >
             {children}

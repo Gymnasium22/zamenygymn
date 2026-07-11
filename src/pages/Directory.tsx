@@ -201,22 +201,15 @@ export const DirectoryPage = () => {
             <div className="flex-1 overflow-y-auto pb-20 custom-scrollbar pr-2">
                 {activeTab === 'teachers' && (
                     <StaggerContainer className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {teachers.map((t, i) => (
+                        {[...teachers]
+                            .sort((a, b) => a.name.localeCompare(b.name, 'ru', { sensitivity: 'base' }))
+                            .map((t) => (
                             <div
                                 key={t.id}
-                                draggable={canEditDirectory}
-                                onDragStart={canEditDirectory ? (e) => onDragStart(e, i) : undefined}
-                                onDragOver={canEditDirectory ? onDragOver : undefined}
-                                onDrop={canEditDirectory ? (e) => onDrop(e, i) : undefined}
-                                className={`modern-card p-4 group flex flex-col ${canEditDirectory ? 'cursor-grab active:cursor-grabbing' : ''}`}
+                                className="modern-card p-4 group flex flex-col"
                             >
                                 <div className="flex justify-between items-start mb-2">
                                     <div className="flex items-center gap-3">
-                                        <Icon
-                                            name="GripVertical"
-                                            className="text-slate-300 dark:text-slate-600"
-                                            size={16}
-                                        />
                                         <div className="font-bold text-slate-800 dark:text-slate-100 text-lg">
                                             {t.name}
                                         </div>
@@ -253,7 +246,7 @@ export const DirectoryPage = () => {
                                         </span>
                                     )}
                                 </div>
-                                <div className="flex flex-wrap gap-1 mt-auto pl-7">
+                                <div className="flex flex-wrap gap-1 mt-auto">
                                     {t.subjectIds.map((sid) => {
                                         const s = subjects.find((sub) => sub.id === sid);
                                         return s ? (

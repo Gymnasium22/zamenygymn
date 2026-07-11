@@ -39,8 +39,8 @@ const ALL_PERMISSIONS: { id: Permission; label: string }[] = [
 
 const ALL_PAGES: { id: PageId; label: string }[] = [
     { id: 'dashboard', label: 'Рабочий стол' },
-    { id: 'schedule', label: 'Расписание 1 пол.' },
-    { id: 'schedule2', label: 'Расписание 2 пол.' },
+    { id: 'schedule', label: '1 полугодие' },
+    { id: 'schedule2', label: '2 полугодие' },
     { id: 'substitutions', label: 'Замены' },
     { id: 'duty', label: 'Дежурство' },
     { id: 'nutrition', label: 'Питание' },
@@ -65,7 +65,7 @@ const formatDate = (iso?: string) => {
 };
 
 export const UsersManagement = () => {
-    const { user: currentUser, profile: currentProfile, organizationId, organizations, isSuperAdmin } = useAuth();
+    const { user: currentUser, profile: currentProfile, organizationId, organizations, isSuperAdmin, refreshProfile } = useAuth();
     const { teachers } = useStaticData();
     const { addToast } = useToast();
     const [users, setUsers] = useState<UserProfile[]>([]);
@@ -176,7 +176,18 @@ export const UsersManagement = () => {
                     `Обновлён пользователь ${editingUser.email} (роль: ${form.role})`,
                     form.organizationId || organizationId
                 );
-                addToast({ type: 'success', title: 'Сохранено', message: 'Права пользователя обновлены' });
+                // Если правили себя — сразу перечитать профиль (Realtime может не сработать)
+                if (editingUser.id === currentUser?.id) {
+                    await refreshProfile();
+                }
+                addToast({
+                    type: 'success',
+                    title: 'Сохранено',
+                    message:
+                        editingUser.id === currentUser?.id
+                            ? 'Ваши разделы и права обновлены. Меню применится сразу.'
+                            : 'Права пользователя обновлены'
+                });
             } else {
                 if (!form.password || form.password.length < 6) {
                     addToast({ type: 'warning', title: 'Пароль слишком короткий', message: 'Минимум 6 символов' });
@@ -541,15 +552,33 @@ export const UsersManagement = () => {
             )}
 
             <Modal isOpen={isModalOpen} onClose={closeModal} title={editingUser ? 'Редактировать пользователя' : 'Новый пользователь'} maxWidth="max-w-3xl">
-                <form onSubmit={handleSubmit} className="space-y-6">
+                <form
+                    onSubmit={handleSubmit}
+                    className="space-y-6"
+                    autoComplete="off"
+                    // Яндекс/Chrome часто игнорируют autoComplete на form — «приманка» + явные значения на полях
+                >
+                    {/* Скрытые поля-приманки: браузер заполняет их, а не поля формы */}
+                    <div className="absolute w-0 h-0 overflow-hidden opacity-0 pointer-events-none" aria-hidden="true">
+                        <input type="text" name="username" tabIndex={-1} autoComplete="username" defaultValue="" />
+                        <input type="password" name="password" tabIndex={-1} autoComplete="current-password" defaultValue="" />
+                    </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         <div>
                             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">ФИО / Имя</label>
                             <input
                                 type="text"
+                                name="gym_display_name"
                                 value={form.displayName}
                                 onChange={(e) => setForm({ ...form, displayName: e.target.value })}
                                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-dark-700 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                autoComplete="off"
+                                autoCorrect="off"
+                                autoCapitalize="off"
+                                spellCheck={false}
+                                data-lpignore="true"
+                                data-1p-ignore="true"
                                 required
                             />
                         </div>
@@ -558,10 +587,17 @@ export const UsersManagement = () => {
                             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Как обращаться</label>
                             <input
                                 type="text"
+                                name="gym_first_name"
                                 value={form.firstName}
                                 onChange={(e) => setForm({ ...form, firstName: e.target.value })}
                                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-dark-700 focus:ring-2 focus:ring-indigo-500 outline-none"
                                 placeholder="Иван"
+                                autoComplete="off"
+                                autoCorrect="off"
+                                autoCapitalize="off"
+                                spellCheck={false}
+                                data-lpignore="true"
+                                data-1p-ignore="true"
                             />
                         </div>
 
@@ -569,10 +605,14 @@ export const UsersManagement = () => {
                             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Email</label>
                             <input
                                 type="email"
+                                name="gym_user_email"
                                 value={form.email}
                                 disabled={!!editingUser}
                                 onChange={(e) => setForm({ ...form, email: e.target.value })}
                                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-dark-700 disabled:bg-slate-100 dark:disabled:bg-slate-800 focus:ring-2 focus:ring-indigo-500 outline-none"
+                                autoComplete="off"
+                                data-lpignore="true"
+                                data-1p-ignore="true"
                                 required
                             />
                         </div>
@@ -583,11 +623,21 @@ export const UsersManagement = () => {
                             </label>
                             <input
                                 type="password"
+                                name="gym_new_password"
                                 value={form.password}
                                 onChange={(e) => setForm({ ...form, password: e.target.value })}
                                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-dark-700 focus:ring-2 focus:ring-indigo-500 outline-none"
                                 minLength={editingUser ? undefined : 6}
                                 required={!editingUser}
+                                // new-password: не подставлять сохранённый «текущий» пароль аккаунта
+                                autoComplete="new-password"
+                                data-lpignore="true"
+                                data-1p-ignore="true"
+                                // readOnly до фокуса — ломает агрессивный autofill Яндекса/Chrome
+                                readOnly
+                                onFocus={(e) => {
+                                    e.currentTarget.readOnly = false;
+                                }}
                             />
                         </div>
 
@@ -608,11 +658,21 @@ export const UsersManagement = () => {
                             </div>
                             <button
                                 type="button"
-                                onClick={() => applyRoleDefaults(form.role)}
-                                className="px-3 py-2.5 text-sm font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-400 dark:hover:bg-indigo-900/30 rounded-xl border border-indigo-200 dark:border-indigo-800 transition-colors shrink-0"
-                                title="Сбросить права и разделы на значения по умолчанию для выбранной роли"
+                                onClick={() => {
+                                    applyRoleDefaults(form.role);
+                                    addToast({
+                                        type: 'info',
+                                        title: 'Пресет роли',
+                                        message:
+                                            form.role === 'teacher' || form.role === 'canteen'
+                                                ? 'Короткий набор страниц для роли применён. При необходимости снимите лишние галочки.'
+                                                : 'Права и страницы сброшены к шаблону роли.'
+                                    });
+                                }}
+                                className="px-3 py-2.5 text-sm font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:hover:bg-indigo-900/50 rounded-xl border-2 border-indigo-300 dark:border-indigo-700 transition-colors shrink-0"
+                                title="Короткое меню: подставить страницы и права как у выбранной роли (учитель/столовая — минимальный набор)"
                             >
-                                Применить права роли
+                                Как для роли
                             </button>
                         </div>
 

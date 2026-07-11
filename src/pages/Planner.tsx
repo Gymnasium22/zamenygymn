@@ -28,6 +28,18 @@ const PRIORITY_LABELS: Record<PlannerTask['priority'], string> = {
     high: 'Высокий'
 };
 
+const STATUS_LABELS: Record<PlannerTask['status'], string> = {
+    todo: 'К выполнению',
+    'in-progress': 'В работе',
+    done: 'Готово'
+};
+
+const STATUS_COLORS: Record<PlannerTask['status'], string> = {
+    todo: 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-700 dark:text-slate-200 dark:border-slate-600',
+    'in-progress': 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800',
+    done: 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800'
+};
+
 const STORAGE_KEY = 'gym_planner_tasks';
 
 export const PlannerPage = () => {
@@ -130,6 +142,11 @@ export const PlannerPage = () => {
                 : t
         );
         saveTasks(updated);
+        addToast({
+            type: 'info',
+            title: 'Статус',
+            message: `${STATUS_LABELS[newStatus]}: ${task.title}`
+        });
     };
 
     const filteredTasks = tasks.filter((t) => (filter === 'all' ? true : t.status === filter));
@@ -171,7 +188,7 @@ export const PlannerPage = () => {
                             Планер администрации
                         </h1>
                         <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-                            Задачи, дедлайны и приоритеты
+                            Статусы: к выполнению → в работе → готово (клик по кружку)
                         </p>
                     </div>
                     {canEditPlanner && (
@@ -252,7 +269,7 @@ export const PlannerPage = () => {
                                             : 'border-slate-300 dark:border-slate-600'
                                     }`}
                                 >
-                                    {task.status === 'done' && <Icon name="Check" size={12} />}
+                                    {task.status === 'done' && <Icon name="CheckCircle" size={12} />}
                                     {task.status === 'in-progress' && <div className="w-2 h-2 rounded-full bg-amber-400" />}
                                 </button>
                                 <div className="flex-1 min-w-0">
@@ -260,6 +277,9 @@ export const PlannerPage = () => {
                                         <h3 className={`font-bold text-sm ${task.status === 'done' ? 'line-through text-slate-400' : 'text-slate-800 dark:text-white'}`}>
                                             {task.title}
                                         </h3>
+                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${STATUS_COLORS[task.status]}`}>
+                                            {STATUS_LABELS[task.status]}
+                                        </span>
                                         <span className={`px-2 py-0.5 rounded text-[10px] font-medium border ${PRIORITY_COLORS[task.priority]}`}>
                                             {PRIORITY_LABELS[task.priority]}
                                         </span>

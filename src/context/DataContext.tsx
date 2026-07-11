@@ -176,52 +176,71 @@ const handleError = {
         );
     },
 
-    firebase: (error: unknown, context: string) => {
-        const err = error as { code?: string; message?: string };
-        const code = err.code;
-        let message = 'Произошла неизвестная ошибка.';
+    /** Понятное сообщение для сети / RLS / Supabase / Firebase */
+    toUserMessage: (error: unknown, context: string): string => {
+        const err = error as { code?: string; message?: string; status?: number; details?: string };
+        const code = String(err.code || '');
+        const msg = (err.message || '').toLowerCase();
 
-        switch (code) {
-            case 'resource-exhausted':
-                message = 'Превышен лимит запросов к базе данных.';
-                break;
-            case 'permission-denied':
-                message = 'Недостаточно прав доступа.';
-                break;
-            case 'unavailable':
-                message = 'Сервис временно недоступен. Попробуйте позже.';
-                break;
-            case 'deadline-exceeded':
-                message = 'Превышено время ожидания ответа.';
-                break;
-            default:
-                message = `Ошибка ${context}: ${err.message || 'Неизвестная ошибка'}`;
+        if (
+            code === 'unavailable' ||
+            code === 'deadline-exceeded' ||
+            msg.includes('failed to fetch') ||
+            msg.includes('network') ||
+            msg.includes('timeout') ||
+            msg.includes('timed out') ||
+            !navigator.onLine
+        ) {
+            return 'Не удалось сохранить. Проверьте интернет и попробуйте снова.';
         }
+        if (
+            code === 'permission-denied' ||
+            code === '42501' ||
+            code === 'PGRST301' ||
+            msg.includes('row-level security') ||
+            msg.includes('permission') ||
+            msg.includes('jwt') ||
+            msg.includes('not authorized')
+        ) {
+            return 'Недостаточно прав для этого действия. Обратитесь к администратору.';
+        }
+        if (code === 'resource-exhausted') {
+            return 'Слишком много запросов к базе. Подождите немного и повторите.';
+        }
+        if (code === '23503' || msg.includes('foreign key')) {
+            return 'Данные ссылаются на удалённую запись. Проверьте связанные справочники.';
+        }
+        if (code === '23505' || msg.includes('duplicate') || msg.includes('conflict')) {
+            return 'Такая запись уже существует.';
+        }
+        return `Не удалось выполнить: ${context}. ${err.message || 'Попробуйте ещё раз.'}`;
+    },
 
-        logger.error(`Firebase ${context}:`, error);
+    firebase: (error: unknown, context: string) => {
+        const message = handleError.toUserMessage(error, context);
+        logger.error(`DB ${context}:`, error);
         window.dispatchEvent(
             new CustomEvent('app-toast', {
-                detail: { type: 'danger', title: 'Ошибка Firebase', message }
+                detail: { type: 'danger', title: 'Ошибка сохранения', message }
             })
         );
     },
 
     firebaseOffline: (error: unknown, context: string, data: Partial<AppData>, organizationId?: string | null) => {
-        // Для мобильных устройств показываем более мягкое сообщение
         const isMobile = window.innerWidth < 768;
+        const offlineHint = handleError.toUserMessage(error, context);
         const message = isMobile
-            ? `Сохранено локально. Синхронизируется при подключении к сети.`
-            : `Ошибка ${context}. Данные сохранены локально и будут синхронизированы при восстановлении соединения.`;
+            ? 'Сохранено на устройстве. Синхронизируется, когда появится сеть.'
+            : `${offlineHint} Изменения сохранены локально и будут отправлены позже.`;
 
-        logger.warn(`Firebase ${context} (оффлайн):`, error);
+        logger.warn(`DB ${context} (оффлайн/очередь):`, error);
 
         window.dispatchEvent(
             new CustomEvent('app-toast', {
-                detail: { type: 'warning', title: 'Оффлайн режим', message }
+                detail: { type: 'warning', title: 'Нет связи с сервером', message }
             })
         );
 
-        // Добавляем в очередь синхронизации
         syncQueue.add(data, getQueueKey(organizationId));
     }
 };
@@ -379,6 +398,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                 (error) => {
                     console.error('[DataContext] Data subscription error:', error);
                     handleError.log('Failed to subscribe to data:', error);
+                    window.dispatchEvent(
+                        new CustomEvent('app-toast', {
+                            detail: {
+                                type: 'warning',
+                                title: 'Не удалось загрузить данные',
+                                message: handleError.toUserMessage(error, 'загрузки данных')
+                            }
+                        })
+                    );
                     // Если ошибка квоты или сети - мы уже загрузили localBackup выше, так что данные не пропадут
                     setIsLoading(false);
                     console.log('[DataContext] isLoading set to false (error)');
@@ -388,6 +416,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
         } catch (error) {
             console.error('[DataContext] Failed to initialize subscription:', error);
             handleError.log('Failed to initialize subscription:', error);
+            window.dispatchEvent(
+                new CustomEvent('app-toast', {
+                    detail: {
+                        type: 'danger',
+                        title: 'Ошибка подключения',
+                        message: handleError.toUserMessage(error, 'подключения к базе')
+                    }
+                })
+            );
             setIsLoading(false);
             unsubscribe = undefined;
             console.log('[DataContext] isLoading set to false (catch)');

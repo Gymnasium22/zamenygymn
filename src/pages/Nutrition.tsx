@@ -8,8 +8,26 @@ import { NutritionRecord } from '../types';
 import { formatDateISO, formatDateEuropean, generateId, getDateOrToday, getMonthOrNow } from '../utils/helpers';
 import { exportService } from '../services/exportService';
 
+/** День заблокирован для редактирования (не-админ) после настроенного времени */
+const isNutritionDateLocked = (
+    date: string,
+    lockEnabled: boolean | undefined,
+    lockTime: string | undefined,
+    bypass: boolean
+): boolean => {
+    if (bypass || !lockEnabled) return false;
+    const today = formatDateISO();
+    if (date < today) return true; // прошлые дни закрыты
+    if (date > today) return false; // будущие открыты
+    const [hh, mm] = (lockTime || '10:00').split(':').map((x) => Number(x) || 0);
+    const now = new Date();
+    const deadline = new Date();
+    deadline.setHours(hh, mm, 0, 0);
+    return now.getTime() >= deadline.getTime();
+};
+
 export const NutritionPage = () => {
-    const { classes } = useStaticData();
+    const { classes, settings } = useStaticData();
     const { nutritionRecords, saveScheduleData } = useScheduleData();
     const { role, user, hasPermission } = useAuth();
     const { addToast } = useToast();
@@ -24,6 +42,19 @@ export const NutritionPage = () => {
         const now = new Date();
         return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     });
+
+    // Для не-админов: день закрыт. Админ всегда может править, но видит предупреждение.
+    const dayLockedForStaff = useMemo(
+        () =>
+            isNutritionDateLocked(
+                selectedDate,
+                settings?.nutritionLockEnabled,
+                settings?.nutritionLockTime,
+                false
+            ),
+        [selectedDate, settings?.nutritionLockEnabled, settings?.nutritionLockTime]
+    );
+    const canMutateDay = canEditNutrition && (!dayLockedForStaff || isAdmin);
 
     // Modal state
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -120,6 +151,16 @@ export const NutritionPage = () => {
 
     // Open modal for editing/creating
     const openModal = (classId?: string, record?: NutritionRecord) => {
+        if (!canMutateDay) {
+            addToast({
+                type: 'warning',
+                title: 'День закрыт',
+                message: isAdmin
+                    ? 'Нет права редактировать питание'
+                    : `Ввод заблокирован после ${settings?.nutritionLockTime || '10:00'}. Обратитесь к администратору.`
+            });
+            return;
+        }
         if (record) {
             setEditingRecord(record);
             setSelectedClassId(record.classId);
@@ -145,6 +186,14 @@ export const NutritionPage = () => {
 
     // Save record
     const saveRecord = useCallback(async () => {
+        if (!canMutateDay) {
+            addToast({
+                type: 'warning',
+                title: 'День закрыт',
+                message: `Редактирование недоступно после ${settings?.nutritionLockTime || '10:00'}.`
+            });
+            return;
+        }
         if (!selectedClassId) {
             addToast({ type: 'warning', title: 'Выберите класс' });
             return;
@@ -218,10 +267,17 @@ export const NutritionPage = () => {
             await saveScheduleData({ nutritionRecords: updatedRecords });
             addToast({ type: 'success', title: 'Данные сохранены' });
             closeModal();
-        } catch {
-            addToast({ type: 'danger', title: 'Ошибка сохранения', message: 'Не удалось сохранить данные о питании' });
+        } catch (err) {
+            addToast({
+                type: 'danger',
+                title: 'Ошибка сохранения',
+                message: 'Не удалось сохранить. Проверьте интернет и попробуйте снова.'
+            });
+            console.error(err);
         }
     }, [
+        canMutateDay,
+        settings?.nutritionLockTime,
         selectedClassId,
         totalCount,
         benefitCount,
@@ -239,6 +295,14 @@ export const NutritionPage = () => {
             const record = nutritionRecords.find((r) => r.id === recordId);
             if (!record) return;
 
+            if (!canMutateDay) {
+                addToast({
+                    type: 'warning',
+                    title: 'День закрыт',
+                    message: `Удаление недоступно после ${settings?.nutritionLockTime || '10:00'}.`
+                });
+                return;
+            }
             // Only users with edit permission can delete, and non-admins can delete only their own records
             if (!canEditNutrition) {
                 addToast({ type: 'warning', title: 'У вас нет права удалять записи о питании' });
@@ -255,11 +319,16 @@ export const NutritionPage = () => {
             try {
                 await saveScheduleData({ nutritionRecords: updatedRecords });
                 addToast({ type: 'success', title: 'Запись удалена' });
-            } catch {
-                addToast({ type: 'danger', title: 'Ошибка удаления', message: 'Не удалось удалить запись о питании' });
+            } catch (err) {
+                addToast({
+                    type: 'danger',
+                    title: 'Ошибка удаления',
+                    message: 'Не удалось удалить. Проверьте интернет.'
+                });
+                console.error(err);
             }
         },
-        [nutritionRecords, saveScheduleData, canEditNutrition, isAdmin, user, addToast]
+        [nutritionRecords, saveScheduleData, canEditNutrition, isAdmin, user, addToast, canMutateDay, settings?.nutritionLockTime]
     );
 
     // Export to PDF (using print)
@@ -340,6 +409,19 @@ export const NutritionPage = () => {
                             onChange={setSelectedDate}
                             className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
                         />
+                        {dayLockedForStaff && (
+                            <div className="flex items-center gap-2 text-sm font-semibold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-3 py-1.5 rounded-xl">
+                                <Icon name="Lock" size={16} />
+                                {isAdmin
+                                    ? `День закрыт для сотрудников (после ${settings?.nutritionLockTime || '10:00'}) — вы можете править`
+                                    : `День закрыт для ввода (после ${settings?.nutritionLockTime || '10:00'})`}
+                            </div>
+                        )}
+                        {!dayLockedForStaff && settings?.nutritionLockEnabled && (
+                            <div className="text-xs text-slate-500 dark:text-slate-400">
+                                Блокировка для сотрудников сегодня в {settings.nutritionLockTime || '10:00'}
+                            </div>
+                        )}
                     </>
                 ) : (
                     <>
@@ -376,7 +458,7 @@ export const NutritionPage = () => {
                             </p>
                         </div>
                     </div>
-                    {canEditNutrition ? (
+                    {canMutateDay ? (
                         <div className="flex flex-wrap gap-2">
                             {classesWithoutData.map((cls) => (
                                 <button
@@ -462,7 +544,7 @@ export const NutritionPage = () => {
                             ? `Данные за ${formatDateEuropean(selectedDate)}`
                             : `Данные за ${getMonthOrNow(selectedMonth).toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}`}
                     </h2>
-                    {canEditNutrition && viewMode === 'day' && (
+                    {canMutateDay && viewMode === 'day' && (
                         <button
                             onClick={() => openModal()}
                             className="px-4 py-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition-colors font-semibold flex items-center gap-2"
@@ -490,7 +572,7 @@ export const NutritionPage = () => {
                                     <th className="px-4 py-3 text-center text-sm font-semibold text-slate-700 dark:text-slate-300">
                                         Обычные
                                     </th>
-                                    {canEditNutrition && (
+                                    {canMutateDay && (
                                         <th className="px-4 py-3 text-center text-sm font-semibold text-slate-700 dark:text-slate-300">
                                             Действия
                                         </th>
@@ -501,7 +583,7 @@ export const NutritionPage = () => {
                                 {recordsForDate.length === 0 ? (
                                     <tr>
                                         <td
-                                            colSpan={canEditNutrition ? 5 : 4}
+                                            colSpan={canMutateDay ? 5 : 4}
                                             className="px-4 py-8 text-center text-slate-500 dark:text-slate-400"
                                         >
                                             Нет данных за выбранную дату
@@ -533,7 +615,7 @@ export const NutritionPage = () => {
                                                 <td className="px-4 py-3 text-center text-green-600 font-semibold">
                                                     {record.regularCount}
                                                 </td>
-                                                {canEditNutrition && (
+                                                {canMutateDay && (
                                                     <td className="px-4 py-3 text-center">
                                                         <div className="flex items-center justify-center gap-2">
                                                             <button

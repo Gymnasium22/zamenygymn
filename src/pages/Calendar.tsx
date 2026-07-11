@@ -46,8 +46,13 @@ export const CalendarPage = () => {
         try {
             await saveStaticData({ settings: { ...settings, calendarEvents: newEvents } });
             addToast({ type: 'success', title: 'Сохранено', message: 'Календарь обновлён' });
-        } catch {
-            addToast({ type: 'danger', title: 'Ошибка', message: 'Не удалось сохранить в облако' });
+        } catch (err) {
+            console.error(err);
+            addToast({
+                type: 'danger',
+                title: 'Не удалось сохранить',
+                message: 'Проверьте интернет. Изменения остались в браузере, но могут не попасть в облако.'
+            });
         }
     };
 
