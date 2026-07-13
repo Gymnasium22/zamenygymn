@@ -155,7 +155,6 @@ export type DashboardWidgetRole = 'superadmin' | 'admin' | 'teacher' | 'canteen'
 export interface Settings {
     id?: string; // Supabase row id
     telegramToken?: string;
-    publicScheduleId?: string | null; // ID for publicly published schedule
     feedbackChatId?: string;
     adminTelegramChatId?: string; // ID администратора для системных уведомлений
     bellPresets?: BellPreset[];

@@ -3,7 +3,7 @@ import { useStaticData, useScheduleData, useData } from '../context/DataContext'
 import { useAuth } from '../context/AuthContext';
 import { Icon } from '../components/Icons';
 import { DateInput } from '../components/DateInput';
-import { useToast, Modal } from '../components/UI';
+import { useToast } from '../components/UI';
 import {
     TelegramTemplates,
     AdminAnnouncement,
@@ -381,24 +381,6 @@ export const SettingsPage = () => {
 
     // Full DB Import / Export refs and states
     const dbFileInputRef = useRef<HTMLInputElement>(null);
-    const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
-    const [publicScheduleUrl, setPublicScheduleUrl] = useState('');
-    
-    const [QRCodeComponent, setQRCodeComponent] = useState<React.ComponentType<{ value: string; size?: number; level?: string; includeMargin?: boolean; className?: string }> | null>(null);
-    useEffect(() => {
-        if (isPublishModalOpen && publicScheduleUrl && !QRCodeComponent) {
-            import('qrcode.react').then((mod) => setQRCodeComponent(() => mod.QRCodeSVG));
-        }
-    }, [isPublishModalOpen, publicScheduleUrl, QRCodeComponent]);
-
-    useEffect(() => {
-        if (settings?.publicScheduleId) {
-            const publicUrl = `${window.location.origin}${window.location.pathname}#/public?id=${settings.publicScheduleId}`;
-            setPublicScheduleUrl(publicUrl);
-        } else {
-            setPublicScheduleUrl('');
-        }
-    }, [settings?.publicScheduleId]);
 
     const fullAppData: AppData = useMemo(
         () => ({
@@ -509,7 +491,7 @@ export const SettingsPage = () => {
                 const rawScheduleCount = (json.schedule?.length || 0) + (json.schedule2?.length || 0);
                 const rawSubstitutionCount = json.substitutions?.length || 0;
 
-                // Normalize legacy Firebase data before validation:
+                // Normalize legacy import data before validation:
                 // - old backups often stored room name/number as roomId instead of room.id
                 // - some schedule items may reference deleted classes
                 // - some substitutions may reference deleted schedule items/teachers
@@ -610,41 +592,6 @@ export const SettingsPage = () => {
             }
         };
         reader.readAsText(file);
-    };
-
-    const handlePublishSchedule = async () => {
-        const newPublicId = generateId();
-        try {
-            await dbService.setPublicData(newPublicId, fullAppData);
-            await saveStaticData({ settings: { ...settings, publicScheduleId: newPublicId } });
-            const publicUrl = `${window.location.origin}${window.location.pathname}#/public?id=${newPublicId}`;
-            setPublicScheduleUrl(publicUrl);
-            setIsPublishModalOpen(true);
-            addToast({ type: 'success', title: 'Успешно', message: 'Расписание опубликовано!' });
-        } catch (e) {
-            logger.error(e);
-            addToast({ type: 'danger', title: 'Ошибка', message: 'Не удалось опубликовать расписание.' });
-        }
-    };
-
-    const clearPublicSchedule = async () => {
-        if (
-            !settings.publicScheduleId ||
-            !window.confirm(
-                'Вы уверены, что хотите удалить публичное расписание? Оно станет недоступно по текущей ссылке.'
-            )
-        ) {
-            return;
-        }
-        try {
-            await dbService.deletePublicData(settings.publicScheduleId);
-            await saveStaticData({ settings: { ...settings, publicScheduleId: null } });
-            addToast({ type: 'success', title: 'Успешно', message: 'Публичное расписание удалено.' });
-            setPublicScheduleUrl('');
-        } catch (e) {
-            logger.error(e);
-            addToast({ type: 'danger', title: 'Ошибка', message: 'Не удалось удалить публичное расписание.' });
-        }
     };
 
     // --- Local state for each section ---
@@ -1043,7 +990,6 @@ export const SettingsPage = () => {
                 settings: {
                     ...settings,
                     telegramToken: defaultSettings.telegramToken,
-                    publicScheduleId: defaultSettings.publicScheduleId,
                     feedbackChatId: defaultSettings.feedbackChatId,
                     adminTelegramChatId: defaultSettings.adminTelegramChatId,
                     weatherCity: defaultSettings.weatherCity,
@@ -1817,88 +1763,6 @@ export const SettingsPage = () => {
                             </div>
 
                             <div className="bg-white dark:bg-dark-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm p-6">
-                                <div className="flex items-center gap-3 mb-4">
-                                    <div className="w-10 h-10 rounded-xl bg-teal-50 dark:bg-teal-900/20 text-teal-600 dark:text-teal-400 flex items-center justify-center shrink-0">
-                                        <Icon name="QrCode" size={20} />
-                                    </div>
-                                    <div>
-                                        <h3 className="font-bold text-slate-800 dark:text-white text-base">
-                                            Публичное расписание
-                                        </h3>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400">
-                                            Публикация интерактивной версии расписания для учеников и родителей
-                                        </p>
-                                    </div>
-                                </div>
-                                
-                                {publicScheduleUrl ? (
-                                    <div className="space-y-4">
-                                        <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-100 dark:border-slate-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                                            <div className="min-w-0 flex-1">
-                                                <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Ссылка для просмотра</div>
-                                                <a 
-                                                    href={publicScheduleUrl} 
-                                                    target="_blank" 
-                                                    rel="noopener noreferrer"
-                                                    className="text-sm font-semibold text-indigo-600 dark:text-indigo-400 hover:underline break-all block"
-                                                >
-                                                    {publicScheduleUrl}
-                                                </a>
-                                            </div>
-                                            <div className="flex gap-2 shrink-0">
-                                                <button
-                                                    onClick={() => {
-                                                        navigator.clipboard.writeText(publicScheduleUrl);
-                                                        addToast({ type: 'success', title: 'Успешно', message: 'Ссылка скопирована' });
-                                                    }}
-                                                    className="p-2 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 rounded-lg transition"
-                                                    title="Копировать ссылку"
-                                                >
-                                                    <Icon name="Copy" size={16} />
-                                                </button>
-                                                <button
-                                                    onClick={() => setIsPublishModalOpen(true)}
-                                                    className="p-2 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-500 rounded-lg transition"
-                                                    title="Показать QR-код"
-                                                >
-                                                    <Icon name="QrCode" size={16} />
-                                                </button>
-                                            </div>
-                                        </div>
-                                        <div className="flex flex-wrap gap-2">
-                                            <button
-                                                onClick={handlePublishSchedule}
-                                                className="px-4 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition flex items-center gap-2"
-                                            >
-                                                <Icon name="RefreshCw" size={16} />
-                                                Обновить публикацию
-                                            </button>
-                                            <button
-                                                onClick={clearPublicSchedule}
-                                                className="px-4 py-2.5 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 rounded-xl font-bold text-sm hover:bg-red-100 dark:hover:bg-red-900/40 transition flex items-center gap-2 border border-red-100 dark:border-red-900"
-                                            >
-                                                <Icon name="Trash2" size={16} />
-                                                Удалить публикацию
-                                            </button>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div>
-                                        <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-                                            Расписание ещё не опубликовано. Создайте общедоступную версию, которой смогут пользоваться ученики и учителя без авторизации.
-                                        </p>
-                                        <button
-                                            onClick={handlePublishSchedule}
-                                            className="px-4 py-2.5 bg-teal-600 text-white rounded-xl font-bold text-sm hover:bg-teal-700 transition flex items-center gap-2"
-                                        >
-                                            <Icon name="Share2" size={16} />
-                                            Опубликовать расписание
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="bg-white dark:bg-dark-800 rounded-2xl border border-slate-100 dark:border-slate-700 shadow-sm p-6">
                                 <div className="flex items-center justify-between gap-3 mb-4">
                                     <div className="flex items-center gap-3">
                                         <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
@@ -2077,45 +1941,6 @@ export const SettingsPage = () => {
                 onCancel={() => setConfirmResetOpen(false)}
             />
 
-            <Modal
-                isOpen={isPublishModalOpen}
-                onClose={() => setIsPublishModalOpen(false)}
-                title="Публичное расписание"
-            >
-                <div className="flex flex-col items-center justify-center p-4 text-center space-y-4">
-                    <p className="text-sm text-slate-600 dark:text-slate-300">
-                        Отсканируйте QR-код или перейдите по ссылке, чтобы увидеть публичное расписание.
-                    </p>
-                    {publicScheduleUrl && QRCodeComponent && (
-                        <>
-                            <QRCodeComponent
-                                value={publicScheduleUrl}
-                                size={256}
-                                level="H"
-                                includeMargin={true}
-                                className="p-2 bg-white border border-slate-200 rounded-lg shadow-md"
-                            />
-                            <a
-                                href={publicScheduleUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-indigo-600 hover:underline text-sm font-medium break-all"
-                            >
-                                {publicScheduleUrl}
-                            </a>
-                            <button
-                                onClick={() => {
-                                    navigator.clipboard.writeText(publicScheduleUrl);
-                                    addToast({ type: 'success', title: 'Успешно', message: 'Ссылка скопирована' });
-                                }}
-                                className="px-4 py-2 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 rounded-xl text-sm font-bold hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition flex items-center gap-2"
-                            >
-                                <Icon name="Copy" size={16} /> Копировать ссылку
-                            </button>
-                        </>
-                    )}
-                </div>
-            </Modal>
         </div>
     );
 };

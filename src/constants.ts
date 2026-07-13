@@ -98,7 +98,6 @@ export const INITIAL_DATA: AppData = {
     absenteeismRecords: [], // New
     settings: {
         telegramToken: '',
-        publicScheduleId: null,
         feedbackChatId: '',
         adminTelegramChatId: '',
         weatherCity: 'Minsk,BY',

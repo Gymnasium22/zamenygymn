@@ -9,9 +9,7 @@ import {
     AuditLogEntry
 } from '../types';
 import { INITIAL_DATA, DEFAULT_BELLS, DEFAULT_DUTY_ZONES, getInitialData } from '../constants';
-import { dbService } from '../services/db';
 import { supabaseDbService } from '../services/dbSupabase';
-import { isSupabase } from '../services/dbProvider';
 import { useAuth } from './AuthContext';
 import { getActiveSemester, generateId } from '../utils/helpers';
 import { produce } from 'immer';
@@ -176,7 +174,7 @@ const handleError = {
         );
     },
 
-    /** Понятное сообщение для сети / RLS / Supabase / Firebase */
+    /** Понятное сообщение для сети / RLS / Supabase */
     toUserMessage: (error: unknown, context: string): string => {
         const err = error as { code?: string; message?: string; status?: number; details?: string };
         const code = String(err.code || '');
@@ -216,7 +214,7 @@ const handleError = {
         return `Не удалось выполнить: ${context}. ${err.message || 'Попробуйте ещё раз.'}`;
     },
 
-    firebase: (error: unknown, context: string) => {
+    db: (error: unknown, context: string) => {
         const message = handleError.toUserMessage(error, context);
         logger.error(`DB ${context}:`, error);
         window.dispatchEvent(
@@ -226,7 +224,7 @@ const handleError = {
         );
     },
 
-    firebaseOffline: (error: unknown, context: string, data: Partial<AppData>, organizationId?: string | null) => {
+    offline: (error: unknown, context: string, data: Partial<AppData>, organizationId?: string | null) => {
         const isMobile = window.innerWidth < 768;
         const offlineHint = handleError.toUserMessage(error, context);
         const message = isMobile
@@ -249,7 +247,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
     children,
     initialData
 }) => {
-    const dataProvider = isSupabase ? supabaseDbService : dbService;
+    const dataProvider = supabaseDbService;
     
     const [data, setInternalData] = useState<AppData>(getInitialData());
     const [isLoading, setIsLoading] = useState(true);
@@ -292,7 +290,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
             return;
         }
 
-        if (isSupabase && !organizationId) {
+        if (!organizationId) {
             // DEV mobile audit without org still needs a renderable tree
             try {
                 if (import.meta.env.DEV && sessionStorage.getItem('gym_mobile_audit') === '1') {
@@ -338,7 +336,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
         console.log('[DataContext] Starting data subscription...');
         setIsLoading(true);
 
-        // 3. Подписываемся на Firebase
+        // 3. Подписываемся на realtime-обновления
         let unsubscribe: (() => void) | undefined;
         try {
             unsubscribe = dataProvider.subscribe(
@@ -383,8 +381,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                         if (syncQueue.items.length > 0) {
                             syncQueue.items.forEach((item) => {
                                 Object.keys(item.data).forEach((key) => {
-                                    if ((loaded as Record<string, unknown>)[key] === undefined) {
-                                        (fixedData as Record<string, unknown>)[key] = (item.data as Record<string, unknown>)[key];
+                                    if ((loaded as unknown as Record<string, unknown>)[key] === undefined) {
+                                        (fixedData as unknown as Record<string, unknown>)[key] = (
+                                            item.data as Record<string, unknown>
+                                        )[key];
                                     }
                                 });
                             });
@@ -512,7 +512,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                             throw dbError;
                         } else {
                             // При ошибке Firestore добавляем в очередь синхронизации вместо отката
-                            handleError.firebaseOffline(dbError, 'сохранения данных', newData, organizationId);
+                            handleError.offline(dbError, 'сохранения данных', newData, organizationId);
                             // НЕ откатываем интерфейс - данные остались в localStorage и будут синхронизированы позже
                         }
                     }
@@ -620,9 +620,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
 
             if (!initialData && user) {
                 try {
-                    dataProvider.save(prevData, user, organizationId).catch((e) => handleError.firebase(e, 'отмены изменений'));
+                    dataProvider.save(prevData, user, organizationId).catch((e) => handleError.db(e, 'отмены изменений'));
                 } catch (e) {
-                    handleError.firebase(e, 'отмены изменений');
+                    handleError.db(e, 'отмены изменений');
                 }
             }
         }
@@ -643,9 +643,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
 
             if (!initialData && user) {
                 try {
-                    dataProvider.save(nextData, user, organizationId).catch((e) => handleError.firebase(e, 'повтора изменений'));
+                    dataProvider.save(nextData, user, organizationId).catch((e) => handleError.db(e, 'повтора изменений'));
                 } catch (e) {
-                    handleError.firebase(e, 'повтора изменений');
+                    handleError.db(e, 'повтора изменений');
                 }
             }
         }

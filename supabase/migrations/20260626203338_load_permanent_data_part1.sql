@@ -1,0 +1,20 @@
+TRUNCATE TABLE public.duty, public.duty_zones, public.bell_schedule, public.teachers, public.classes, public.rooms, public.subjects, public.settings CASCADE;
+
+INSERT INTO public.subjects ("id", "organization_id", "name", "color", "difficulty", "order") VALUES ('s2', 'f1bd501e-e4ee-4e9f-a657-cbd6ccee41c7', 'Русский язык', '#074acf', 9, 0);
+INSERT INTO public.subjects ("id", "organization_id", "name", "color", "difficulty", "order") VALUES ('s3', 'f1bd501e-e4ee-4e9f-a657-cbd6ccee41c7', 'Русская литература', '#a8aee1', 6, 1);
+INSERT INTO public.subjects ("id", "organization_id", "name", "color", "difficulty", "order") VALUES ('gcoo8v9sm', 'f1bd501e-e4ee-4e9f-a657-cbd6ccee41c7', 'Белорусский язык', '#029754', 9, 2);
+INSERT INTO public.subjects ("id", "organization_id", "name", "color", "difficulty", "order") VALUES ('scll7ps3p', 'f1bd501e-e4ee-4e9f-a657-cbd6ccee41c7', 'Белорусская литература', '#86f393', 7, 3);
+INSERT INTO public.subjects ("id", "organization_id", "name", "color", "difficulty", "order") VALUES ('qu316sivh', 'f1bd501e-e4ee-4e9f-a657-cbd6ccee41c7', 'Английский язык', '#c038ff', 8, 4);
+INSERT INTO public.subjects ("id", "organization_id", "name", "color", "difficulty", "order") VALUES ('s1', 'f1bd501e-e4ee-4e9f-a657-cbd6ccee41c7', 'Математика', '#e60000', 10, 5);
+INSERT INTO public.subjects ("id", "organization_id", "name", "color", "difficulty", "order") VALUES ('s6', 'f1bd501e-e4ee-4e9f-a657-cbd6ccee41c7', 'Информатика', '#bf0888', 6, 6);
+INSERT INTO public.subjects ("id", "organization_id", "name", "color", "difficulty", "order") VALUES ('s4', 'f1bd501e-e4ee-4e9f-a657-cbd6ccee41c7', 'Физика', '#f59b00', 11, 7);
+INSERT INTO public.subjects ("id", "organization_id", "name", "color", "difficulty", "order") VALUES ('gllg5wayv', 'f1bd501e-e4ee-4e9f-a657-cbd6ccee41c7', 'География', '#fee901', 8, 8);
+INSERT INTO public.subjects ("id", "organization_id", "name", "color", "difficulty", "order") VALUES ('ervxr7l7a', 'f1bd501e-e4ee-4e9f-a657-cbd6ccee41c7', 'Биология', '#1dedae', 8, 9);
+INSERT INTO public.subjects ("id", "organization_id", "name", "color", "difficulty", "order") VALUES ('7bzmysopc', 'f1bd501e-e4ee-4e9f-a657-cbd6ccee41c7', 'ОБЖ', '#ae6847', 3, 10);
+INSERT INTO public.subjects ("id", "organization_id", "name", "color", "difficulty", "order") VALUES ('d31dcqvjl', 'f1bd501e-e4ee-4e9f-a657-cbd6ccee41c7', 'Химия', '#0df4f8', 10, 11);
+INSERT INTO public.subjects ("id", "organization_id", "name", "color", "difficulty", "order") VALUES ('s5', 'f1bd501e-e4ee-4e9f-a657-cbd6ccee41c7', 'История', '#c9b192', 8, 12);
+INSERT INTO public.subjects ("id", "organization_id", "name", "color", "difficulty", "order") VALUES ('nau3lc5db', 'f1bd501e-e4ee-4e9f-a657-cbd6ccee41c7', 'Черчение', '#afacac', 1, 13);
+INSERT INTO public.subjects ("id", "organization_id", "name", "color", "difficulty", "order") VALUES ('0hkqtmguo', 'f1bd501e-e4ee-4e9f-a657-cbd6ccee41c7', 'Искусство', '#dd4678', 1, 14);
+INSERT INTO public.subjects ("id", "organization_id", "name", "color", "difficulty", "order") VALUES ('txbd8cu85', 'f1bd501e-e4ee-4e9f-a657-cbd6ccee41c7', 'Физ. культ. и зд.', '#6aa8d7', 4, 15);
+INSERT INTO public.subjects ("id", "organization_id", "name", "color", "difficulty", "order") VALUES ('egqvj136z', 'f1bd501e-e4ee-4e9f-a657-cbd6ccee41c7', 'Трудовое обучение', '#e7a3ef', 1, 16);
+INSERT INTO public.subjects ("id", "organization_id", "name", "color", "difficulty", "order") VALUES ('ms6fqhqcs', 'f1bd501e-e4ee-4e9f-a657-cbd6ccee41c7', 'Факультатив', '#e0e7ff', 5, 17);;

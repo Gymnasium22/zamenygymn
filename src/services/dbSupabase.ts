@@ -2,7 +2,6 @@ import { AppData, Teacher, Subject, ClassEntity, Room, ScheduleItem, Substitutio
 import { INITIAL_DATA } from '../constants';
 import { logger } from '../utils/logger';
 import { supabase } from './supabase';
-import { isSupabase } from './dbProvider';
 
 const toSnakeCase = (obj: Record<string, unknown>): Record<string, unknown> => {
     const result: Record<string, unknown> = {};
@@ -531,16 +530,4 @@ export const supabaseDbService = {
 
     },
 
-    publishPublicData: async (_id: string, _data: AppData): Promise<void> => {
-        logger.warn('publishPublicData not yet implemented for Supabase');
-    },
-
-    getPublicData: async (_id: string): Promise<AppData | null> => {
-        return null;
-    },
-
-    deletePublicData: async (_id: string): Promise<void> => {
-    }
 };
-
-export const dataService = isSupabase ? supabaseDbService : null;

@@ -30,7 +30,6 @@ export const supabaseSettingsService = {
         if (settings.shift2Periods !== undefined) updates.shift2_periods = settings.shift2Periods;
         if (settings.maxPeriods !== undefined) updates.max_periods = settings.maxPeriods;
         if (settings.telegramToken !== undefined) updates.telegram_token = settings.telegramToken;
-        if (settings.publicScheduleId !== undefined) updates.public_schedule_id = settings.publicScheduleId;
         if (settings.feedbackChatId !== undefined) updates.feedback_chat_id = settings.feedbackChatId;
         if (settings.adminTelegramChatId !== undefined) updates.admin_telegram_chat_id = settings.adminTelegramChatId;
         if (settings.bellPresets !== undefined) updates.bell_presets = settings.bellPresets;
@@ -79,7 +78,6 @@ function mapSettings(data: Record<string, unknown>): Settings {
         shift2Periods: (data.shift2_periods as number) || 8,
         maxPeriods: (data.max_periods as number) || 8,
         telegramToken: (data.telegram_token as string) || undefined,
-        publicScheduleId: (data.public_schedule_id as string) || undefined,
         feedbackChatId: (data.feedback_chat_id as string) || undefined,
         adminTelegramChatId: (data.admin_telegram_chat_id as string) || undefined,
         bellPresets: (data.bell_presets as BellPreset[] | undefined) || undefined,

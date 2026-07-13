@@ -142,6 +142,18 @@ export const supabaseUsersService = {
         // В схеме profiles нет last_login_at — не дергаем API (иначе 400).
         // При появлении колонки можно вернуть update.
         return;
+    },
+
+    /** Remembers dismissed app announcement (best-effort; localStorage is primary). */
+    dismissAppAnnouncement: async (uid: string, publishedAt: string): Promise<void> => {
+        try {
+            await supabase
+                .from('profiles')
+                .update({ dismissed_app_announcement_at: publishedAt, updated_at: new Date().toISOString() })
+                .eq('id', uid);
+        } catch {
+            // Column may not exist — AnnouncementModal also writes localStorage
+        }
     }
 };
 

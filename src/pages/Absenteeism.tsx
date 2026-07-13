@@ -2,7 +2,6 @@ import { useState, useMemo, useRef, useCallback } from 'react';
 import { useStaticData, useScheduleData } from '../context/DataContext';
 import { useAuth } from '../context/AuthContext';
 import { DateInput } from '../components/DateInput';
-// import { dbService } from '../services/db';
 import { Icon } from '../components/Icons';
 import { Modal, useToast } from '../components/UI';
 import { AbsenteeismRecord, StudentAbsence } from '../types';

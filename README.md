@@ -2,7 +2,7 @@
 
 [![React](https://img.shields.io/badge/React-18.2.0-blue.svg)](https://reactjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.4.2-blue.svg)](https://www.typescriptlang.org/)
-[![Firebase](https://img.shields.io/badge/Firebase-11.6.0-orange.svg)](https://firebase.google.com/)
+[![Supabase](https://img.shields.io/badge/Supabase-Backend-3FCF8E.svg)](https://supabase.com/)
 [![Vite](https://img.shields.io/badge/Vite-6.3.5-646CFF.svg)](https://vitejs.dev/)
 [![PWA](https://img.shields.io/badge/PWA-Ready-green.svg)](https://web.dev/progressive-web-apps/)
 
@@ -57,18 +57,10 @@
    ```
 
 3. **Настройте переменные окружения:**
-   Создайте файл `.env.local`:
+   Скопируйте `.env.example` → `.env` и заполните:
    ```env
-   # Firebase конфигурация
-   VITE_FIREBASE_API_KEY=your_api_key
-   VITE_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
-   VITE_FIREBASE_PROJECT_ID=your_project_id
-   VITE_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
-   VITE_FIREBASE_MESSAGING_SENDER_ID=123456789
-   VITE_FIREBASE_APP_ID=1:123456789:web:abcdef
-
-   # Опционально: Telegram бот
-   VITE_TELEGRAM_BOT_TOKEN=your_bot_token
+   VITE_SUPABASE_URL=https://your-project.supabase.co
+   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
    ```
 
 4. **Запустите приложение:**
@@ -84,44 +76,36 @@
 
 ## 🔐 Аутентификация
 
-Приложение поддерживает три типа пользователей:
-- **Администратор** - полный доступ ко всем функциям
-- **Учитель** - ограниченный доступ (расписание, дежурство)
-- **Гость** - только просмотр расписания
+Supabase Auth + таблица `profiles`. Роли:
+- **superadmin** — все организации
+- **admin** — полное управление организацией
+- **teacher** — ограниченный доступ
+- **canteen** — питание
 
 ## 🛠 Технологии
 
 - **Frontend:** React 18, TypeScript, Tailwind CSS
-- **Backend:** Firebase Firestore, Firebase Auth
+- **Backend:** Supabase (Postgres, Auth, Realtime, RLS)
 - **Build:** Vite 6
 - **Tests:** Vitest 4
 - **PWA:** Workbox, Vite PWA Plugin
-- **UI Components:** Custom компоненты с Heroicons
-- **Charts:** BarChart компоненты для отчетов
 
 ## 📁 Структура проекта
 
 ```
 src/
-├── components/          # Переиспользуемые компоненты
-│   ├── Icons.tsx       # Иконки и компоненты иконок
-│   └── UI.tsx          # UI компоненты (Modal, Select, etc.)
-├── context/            # React Context для состояния
-│   ├── AuthContext.tsx # Аутентификация
-│   └── DataContext.tsx # Данные приложения
-├── pages/              # Страницы приложения
-│   ├── Login.tsx       # Вход в систему
-│   ├── Dashboard.tsx   # Рабочий стол
-│   ├── Schedule.tsx    # Расписание
-│   ├── Substitutions.tsx # Замены
-│   ├── Directory.tsx   # Справочники
-│   ├── Reports.tsx     # Отчеты
-│   └── Admin.tsx       # Администрирование
-├── services/           # Сервисы
-│   ├── db.ts          # Работа с Firebase
-│   └── firebase.ts    # Конфигурация Firebase
-├── types.ts           # TypeScript типы
-└── constants.ts       # Константы и начальные данные
+├── components/          # UI-компоненты
+├── context/             # AuthContext, DataContext
+├── pages/               # Страницы приложения
+├── services/
+│   ├── supabase.ts      # Клиент Supabase
+│   ├── dbSupabase.ts    # Загрузка/сохранение данных
+│   ├── authAdapter.ts   # Auth API
+│   └── supabase/        # Users, settings, …
+└── …
+supabase/
+├── migrations/          # SQL-миграции
+└── rls_policies.sql     # RLS (справочно)
 ```
 
 ## 🔧 Скрипты
@@ -147,9 +131,10 @@ npm run deploy       # Деплой на GitHub Pages
 
 ## 🐛 Устранение неполадок
 
-### Проблемы с Firebase
-- Убедитесь, что все переменные окружения правильно установлены
-- Проверьте правила Firestore на корректность
+### Проблемы с Supabase
+- Проверьте `VITE_SUPABASE_URL` и `VITE_SUPABASE_ANON_KEY` в `.env`
+- Убедитесь, что пользователь имеет `organization_id` в `profiles`
+- При ошибках прав проверьте RLS-политики
 
 ### Проблемы с PWA
 - Очистите кеш браузера

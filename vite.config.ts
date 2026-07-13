@@ -82,13 +82,13 @@ export default defineConfig({
             }
           },
           {
-            urlPattern: /^https:\/\/.*\.googleapis\.com\/.*/i,
+            urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
             handler: 'NetworkFirst',
             options: {
-              cacheName: 'firebase-cache',
+              cacheName: 'supabase-api-cache',
               expiration: {
                 maxEntries: 100,
-                maxAgeSeconds: 60 * 60 * 2 // 2 часа для данных расписания
+                maxAgeSeconds: 60 * 60 * 2
               }
             }
           }

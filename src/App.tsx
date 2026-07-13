@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { HashRouter, Routes, Route, Navigate, NavLink, useSearchParams, useLocation, useOutlet } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate, NavLink, useLocation, useOutlet } from 'react-router-dom';
 import useMedia from 'use-media';
 import { DataProvider, useStaticData, StaticDataProvider, ScheduleDataProvider } from './context/DataContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
@@ -32,13 +32,10 @@ const MiniHomeRedirect = React.lazy(() =>
 );
 import { TelegramHost } from './miniapp/TelegramHost';
 import { MobileShell } from './mobile/MobileShell';
-import { dbService } from './services/db';
-import { AppData, PageId } from './types';
-import { INITIAL_DATA, getInitialData } from './constants';
+import { PageId } from './types';
 import { useAutoBackup } from './hooks/useAutoBackup';
 import { useSessionTimeout } from './hooks/useSessionTimeout';
 import { safeLocalStorageGet, safeLocalStorageSet } from './utils/localStorage';
-import { logger } from './utils/logger';
 
 /** Страницы с реальными маршрутами (не settings-табы users/organizations). */
 const NAVIGABLE_PAGE_IDS: PageId[] = [
@@ -741,83 +738,6 @@ const Layout = () => {
     );
 };
 
-const PublicLayout = () => {
-    const [publicData, setPublicData] = useState<AppData | null>(null);
-    const [loadingPublic, setLoadingPublic] = useState(true);
-    const [searchParams] = useSearchParams();
-    const publicId = searchParams.get('id');
-
-    useEffect(() => {
-        if (publicId) {
-            setLoadingPublic(true);
-            dbService
-                .getPublicData(publicId)
-                .then((data) => {
-                    const mergedData: AppData = {
-                        ...getInitialData(),
-                        ...data,
-                        settings: { ...INITIAL_DATA.settings, ...data?.settings }
-                    };
-                    setPublicData(mergedData);
-                    setLoadingPublic(false);
-                })
-                .catch((e) => {
-                    logger.error('Failed to load public data:', e);
-                    setPublicData(null);
-                    setLoadingPublic(false);
-                });
-        } else {
-            setLoadingPublic(false);
-            setPublicData(null);
-        }
-    }, [publicId]);
-
-    if (loadingPublic) {
-        return (
-            <div className="h-screen flex items-center justify-center bg-slate-50 dark:bg-dark-950">
-                <Icon name="Loader" className="animate-spin text-indigo-600" size={48} />
-            </div>
-        );
-    }
-
-    if (!publicData) {
-        return (
-            <div className="min-h-screen flex flex-col items-center justify-center text-center p-8">
-                <Icon name="AlertTriangle" size={64} className="text-red-500 mb-4" />
-                <h1 className="text-2xl font-bold text-slate-800 dark:text-white mb-2">Расписание не найдено</h1>
-                <p className="text-slate-500 dark:text-slate-400">Публичное расписание недоступно по этой ссылке.</p>
-            </div>
-        );
-    }
-
-    return (
-        <DataProvider initialData={publicData}>
-            <StaticDataProvider>
-                <ScheduleDataProvider>
-                    <div className="min-h-screen bg-slate-50 dark:bg-dark-950 flex flex-col">
-                        <header className="bg-white dark:bg-dark-800 border-b border-slate-200 dark:border-slate-700 px-6 py-4 flex items-center justify-between sticky top-0 z-50 no-print shadow-sm">
-                            <div className="flex items-center gap-3">
-                                <div className="bg-indigo-600 p-2 rounded-lg text-white">
-                                    <Icon name="GraduationCap" size={24} />
-                                </div>
-                                <div>
-                                    <h1 className="font-black text-slate-800 dark:text-white text-lg leading-none">
-                                        {publicData?.settings?.schoolName || 'Расписание'}
-                                    </h1>
-                                    <p className="text-xs font-bold text-slate-400 uppercase">Публичное расписание</p>
-                                </div>
-                            </div>
-                        </header>
-                        <main className="flex-1 p-4 lg:p-8 overflow-auto">
-                            <SchedulePage readOnly={true} />
-                        </main>
-                    </div>
-                </ScheduleDataProvider>
-            </StaticDataProvider>
-        </DataProvider>
-    );
-};
-
 export default function App() {
     return (
         <ToastProvider>
@@ -1106,7 +1026,6 @@ export default function App() {
                                                 }
                                             />
                                         </Route>
-                                        <Route path="/public" element={<PublicLayout />} />
                                     </Routes>
                                 </React.Suspense>
                             </HashRouter>

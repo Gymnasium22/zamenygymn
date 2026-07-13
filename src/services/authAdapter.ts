@@ -1,8 +1,4 @@
-import { User } from 'firebase/auth';
-import { auth as firebaseAuth } from './firebase';
 import { supabase } from './supabase';
-import { isSupabase } from './dbProvider';
-import { usersService } from './users';
 import { supabaseUsersService } from './supabase/users';
 
 export interface UnifiedUser {
@@ -15,44 +11,10 @@ export interface AuthAdapter {
     onAuthStateChanged: (callback: (user: UnifiedUser | null) => void) => () => void;
     signIn: (email: string, password: string) => Promise<{ user: UnifiedUser | null; error: Error | null }>;
     signOut: () => Promise<void>;
-    getUsersService: () => typeof usersService | typeof supabaseUsersService;
+    getUsersService: () => typeof supabaseUsersService;
 }
 
-const mapFirebaseUser = (user: User): UnifiedUser => ({
-    id: user.uid,
-    email: user.email
-});
-
-export const firebaseAdapter: AuthAdapter = {
-    getCurrentUser: async () => {
-        return firebaseAuth?.currentUser ? mapFirebaseUser(firebaseAuth.currentUser) : null;
-    },
-    onAuthStateChanged: (callback) => {
-        if (!firebaseAuth) return () => {};
-        const unsubscribe = firebaseAuth.onAuthStateChanged((user) => {
-            callback(user ? mapFirebaseUser(user) : null);
-        });
-        return unsubscribe;
-    },
-    signIn: async (email, password) => {
-        if (!firebaseAuth) return { user: null, error: new Error('Firebase not initialized') };
-        try {
-            const { signInWithEmailAndPassword } = await import('firebase/auth');
-            const result = await signInWithEmailAndPassword(firebaseAuth, email, password);
-            return { user: mapFirebaseUser(result.user), error: null };
-        } catch (error) {
-            return { user: null, error: error as Error };
-        }
-    },
-    signOut: async () => {
-        if (!firebaseAuth) return;
-        const { signOut } = await import('firebase/auth');
-        await signOut(firebaseAuth);
-    },
-    getUsersService: () => usersService
-};
-
-export const supabaseAdapter: AuthAdapter = {
+export const authAdapter: AuthAdapter = {
     getCurrentUser: async () => {
         const { data } = await supabase.auth.getUser();
         return data.user ? { id: data.user.id, email: data.user.email || '' } : null;
@@ -98,5 +60,3 @@ export const supabaseAdapter: AuthAdapter = {
     },
     getUsersService: () => supabaseUsersService
 };
-
-export const authAdapter = isSupabase ? supabaseAdapter : firebaseAdapter;

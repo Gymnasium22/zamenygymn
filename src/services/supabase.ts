@@ -1,11 +1,15 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://bbktjircoangqvusirap.supabase.co';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJia3RqaXJjb2FuZ3F2dXNpcmFwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0NDI3NzQsImV4cCI6MjA5ODAxODc3NH0.RIy_uePmskvjkwK2hMHIFVZey1h3MmB2fIMR8nZtXec';
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+if (!supabaseUrl || !supabaseAnonKey) {
+    console.error(
+        '[Supabase] Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY. Set them in .env'
+    );
+}
 
-console.log('[Supabase] Client initialized with URL:', supabaseUrl);
+export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '');
 
 export type DbTables = {
   organizations: {
@@ -99,7 +103,6 @@ export type DbTables = {
     shift2_periods: number;
     max_periods: number;
     telegram_token: string | null;
-    public_schedule_id: string | null;
     feedback_chat_id: string | null;
     admin_telegram_chat_id: string | null;
     bell_presets: unknown | null;
