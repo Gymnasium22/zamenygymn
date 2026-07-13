@@ -46,3 +46,6 @@ supabase/.temp/
 # Internal docs
 MOBILE-IMPROVEMENTS.md
 PWA-SETUP.md
+
+# Local presentations / business docs (not for repo)
+presentations/

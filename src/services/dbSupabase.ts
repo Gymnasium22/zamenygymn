@@ -327,13 +327,29 @@ export const supabaseDbService = {
         const currentYear = data.settings?.currentYear || new Date().getFullYear();
 
         const mapScheduleItem = (item: ScheduleItem, semester: number) => {
-            const obj = toSnakeCase(item as unknown as Record<string, unknown>);
-            if (!obj.id) obj.id = genId();
-            if (!obj.organization_id) obj.organization_id = orgId;
-            obj.semester = semester;
-            // Если academicYear не установлен, используем currentYear
-            if (!obj.academic_year) obj.academic_year = currentYear;
-            return obj;
+            // Whitelist only DB columns. Full toSnakeCase also copies createdAt/updatedAt
+            // from loaded rows; for NEW lessons those keys are missing, and any null/undefined
+            // would be sent as SQL NULL and override DEFAULT now() — leaving timestamps empty.
+            const raw = item as ScheduleItem & { createdAt?: string; updatedAt?: string };
+            const now = new Date().toISOString();
+            const createdAt =
+                typeof raw.createdAt === 'string' && raw.createdAt.trim() ? raw.createdAt : now;
+            return {
+                id: raw.id || genId(),
+                organization_id: raw.organizationId || orgId,
+                semester,
+                day: raw.day,
+                period: raw.period,
+                shift: raw.shift,
+                class_id: raw.classId || null,
+                subject_id: raw.subjectId || null,
+                teacher_id: raw.teacherId || null,
+                room_id: raw.roomId || null,
+                direction: raw.direction || null,
+                academic_year: raw.academicYear || currentYear,
+                created_at: createdAt,
+                updated_at: now
+            };
         };
 
         // During full imports, skip rows that reference classes/subjects/teachers/rooms
