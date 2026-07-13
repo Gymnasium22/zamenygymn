@@ -1,20 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Icon } from '../components/Icons';
 import { useToast } from '../components/UI';
-import { safeLocalStorageGet, safeLocalStorageSet } from '../utils/localStorage';
+import { safeLocalStorageGet, safeLocalStorageRemove } from '../utils/localStorage';
 import { generateId } from '../utils/helpers';
 import { useAuth } from '../context/AuthContext';
-
-interface PlannerTask {
-    id: string;
-    title: string;
-    description?: string;
-    deadline?: string; // YYYY-MM-DD
-    priority: 'low' | 'medium' | 'high';
-    status: 'todo' | 'in-progress' | 'done';
-    createdAt: string;
-    completedAt?: string;
-}
+import { plannerService, PlannerTask } from '../services/supabase/planner';
+import { logger } from '../utils/logger';
 
 const PRIORITY_COLORS: Record<PlannerTask['priority'], string> = {
     low: 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600',
@@ -40,15 +31,15 @@ const STATUS_COLORS: Record<PlannerTask['status'], string> = {
     done: 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800'
 };
 
-const STORAGE_KEY = 'gym_planner_tasks';
+const LEGACY_STORAGE_KEY = 'gym_planner_tasks';
 
 export const PlannerPage = () => {
     const { addToast } = useToast();
     const { organizationId, hasPermission } = useAuth();
-    const storageKey = organizationId ? `${STORAGE_KEY}_${organizationId}` : STORAGE_KEY;
     const canEditPlanner = hasPermission('edit_planner');
     const [tasks, setTasks] = useState<PlannerTask[]>([]);
     const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
     const [filter, setFilter] = useState<PlannerTask['status'] | 'all'>('all');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingTask, setEditingTask] = useState<PlannerTask | null>(null);
@@ -60,27 +51,58 @@ export const PlannerPage = () => {
         deadline: ''
     });
 
-    useEffect(() => {
-        const stored = safeLocalStorageGet(storageKey);
-        if (stored) {
-            try {
-                const parsed = JSON.parse(stored);
-                if (Array.isArray(parsed)) setTasks(parsed);
-            } catch {
-                // ignore
-            }
-        }
-        setLoading(false);
-    }, [storageKey]);
-
-    const saveTasks = (newTasks: PlannerTask[]) => {
-        if (!canEditPlanner) {
-            addToast({ type: 'warning', title: 'Нет прав', message: 'Планер открыт только для просмотра' });
+    const loadTasks = useCallback(async () => {
+        if (!organizationId) {
+            setTasks([]);
+            setLoading(false);
             return;
         }
-        setTasks(newTasks);
-        safeLocalStorageSet(storageKey, JSON.stringify(newTasks));
-    };
+
+        setLoading(true);
+        try {
+            let remote = await plannerService.list(organizationId);
+
+            // Migrate legacy localStorage tasks once if cloud is empty
+            if (remote.length === 0) {
+                const legacyKey = `${LEGACY_STORAGE_KEY}_${organizationId}`;
+                const stored = safeLocalStorageGet(legacyKey) || safeLocalStorageGet(LEGACY_STORAGE_KEY);
+                if (stored) {
+                    try {
+                        const parsed = JSON.parse(stored) as PlannerTask[];
+                        if (Array.isArray(parsed) && parsed.length > 0) {
+                            await plannerService.migrateFromLocal(organizationId, parsed);
+                            remote = await plannerService.list(organizationId);
+                            safeLocalStorageRemove(legacyKey);
+                            safeLocalStorageRemove(LEGACY_STORAGE_KEY);
+                            addToast({
+                                type: 'success',
+                                title: 'Планер',
+                                message: `Перенесено задач в облако: ${parsed.length}`
+                            });
+                        }
+                    } catch (e) {
+                        logger.warn('Planner local migrate failed:', e);
+                    }
+                }
+            }
+
+            setTasks(remote);
+        } catch (e) {
+            logger.error('Failed to load planner tasks:', e);
+            addToast({
+                type: 'danger',
+                title: 'Ошибка',
+                message: 'Не удалось загрузить задачи планера'
+            });
+            setTasks([]);
+        } finally {
+            setLoading(false);
+        }
+    }, [organizationId, addToast]);
+
+    useEffect(() => {
+        loadTasks();
+    }, [loadTasks]);
 
     const openAdd = () => {
         if (!canEditPlanner) return;
@@ -96,9 +118,9 @@ export const PlannerPage = () => {
         setIsModalOpen(true);
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!canEditPlanner) return;
+        if (!canEditPlanner || !organizationId) return;
         if (!form.title?.trim()) return;
 
         const newTask: PlannerTask = {
@@ -107,46 +129,74 @@ export const PlannerPage = () => {
             description: form.description?.trim(),
             priority: form.priority || 'medium',
             status: form.status || 'todo',
-            deadline: form.deadline,
+            deadline: form.deadline || undefined,
             createdAt: editingTask?.createdAt || new Date().toISOString(),
-            completedAt: form.status === 'done' ? new Date().toISOString() : undefined
+            completedAt:
+                form.status === 'done'
+                    ? editingTask?.completedAt || new Date().toISOString()
+                    : undefined,
+            organizationId
         };
 
-        const newTasks = editingTask
-            ? tasks.map((t) => (t.id === editingTask.id ? newTask : t))
-            : [...tasks, newTask];
-
-        saveTasks(newTasks);
-        setIsModalOpen(false);
-        addToast({ type: 'success', title: 'Сохранено', message: editingTask ? 'Задача обновлена' : 'Задача создана' });
+        setSaving(true);
+        try {
+            await plannerService.upsert(newTask, organizationId);
+            setTasks((prev) => {
+                const exists = prev.some((t) => t.id === newTask.id);
+                return exists ? prev.map((t) => (t.id === newTask.id ? newTask : t)) : [newTask, ...prev];
+            });
+            setIsModalOpen(false);
+            addToast({
+                type: 'success',
+                title: 'Сохранено',
+                message: editingTask ? 'Задача обновлена' : 'Задача создана'
+            });
+        } catch (err) {
+            logger.error(err);
+            addToast({ type: 'danger', title: 'Ошибка', message: 'Не удалось сохранить задачу' });
+        } finally {
+            setSaving(false);
+        }
     };
 
-    const handleDelete = (id: string) => {
-        if (!canEditPlanner) return;
+    const handleDelete = async (id: string) => {
+        if (!canEditPlanner || !organizationId) return;
         if (!window.confirm('Удалить задачу?')) return;
-        saveTasks(tasks.filter((t) => t.id !== id));
-        addToast({ type: 'success', title: 'Удалено', message: 'Задача удалена' });
+        try {
+            await plannerService.remove(id, organizationId);
+            setTasks((prev) => prev.filter((t) => t.id !== id));
+            addToast({ type: 'success', title: 'Удалено', message: 'Задача удалена' });
+        } catch (err) {
+            logger.error(err);
+            addToast({ type: 'danger', title: 'Ошибка', message: 'Не удалось удалить задачу' });
+        }
     };
 
-    const toggleStatus = (task: PlannerTask) => {
-        if (!canEditPlanner) return;
+    const toggleStatus = async (task: PlannerTask) => {
+        if (!canEditPlanner || !organizationId) return;
         const nextStatus: Record<PlannerTask['status'], PlannerTask['status']> = {
             todo: 'in-progress',
             'in-progress': 'done',
             done: 'todo'
         };
         const newStatus = nextStatus[task.status];
-        const updated = tasks.map((t) =>
-            t.id === task.id
-                ? { ...t, status: newStatus, completedAt: newStatus === 'done' ? new Date().toISOString() : undefined }
-                : t
-        );
-        saveTasks(updated);
-        addToast({
-            type: 'info',
-            title: 'Статус',
-            message: `${STATUS_LABELS[newStatus]}: ${task.title}`
-        });
+        const updated: PlannerTask = {
+            ...task,
+            status: newStatus,
+            completedAt: newStatus === 'done' ? new Date().toISOString() : undefined
+        };
+        try {
+            await plannerService.upsert(updated, organizationId);
+            setTasks((prev) => prev.map((t) => (t.id === task.id ? updated : t)));
+            addToast({
+                type: 'info',
+                title: 'Статус',
+                message: `${STATUS_LABELS[newStatus]}: ${task.title}`
+            });
+        } catch (err) {
+            logger.error(err);
+            addToast({ type: 'danger', title: 'Ошибка', message: 'Не удалось обновить статус' });
+        }
     };
 
     const filteredTasks = tasks.filter((t) => (filter === 'all' ? true : t.status === filter));
@@ -170,6 +220,17 @@ export const PlannerPage = () => {
         return new Date(task.deadline) < new Date(new Date().toISOString().split('T')[0]);
     };
 
+    if (!organizationId) {
+        return (
+            <div className="h-full flex items-center justify-center p-8 text-center">
+                <div>
+                    <Icon name="Building2" size={40} className="mx-auto mb-3 text-slate-300" />
+                    <p className="text-slate-500 dark:text-slate-400">Выберите организацию, чтобы открыть планер</p>
+                </div>
+            </div>
+        );
+    }
+
     if (loading) {
         return (
             <div className="h-full flex items-center justify-center">
@@ -188,7 +249,7 @@ export const PlannerPage = () => {
                             Планер администрации
                         </h1>
                         <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
-                            Статусы: к выполнению → в работе → готово (клик по кружку)
+                            Статусы: к выполнению → в работе → готово (клик по кружку). Данные организации в облаке.
                         </p>
                     </div>
                     {canEditPlanner && (
@@ -218,12 +279,14 @@ export const PlannerPage = () => {
                 </div>
 
                 <div className="flex gap-2">
-                    {([
-                        { id: 'all', label: 'Все' },
-                        { id: 'todo', label: 'К выполнению' },
-                        { id: 'in-progress', label: 'В работе' },
-                        { id: 'done', label: 'Готово' }
-                    ] as const).map((f) => (
+                    {(
+                        [
+                            { id: 'all', label: 'Все' },
+                            { id: 'todo', label: 'К выполнению' },
+                            { id: 'in-progress', label: 'В работе' },
+                            { id: 'done', label: 'Готово' }
+                        ] as const
+                    ).map((f) => (
                         <button
                             key={f.id}
                             onClick={() => setFilter(f.id)}
@@ -253,8 +316,8 @@ export const PlannerPage = () => {
                                 task.status === 'done'
                                     ? 'border-slate-100 dark:border-slate-700 opacity-60'
                                     : isOverdue(task)
-                                    ? 'border-red-200 dark:border-red-800 ring-1 ring-red-100 dark:ring-red-900/20'
-                                    : 'border-slate-100 dark:border-slate-700'
+                                      ? 'border-red-200 dark:border-red-800 ring-1 ring-red-100 dark:ring-red-900/20'
+                                      : 'border-slate-100 dark:border-slate-700'
                             }`}
                         >
                             <div className="flex items-start gap-3">
@@ -265,22 +328,30 @@ export const PlannerPage = () => {
                                         task.status === 'done'
                                             ? 'bg-emerald-500 border-emerald-500 text-white'
                                             : task.status === 'in-progress'
-                                            ? 'border-amber-400 bg-amber-50'
-                                            : 'border-slate-300 dark:border-slate-600'
+                                              ? 'border-amber-400 bg-amber-50'
+                                              : 'border-slate-300 dark:border-slate-600'
                                     }`}
                                 >
                                     {task.status === 'done' && <Icon name="CheckCircle" size={12} />}
-                                    {task.status === 'in-progress' && <div className="w-2 h-2 rounded-full bg-amber-400" />}
+                                    {task.status === 'in-progress' && (
+                                        <div className="w-2 h-2 rounded-full bg-amber-400" />
+                                    )}
                                 </button>
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 flex-wrap">
-                                        <h3 className={`font-bold text-sm ${task.status === 'done' ? 'line-through text-slate-400' : 'text-slate-800 dark:text-white'}`}>
+                                        <h3
+                                            className={`font-bold text-sm ${task.status === 'done' ? 'line-through text-slate-400' : 'text-slate-800 dark:text-white'}`}
+                                        >
                                             {task.title}
                                         </h3>
-                                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${STATUS_COLORS[task.status]}`}>
+                                        <span
+                                            className={`px-2 py-0.5 rounded text-[10px] font-bold border ${STATUS_COLORS[task.status]}`}
+                                        >
                                             {STATUS_LABELS[task.status]}
                                         </span>
-                                        <span className={`px-2 py-0.5 rounded text-[10px] font-medium border ${PRIORITY_COLORS[task.priority]}`}>
+                                        <span
+                                            className={`px-2 py-0.5 rounded text-[10px] font-medium border ${PRIORITY_COLORS[task.priority]}`}
+                                        >
                                             {PRIORITY_LABELS[task.priority]}
                                         </span>
                                         {isOverdue(task) && (
@@ -290,10 +361,14 @@ export const PlannerPage = () => {
                                         )}
                                     </div>
                                     {task.description && (
-                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{task.description}</p>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                            {task.description}
+                                        </p>
                                     )}
                                     {task.deadline && (
-                                        <div className={`text-xs mt-1 flex items-center gap-1 ${isOverdue(task) ? 'text-red-500 font-medium' : 'text-slate-400 dark:text-slate-500'}`}>
+                                        <div
+                                            className={`text-xs mt-1 flex items-center gap-1 ${isOverdue(task) ? 'text-red-500 font-medium' : 'text-slate-400 dark:text-slate-500'}`}
+                                        >
                                             <Icon name="Calendar" size={12} />
                                             Дедлайн: {new Date(task.deadline).toLocaleDateString('ru-RU')}
                                         </div>
@@ -329,7 +404,9 @@ export const PlannerPage = () => {
                         </h3>
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Название</label>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                                    Название
+                                </label>
                                 <input
                                     type="text"
                                     value={form.title}
@@ -339,7 +416,9 @@ export const PlannerPage = () => {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Описание</label>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                                    Описание
+                                </label>
                                 <textarea
                                     value={form.description}
                                     onChange={(e) => setForm({ ...form, description: e.target.value })}
@@ -349,10 +428,17 @@ export const PlannerPage = () => {
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Приоритет</label>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                                        Приоритет
+                                    </label>
                                     <select
                                         value={form.priority}
-                                        onChange={(e) => setForm({ ...form, priority: e.target.value as PlannerTask['priority'] })}
+                                        onChange={(e) =>
+                                            setForm({
+                                                ...form,
+                                                priority: e.target.value as PlannerTask['priority']
+                                            })
+                                        }
                                         className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-dark-700 text-slate-800 dark:text-slate-200 outline-none focus:border-indigo-500"
                                     >
                                         <option value="low">Низкий</option>
@@ -361,10 +447,17 @@ export const PlannerPage = () => {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Статус</label>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                                        Статус
+                                    </label>
                                     <select
                                         value={form.status}
-                                        onChange={(e) => setForm({ ...form, status: e.target.value as PlannerTask['status'] })}
+                                        onChange={(e) =>
+                                            setForm({
+                                                ...form,
+                                                status: e.target.value as PlannerTask['status']
+                                            })
+                                        }
                                         className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-dark-700 text-slate-800 dark:text-slate-200 outline-none focus:border-indigo-500"
                                     >
                                         <option value="todo">К выполнению</option>
@@ -374,7 +467,9 @@ export const PlannerPage = () => {
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Дедлайн</label>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                                    Дедлайн
+                                </label>
                                 <input
                                     type="date"
                                     value={form.deadline || ''}
@@ -392,9 +487,10 @@ export const PlannerPage = () => {
                                 </button>
                                 <button
                                     type="submit"
-                                    className="flex-1 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-colors text-sm font-medium"
+                                    disabled={saving}
+                                    className="flex-1 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white rounded-xl transition-colors text-sm font-medium"
                                 >
-                                    Сохранить
+                                    {saving ? 'Сохранение…' : 'Сохранить'}
                                 </button>
                             </div>
                         </form>
