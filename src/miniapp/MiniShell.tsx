@@ -66,7 +66,7 @@ export const MiniShell: React.FC<{ children?: React.ReactNode }> = ({ children }
     }, [allowed]);
 
     const orgName =
-        organizations.find((o) => o.id === organizationId)?.name || settings?.schoolName || 'Школа';
+        organizations.find((o) => o.id === organizationId)?.name || settings?.schoolName || 'Управление учреждением';
 
     const semester = getActiveSemester(new Date(), settings) ?? 1;
     const scheduleQuick =

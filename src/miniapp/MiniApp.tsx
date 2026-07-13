@@ -80,7 +80,7 @@ export const MiniApp: React.FC = () => {
                         <Icon name="GraduationCap" size={26} />
                     </div>
                     <div>
-                        <h1>Гимназия Pro22</h1>
+                        <h1>Управление учреждением</h1>
                         <p>
                             {isInsideTelegram()
                                 ? tgName

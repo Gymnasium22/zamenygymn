@@ -1,4 +1,4 @@
-# 🎓 Гимназия Pro22 - Система управления расписанием
+# 🎓 Управление учреждением
 
 [![React](https://img.shields.io/badge/React-18.2.0-blue.svg)](https://reactjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.4.2-blue.svg)](https://www.typescriptlang.org/)
@@ -6,7 +6,7 @@
 [![Vite](https://img.shields.io/badge/Vite-6.3.5-646CFF.svg)](https://vitejs.dev/)
 [![PWA](https://img.shields.io/badge/PWA-Ready-green.svg)](https://web.dev/progressive-web-apps/)
 
-Современная веб-система для управления расписанием, заменами и справочниками гимназии №22.
+Современная веб-система для управления расписанием, заменами и справочниками образовательных учреждений (поддержка нескольких организаций).
 
 ## ✨ Возможности
 
@@ -173,9 +173,8 @@ npm run deploy       # Деплой на GitHub Pages
 
 ## 📞 Контакты
 
-- **Организация:** Гимназия №22
+- **Продукт:** Управление учреждением
 - **Разработчик:** Команда разработки
-- **Email:** admin@gymnasium22.com
 
 ---
 

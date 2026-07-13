@@ -513,7 +513,7 @@ const Layout = () => {
                         </div>
                         <div className="min-w-0">
                             <h1 className="text-lg font-black text-slate-800 dark:text-white tracking-tight truncate max-w-[150px]" title={organizationName}>{organizationName}</h1>
-                            <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Управление V2.0</p>
+                            <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Управление учреждением</p>
                         </div>
                     </div>
 

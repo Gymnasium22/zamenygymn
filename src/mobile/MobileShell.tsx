@@ -147,7 +147,7 @@ export const MobileShell: React.FC<MobileShellProps> = ({
     const orgName =
         organizations.find((o) => o.id === organizationId)?.name ||
         settings?.schoolName ||
-        'Гимназия Pro22';
+        'Управление учреждением';
 
     const currentPath = location.pathname.replace(/\/$/, '') || '/';
 
