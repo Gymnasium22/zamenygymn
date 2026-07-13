@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="black">
+  <!-- Safari pinned tab monochrome mark: institutional building -->
+  <path d="M256 72L96 176v28h320v-28L256 72zm-8 48h16v32h-16v-32z"/>
+  <path d="M120 220h52v160h-52V220zm110 0h52v160h-52V220zm110 0h52v160h-52V220z"/>
+  <path d="M88 392h336v32H88v-32z"/>
+  <path d="M200 248h112v16H200v-16zm0 40h112v16H200v-16zm0 40h72v16h-72v-16z"/>
+</svg>
