@@ -43,6 +43,34 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+/** DEV-only: sessionStorage.gym_mobile_audit=1 — полный доступ для визуального QA без логина */
+const AUDIT_ALL_PAGES: PageId[] = [
+    'dashboard',
+    'schedule',
+    'schedule2',
+    'substitutions',
+    'duty',
+    'nutrition',
+    'absenteeism',
+    'bells',
+    'directory',
+    'reports',
+    'export',
+    'admin',
+    'calendar',
+    'planner',
+    'settings',
+    'archive'
+];
+
+const isMobileAuditMode = (): boolean => {
+    try {
+        return import.meta.env.DEV && sessionStorage.getItem('gym_mobile_audit') === '1';
+    } catch {
+        return false;
+    }
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<UnifiedUser | null>(null);
     const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -51,6 +79,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [currentOrganizationId, setCurrentOrganizationId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [isBlocked, setIsBlocked] = useState(false);
+    const [auditMode] = useState(isMobileAuditMode);
 
     const isSuperAdmin = role === 'superadmin';
 
@@ -186,22 +215,84 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const hasPermission = useCallback(
         (permission: Permission) => {
+            if (auditMode) return true;
             return profile?.isActive === true && profile.permissions.includes(permission);
         },
-        [profile]
+        [profile, auditMode]
     );
 
     const canViewPage = useCallback(
         (pageId: PageId) => {
+            if (auditMode) return AUDIT_ALL_PAGES.includes(pageId);
             if (!profile || profile.isActive !== true) return false;
             // Все роли, включая superadmin — только по галочкам «Страницы» в профиле
             const pages = normalizeAllowedPages(profile);
             return pages.includes(pageId);
         },
-        [profile, normalizeAllowedPages]
+        [profile, normalizeAllowedPages, auditMode]
     );
 
     useEffect(() => {
+        if (auditMode) {
+            let cancelled = false;
+            const run = async () => {
+                const list = await loadOrganizations();
+                const orgId = list[0]?.id || null;
+                if (cancelled) return;
+                const auditProfile: UserProfile = {
+                    id: 'audit-user',
+                    email: 'audit@local.dev',
+                    displayName: 'Mobile Audit',
+                    role: 'superadmin',
+                    isActive: true,
+                    permissions: [
+                        'view_dashboard',
+                        'view_schedule',
+                        'edit_schedule',
+                        'view_substitutions',
+                        'edit_substitutions',
+                        'view_duty',
+                        'edit_duty',
+                        'view_nutrition',
+                        'edit_nutrition',
+                        'view_absenteeism',
+                        'edit_absenteeism',
+                        'view_directory',
+                        'edit_directory',
+                        'view_bells',
+                        'edit_bells',
+                        'view_admin',
+                        'view_reports',
+                        'view_export',
+                        'view_settings',
+                        'manage_users',
+                        'manage_organizations',
+                        'view_calendar',
+                        'edit_calendar',
+                        'view_planner',
+                        'edit_planner'
+                    ],
+                    allowedPages: AUDIT_ALL_PAGES,
+                    organizationId: orgId
+                };
+                setUser({ id: 'audit-user', email: 'audit@local.dev' });
+                setProfile(auditProfile);
+                setRole('superadmin');
+                setIsBlocked(false);
+                setOrganizations(list);
+                setCurrentOrganizationId(orgId);
+                setLoading(false);
+                console.log('[AuthContext] Mobile audit mode active, org=', orgId);
+            };
+            run().catch((e) => {
+                console.error('[AuthContext] Audit mode failed', e);
+                setLoading(false);
+            });
+            return () => {
+                cancelled = true;
+            };
+        }
+
         let unsubProfile: (() => void) | null = null;
 
         console.log('[AuthContext] Starting auth state subscription');
@@ -253,9 +344,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             unsubscribe();
             if (unsubProfile) unsubProfile();
         };
-    }, [applyProfile]);
+    }, [applyProfile, auditMode]);
 
     const logout = async () => {
+        if (auditMode) {
+            try {
+                sessionStorage.removeItem('gym_mobile_audit');
+            } catch {
+                /* ignore */
+            }
+            window.location.reload();
+            return;
+        }
         await authAdapter.signOut();
         setUser(null);
         setProfile(null);
@@ -274,7 +374,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 organizations,
                 isSuperAdmin,
                 permissions: profile?.permissions || [],
-                allowedPages: profile?.allowedPages || [],
+                allowedPages: auditMode ? AUDIT_ALL_PAGES : profile?.allowedPages || [],
                 loading,
                 isBlocked,
                 logout,

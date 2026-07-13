@@ -1581,11 +1581,11 @@ export const DashboardPage = () => {
     };
 
     return (
-        <div className="max-w-7xl mx-auto space-y-8 pb-20">
+        <div className="max-w-7xl mx-auto space-y-8 pb-20 w-full min-w-0 box-border">
             {/* NEW Header Layout */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in">
-                <div className="lg:col-span-2 flex flex-col justify-end">
-                    <h1 className="text-3xl lg:text-4xl font-semibold text-slate-800 dark:text-white tracking-tight mb-1">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in w-full min-w-0">
+                <div className="lg:col-span-2 flex flex-col justify-end min-w-0 w-full">
+                    <h1 className="text-3xl lg:text-4xl font-semibold text-slate-800 dark:text-white tracking-tight mb-1 break-words">
                         {greeting}, {profile?.firstName || profile?.displayName || (role === 'superadmin' ? 'Суперадмин' : role === 'admin' ? 'Администратор' : role === 'canteen' ? 'Столовая' : 'Учитель')}!
                     </h1>
                     <p className="text-slate-500 dark:text-slate-400 text-base md:text-lg font-medium mb-4">

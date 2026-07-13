@@ -77,7 +77,7 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
     const [draggedItem, setDraggedItem] = useState<ScheduleItem | null>(null);
     const [dragOverCell, setDragOverCell] = useState<string | null>(null);
 
-    const isMobile = useMedia({ maxWidth: 768 });
+    const isMobile = useMedia({ maxWidth: 1023 });
     const [mobileListView, setMobileListView] = useState(true);
 
     // --- Mobile Swipe Navigation for Days ---
@@ -970,7 +970,8 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
             onTouchMove={isMobile && viewMode !== 'week' ? handleTouchMove : undefined}
             onTouchEnd={isMobile && viewMode !== 'week' ? handleTouchEnd : undefined}
         >
-            <div className="flex items-center gap-2 mb-4 px-4 pt-2">
+            {/* На mobile shell заголовок уже в app-bar — не дублируем */}
+            <div className="hidden lg:flex items-center gap-2 mb-4 px-4 pt-2">
                 <h2 className="text-xl font-bold text-slate-800 dark:text-white">
                     {semester === 1 ? 'Расписание (1-е полугодие)' : 'Расписание (2-е полугодие)'}
                 </h2>
@@ -984,41 +985,60 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
                     actions={contextActions}
                 />
             )}
-            <div className="bg-white dark:bg-dark-800 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 mb-6 flex flex-col xl:flex-row gap-4 items-start xl:items-center justify-between no-print">
-                <div className="flex gap-4 items-center flex-wrap">
-                    <div className="flex bg-slate-100 dark:bg-slate-700 p-1 rounded-xl">
-                        <button
-                            onClick={() => setSelectedShift(Shift.First)}
-                            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${selectedShift === Shift.First ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}
-                        >
-                            1 смена
-                        </button>
-                        <button
-                            onClick={() => setSelectedShift(Shift.Second)}
-                            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${selectedShift === Shift.Second ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}
-                        >
-                            2 смена
-                        </button>
+            <div className="bg-white dark:bg-dark-800 p-3 sm:p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 mb-4 sm:mb-6 flex flex-col xl:flex-row gap-3 sm:gap-4 items-stretch xl:items-center justify-between no-print w-full min-w-0">
+                <div className="flex flex-col gap-2 sm:gap-3 min-w-0 w-full">
+                    <div className="flex gap-2 sm:gap-3 items-center flex-wrap">
+                        <div className="flex bg-slate-100 dark:bg-slate-700 p-1 rounded-xl shrink-0">
+                            <button
+                                onClick={() => setSelectedShift(Shift.First)}
+                                className={`px-3 sm:px-4 py-2 rounded-lg text-sm font-bold transition-all ${selectedShift === Shift.First ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}
+                            >
+                                1 смена
+                            </button>
+                            <button
+                                onClick={() => setSelectedShift(Shift.Second)}
+                                className={`px-3 sm:px-4 py-2 rounded-lg text-sm font-bold transition-all ${selectedShift === Shift.Second ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}
+                            >
+                                2 смена
+                            </button>
+                        </div>
+                        {!readOnly && (
+                            <div className="flex bg-slate-100 dark:bg-slate-700 p-1 rounded-xl ml-auto sm:ml-0">
+                                <button
+                                    onClick={undo}
+                                    disabled={!canUndo}
+                                    className="p-2 text-slate-500 disabled:opacity-30 hover:bg-white dark:hover:bg-slate-600 rounded-lg transition"
+                                >
+                                    <Icon name="RotateCcw" size={18} />
+                                </button>
+                                <button
+                                    onClick={redo}
+                                    disabled={!canRedo}
+                                    className="p-2 text-slate-500 disabled:opacity-30 hover:bg-white dark:hover:bg-slate-600 rounded-lg transition"
+                                >
+                                    <Icon name="RotateCw" size={18} />
+                                </button>
+                            </div>
+                        )}
                     </div>
                     {viewMode !== 'week' && (
-                        <div className="flex items-center gap-2">
-                            {/* Mobile swipe hint */}
+                        <div className="flex items-center gap-1 w-full min-w-0">
                             {isMobile && (
                                 <button
                                     onClick={goToPrevDay}
                                     disabled={DAYS.indexOf(selectedDay) === 0}
-                                    className="md:hidden p-1.5 rounded-lg text-slate-400 disabled:opacity-30 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                                    className="lg:hidden p-1.5 rounded-lg text-slate-400 disabled:opacity-30 hover:bg-slate-100 dark:hover:bg-slate-700 transition shrink-0"
                                     aria-label="Предыдущий день"
                                 >
                                     <Icon name="ChevronLeft" size={18} />
                                 </button>
                             )}
-                            <div className="flex overflow-x-auto pb-1 gap-1 max-w-[40vw] hide-scrollbar">
+                            <div className="flex overflow-x-auto pb-0.5 gap-1 flex-1 min-w-0 hide-scrollbar">
                                 {DAYS.map((day) => (
                                     <button
                                         key={day}
                                         onClick={() => setSelectedDay(day)}
-                                        className={`whitespace-nowrap px-4 py-2 rounded-xl text-sm font-bold transition-all ${selectedDay === day ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
+                                        className={`whitespace-nowrap px-3 sm:px-4 py-2 rounded-xl text-sm font-bold transition-all shrink-0 ${selectedDay === day ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
                                     >
                                         {day}
                                     </button>
@@ -1028,30 +1048,12 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
                                 <button
                                     onClick={goToNextDay}
                                     disabled={DAYS.indexOf(selectedDay) === DAYS.length - 1}
-                                    className="md:hidden p-1.5 rounded-lg text-slate-400 disabled:opacity-30 hover:bg-slate-100 dark:hover:bg-slate-700 transition"
+                                    className="lg:hidden p-1.5 rounded-lg text-slate-400 disabled:opacity-30 hover:bg-slate-100 dark:hover:bg-slate-700 transition shrink-0"
                                     aria-label="Следующий день"
                                 >
                                     <Icon name="ChevronRight" size={18} />
                                 </button>
                             )}
-                        </div>
-                    )}
-                    {!readOnly && (
-                        <div className="flex bg-slate-100 dark:bg-slate-700 p-1 rounded-xl">
-                            <button
-                                onClick={undo}
-                                disabled={!canUndo}
-                                className="p-2 text-slate-500 disabled:opacity-30 hover:bg-white dark:hover:bg-slate-600 rounded-lg transition"
-                            >
-                                <Icon name="RotateCcw" size={18} />
-                            </button>
-                            <button
-                                onClick={redo}
-                                disabled={!canRedo}
-                                className="p-2 text-slate-500 disabled:opacity-30 hover:bg-white dark:hover:bg-slate-600 rounded-lg transition"
-                            >
-                                <Icon name="RotateCw" size={18} />
-                            </button>
                         </div>
                     )}
                 </div>
@@ -1192,12 +1194,27 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
                 </div>
             )}
 
-            <div className="flex-1 bg-white dark:bg-dark-800 rounded-2xl shadow-xl shadow-slate-200/50 dark:shadow-none border border-slate-100 dark:border-slate-700 overflow-hidden flex flex-col transition-colors duration-300 no-print">
-                <div className={`overflow-auto flex-1 custom-scrollbar ${isMobile ? 'mobile-table-scroll' : ''}`}>
-                    {isMobile && (mobileListView || readOnly) && filterId ? (
+            <div className="flex-1 min-h-0 bg-white dark:bg-dark-800 rounded-2xl shadow-xl shadow-slate-200/50 dark:shadow-none border border-slate-100 dark:border-slate-700 overflow-hidden flex flex-col transition-colors duration-300 no-print">
+                <div className={`overflow-auto flex-1 min-h-0 custom-scrollbar ${isMobile ? 'mobile-table-scroll' : ''}`}>
+                    {isMobile && !filterId && viewMode !== 'week' ? (
+                        <div className="flex flex-col items-center justify-center text-center p-8 min-h-[220px] gap-3">
+                            <div className="w-14 h-14 rounded-2xl bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-300 flex items-center justify-center">
+                                <Icon name="Filter" size={28} />
+                            </div>
+                            <p className="text-base font-bold text-slate-800 dark:text-white">
+                                Выберите{' '}
+                                {viewMode === 'class' ? 'класс' : viewMode === 'teacher' ? 'учителя' : 'предмет'}
+                            </p>
+                            <p className="text-sm text-slate-500 dark:text-slate-400 max-w-xs">
+                                На телефоне удобнее смотреть расписание одного{' '}
+                                {viewMode === 'class' ? 'класса' : viewMode === 'teacher' ? 'учителя' : 'предмета'} — список
+                                уроков без широкой таблицы.
+                            </p>
+                        </div>
+                    ) : isMobile && (mobileListView || readOnly) && filterId ? (
                         renderMobileListView()
                     ) : (
-                        <table className="w-full border-collapse min-w-[1000px]">
+                        <table className={`w-full border-collapse ${isMobile ? 'min-w-[640px]' : 'min-w-[1000px]'}`}>
                             <thead className="bg-slate-50 dark:bg-slate-700 sticky top-0 z-20">
                                 <tr>
                                     <th className="p-4 border-b border-r border-slate-100 dark:border-slate-600 text-left text-xs font-extrabold text-slate-400 uppercase w-40 sticky left-0 bg-slate-50 dark:bg-slate-700 z-30">

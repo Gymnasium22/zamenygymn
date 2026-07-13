@@ -104,7 +104,7 @@ export const SubstitutionsPage = () => {
     const [dragOverLessonId, setDragOverLessonId] = useState<string | null>(null);
 
     // Mobile state
-    const isMobile = useMedia({ maxWidth: 768 });
+    const isMobile = useMedia({ maxWidth: 1023 });
     const [mobileTab, setMobileTab] = useState<'lessons' | 'teachers'>('lessons');
 
     const activeSchedule = useMemo(() => {

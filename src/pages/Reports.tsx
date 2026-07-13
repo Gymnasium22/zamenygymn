@@ -224,8 +224,8 @@ export const ReportsPage = () => {
             </div>
 
             {reportTab === 'load' && (
-                <div className="bg-white dark:bg-dark-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 overflow-auto max-h-[70vh]">
-                    <table className="w-full text-left border-collapse">
+                <div className="bg-white dark:bg-dark-800 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 overflow-x-auto overflow-y-auto max-h-[70vh] max-w-full">
+                    <table className="w-full text-left border-collapse min-w-[520px]">
                         <thead className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-700 border-b border-slate-200 dark:border-slate-600">
                             <tr>
                                 <th className="p-4 font-bold text-slate-500 dark:text-slate-400 text-xs uppercase">

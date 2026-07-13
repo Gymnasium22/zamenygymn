@@ -1666,9 +1666,9 @@ export const ExportPage = () => {
                                 </button>
                             </div>
                         </div>
-                        <div className="overflow-auto bg-slate-100 dark:bg-slate-900 p-8 rounded-xl border border-slate-200 dark:border-slate-700 flex justify-start">
+                        <div className="overflow-x-auto overflow-y-auto bg-slate-100 dark:bg-slate-900 p-3 sm:p-8 rounded-xl border border-slate-200 dark:border-slate-700 flex justify-start max-w-full">
                             {subsForDate.length === 0 ? (
-                                <div className="bg-white p-8 min-w-[800px] max-w-[1000px] shadow-xl text-slate-900">
+                                <div className="bg-white p-4 sm:p-8 min-w-[320px] sm:min-w-[800px] max-w-[1000px] shadow-xl text-slate-900 w-full sm:w-auto">
                                     <ReportHeader exportDate={exportDate} dayComment={dayComment} />
                                     <div className="py-12 text-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50">
                                         <p className="text-slate-400 font-medium italic">Замен на этот день нет</p>

@@ -7,6 +7,7 @@ import { Icon } from './components/Icons';
 import { StatusWidget, BottomNavigation, ToastProvider, CommandPalette, Modal } from './components/UI';
 import { AnnouncementModal } from './components/AnnouncementModal';
 import { PullToRefresh } from './components/PullToRefresh';
+import { useIsMobileApp } from './hooks/useIsMobileApp';
 import { DashboardPage } from './pages/Dashboard';
 import { SchedulePage } from './pages/Schedule';
 import { SubstitutionsPage } from './pages/Substitutions';
@@ -25,6 +26,12 @@ const AbsenteeismPage = React.lazy(() => import('./pages/Absenteeism').then(m =>
 const CalendarPage = React.lazy(() => import('./pages/Calendar').then(m => ({ default: m.CalendarPage })));
 const PlannerPage = React.lazy(() => import('./pages/Planner').then(m => ({ default: m.PlannerPage })));
 const LoginPage = React.lazy(() => import('./pages/Login').then(m => ({ default: m.LoginPage })));
+const MiniApp = React.lazy(() => import('./miniapp/MiniApp').then(m => ({ default: m.MiniApp })));
+const MiniHomeRedirect = React.lazy(() =>
+    import('./miniapp/MiniApp').then((m) => ({ default: m.MiniHomeRedirect }))
+);
+import { TelegramHost } from './miniapp/TelegramHost';
+import { MobileShell } from './mobile/MobileShell';
 import { dbService } from './services/db';
 import { AppData, PageId } from './types';
 import { INITIAL_DATA, getInitialData } from './constants';
@@ -53,18 +60,20 @@ const NAVIGABLE_PAGE_IDS: PageId[] = [
     'archive'
 ];
 
-const getSafeHomePath = (allowedPages: PageId[], role: string | null): string => {
+const getSafeHomePath = (allowedPages: PageId[], role: string | null, base = ''): string => {
     const fromList = allowedPages.find((p) => NAVIGABLE_PAGE_IDS.includes(p));
-    if (fromList) return `/${fromList}`;
-    if (role === 'superadmin' || role === 'admin') return '/dashboard';
-    return '/login';
+    if (fromList) return `${base}/${fromList}`;
+    if (role === 'superadmin' || role === 'admin') return `${base}/dashboard`;
+    return base ? `${base}` : '/login';
 };
 
 const ProtectedRoute = ({
     children,
     allowedRoles,
-    pageId
-}: React.PropsWithChildren<{ allowedRoles?: string[]; pageId?: PageId }>) => {
+    pageId,
+    /** База для редиректов: '' = основное приложение, '/tg' = Mini App */
+    pathBase = ''
+}: React.PropsWithChildren<{ allowedRoles?: string[]; pageId?: PageId; pathBase?: string }>) => {
     const { role, loading, canViewPage, allowedPages } = useAuth();
 
     if (loading)
@@ -75,16 +84,15 @@ const ProtectedRoute = ({
         );
 
     if (!role) {
-        return <Navigate to="/login" replace />;
+        return <Navigate to={pathBase === '/tg' || pathBase === '/mini' ? '/tg' : '/login'} replace />;
     }
 
-    const fallback = getSafeHomePath(allowedPages, role);
+    const fallback = getSafeHomePath(allowedPages, role, pathBase);
 
     if (allowedRoles && !allowedRoles.includes(role)) {
         return <Navigate to={fallback} replace />;
     }
 
-    // pageId: доступ по списку страниц пользователя (суперадмин — всегда true в canViewPage)
     if (pageId && !canViewPage(pageId)) {
         return <Navigate to={fallback} replace />;
     }
@@ -140,6 +148,8 @@ const loadMenuOrder = (): PageId[] => {
 };
 
 const Layout = () => {
+    /** До lg — app-like MobileShell; lg+ — прежний десктопный Layout */
+    const isMobileApp = useIsMobileApp();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isCommandOpen, setIsCommandOpen] = useState(false);
     const [isAppearanceOpen, setIsAppearanceOpen] = useState(false);
@@ -320,10 +330,170 @@ const Layout = () => {
         }
     });
 
+    const appearanceModal = (
+            <Modal
+                isOpen={isAppearanceOpen}
+                onClose={() => setIsAppearanceOpen(false)}
+                title="Оформление"
+                maxWidth="max-w-sm"
+            >
+                <div className="space-y-5">
+                    <div>
+                        <div className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
+                            Тема
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setTheme('light')}
+                                className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold border transition ${
+                                    theme === 'light'
+                                        ? 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-700'
+                                        : 'bg-white/50 dark:bg-white/5 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-600 hover:border-indigo-300'
+                                }`}
+                            >
+                                <Icon name="Sun" size={18} /> Светлая
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setTheme('dark')}
+                                className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold border transition ${
+                                    theme === 'dark'
+                                        ? 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-700'
+                                        : 'bg-white/50 dark:bg-white/5 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-600 hover:border-indigo-300'
+                                }`}
+                            >
+                                <Icon name="Moon" size={18} /> Тёмная
+                            </button>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
+                            Плотность
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setCompact((c) => !c)}
+                            className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold border transition ${
+                                compact
+                                    ? 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-700'
+                                    : 'bg-white/50 dark:bg-white/5 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-600'
+                            }`}
+                        >
+                            <span className="flex items-center gap-2">
+                                <Icon name="Columns" size={18} />
+                                Компактный режим
+                            </span>
+                            <span className="text-[11px] font-bold opacity-70">{compact ? 'Вкл' : 'Выкл'}</span>
+                        </button>
+                    </div>
+
+                    <div>
+                        <div className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
+                            Цвет приложения
+                        </div>
+                        <div className="flex items-center justify-center gap-3 flex-wrap">
+                            {[
+                                { id: 'default', color: 'bg-gradient-to-br from-indigo-500 to-purple-600', label: 'Классика' },
+                                { id: 'ocean', color: 'bg-gradient-to-br from-sky-500 to-cyan-500', label: 'Океан' },
+                                { id: 'forest', color: 'bg-gradient-to-br from-emerald-500 to-lime-500', label: 'Лес' },
+                                { id: 'sunset', color: 'bg-gradient-to-br from-amber-500 to-orange-500', label: 'Закат' },
+                                { id: 'rose', color: 'bg-gradient-to-br from-rose-500 to-pink-500', label: 'Роза' }
+                            ].map((t) => (
+                                <button
+                                    key={t.id}
+                                    type="button"
+                                    onClick={() => setThemePreset(t.id)}
+                                    className={`w-9 h-9 rounded-full ${t.color} transition-all ${
+                                        themePreset === t.id
+                                            ? 'ring-2 ring-offset-2 ring-slate-400 dark:ring-slate-400 scale-110 shadow-md'
+                                            : 'opacity-70 hover:opacity-100'
+                                    }`}
+                                    title={t.label}
+                                    aria-label={t.label}
+                                />
+                            ))}
+                        </div>
+                        <p className="text-center text-[11px] text-slate-400 mt-2">
+                            {[
+                                { id: 'default', label: 'Классика' },
+                                { id: 'ocean', label: 'Океан' },
+                                { id: 'forest', label: 'Лес' },
+                                { id: 'sunset', label: 'Закат' },
+                                { id: 'rose', label: 'Роза' }
+                            ].find((t) => t.id === themePreset)?.label || 'Классика'}
+                        </p>
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={() => setIsAppearanceOpen(false)}
+                        className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold transition"
+                    >
+                        Готово
+                    </button>
+                </div>
+            </Modal>
+    );
+
+    const sessionAndAnnouncements = (
+        <>
+            <CommandPalette isOpen={isCommandOpen} onClose={() => setIsCommandOpen(false)} />
+            {showAnnouncement && settings?.appAnnouncement && (
+                <AnnouncementModal
+                    announcement={settings.appAnnouncement}
+                    onClose={() => setShowAnnouncement(false)}
+                />
+            )}
+            {sessionWarning && (
+                <div
+                    data-overlay="session"
+                    className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-fade-in"
+                >
+                    <div className="float-panel rounded-3xl w-full max-w-sm p-6 text-center">
+                        <Icon name="Clock" size={48} className="mx-auto mb-4 text-amber-500 animate-pulse-glow" />
+                        <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-2">Сессия истекает</h3>
+                        <p className="text-sm text-slate-600 dark:text-slate-300 mb-6">
+                            Вы неактивны более {Math.max(1, (settings?.sessionTimeoutMinutes || 30) - 2)} минут. Через 2 минуты произойдёт автоматический выход.
+                        </p>
+                        <button
+                            onClick={() => {
+                                setSessionWarning(false);
+                                resetTimer();
+                            }}
+                            className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-2xl font-bold transition-all shadow-glow active:scale-95"
+                        >
+                            Продолжить работу
+                        </button>
+                    </div>
+                </div>
+            )}
+        </>
+    );
+
+    /* ——— Мобильная PWA-оболочка: полный функционал, app-like chrome ——— */
+    if (isMobileApp) {
+        return (
+            <>
+                <MobileShell
+                    onOpenAppearance={() => setIsAppearanceOpen(true)}
+                    onOpenCommand={() => setIsCommandOpen(true)}
+                >
+                    <div key={location.pathname} className="animate-page-in min-h-0 w-full max-w-full min-w-0 box-border">
+                        <MainContent />
+                    </div>
+                </MobileShell>
+                {appearanceModal}
+                {sessionAndAnnouncements}
+            </>
+        );
+    }
+
     return (
         <div
             ref={spotlightRef}
-            className="spotlight-container flex h-screen bg-slate-50 dark:bg-dark-950 overflow-hidden transition-colors duration-300 mesh-gradient-bg noise-overlay"
+            className="spotlight-container flex h-screen w-full max-w-full bg-slate-50 dark:bg-dark-950 overflow-hidden transition-colors duration-300 mesh-gradient-bg noise-overlay"
         >
             {isMobileMenuOpen && (
                 <div
@@ -334,7 +504,7 @@ const Layout = () => {
 
             {/* Sidebar - hidden on mobile unless opened via menu */}
             <aside
-                className={`fixed lg:static inset-y-0 left-0 z-50 w-64 lg:w-64 sidebar-2026 transform transition-transform duration-300 ease-in-out ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} no-print overflow-hidden relative`}
+                className={`fixed inset-y-0 left-0 z-50 w-64 sidebar-2026 transform transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} no-print overflow-hidden shrink-0`}
             >
                 <div className="h-full flex flex-col relative">
                     <div className="p-5 flex items-center gap-3 border-b border-white/20 dark:border-white/5 pt-6">
@@ -536,125 +706,22 @@ const Layout = () => {
                 </div>
             </aside>
 
-            <Modal
-                isOpen={isAppearanceOpen}
-                onClose={() => setIsAppearanceOpen(false)}
-                title="Оформление"
-                maxWidth="max-w-sm"
-            >
-                <div className="space-y-5">
-                    <div>
-                        <div className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
-                            Тема
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                            <button
-                                type="button"
-                                onClick={() => setTheme('light')}
-                                className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold border transition ${
-                                    theme === 'light'
-                                        ? 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-700'
-                                        : 'bg-white/50 dark:bg-white/5 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-600 hover:border-indigo-300'
-                                }`}
-                            >
-                                <Icon name="Sun" size={18} /> Светлая
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setTheme('dark')}
-                                className={`flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold border transition ${
-                                    theme === 'dark'
-                                        ? 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-700'
-                                        : 'bg-white/50 dark:bg-white/5 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-600 hover:border-indigo-300'
-                                }`}
-                            >
-                                <Icon name="Moon" size={18} /> Тёмная
-                            </button>
-                        </div>
-                    </div>
+            {appearanceModal}
 
-                    <div>
-                        <div className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
-                            Плотность
-                        </div>
-                        <button
-                            type="button"
-                            onClick={() => setCompact((c) => !c)}
-                            className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold border transition ${
-                                compact
-                                    ? 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-700'
-                                    : 'bg-white/50 dark:bg-white/5 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-600'
-                            }`}
-                        >
-                            <span className="flex items-center gap-2">
-                                <Icon name="Columns" size={18} />
-                                Компактный режим
-                            </span>
-                            <span className="text-[11px] font-bold opacity-70">{compact ? 'Вкл' : 'Выкл'}</span>
-                        </button>
-                    </div>
-
-                    <div>
-                        <div className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
-                            Цвет приложения
-                        </div>
-                        <div className="flex items-center justify-center gap-3 flex-wrap">
-                            {[
-                                { id: 'default', color: 'bg-gradient-to-br from-indigo-500 to-purple-600', label: 'Классика' },
-                                { id: 'ocean', color: 'bg-gradient-to-br from-sky-500 to-cyan-500', label: 'Океан' },
-                                { id: 'forest', color: 'bg-gradient-to-br from-emerald-500 to-lime-500', label: 'Лес' },
-                                { id: 'sunset', color: 'bg-gradient-to-br from-amber-500 to-orange-500', label: 'Закат' },
-                                { id: 'rose', color: 'bg-gradient-to-br from-rose-500 to-pink-500', label: 'Роза' }
-                            ].map((t) => (
-                                <button
-                                    key={t.id}
-                                    type="button"
-                                    onClick={() => setThemePreset(t.id)}
-                                    className={`w-9 h-9 rounded-full ${t.color} transition-all ${
-                                        themePreset === t.id
-                                            ? 'ring-2 ring-offset-2 ring-slate-400 dark:ring-slate-400 scale-110 shadow-md'
-                                            : 'opacity-70 hover:opacity-100'
-                                    }`}
-                                    title={t.label}
-                                    aria-label={t.label}
-                                />
-                            ))}
-                        </div>
-                        <p className="text-center text-[11px] text-slate-400 mt-2">
-                            {[
-                                { id: 'default', label: 'Классика' },
-                                { id: 'ocean', label: 'Океан' },
-                                { id: 'forest', label: 'Лес' },
-                                { id: 'sunset', label: 'Закат' },
-                                { id: 'rose', label: 'Роза' }
-                            ].find((t) => t.id === themePreset)?.label || 'Классика'}
-                        </p>
-                    </div>
-
-                    <button
-                        type="button"
-                        onClick={() => setIsAppearanceOpen(false)}
-                        className="w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold transition"
-                    >
-                        Готово
-                    </button>
-                </div>
-            </Modal>
-
-            <main className="flex-1 flex flex-col min-w-0 bg-transparent relative z-10">
-                <header className="lg:hidden p-4 flex items-center gap-3 glass-panel border-b border-white/20 dark:border-white/5 no-print sticky top-0 z-30">
+            <main className="flex-1 flex flex-col min-w-0 w-full max-w-full overflow-x-hidden bg-transparent relative z-10">
+                <header className="lg:hidden p-4 flex items-center gap-3 glass-panel border-b border-white/20 dark:border-white/5 no-print sticky top-0 z-30 w-full max-w-full box-border">
                     <button
                         onClick={() => setIsMobileMenuOpen(true)}
-                        className="p-2 rounded-xl text-slate-500 dark:text-slate-400 hover:bg-white/40 dark:hover:bg-white/5 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
+                        className="p-2 rounded-xl text-slate-500 dark:text-slate-400 hover:bg-white/40 dark:hover:bg-white/5 hover:text-slate-800 dark:hover:text-slate-200 transition-colors shrink-0"
                         aria-label="Открыть меню"
                     >
                         <Icon name="Menu" size={22} />
                     </button>
-                    <span className="font-bold text-slate-800 dark:text-white text-lg tracking-tight truncate flex-1" title={organizationName}>{organizationName}</span>
+                    <span className="font-bold text-slate-800 dark:text-white text-lg tracking-tight truncate flex-1 min-w-0" title={organizationName}>{organizationName}</span>
                     <button
                         type="button"
                         onClick={() => setIsCommandOpen(true)}
-                        className="p-2 rounded-xl text-slate-500 hover:bg-white/40 dark:hover:bg-white/5"
+                        className="p-2 rounded-xl text-slate-500 hover:bg-white/40 dark:hover:bg-white/5 shrink-0"
                         aria-label="Поиск (Ctrl+K)"
                         title="Поиск (Ctrl+K)"
                     >
@@ -662,42 +729,14 @@ const Layout = () => {
                     </button>
                 </header>
 
-                <div key={location.pathname} className="flex-1 overflow-auto lg:overflow-auto p-4 lg:p-8 pb-24 lg:pb-8 custom-scrollbar-2026 relative animate-page-in">
+                <div key={location.pathname} className="flex-1 overflow-x-hidden overflow-y-auto lg:overflow-auto p-4 lg:p-8 pb-24 lg:pb-8 custom-scrollbar-2026 relative animate-page-in w-full max-w-full min-w-0 box-border">
                     <MainContent />
                 </div>
 
+                {/* На <lg всегда MobileShell — этот BottomNavigation только fallback, если media-query сбойнул */}
                 <BottomNavigation onMenuClick={() => setIsMobileMenuOpen(true)} allowedPages={allowedPages} />
             </main>
-            <CommandPalette isOpen={isCommandOpen} onClose={() => setIsCommandOpen(false)} />
-            {showAnnouncement && settings?.appAnnouncement && (
-                <AnnouncementModal
-                    announcement={settings.appAnnouncement}
-                    onClose={() => setShowAnnouncement(false)}
-                />
-            )}
-            {sessionWarning && (
-                <div
-                    data-overlay="session"
-                    className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4 animate-fade-in"
-                >
-                    <div className="float-panel rounded-3xl w-full max-w-sm p-6 text-center">
-                        <Icon name="Clock" size={48} className="mx-auto mb-4 text-amber-500 animate-pulse-glow" />
-                        <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-2">Сессия истекает</h3>
-                        <p className="text-sm text-slate-600 dark:text-slate-300 mb-6">
-                            Вы неактивны более {Math.max(1, (settings?.sessionTimeoutMinutes || 30) - 2)} минут. Через 2 минуты произойдёт автоматический выход.
-                        </p>
-                        <button
-                            onClick={() => {
-                                setSessionWarning(false);
-                                resetTimer();
-                            }}
-                            className="w-full py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-2xl font-bold transition-all shadow-glow active:scale-95"
-                        >
-                            Продолжить работу
-                        </button>
-                    </div>
-                </div>
-            )}
+            {sessionAndAnnouncements}
         </div>
     );
 };
@@ -792,9 +831,143 @@ export default function App() {
                                     v7_relativeSplatPath: true
                                 }}
                             >
+                                <TelegramHost />
                                 <React.Suspense fallback={<div className="h-screen flex items-center justify-center bg-slate-50 dark:bg-dark-950"><Icon name="Loader" className="animate-spin text-indigo-600" size={48} /></div>}>
                                     <Routes>
                                         <Route path="/login" element={<LoginPage />} />
+                                        <Route path="/mini" element={<Navigate to="/tg" replace />} />
+                                        {/* Telegram Mini App: компактный shell, те же страницы что и в полной версии */}
+                                        <Route path="/tg" element={<MiniApp />}>
+                                            <Route index element={<MiniHomeRedirect />} />
+                                            <Route
+                                                path="dashboard"
+                                                element={
+                                                    <ProtectedRoute pathBase="/tg" pageId="dashboard">
+                                                        <DashboardPage />
+                                                    </ProtectedRoute>
+                                                }
+                                            />
+                                            <Route
+                                                path="schedule"
+                                                element={
+                                                    <ProtectedRoute pathBase="/tg" pageId="schedule">
+                                                        <SchedulePageWrapper semester={1} />
+                                                    </ProtectedRoute>
+                                                }
+                                            />
+                                            <Route
+                                                path="schedule2"
+                                                element={
+                                                    <ProtectedRoute pathBase="/tg" pageId="schedule2">
+                                                        <SchedulePageWrapper semester={2} />
+                                                    </ProtectedRoute>
+                                                }
+                                            />
+                                            <Route
+                                                path="substitutions"
+                                                element={
+                                                    <ProtectedRoute pathBase="/tg" pageId="substitutions">
+                                                        <SubstitutionsPage />
+                                                    </ProtectedRoute>
+                                                }
+                                            />
+                                            <Route
+                                                path="duty"
+                                                element={
+                                                    <ProtectedRoute pathBase="/tg" pageId="duty">
+                                                        <DutyPage />
+                                                    </ProtectedRoute>
+                                                }
+                                            />
+                                            <Route
+                                                path="nutrition"
+                                                element={
+                                                    <ProtectedRoute pathBase="/tg" pageId="nutrition">
+                                                        <NutritionPage />
+                                                    </ProtectedRoute>
+                                                }
+                                            />
+                                            <Route
+                                                path="absenteeism"
+                                                element={
+                                                    <ProtectedRoute pathBase="/tg" pageId="absenteeism">
+                                                        <AbsenteeismPage />
+                                                    </ProtectedRoute>
+                                                }
+                                            />
+                                            <Route
+                                                path="directory"
+                                                element={
+                                                    <ProtectedRoute pathBase="/tg" pageId="directory">
+                                                        <DirectoryPage />
+                                                    </ProtectedRoute>
+                                                }
+                                            />
+                                            <Route
+                                                path="bells"
+                                                element={
+                                                    <ProtectedRoute pathBase="/tg" pageId="bells">
+                                                        <BellsPage />
+                                                    </ProtectedRoute>
+                                                }
+                                            />
+                                            <Route
+                                                path="admin"
+                                                element={
+                                                    <ProtectedRoute pathBase="/tg" pageId="admin">
+                                                        <AdminPage />
+                                                    </ProtectedRoute>
+                                                }
+                                            />
+                                            <Route
+                                                path="calendar"
+                                                element={
+                                                    <ProtectedRoute pathBase="/tg" pageId="calendar">
+                                                        <CalendarPage />
+                                                    </ProtectedRoute>
+                                                }
+                                            />
+                                            <Route
+                                                path="planner"
+                                                element={
+                                                    <ProtectedRoute pathBase="/tg" pageId="planner">
+                                                        <PlannerPage />
+                                                    </ProtectedRoute>
+                                                }
+                                            />
+                                            <Route
+                                                path="reports"
+                                                element={
+                                                    <ProtectedRoute pathBase="/tg" pageId="reports">
+                                                        <ReportsPage />
+                                                    </ProtectedRoute>
+                                                }
+                                            />
+                                            <Route
+                                                path="export"
+                                                element={
+                                                    <ProtectedRoute pathBase="/tg" pageId="export">
+                                                        <ExportPage />
+                                                    </ProtectedRoute>
+                                                }
+                                            />
+                                            <Route
+                                                path="settings"
+                                                element={
+                                                    <ProtectedRoute pathBase="/tg" pageId="settings">
+                                                        <SettingsPage />
+                                                    </ProtectedRoute>
+                                                }
+                                            />
+                                            <Route
+                                                path="archive"
+                                                element={
+                                                    <ProtectedRoute pathBase="/tg" pageId="archive">
+                                                        <ArchivePage />
+                                                    </ProtectedRoute>
+                                                }
+                                            />
+                                        </Route>
                                         <Route
                                             path="/"
                                             element={
@@ -959,7 +1132,7 @@ const MainContent = () => {
     }
 
     return (
-        <div className="h-full">
+        <div className="h-full min-h-0 w-full max-w-full min-w-0 flex-1 flex flex-col overflow-hidden overflow-x-hidden box-border">
             <PullToRefresh onRefresh={handleRefresh}>{outlet}</PullToRefresh>
         </div>
     );

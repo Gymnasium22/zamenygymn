@@ -293,6 +293,20 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
         }
 
         if (isSupabase && !organizationId) {
+            // DEV mobile audit without org still needs a renderable tree
+            try {
+                if (import.meta.env.DEV && sessionStorage.getItem('gym_mobile_audit') === '1') {
+                    console.log('[DataContext] Audit mode without org — using initial data');
+                    const seed = getInitialData();
+                    setInternalData(seed);
+                    setHistory([seed]);
+                    setHistoryPointer(0);
+                    setIsLoading(false);
+                    return;
+                }
+            } catch {
+                /* ignore */
+            }
             console.log('[DataContext] Waiting for organization...');
             return;
         }

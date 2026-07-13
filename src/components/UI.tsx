@@ -83,7 +83,7 @@ export const ToastContainer = ({ toasts, onRemoveToast }: ToastContainerProps) =
     if (toasts.length === 0) return null;
 
     return (
-        <div className="fixed top-4 right-4 z-[60] space-y-2 md:top-4 md:right-4 md:left-auto md:w-auto left-4 right-4 w-auto">
+        <div className="fixed top-4 right-4 z-[70] space-y-2 md:top-4 md:right-4 md:left-auto md:w-auto left-4 right-4 w-auto app-mobile-toast-stack">
             {toasts.length > 1 && (
                 <div className="flex justify-end mb-2">
                     <button
@@ -272,11 +272,11 @@ export const Modal = ({ isOpen, onClose, title, children, maxWidth = 'max-w-lg' 
             aria-modal="true"
             aria-labelledby="modal-title"
             tabIndex={-1}
-            className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/35 backdrop-blur-sm p-3 md:p-4 animate-fade-in no-print"
+            className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-slate-950/35 backdrop-blur-sm p-0 sm:p-3 md:p-4 animate-fade-in no-print"
             onClick={(e) => e.target === e.currentTarget && onClose()}
         >
             <div
-                className={`float-panel w-full ${maxWidth} flex flex-col max-h-[86vh] transition-all duration-300`}
+                className={`float-panel w-full ${maxWidth} flex flex-col max-h-[92dvh] sm:max-h-[86vh] rounded-t-2xl sm:rounded-2xl transition-all duration-300`}
             >
                 <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200/70 dark:border-slate-700/70">
                     <h2 id="modal-title" className="text-lg md:text-xl font-semibold text-slate-800 dark:text-white tracking-tight">{title}</h2>

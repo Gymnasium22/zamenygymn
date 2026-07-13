@@ -69,7 +69,8 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefres
     return (
         <div
             ref={containerRef}
-            className="relative h-full overflow-y-auto overflow-x-hidden -webkit-overflow-scrolling-touch"
+            className="pull-to-refresh relative h-full min-h-0 w-full max-w-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden box-border"
+            style={{ WebkitOverflowScrolling: 'touch' }}
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
