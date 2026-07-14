@@ -511,7 +511,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                             // и не продолжал цепочку зависимых сохранений (например, импорт schedule → substitutions).
                             throw dbError;
                         } else {
-                            // При ошибке Firestore добавляем в очередь синхронизации вместо отката
+                            // При сетевой/временной ошибке Supabase — в очередь синхронизации, без отката UI
                             handleError.offline(dbError, 'сохранения данных', newData, organizationId);
                             // НЕ откатываем интерфейс - данные остались в localStorage и будут синхронизированы позже
                         }
