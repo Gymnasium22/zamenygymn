@@ -5,6 +5,7 @@ import { exportService } from '../services/exportService';
 import { escapeCsv } from '../utils/csv';
 import { BarChart } from '../components/UI';
 import { DAYS, Substitution, Settings } from '../types';
+import { DateInput } from '../components/DateInput';
 import { getActiveSemester, formatDateEuropean } from '../utils/helpers';
 
 const PLAN_WEEKS = 4;
@@ -579,11 +580,11 @@ export const ReportsPage = () => {
                                 <option value="month">Месяц</option>
                             </select>
                             {periodMode === 'month' && (
-                                <input
+                                <DateInput
                                     type="month"
                                     value={selectedMonth}
-                                    onChange={(e) => setSelectedMonth(e.target.value)}
-                                    className="bg-transparent text-sm font-bold text-slate-700 dark:text-slate-200 outline-none"
+                                    onChange={setSelectedMonth}
+                                    className="bg-transparent text-sm font-bold text-slate-700 dark:text-slate-200 outline-none w-28"
                                 />
                             )}
                         </div>

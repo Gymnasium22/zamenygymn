@@ -5,7 +5,7 @@ import { DateInput } from '../components/DateInput';
 import { Icon } from '../components/Icons';
 import { Modal, useToast, SearchableSelect } from '../components/UI';
 import { NutritionRecord } from '../types';
-import { formatDateISO, formatDateEuropean, generateId, getDateOrToday, getMonthOrNow } from '../utils/helpers';
+import { formatDateISO, formatDateEuropean, formatMonthLong, BY_LOCALE, generateId, getDateOrToday, getMonthOrNow } from '../utils/helpers';
 import { exportService } from '../services/exportService';
 
 /** День заблокирован для редактирования (не-админ) после настроенного времени */
@@ -542,7 +542,7 @@ export const NutritionPage = () => {
                     <h2 className="text-lg font-bold text-slate-800 dark:text-white">
                         {viewMode === 'day'
                             ? `Данные за ${formatDateEuropean(selectedDate)}`
-                            : `Данные за ${getMonthOrNow(selectedMonth).toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}`}
+                            : `Данные за ${formatMonthLong(selectedMonth)}`}
                     </h2>
                     {canMutateDay && viewMode === 'day' && (
                         <button
@@ -677,7 +677,7 @@ export const NutritionPage = () => {
                                     monthStats.statsByDate.map(([date, stats]) => (
                                         <tr key={date} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
                                             <td className="px-4 py-3 font-semibold text-slate-800 dark:text-white">
-                                                {getDateOrToday(date).toLocaleDateString('ru-RU', {
+                                                {getDateOrToday(date).toLocaleDateString(BY_LOCALE, {
                                                     weekday: 'short',
                                                     day: 'numeric',
                                                     month: 'short'
@@ -712,7 +712,7 @@ export const NutritionPage = () => {
                         <>
                             <p className="text-center mb-6 text-slate-600">
                                 Дата:{' '}
-                                {getDateOrToday(selectedDate).toLocaleDateString('ru-RU', {
+                                {getDateOrToday(selectedDate).toLocaleDateString(BY_LOCALE, {
                                     day: 'numeric',
                                     month: 'long',
                                     year: 'numeric'
@@ -773,7 +773,7 @@ export const NutritionPage = () => {
                         <>
                             <p className="text-center mb-6 text-slate-600">
                                 Месяц:{' '}
-                                {getMonthOrNow(selectedMonth).toLocaleDateString('ru-RU', {
+                                {getMonthOrNow(selectedMonth).toLocaleDateString(BY_LOCALE, {
                                     month: 'long',
                                     year: 'numeric'
                                 })}

@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef, useMemo, useCallback, createContext
 import { Icon } from './Icons';
 import { useStaticData, useScheduleData } from '../context/DataContext';
 import { DayOfWeek, PageId, Shift } from '../types';
-import { generateId, getActiveSemester } from '../utils/helpers';
+import { formatDateEuropean, generateId, getActiveSemester } from '../utils/helpers';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -1248,7 +1248,7 @@ export const CommandPalette = ({ isOpen, onClose }: CommandPaletteProps) => {
                     if (s.date.includes(q) || s.date === today) {
                         const t = teachers.find((x) => x.id === s.originalTeacherId);
                         if (t && actions.filter((a) => a.type === 'sub').length < 3) {
-                            actions.push({ type: 'sub', label: `Замена ${s.date}`, subtitle: `Вместо: ${t.name}`, icon: 'Repeat', id: s.date });
+                            actions.push({ type: 'sub', label: `Замена ${formatDateEuropean(s.date)}`, subtitle: `Вместо: ${t.name}`, icon: 'Repeat', id: s.date });
                         }
                     }
                 });

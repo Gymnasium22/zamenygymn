@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Icon } from '../components/Icons';
 import { useToast } from '../components/UI';
 import { safeLocalStorageGet, safeLocalStorageRemove } from '../utils/localStorage';
-import { generateId } from '../utils/helpers';
+import { DateInput } from '../components/DateInput';
+import { formatDateEuropean, generateId } from '../utils/helpers';
 import { useAuth } from '../context/AuthContext';
 import { plannerService, PlannerTask } from '../services/supabase/planner';
 import { logger } from '../utils/logger';
@@ -370,7 +371,7 @@ export const PlannerPage = () => {
                                             className={`text-xs mt-1 flex items-center gap-1 ${isOverdue(task) ? 'text-red-500 font-medium' : 'text-slate-400 dark:text-slate-500'}`}
                                         >
                                             <Icon name="Calendar" size={12} />
-                                            Дедлайн: {new Date(task.deadline).toLocaleDateString('ru-RU')}
+                                            Дедлайн: {formatDateEuropean(task.deadline)}
                                         </div>
                                     )}
                                 </div>
@@ -468,12 +469,11 @@ export const PlannerPage = () => {
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-                                    Дедлайн
+                                    Дедлайн (ДД.ММ.ГГГГ)
                                 </label>
-                                <input
-                                    type="date"
+                                <DateInput
                                     value={form.deadline || ''}
-                                    onChange={(e) => setForm({ ...form, deadline: e.target.value })}
+                                    onChange={(v) => setForm({ ...form, deadline: v })}
                                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-dark-700 text-slate-800 dark:text-slate-200 outline-none focus:border-indigo-500"
                                 />
                             </div>

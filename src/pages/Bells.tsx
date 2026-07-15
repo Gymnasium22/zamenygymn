@@ -5,7 +5,7 @@ import { DateInput } from '../components/DateInput';
 import { Icon } from '../components/Icons';
 import { Modal, useToast } from '../components/UI';
 import { Shift, SHIFT_PERIODS, Bell } from '../types';
-import { formatDateEuropean } from '../utils/helpers';
+import { formatDateEuropean, formatTimeHM } from '../utils/helpers';
 import { exportService } from '../services/exportService';
 import { DEFAULT_BELLS } from '../constants';
 import { generateId } from '../utils/helpers';
@@ -583,7 +583,7 @@ export const BellsPage = () => {
                 <tr class="empty-row"><td colspan="4" style="border:none"></td></tr>
                 <tr>
                     <td colspan="4" class="footer-block">
-                        Экспортировано: ${formatDateEuropean(new Date())} в ${new Date().toLocaleTimeString('ru-RU')}
+                        Экспортировано: ${formatDateEuropean(new Date())} в ${formatTimeHM(new Date())}
                     </td>
                 </tr>
             </table>

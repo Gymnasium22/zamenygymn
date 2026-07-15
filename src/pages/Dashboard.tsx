@@ -5,7 +5,7 @@ import { Icon } from '../components/Icons';
 import { DayOfWeek, DAYS, ScheduleItem, Shift, UserRole } from '../types';
 import { useNavigate, NavLink } from 'react-router-dom';
 import { Modal, useToast } from '../components/UI';
-import { getActiveSemester, formatDateISO } from '../utils/helpers';
+import { getActiveSemester, formatDateISO, formatDateLong, BY_LOCALE } from '../utils/helpers';
 import { weatherService, WeatherData, ForecastItem } from '../services/weatherService';
 import { escapeMarkdown } from '../utils/escapeHtml';
 import { safeLocalStorageGet, safeLocalStorageSet } from '../utils/localStorage';
@@ -262,7 +262,7 @@ const WeatherWidget = () => {
                 {forecastData.slice(0, 3).map((day, idx) => (
                     <div key={idx} className="flex flex-col items-center">
                         <span className="text-[8px] opacity-80 uppercase font-bold">
-                            {new Date(day.dt * 1000).toLocaleDateString('ru-RU', { weekday: 'short' })}
+                            {new Date(day.dt * 1000).toLocaleDateString(BY_LOCALE, { weekday: 'short' })}
                         </span>
                         <span className="text-xs font-bold">{Math.round(day.main.temp)}°</span>
                     </div>
@@ -1590,7 +1590,7 @@ export const DashboardPage = () => {
                     </h1>
                     <p className="text-slate-500 dark:text-slate-400 text-base md:text-lg font-medium mb-4">
                         Сегодня{' '}
-                        {currentDate.toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' })}
+                        {formatDateLong(currentDate)}
                     </p>
 
                     <div className="flex flex-wrap gap-2">

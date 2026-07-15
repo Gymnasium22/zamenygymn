@@ -215,11 +215,10 @@ const CalendarEventsEditor: React.FC<{
         <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end">
                 <div className="sm:col-span-3">
-                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Дата</label>
-                    <input
-                        type="date"
+                    <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">Дата (ДД.ММ.ГГГГ)</label>
+                    <DateInput
                         value={form.date}
-                        onChange={(e) => setForm({ ...form, date: e.target.value })}
+                        onChange={(v) => setForm({ ...form, date: v })}
                         className="w-full border border-slate-200 dark:border-slate-600 p-2.5 rounded-xl text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500"
                     />
                 </div>
@@ -1845,10 +1844,10 @@ export const SettingsPage = () => {
                                             <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">
                                                 Время (после него день закрыт)
                                             </label>
-                                            <input
+                                            <DateInput
                                                 type="time"
                                                 value={nutritionLockTime}
-                                                onChange={(e) => setNutritionLockTime(e.target.value || '10:00')}
+                                                onChange={(v) => setNutritionLockTime(v || '10:00')}
                                                 disabled={!nutritionLockEnabled}
                                                 className="w-full sm:w-40 border border-slate-200 dark:border-slate-600 p-2.5 rounded-xl text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500 disabled:opacity-50"
                                             />

@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Icon } from './Icons';
 import { Modal } from './UI';
+import { DateInput } from './DateInput';
 import { generateId } from '../utils/helpers';
 import { CalendarEvent } from '../types';
 
@@ -218,11 +219,10 @@ export const SchoolCalendar: React.FC<SchoolCalendarProps> = ({ events, onEvents
             <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingEvent ? 'Редактировать событие' : 'Новое событие'} maxWidth="max-w-md">
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Дата</label>
-                        <input
-                            type="date"
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Дата (ДД.ММ.ГГГГ)</label>
+                        <DateInput
                             value={form.date}
-                            onChange={(e) => setForm({ ...form, date: e.target.value })}
+                            onChange={(v) => setForm({ ...form, date: v })}
                             className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-dark-700 text-slate-800 dark:text-slate-200 outline-none focus:border-indigo-500"
                             required
                         />

@@ -3,6 +3,7 @@ import { AppAnnouncement } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { usersService } from '../services/users';
 import { formatAnnouncement } from '../utils/announcementFormat';
+import { formatDateTimeEuropean } from '../utils/helpers';
 import { Icon } from './Icons';
 import { safeLocalStorageSet } from '../utils/localStorage';
 
@@ -90,7 +91,7 @@ export const AnnouncementModal = ({ announcement, onClose }: AnnouncementModalPr
 
                         {announcement.publishedAt && (
                             <p className="mt-6 text-xs text-slate-400">
-                                Опубликовано {new Date(announcement.publishedAt).toLocaleDateString('ru-RU')}
+                                Опубликовано {formatDateTimeEuropean(announcement.publishedAt)}
                             </p>
                         )}
                     </div>

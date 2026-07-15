@@ -214,7 +214,7 @@ export const ManualSearchModal: React.FC<ManualSearchModalProps> = ({
             ))}
             {searchValue.length > 1 && results.length === 0 && (
                 <div className="text-center text-slate-400 text-xs py-4">
-                    Уроки не найдены на выбранную дату ({selectedDate})
+                    Уроки не найдены на выбранную дату ({formatDateEuropean(selectedDate)})
                 </div>
             )}
         </div>

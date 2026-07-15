@@ -14,7 +14,7 @@ import {
     Teacher,
     Room
 } from '../types';
-import { formatDateISO, formatDateEuropean, getActiveSemester, getDateOrToday } from '../utils/helpers';
+import { formatDateISO, formatDateEuropean, formatMonthLong, getActiveSemester, getDateOrToday } from '../utils/helpers';
 import { exportService } from '../services/exportService';
 import { useToast } from '../components/UI';
 import { SanitaryScheduleTab } from '../components/SanitaryScheduleTab';
@@ -48,7 +48,7 @@ const ReportHeader = ({ exportDate, dayComment }: ReportHeaderProps) => {
             <div className="text-right">
                 <div className="text-xs text-slate-400 uppercase font-bold tracking-wider mb-1">Дата</div>
                 <div className="text-xl font-bold text-slate-800">
-                    {getDateOrToday(exportDate).toLocaleDateString('ru-RU', {
+                    {getDateOrToday(exportDate).toLocaleDateString('ru-BY', {
                         day: 'numeric',
                         month: 'long',
                         year: 'numeric'
@@ -852,7 +852,7 @@ export const ExportPage = () => {
             }
         });
 
-        let content = `<h3>Отчет по заменам за ${targetDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}</h3>`;
+        let content = `<h3>Отчет по заменам за ${formatMonthLong(targetDate)}</h3>`;
 
         const renderRowsLocal = (items: SubstitutionDetail[]) => {
             return items
@@ -1036,7 +1036,7 @@ export const ExportPage = () => {
         return {
             html: content,
             styles,
-            title: `Отчет по заменам за ${targetDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}`
+            title: `Отчет по заменам за ${formatMonthLong(targetDate)}`
         };
     };
 
@@ -1079,7 +1079,7 @@ export const ExportPage = () => {
         if (refusalsData.length === 0) return null;
 
         let html = `
-            <h3>Отчет об отказах за ${targetDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}</h3>
+            <h3>Отчет об отказах за ${formatMonthLong(targetDate)}</h3>
             <table>
             <thead>
                 <tr class="header">
@@ -1138,7 +1138,7 @@ export const ExportPage = () => {
 
         return {
             html,
-            title: `Отчет об отказах за ${targetDate.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}`
+            title: `Отчет об отказах за ${formatMonthLong(targetDate)}`
         };
     };
 

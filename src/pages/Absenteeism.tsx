@@ -5,7 +5,7 @@ import { DateInput } from '../components/DateInput';
 import { Icon } from '../components/Icons';
 import { Modal, useToast } from '../components/UI';
 import { AbsenteeismRecord, StudentAbsence } from '../types';
-import { formatDateISO, formatDateEuropean, generateId, getMonthOrNow, getDateOrToday } from '../utils/helpers';
+import { formatDateISO, formatDateEuropean, formatMonthLong, generateId, getMonthOrNow, getDateOrToday } from '../utils/helpers';
 import DOMPurify from 'dompurify';
 
 export const AbsenteeismPage = () => {
@@ -488,7 +488,7 @@ export const AbsenteeismPage = () => {
                     <div className="p-6 border-b border-slate-200 dark:border-slate-700">
                         <h2 className="text-lg font-semibold text-slate-800 dark:text-white">
                             Статистика за{' '}
-                            {getMonthOrNow(selectedMonth).toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })}
+                            {formatMonthLong(selectedMonth)}
                         </h2>
                         <p className="text-slate-500 mt-1">Сводная таблица по всем классам</p>
                     </div>

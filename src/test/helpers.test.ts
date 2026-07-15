@@ -3,6 +3,11 @@ import {
     getActiveSemester,
     getScheduleForDate,
     formatDateISO,
+    formatDateEuropean,
+    formatTimeHM,
+    formatMonthEuropean,
+    toDateISO,
+    toMonthISO,
     isValidDateString,
     parseDateSafe,
     getDateOrToday,
@@ -78,6 +83,28 @@ describe('formatDateISO', () => {
     });
 });
 
+describe('Belarus date formats', () => {
+    it('formatDateEuropean: ISO → DD.MM.YYYY без сдвига UTC', () => {
+        expect(formatDateEuropean('2026-05-13')).toBe('13.05.2026');
+        expect(formatDateEuropean(new Date(2026, 0, 5))).toBe('05.01.2026');
+    });
+
+    it('toDateISO: DD.MM.YYYY → YYYY-MM-DD', () => {
+        expect(toDateISO('13.05.2026')).toBe('2026-05-13');
+        expect(toDateISO('5.1.2026')).toBe('2026-01-05');
+    });
+
+    it('formatTimeHM: 24-часовой формат', () => {
+        expect(formatTimeHM('08:05:00')).toBe('08:05');
+        expect(formatTimeHM('9:30')).toBe('09:30');
+    });
+
+    it('formatMonthEuropean', () => {
+        expect(formatMonthEuropean('2026-09')).toBe('09.2026');
+        expect(toMonthISO('09.2026')).toBe('2026-09');
+    });
+});
+
 describe('getScheduleForDate', () => {
     it('возвращает schedule2 для 2-го семестра', () => {
         const date = new Date(2026, 0, 15); // январь
@@ -130,7 +157,15 @@ describe('parseDateSafe', () => {
     it('парсит корректную строку', () => {
         const date = parseDateSafe('2026-05-13');
         expect(date).not.toBeNull();
-        expect(date!.toISOString().startsWith('2026-05-13')).toBe(true);
+        expect(date!.getFullYear()).toBe(2026);
+        expect(date!.getMonth()).toBe(4);
+        expect(date!.getDate()).toBe(13);
+        expect(formatDateISO(date!)).toBe('2026-05-13');
+    });
+
+    it('парсит DD.MM.YYYY', () => {
+        const date = parseDateSafe('13.05.2026');
+        expect(formatDateISO(date!)).toBe('2026-05-13');
     });
 
     it('возвращает null для невалидной строки', () => {
@@ -145,12 +180,13 @@ describe('parseDateSafe', () => {
 describe('getDateOrToday', () => {
     it('возвращает дату для корректной строки', () => {
         const date = getDateOrToday('2026-05-13');
-        expect(date.toISOString().startsWith('2026-05-13')).toBe(true);
+        expect(formatDateISO(date)).toBe('2026-05-13');
     });
 
     it('возвращает сегодня для невалидной строки', () => {
         const date = getDateOrToday('invalid');
         expect(date.getTime()).not.toBeNaN();
+        expect(formatDateISO(date)).toBe(formatDateISO(new Date()));
     });
 });
 

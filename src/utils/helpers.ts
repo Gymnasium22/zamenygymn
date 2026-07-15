@@ -55,8 +55,11 @@ export const getScheduleForDate = (
     return semester === 2 ? data.schedule2 || [] : data.schedule || [];
 };
 
+/** Locale for Belarus-facing UI (dates, months, weekdays). */
+export const BY_LOCALE = 'ru-BY';
+
 /**
- * Безопасное получение даты в формате YYYY-MM-DD
+ * Storage / SQL format: YYYY-MM-DD (local calendar day, no UTC shift).
  */
 export const formatDateISO = (date: Date = new Date()): string => {
     const year = date.getFullYear();
@@ -66,15 +69,133 @@ export const formatDateISO = (date: Date = new Date()): string => {
 };
 
 /**
- * Форматирование даты в европейском формате DD.MM.YYYY
+ * Belarus / EU display format: DD.MM.YYYY
+ * Accepts Date, ISO YYYY-MM-DD, or already DD.MM.YYYY.
  */
 export const formatDateEuropean = (date: Date | string): string => {
-    const d = typeof date === 'string' ? new Date(date) : date;
-    if (isNaN(d.getTime())) return '';
-    const day = String(d.getDate()).padStart(2, '0');
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const year = d.getFullYear();
+    if (date == null || date === '') return '';
+    if (typeof date === 'string') {
+        const s = date.trim();
+        // Already Belarus format
+        if (/^\d{2}\.\d{2}\.\d{4}$/.test(s)) return s;
+        // ISO date (optionally with time)
+        const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (iso) {
+            return `${iso[3]}.${iso[2]}.${iso[1]}`;
+        }
+        const d = new Date(s);
+        if (isNaN(d.getTime())) return '';
+        return formatDateEuropean(d);
+    }
+    if (isNaN(date.getTime())) return '';
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
     return `${day}.${month}.${year}`;
+};
+
+/**
+ * Time display/storage for UI: HH:MM (24-hour, as in Belarus).
+ */
+export const formatTimeHM = (value: Date | string | null | undefined): string => {
+    if (value == null || value === '') return '';
+    if (typeof value === 'string') {
+        const s = value.trim();
+        const m = s.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?/);
+        if (m) {
+            const hh = String(Math.min(23, Number(m[1]))).padStart(2, '0');
+            const mm = String(Math.min(59, Number(m[2]))).padStart(2, '0');
+            return `${hh}:${mm}`;
+        }
+        const d = new Date(s);
+        if (!isNaN(d.getTime())) {
+            return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+        }
+        return '';
+    }
+    if (isNaN(value.getTime())) return '';
+    return `${String(value.getHours()).padStart(2, '0')}:${String(value.getMinutes()).padStart(2, '0')}`;
+};
+
+/**
+ * Date + time for logs/exports: DD.MM.YYYY HH:MM
+ */
+export const formatDateTimeEuropean = (date: Date | string): string => {
+    const d = typeof date === 'string' ? parseDateSafe(date) : date;
+    if (!d || isNaN(d.getTime())) {
+        // ISO datetime string without reliable parse
+        if (typeof date === 'string' && date.includes('T')) {
+            const [dayPart, timePart] = date.split('T');
+            const dateStr = formatDateEuropean(dayPart);
+            const timeStr = formatTimeHM(timePart);
+            return timeStr ? `${dateStr} ${timeStr}` : dateStr;
+        }
+        return formatDateEuropean(date);
+    }
+    return `${formatDateEuropean(d)} ${formatTimeHM(d)}`;
+};
+
+/**
+ * Month display: MM.YYYY (from YYYY-MM storage or Date).
+ */
+export const formatMonthEuropean = (value: string | Date | undefined): string => {
+    if (value == null || value === '') return '';
+    if (typeof value === 'string') {
+        if (/^\d{2}\.\d{4}$/.test(value)) return value;
+        const m = value.match(/^(\d{4})-(\d{2})/);
+        if (m) return `${m[2]}.${m[1]}`;
+    }
+    const d = typeof value === 'string' ? parseMonthSafe(value) : value;
+    if (!d || isNaN(d.getTime())) return '';
+    return `${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
+};
+
+/**
+ * Convert display date (DD.MM.YYYY or YYYY-MM-DD) → storage YYYY-MM-DD.
+ * Does not call parseDateSafe (avoids recursion).
+ */
+export const toDateISO = (value: string | Date | undefined | null): string => {
+    if (value == null || value === '') return '';
+    if (value instanceof Date) {
+        if (isNaN(value.getTime())) return '';
+        return formatDateISO(value);
+    }
+    const s = value.trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+        return isValidDateString(s) ? s : '';
+    }
+    const eu = s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+    if (eu) {
+        const day = Number(eu[1]);
+        const month = Number(eu[2]);
+        const year = Number(eu[3]);
+        if (!isValidYmd(year, month, day)) return '';
+        return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    }
+    return '';
+};
+
+/**
+ * Convert display month (MM.YYYY or YYYY-MM) → storage YYYY-MM.
+ */
+export const toMonthISO = (value: string | undefined | null): string => {
+    if (!value) return '';
+    const s = value.trim();
+    if (/^\d{4}-\d{2}$/.test(s) && isValidMonthString(s)) return s;
+    const eu = s.match(/^(\d{1,2})\.(\d{4})$/);
+    if (eu) {
+        const month = Number(eu[1]);
+        const year = Number(eu[2]);
+        if (month < 1 || month > 12) return '';
+        return `${year}-${String(month).padStart(2, '0')}`;
+    }
+    return '';
+};
+
+const isValidYmd = (year: number, month: number, day: number): boolean => {
+    if (month < 1 || month > 12 || day < 1 || day > 31) return false;
+    const d = new Date(year, month - 1, day);
+    return d.getFullYear() === year && d.getMonth() === month - 1 && d.getDate() === day;
 };
 
 /**
@@ -82,25 +203,39 @@ export const formatDateEuropean = (date: Date | string): string => {
  */
 export const isValidDateString = (value: string): boolean => {
     if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-    const date = new Date(value);
-    if (isNaN(date.getTime())) return false;
     const [year, month, day] = value.split('-').map(Number);
-    return (
-        date.getUTCFullYear() === year &&
-        date.getUTCMonth() + 1 === month &&
-        date.getUTCDate() === day
-    );
+    return isValidYmd(year, month, day);
 };
 
 /**
- * Безопасно парсит строку даты YYYY-MM-DD в объект Date.
- * Возвращает null, если дата невалидна.
+ * Валидная дата в отображаемом формате DD.MM.YYYY.
+ */
+export const isValidEuropeanDateString = (value: string): boolean => {
+    return isValidDateString(toDateISO(value));
+};
+
+/**
+ * Безопасно парсит YYYY-MM-DD, DD.MM.YYYY или Date → Date (local calendar).
  */
 export const parseDateSafe = (value: string | Date | undefined): Date | null => {
     if (!value) return null;
-    const date = typeof value === 'string' ? new Date(value) : value;
-    if (isNaN(date.getTime())) return null;
-    return date;
+    if (value instanceof Date) {
+        return isNaN(value.getTime()) ? null : value;
+    }
+    const s = value.trim();
+    const iso = toDateISO(s);
+    if (iso) {
+        const [year, month, day] = iso.split('-').map(Number);
+        const date = new Date(year, month - 1, day);
+        return isNaN(date.getTime()) ? null : date;
+    }
+    // ISO datetime with time part
+    const withTime = s.match(/^(\d{4})-(\d{2})-(\d{2})[T\s]/);
+    if (withTime) {
+        const date = new Date(Number(withTime[1]), Number(withTime[2]) - 1, Number(withTime[3]));
+        return isNaN(date.getTime()) ? null : date;
+    }
+    return null;
 };
 
 /**
@@ -120,12 +255,13 @@ export const isValidMonthString = (value: string): boolean => {
 };
 
 /**
- * Безопасно парсит строку месяца YYYY-MM в объект Date (первый день месяца).
- * Возвращает null, если строка невалидна.
+ * Безопасно парсит строку месяца YYYY-MM / MM.YYYY в объект Date (первый день месяца).
  */
 export const parseMonthSafe = (value: string | undefined): Date | null => {
-    if (!value || !isValidMonthString(value)) return null;
-    const [year, month] = value.split('-').map(Number);
+    if (!value) return null;
+    const iso = toMonthISO(value) || (isValidMonthString(value) ? value : '');
+    if (!iso || !isValidMonthString(iso)) return null;
+    const [year, month] = iso.split('-').map(Number);
     const date = new Date(year, month - 1, 1);
     if (isNaN(date.getTime())) return null;
     return date;
@@ -136,4 +272,22 @@ export const parseMonthSafe = (value: string | undefined): Date | null => {
  */
 export const getMonthOrNow = (value: string | undefined): Date => {
     return parseMonthSafe(value) ?? new Date();
+};
+
+/**
+ * Month name + year in Belarus locale, e.g. "сентябрь 2026 г."
+ */
+export const formatMonthLong = (value: string | Date | undefined): string => {
+    const d = typeof value === 'string' ? parseMonthSafe(value) ?? parseDateSafe(value) : value;
+    if (!d || isNaN(d.getTime())) return '';
+    return d.toLocaleDateString(BY_LOCALE, { month: 'long', year: 'numeric' });
+};
+
+/**
+ * Long date for dashboards: "понедельник, 15 сентября"
+ */
+export const formatDateLong = (value: Date | string): string => {
+    const d = parseDateSafe(value);
+    if (!d) return formatDateEuropean(value);
+    return d.toLocaleDateString(BY_LOCALE, { weekday: 'long', day: 'numeric', month: 'long' });
 };
