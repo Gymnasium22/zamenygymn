@@ -111,10 +111,17 @@ export const supabaseSubstitutionsService = {
     },
 
     create: async (sub: Omit<Substitution, 'id'>): Promise<Substitution> => {
-        const genId = () => Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+        const genId = () =>
+            typeof crypto !== 'undefined' && crypto.randomUUID
+                ? crypto.randomUUID()
+                : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+                      const r = (Math.random() * 16) | 0;
+                      const v = c === 'x' ? r : (r & 0x3) | 0x8;
+                      return v.toString(16);
+                  });
         const { data, error } = await supabase.from('substitutions').insert({
             id: genId(),
-            date: sub.date,
+            date: String(sub.date).split('T')[0],
             schedule_item_id: sub.scheduleItemId || null,
             original_teacher_id: sub.originalTeacherId || null,
             replacement_teacher_id: sub.replacementTeacherId || null,
@@ -157,7 +164,7 @@ export const supabaseSubstitutionsService = {
 function mapSubstitution(data: Record<string, unknown>): Substitution {
     return {
         id: data.id as string,
-        date: data.date as string,
+        date: String(data.date || '').split('T')[0],
         scheduleItemId: (data.schedule_item_id as string) || '',
         originalTeacherId: (data.original_teacher_id as string) || '',
         replacementTeacherId: (data.replacement_teacher_id as string) || '',
@@ -177,7 +184,7 @@ export const supabaseAbsenteeismService = {
         if (error) throw error;
         return (data || []).map((a: Record<string, unknown>) => ({
             id: a.id as string,
-            date: a.date as string,
+            date: String(a.date || '').split('T')[0],
             classId: (a.class_id as string) || '',
             absences: (a.absences as StudentAbsence[]) || [],
             presentCount: (a.present_count as number) || 0,
@@ -214,7 +221,7 @@ export const supabaseNutritionService = {
         if (error) throw error;
         return (data || []).map((n: Record<string, unknown>) => ({
             id: n.id as string,
-            date: n.date as string,
+            date: String(n.date || '').split('T')[0],
             classId: (n.class_id as string) || '',
             breakfastCount: (n.breakfast_count as number) || 0,
             lunchCount: (n.lunch_count as number) || 0,

@@ -40,6 +40,25 @@ const genUUID = () => {
     });
 };
 
+/** Postgres DATE / ISO → YYYY-MM-DD for the app */
+const toDateOnly = (value: unknown): string | undefined => {
+    if (value == null || value === '') return undefined;
+    return String(value).split('T')[0];
+};
+
+/** Postgres TIME / "HH:MM:SS" → "HH:MM" for bells UI */
+const toTimeHm = (value: unknown): string => {
+    if (value == null || value === '') return '';
+    const s = String(value);
+    return s.length >= 5 ? s.slice(0, 5) : s;
+};
+
+/** App date string → DATE column (null if empty) */
+const asDateParam = (value: unknown): string | null => {
+    const d = toDateOnly(value);
+    return d || null;
+};
+
 // Fetch IDs that already exist in a table (used to validate foreign references at runtime)
 const fetchExistingIds = async (tableName: string, ids: string[]): Promise<Set<string>> => {
     const uniqueIds = Array.from(new Set(ids)).filter(Boolean);
@@ -66,6 +85,7 @@ export const supabaseDbService = {
             try {
                 const [
                     teachersRes,
+                    teacherSubjectsRes,
                     subjectsRes,
                     classesRes,
                     roomsRes,
@@ -80,6 +100,7 @@ export const supabaseDbService = {
                     bellScheduleRes
                 ] = await Promise.all([
                     supabase.from('teachers').select('*').eq('organization_id', orgId),
+                    supabase.from('teacher_subjects').select('teacher_id, subject_id').eq('organization_id', orgId),
                     supabase.from('subjects').select('*').eq('organization_id', orgId),
                     supabase.from('classes').select('*').eq('organization_id', orgId),
                     supabase.from('rooms').select('*').eq('organization_id', orgId),
@@ -95,6 +116,7 @@ export const supabaseDbService = {
                 ]);
 
                 if (teachersRes.error) throw teachersRes.error;
+                if (teacherSubjectsRes.error) throw teacherSubjectsRes.error;
                 if (subjectsRes.error) throw subjectsRes.error;
                 if (classesRes.error) throw classesRes.error;
                 if (roomsRes.error) throw roomsRes.error;
@@ -107,9 +129,28 @@ export const supabaseDbService = {
                 if (dutyZonesRes.error) throw dutyZonesRes.error;
                 if (bellScheduleRes.error) throw bellScheduleRes.error;
 
+                const subjectsByTeacher = new Map<string, string[]>();
+                for (const link of teacherSubjectsRes.data || []) {
+                    const tid = (link as { teacher_id: string }).teacher_id;
+                    const sid = (link as { subject_id: string }).subject_id;
+                    if (!tid || !sid) continue;
+                    const list = subjectsByTeacher.get(tid) || [];
+                    list.push(sid);
+                    subjectsByTeacher.set(tid, list);
+                }
+
                 const data: AppData = {
                     ...INITIAL_DATA,
-                    teachers: (teachersRes.data || []).map((t: Record<string, unknown>) => ({ ...fromSnakeCase(t), id: t.id })) as Teacher[],
+                    teachers: (teachersRes.data || []).map((t: Record<string, unknown>) => {
+                        const obj = fromSnakeCase(t) as Record<string, unknown>;
+                        delete obj.subjectIds;
+                        return {
+                            ...obj,
+                            id: t.id,
+                            subjectIds: subjectsByTeacher.get(t.id as string) || [],
+                            birthDate: toDateOnly(t.birth_date)
+                        } as Teacher;
+                    }),
                     subjects: (subjectsRes.data || []).map((s: Record<string, unknown>) => ({ ...fromSnakeCase(s), id: s.id })) as Subject[],
                     classes: (classesRes.data || []).map((c: Record<string, unknown>) => ({ ...fromSnakeCase(c), id: c.id })) as ClassEntity[],
                     rooms: (roomsRes.data || []).map((r: Record<string, unknown>) => ({ ...fromSnakeCase(r), id: r.id })) as Room[],
@@ -117,22 +158,28 @@ export const supabaseDbService = {
                     schedule2: (schedule2Res.data || []).map((s: Record<string, unknown>) => ({ ...fromSnakeCase(s), id: s.id })) as ScheduleItem[],
                     substitutions: (substitutionsRes.data || []).map((s: Record<string, unknown>) => {
                         const obj = fromSnakeCase(s) as Record<string, unknown>;
-                        if (obj.date && typeof obj.date === 'string') {
-                            obj.date = obj.date.split('T')[0];
-                        }
+                        obj.date = toDateOnly(obj.date) || obj.date;
                         return { ...obj, id: s.id } as Substitution;
                     }),
                     dutySchedule: (dutyRes.data || []).map((d: Record<string, unknown>) => ({ ...fromSnakeCase(d), id: d.id })) as DutyRecord[],
-                    nutritionRecords: (nutritionRes.data || []).map((n: Record<string, unknown>) => ({ ...fromSnakeCase(n), id: n.id })) as NutritionRecord[],
-                    absenteeismRecords: (absenteeismRes.data || []).map((a: Record<string, unknown>) => ({ ...fromSnakeCase(a), id: a.id })) as AbsenteeismRecord[],
+                    nutritionRecords: (nutritionRes.data || []).map((n: Record<string, unknown>) => {
+                        const obj = fromSnakeCase(n) as Record<string, unknown>;
+                        obj.date = toDateOnly(obj.date) || obj.date;
+                        return { ...obj, id: n.id } as NutritionRecord;
+                    }),
+                    absenteeismRecords: (absenteeismRes.data || []).map((a: Record<string, unknown>) => {
+                        const obj = fromSnakeCase(a) as Record<string, unknown>;
+                        obj.date = toDateOnly(obj.date) || obj.date;
+                        return { ...obj, id: a.id } as AbsenteeismRecord;
+                    }),
                     settings: settingsRes.data ? { ...fromSnakeCase(settingsRes.data), id: settingsRes.data.id } as Settings : INITIAL_DATA.settings,
                     dutyZones: (dutyZonesRes.data || []).map((z: Record<string, unknown>) => ({ ...fromSnakeCase(z), id: z.id })) as DutyZone[],
                     bellSchedule: (bellScheduleRes.data || []).map((b: Record<string, unknown>) => ({
                         id: b.id,
                         shift: b.shift,
                         period: b.period,
-                        start: b.start_time,
-                        end: b.end_time,
+                        start: toTimeHm(b.start_time),
+                        end: toTimeHm(b.end_time),
                         day: b.day,
                         cancelled: b.cancelled
                     })) as Bell[],
@@ -225,15 +272,7 @@ export const supabaseDbService = {
         };
 
         // 1. Reference tables (must be saved BEFORE schedule_items because of FK constraints)
-        if (data.teachers) {
-            await syncTable('teachers', data.teachers as unknown as Record<string, unknown>[], (t) => {
-                const obj = toSnakeCase(t);
-                if (!obj.id) obj.id = genId();
-                if (!obj.organization_id) obj.organization_id = orgId;
-                return obj;
-            });
-        }
-
+        // Subjects first so teacher_subjects FK can resolve
         if (data.subjects) {
             await syncTable('subjects', data.subjects as unknown as Record<string, unknown>[], (s) => {
                 const obj = toSnakeCase(s);
@@ -241,6 +280,40 @@ export const supabaseDbService = {
                 if (!obj.organization_id) obj.organization_id = orgId;
                 return obj;
             });
+        }
+
+        if (data.teachers) {
+            const teachers = data.teachers as Teacher[];
+            await syncTable('teachers', teachers as unknown as Record<string, unknown>[], (t) => {
+                const obj = toSnakeCase(t);
+                if (!obj.id) obj.id = genId();
+                if (!obj.organization_id) obj.organization_id = orgId;
+                // M:N lives in teacher_subjects — do not write array column
+                delete obj.subject_ids;
+                obj.birth_date = asDateParam(obj.birth_date);
+                return obj;
+            });
+
+            // Rebuild teacher ↔ subject links for this org
+            const { error: delLinksError } = await supabase
+                .from('teacher_subjects')
+                .delete()
+                .eq('organization_id', orgId);
+            if (delLinksError) throw delLinksError;
+
+            const links: { teacher_id: string; subject_id: string; organization_id: string }[] = [];
+            for (const t of teachers) {
+                const tid = t.id;
+                if (!tid) continue;
+                for (const sid of t.subjectIds || []) {
+                    if (!sid) continue;
+                    links.push({ teacher_id: tid, subject_id: sid, organization_id: orgId });
+                }
+            }
+            if (links.length > 0) {
+                const { error: insLinksError } = await supabase.from('teacher_subjects').upsert(links);
+                if (insLinksError) throw insLinksError;
+            }
         }
 
         if (data.classes) {
@@ -308,6 +381,7 @@ export const supabaseDbService = {
                 if (!obj.id) obj.id = genId();
                 if (!obj.organization_id) obj.organization_id = orgId;
                 if (!obj.academic_year) obj.academic_year = currentYear;
+                obj.date = asDateParam(obj.date);
                 return obj;
             });
         }
@@ -318,6 +392,7 @@ export const supabaseDbService = {
                 if (!obj.id) obj.id = genId();
                 if (!obj.organization_id) obj.organization_id = orgId;
                 if (!obj.academic_year) obj.academic_year = currentYear;
+                obj.date = asDateParam(obj.date);
                 return obj;
             });
         }
@@ -440,6 +515,7 @@ export const supabaseDbService = {
                     if (!obj.id) obj.id = genId();
                     if (!obj.organization_id) obj.organization_id = orgId;
                     if (!obj.academic_year) obj.academic_year = currentYear;
+                    obj.date = asDateParam(obj.date);
                     return obj;
                 })
                 .filter(filterSubstitution);
@@ -477,6 +553,7 @@ export const supabaseDbService = {
                     if (!obj.id) obj.id = genId();
                     if (!obj.organization_id) obj.organization_id = orgId;
                     if (!obj.academic_year) obj.academic_year = currentYear;
+                    obj.date = asDateParam(obj.date);
                     return filterSubstitution(obj) ? obj : null;
                 });
             }
@@ -494,8 +571,8 @@ export const supabaseDbService = {
                         organization_id: orgId,
                         shift: obj.shift,
                         period: obj.period,
-                        start_time: obj.start,
-                        end_time: obj.end,
+                        start_time: toTimeHm(obj.start) || obj.start,
+                        end_time: toTimeHm(obj.end) || obj.end,
                         day: obj.day || 'default',
                         cancelled: obj.cancelled || false
                     };

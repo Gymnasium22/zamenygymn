@@ -39,7 +39,6 @@ export type DbTables = {
     id: string;
     organization_id: string;
     name: string;
-    subject_ids: string[];
     shifts: string[];
     max_periods: number;
     class_teacher_of: string | null;
@@ -50,6 +49,12 @@ export type DbTables = {
     order: number | null;
     created_at: string;
     updated_at: string;
+  };
+  teacher_subjects: {
+    teacher_id: string;
+    subject_id: string;
+    organization_id: string;
+    created_at: string;
   };
   classes: {
     id: string;
