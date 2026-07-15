@@ -19,15 +19,29 @@ export default defineConfig({
       ],
       manifest: {
         name: 'Управление учреждением',
-        short_name: 'Учреждение',
+        // short_name is what Android/iOS show under the home-screen icon (was "Учреждение")
+        short_name: 'Управление учреждением',
         description: 'Система управления расписанием, заменами и справочниками для образовательных учреждений',
         theme_color: '#4f46e5',
-        background_color: '#ffffff',
+        background_color: '#4f46e5',
         display: 'standalone',
-        orientation: 'portrait-primary',
+        orientation: 'any',
         scope: '/zamenygymn/',
-        start_url: '/zamenygymn/',
+        start_url: '/zamenygymn/?source=pwa',
+        lang: 'ru',
         icons: [
+          {
+            src: 'icon-96.png',
+            sizes: '96x96',
+            type: 'image/png',
+            purpose: 'any',
+          },
+          {
+            src: 'icon-144.png',
+            sizes: '144x144',
+            type: 'image/png',
+            purpose: 'any',
+          },
           {
             src: 'icon-192.png',
             sizes: '192x192',
