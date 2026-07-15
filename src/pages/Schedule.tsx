@@ -4,7 +4,7 @@ import { useStaticData, useScheduleData } from '../context/DataContext';
 import { Icon } from '../components/Icons';
 import { Modal, SearchableSelect, ContextMenu, useToast } from '../components/UI';
 import { Shift, DayOfWeek, DAYS, SHIFT_PERIODS, ScheduleItem } from '../types';
-import { generateId } from '../utils/helpers';
+import { formatDateEuropean, generateId } from '../utils/helpers';
 import useMedia from 'use-media';
 import { useSearchParams } from 'react-router-dom';
 
@@ -1603,13 +1603,7 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
                         <div className="max-w-[1100px] mx-auto">
                             <div className="text-center mb-6">
                                 <h1 className="text-2xl font-black text-slate-800 uppercase">{printTitle}</h1>
-                                <p className="text-slate-500 font-bold">
-                                    {new Date().toLocaleDateString('ru-RU', {
-                                        day: 'numeric',
-                                        month: 'long',
-                                        year: 'numeric'
-                                    })}
-                                </p>
+                                <p className="text-slate-500 font-bold">{formatDateEuropean(new Date())}</p>
                             </div>
 
                             <table className="w-full border-collapse border border-slate-300 text-xs">

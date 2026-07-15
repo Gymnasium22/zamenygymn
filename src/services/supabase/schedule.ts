@@ -1,5 +1,20 @@
 import { supabase } from '../supabase';
-import { ScheduleItem, Substitution, AbsenteeismRecord, NutritionRecord, DutyRecord, StudentAbsence } from '../../types';
+import {
+    ScheduleItem,
+    Substitution,
+    AbsenteeismRecord,
+    NutritionRecord,
+    DutyRecord,
+    StudentAbsence
+} from '../../types';
+import { generateId } from '../../utils/helpers';
+
+const currentAcademicYear = (): number => new Date().getFullYear();
+
+const dateOnly = (value: unknown): string => {
+    if (value == null || value === '') return '';
+    return String(value).split('T')[0];
+};
 
 export const supabaseScheduleService = {
     subscribe: (semester: 1 | 2, onNext: (items: ScheduleItem[]) => void, onError?: (error: Error) => void) => {
@@ -28,20 +43,24 @@ export const supabaseScheduleService = {
     },
 
     create: async (item: Omit<ScheduleItem, 'id'>): Promise<ScheduleItem> => {
-        const genId = () => Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
-        const { data, error } = await supabase.from('schedule_items').insert({
-            id: genId(),
-            semester: item.semester,
-            day: item.day,
-            period: item.period,
-            shift: item.shift,
-            class_id: item.classId || null,
-            subject_id: item.subjectId || null,
-            teacher_id: item.teacherId || null,
-            room_id: item.roomId || null,
-            direction: item.direction || null,
-            organization_id: item.organizationId || null
-        }).select().single();
+        const { data, error } = await supabase
+            .from('schedule_items')
+            .insert({
+                id: generateId(),
+                semester: item.semester,
+                day: item.day,
+                period: item.period,
+                shift: item.shift,
+                class_id: item.classId || null,
+                subject_id: item.subjectId || null,
+                teacher_id: item.teacherId || null,
+                room_id: item.roomId || null,
+                direction: item.direction || null,
+                organization_id: item.organizationId || null,
+                academic_year: item.academicYear || currentAcademicYear()
+            })
+            .select()
+            .single();
         if (error) throw error;
         return mapScheduleItem(data);
     },
@@ -56,6 +75,7 @@ export const supabaseScheduleService = {
         if (changes.teacherId !== undefined) updates.teacher_id = changes.teacherId || null;
         if (changes.roomId !== undefined) updates.room_id = changes.roomId || null;
         if (changes.direction !== undefined) updates.direction = changes.direction || null;
+        if (changes.academicYear !== undefined) updates.academic_year = changes.academicYear;
         updates.updated_at = new Date().toISOString();
 
         const { error } = await supabase.from('schedule_items').update(updates).eq('id', id);
@@ -80,7 +100,8 @@ function mapScheduleItem(data: Record<string, unknown>): ScheduleItem {
         teacherId: (data.teacher_id as string) || '',
         roomId: (data.room_id as string) || undefined,
         direction: (data.direction as string) || undefined,
-        organizationId: data.organization_id as string
+        organizationId: data.organization_id as string,
+        academicYear: (data.academic_year as number) || undefined
     };
 }
 
@@ -111,35 +132,32 @@ export const supabaseSubstitutionsService = {
     },
 
     create: async (sub: Omit<Substitution, 'id'>): Promise<Substitution> => {
-        const genId = () =>
-            typeof crypto !== 'undefined' && crypto.randomUUID
-                ? crypto.randomUUID()
-                : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-                      const r = (Math.random() * 16) | 0;
-                      const v = c === 'x' ? r : (r & 0x3) | 0x8;
-                      return v.toString(16);
-                  });
-        const { data, error } = await supabase.from('substitutions').insert({
-            id: genId(),
-            date: String(sub.date).split('T')[0],
-            schedule_item_id: sub.scheduleItemId || null,
-            original_teacher_id: sub.originalTeacherId || null,
-            replacement_teacher_id: sub.replacementTeacherId || null,
-            replacement_room_id: sub.replacementRoomId || null,
-            replacement_class_id: sub.replacementClassId || null,
-            replacement_subject_id: sub.replacementSubjectId || null,
-            is_merger: sub.isMerger || false,
-            lesson_absence_reason: sub.lessonAbsenceReason || null,
-            refusals: sub.refusals || [],
-            organization_id: sub.organizationId || null
-        }).select().single();
+        const { data, error } = await supabase
+            .from('substitutions')
+            .insert({
+                id: generateId(),
+                date: dateOnly(sub.date),
+                schedule_item_id: sub.scheduleItemId || null,
+                original_teacher_id: sub.originalTeacherId || null,
+                replacement_teacher_id: sub.replacementTeacherId || null,
+                replacement_room_id: sub.replacementRoomId || null,
+                replacement_class_id: sub.replacementClassId || null,
+                replacement_subject_id: sub.replacementSubjectId || null,
+                is_merger: sub.isMerger || false,
+                lesson_absence_reason: sub.lessonAbsenceReason || null,
+                refusals: sub.refusals || [],
+                organization_id: sub.organizationId || null,
+                academic_year: currentAcademicYear()
+            })
+            .select()
+            .single();
         if (error) throw error;
         return mapSubstitution(data);
     },
 
     update: async (id: string, changes: Partial<Substitution>): Promise<void> => {
         const updates: Record<string, unknown> = {};
-        if (changes.date !== undefined) updates.date = changes.date;
+        if (changes.date !== undefined) updates.date = dateOnly(changes.date);
         if (changes.scheduleItemId !== undefined) updates.schedule_item_id = changes.scheduleItemId || null;
         if (changes.originalTeacherId !== undefined) updates.original_teacher_id = changes.originalTeacherId || null;
         if (changes.replacementTeacherId !== undefined) updates.replacement_teacher_id = changes.replacementTeacherId || null;
@@ -164,7 +182,7 @@ export const supabaseSubstitutionsService = {
 function mapSubstitution(data: Record<string, unknown>): Substitution {
     return {
         id: data.id as string,
-        date: String(data.date || '').split('T')[0],
+        date: dateOnly(data.date),
         scheduleItemId: (data.schedule_item_id as string) || '',
         originalTeacherId: (data.original_teacher_id as string) || '',
         replacementTeacherId: (data.replacement_teacher_id as string) || '',
@@ -184,7 +202,7 @@ export const supabaseAbsenteeismService = {
         if (error) throw error;
         return (data || []).map((a: Record<string, unknown>) => ({
             id: a.id as string,
-            date: String(a.date || '').split('T')[0],
+            date: dateOnly(a.date),
             classId: (a.class_id as string) || '',
             absences: (a.absences as StudentAbsence[]) || [],
             presentCount: (a.present_count as number) || 0,
@@ -199,8 +217,8 @@ export const supabaseAbsenteeismService = {
 
     set: async (record: AbsenteeismRecord): Promise<void> => {
         const { error } = await supabase.from('absenteeism').upsert({
-            id: record.id,
-            date: record.date,
+            id: record.id || generateId(),
+            date: dateOnly(record.date),
             class_id: record.classId || null,
             absences: record.absences || [],
             present_count: record.presentCount || 0,
@@ -209,7 +227,8 @@ export const supabaseAbsenteeismService = {
             entered_at: record.enteredAt || null,
             updated_at: record.updatedAt || new Date().toISOString(),
             updated_by: record.updatedBy || null,
-            organization_id: record.organizationId
+            organization_id: record.organizationId,
+            academic_year: currentAcademicYear()
         });
         if (error) throw error;
     }
@@ -221,7 +240,7 @@ export const supabaseNutritionService = {
         if (error) throw error;
         return (data || []).map((n: Record<string, unknown>) => ({
             id: n.id as string,
-            date: String(n.date || '').split('T')[0],
+            date: dateOnly(n.date),
             classId: (n.class_id as string) || '',
             breakfastCount: (n.breakfast_count as number) || 0,
             lunchCount: (n.lunch_count as number) || 0,
@@ -237,8 +256,8 @@ export const supabaseNutritionService = {
 
     set: async (record: NutritionRecord): Promise<void> => {
         const { error } = await supabase.from('nutrition').upsert({
-            id: record.id,
-            date: record.date,
+            id: record.id || generateId(),
+            date: dateOnly(record.date),
             class_id: record.classId || null,
             breakfast_count: record.breakfastCount || 0,
             lunch_count: record.lunchCount || 0,
@@ -249,6 +268,7 @@ export const supabaseNutritionService = {
             entered_by: record.enteredBy || null,
             entered_at: record.enteredAt || null,
             organization_id: record.organizationId,
+            academic_year: currentAcademicYear(),
             updated_at: new Date().toISOString()
         });
         if (error) throw error;
@@ -271,14 +291,16 @@ export const supabaseDutyService = {
 
     set: async (record: DutyRecord): Promise<void> => {
         const { error } = await supabase.from('duty').upsert({
-            id: record.id,
+            id: record.id || generateId(),
             day: record.day,
             shift: record.shift,
             zone_id: record.zoneId,
             teacher_id: record.teacherId,
             organization_id: record.organizationId,
+            academic_year: currentAcademicYear(),
             updated_at: new Date().toISOString()
         });
         if (error) throw error;
     }
 };
+

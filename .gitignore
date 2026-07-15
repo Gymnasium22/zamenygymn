@@ -43,6 +43,10 @@ scripts/
 # Supabase CLI local link cache (never commit)
 supabase/.temp/
 
+# Local data dumps / screenshots (may contain school data)
+exports/
+screenshots/
+
 # Internal docs
 MOBILE-IMPROVEMENTS.md
 PWA-SETUP.md

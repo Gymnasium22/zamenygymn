@@ -1,16 +1,6 @@
 import { supabase } from '../supabase';
 import { Teacher, Subject } from '../../types';
-
-const genUUID = () => {
-    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-        return crypto.randomUUID();
-    }
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-        const r = (Math.random() * 16) | 0;
-        const v = c === 'x' ? r : (r & 0x3) | 0x8;
-        return v.toString(16);
-    });
-};
+import { generateId } from '../../utils/helpers';
 
 const toDateOnly = (value: unknown): string | undefined => {
     if (value == null || value === '') return undefined;
@@ -89,7 +79,7 @@ export const supabaseTeachersService = {
     },
 
     create: async (teacher: Omit<Teacher, 'id'>): Promise<Teacher> => {
-        const id = genUUID();
+        const id = generateId();
         const { data, error } = await supabase
             .from('teachers')
             .insert({
@@ -202,7 +192,7 @@ export const supabaseSubjectsService = {
         const { data, error } = await supabase
             .from('subjects')
             .insert({
-                id: genUUID(),
+                id: generateId(),
                 name: subject.name,
                 color: subject.color || null,
                 difficulty: subject.difficulty || null,

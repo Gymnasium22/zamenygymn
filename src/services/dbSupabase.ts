@@ -1,6 +1,7 @@
 import { AppData, Teacher, Subject, ClassEntity, Room, ScheduleItem, Substitution, DutyRecord, NutritionRecord, AbsenteeismRecord, Settings, DutyZone, Bell } from '../types';
 import { INITIAL_DATA } from '../constants';
 import { logger } from '../utils/logger';
+import { generateId } from '../utils/helpers';
 import { supabase } from './supabase';
 
 const toSnakeCase = (obj: Record<string, unknown>): Record<string, unknown> => {
@@ -27,18 +28,6 @@ const fromSnakeCase = (obj: Record<string, unknown>): Record<string, unknown> =>
     return result;
 };
 
-
-const genUUID = () => {
-    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-        return crypto.randomUUID();
-    }
-    // fallback for older browsers
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-        const r = Math.random() * 16 | 0;
-        const v = c === 'x' ? r : (r & 0x3 | 0x8);
-        return v.toString(16);
-    });
-};
 
 /** Postgres DATE / ISO → YYYY-MM-DD for the app */
 const toDateOnly = (value: unknown): string | undefined => {
@@ -232,7 +221,7 @@ export const supabaseDbService = {
             logger.error("[dbSupabase] organizationId is required for save");
             throw new Error("organizationId is required");
         }
-        const genId = genUUID;
+        const genId = generateId;
 
         // Helper to sync a table: delete removed rows, then upsert the rest
         const syncTable = async (
@@ -564,8 +553,8 @@ export const supabaseDbService = {
             try {
                 const mapped = data.bellSchedule.map((b) => {
                     const obj = toSnakeCase(b as unknown as Record<string, unknown>);
-                    const rawId = (obj.id as string) || genUUID();
-                    const validId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawId) ? rawId : genUUID();
+                    const rawId = (obj.id as string) || generateId();
+                    const validId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawId) ? rawId : generateId();
                     return {
                         id: validId,
                         organization_id: orgId,

@@ -8,6 +8,7 @@ import { DAYS, ScheduleItem, ClassEntity, Substitution, SubstitutionParams } fro
 import {
     formatDateISO,
     formatDateEuropean,
+    formatDateLong,
     getScheduleForDate,
     generateId,
     getActiveSemester,
@@ -1138,21 +1139,16 @@ export const SubstitutionsPage = () => {
                                 >
                                     <Icon name="ArrowRight" className="rotate-180" size={18} />
                                 </button>
-                                <div className="flex-1 flex items-center justify-center gap-2 font-bold text-slate-700 dark:text-slate-200 cursor-pointer relative group">
-                                    <Icon name="Calendar" size={18} className="text-indigo-500" />
-                                    <span>
-                                        {getDateOrToday(selectedDate).toLocaleDateString('ru-RU', {
-                                            day: 'numeric',
-                                            month: 'long',
-                                            weekday: 'short'
-                                        })}
-                                    </span>
-                                    {/* Invisible date picker overlay */}
+                                <div className="flex-1 flex flex-col sm:flex-row items-center justify-center gap-2 font-bold text-slate-700 dark:text-slate-200">
+                                    <div className="flex items-center gap-2">
+                                        <Icon name="Calendar" size={18} className="text-indigo-500" />
+                                        <span className="capitalize">{formatDateLong(selectedDate)}</span>
+                                    </div>
                                     <DateInput
                                         ref={dateInputRef}
                                         value={selectedDate}
                                         onChange={setSelectedDate}
-                                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                        className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-dark-800 text-sm font-semibold w-[9.5rem]"
                                     />
                                 </div>
                                 <button

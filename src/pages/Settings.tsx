@@ -16,7 +16,7 @@ import {
     CalendarEvent,
 } from '../types';
 import { INITIAL_DATA, getInitialData } from '../constants';
-import { formatDateEuropean, formatDateISO, generateId } from '../utils/helpers';
+import { formatDateEuropean, formatDateISO, formatDateTimeEuropean, formatTimeHM, generateId } from '../utils/helpers';
 import { auditLog } from '../services/auditLog';
 import { logger } from '../utils/logger';
 import { safeLocalStorageGet, safeLocalStorageRemove } from '../utils/localStorage';
@@ -288,7 +288,7 @@ const CalendarEventsEditor: React.FC<{
                             {sorted.map((ev) => (
                                 <tr key={ev.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
                                     <td className="px-3 py-2 whitespace-nowrap text-slate-600 dark:text-slate-300">
-                                        {new Date(ev.date).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })}
+                                        {formatDateEuropean(ev.date)}
                                     </td>
                                     <td className="px-3 py-2 text-slate-700 dark:text-slate-200 font-medium">{ev.title}</td>
                                     <td className="px-3 py-2">
@@ -2164,8 +2164,8 @@ const AuditLogViewer: React.FC = () => {
             const headers = ['Дата', 'Время', 'Пользователь', 'Роль', 'Действие', 'Тип объекта', 'Название объекта', 'Подробное описание'];
             const rows = all.map((e) => {
                 const dt = new Date(e.timestamp);
-                const date = dt.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
-                const time = dt.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                const date = formatDateEuropean(dt);
+                const time = formatTimeHM(dt) + `:${String(dt.getSeconds()).padStart(2, '0')}`;
                 const action = actionLabels[e.action] || e.action;
                 const entity = entityLabels[e.entityType || ''] || e.entityType || '';
                 const baseDesc = actionDescriptions[e.action] || e.action;
@@ -2307,10 +2307,7 @@ const AuditLogViewer: React.FC = () => {
                             {entries.map((entry) => (
                                 <tr key={entry.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
                                     <td className="px-3 py-2 text-slate-500 dark:text-slate-400 whitespace-nowrap text-xs">
-                                        {new Date(entry.timestamp).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' })}{' '}
-                                        <span className="font-mono">
-                                            {new Date(entry.timestamp).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
-                                        </span>
+                                        {formatDateTimeEuropean(entry.timestamp)}
                                     </td>
                                     <td className="px-3 py-2 text-slate-600 dark:text-slate-300 truncate max-w-[120px] text-xs" title={entry.userEmail}>
                                         {entry.userEmail}

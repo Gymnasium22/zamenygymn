@@ -1,5 +1,6 @@
 import { supabase } from '../supabase';
 import { ClassEntity, Room } from '../../types';
+import { generateId } from '../../utils/helpers';
 
 export const supabaseClassesService = {
     subscribe: (onNext: (classes: ClassEntity[]) => void, onError?: (error: Error) => void) => {
@@ -28,9 +29,8 @@ export const supabaseClassesService = {
     },
 
     create: async (cls: Omit<ClassEntity, 'id'>): Promise<ClassEntity> => {
-        const genId = () => Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
         const { data, error } = await supabase.from('classes').insert({
-            id: genId(),
+            id: generateId(),
             name: cls.name,
             shift: cls.shift,
             students_count: cls.studentsCount || 0,
@@ -114,9 +114,8 @@ export const supabaseRoomsService = {
     },
 
     create: async (room: Omit<Room, 'id'>): Promise<Room> => {
-        const genId = () => Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
         const { data, error } = await supabase.from('rooms').insert({
-            id: genId(),
+            id: generateId(),
             name: room.name,
             floor: room.floor || null,
             capacity: room.capacity || null,

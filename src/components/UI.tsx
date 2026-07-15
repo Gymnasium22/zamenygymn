@@ -40,7 +40,7 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
             const { type = 'danger', title = 'Уведомление', message } = customEvent.detail;
 
             // Generate ID here to avoid dependency issues
-            const id = Date.now().toString() + Math.random().toString(36).substring(2, 9);
+            const id = generateId();
             setToasts((prev) => [...prev, { type: type as ToastProps['type'], title, message, id }]);
         };
         window.addEventListener('app-toast', handleAppToast);
