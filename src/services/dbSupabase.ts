@@ -79,19 +79,19 @@ export const supabaseDbService = {
                     dutyZonesRes,
                     bellScheduleRes
                 ] = await Promise.all([
-                    supabase.from('teachers').select('*').or(`organization_id.eq.${orgId},organization_id.is.null`),
-                    supabase.from('subjects').select('*').or(`organization_id.eq.${orgId},organization_id.is.null`),
-                    supabase.from('classes').select('*').or(`organization_id.eq.${orgId},organization_id.is.null`),
-                    supabase.from('rooms').select('*').or(`organization_id.eq.${orgId},organization_id.is.null`),
-                    supabase.from('schedule_items').select('*').eq('semester', 1).or(`organization_id.eq.${orgId},organization_id.is.null`),
-                    supabase.from('schedule_items').select('*').eq('semester', 2).or(`organization_id.eq.${orgId},organization_id.is.null`),
-                    supabase.from('substitutions').select('*').or(`organization_id.eq.${orgId},organization_id.is.null`),
+                    supabase.from('teachers').select('*').eq('organization_id', orgId),
+                    supabase.from('subjects').select('*').eq('organization_id', orgId),
+                    supabase.from('classes').select('*').eq('organization_id', orgId),
+                    supabase.from('rooms').select('*').eq('organization_id', orgId),
+                    supabase.from('schedule_items').select('*').eq('semester', 1).eq('organization_id', orgId),
+                    supabase.from('schedule_items').select('*').eq('semester', 2).eq('organization_id', orgId),
+                    supabase.from('substitutions').select('*').eq('organization_id', orgId),
                     supabase.from('settings').select('*').eq('organization_id', orgId).maybeSingle(),
-                    supabase.from('duty').select('*').or(`organization_id.eq.${orgId},organization_id.is.null`),
-                    supabase.from('nutrition').select('*').or(`organization_id.eq.${orgId},organization_id.is.null`),
-                    supabase.from('absenteeism').select('*').or(`organization_id.eq.${orgId},organization_id.is.null`),
-                    supabase.from('duty_zones').select('*').or(`organization_id.eq.${orgId},organization_id.is.null`),
-                    supabase.from('bell_schedule').select('*').or(`organization_id.eq.${orgId},organization_id.is.null`)
+                    supabase.from('duty').select('*').eq('organization_id', orgId),
+                    supabase.from('nutrition').select('*').eq('organization_id', orgId),
+                    supabase.from('absenteeism').select('*').eq('organization_id', orgId),
+                    supabase.from('duty_zones').select('*').eq('organization_id', orgId),
+                    supabase.from('bell_schedule').select('*').eq('organization_id', orgId)
                 ]);
 
                 if (teachersRes.error) throw teachersRes.error;
@@ -185,7 +185,7 @@ export const supabaseDbService = {
             logger.error("[dbSupabase] organizationId is required for save");
             throw new Error("organizationId is required");
         }
-        const genId = () => Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+        const genId = genUUID;
 
         // Helper to sync a table: delete removed rows, then upsert the rest
         const syncTable = async (
@@ -277,11 +277,14 @@ export const supabaseDbService = {
         }
 
         // 3. Other tables
+        // Academic year for year-scoped tables (must be NOT NULL in schema)
+        const currentYear = data.settings?.currentYear || new Date().getFullYear();
+
         if (data.dutySchedule) {
             const zoneIds = new Set((data.dutyZones || []).map((z) => z.id));
             const hasZones = data.dutyZones !== undefined;
             const validDuty = (data.dutySchedule as unknown as Record<string, unknown>[]).filter((d) => {
-                const zoneId = d.zone_id as string | null;
+                const zoneId = (d.zoneId ?? d.zone_id) as string | null;
                 if (hasZones && zoneId && !zoneIds.has(zoneId)) {
                     logger.warn(`Skipping duty record ${d.id}: zone_id ${zoneId} not present in import`);
                     return false;
@@ -293,6 +296,7 @@ export const supabaseDbService = {
                     const obj = toSnakeCase(d);
                     if (!obj.id) obj.id = genId();
                     if (!obj.organization_id) obj.organization_id = orgId;
+                    if (!obj.academic_year) obj.academic_year = currentYear;
                     return obj;
                 });
             }
@@ -303,6 +307,7 @@ export const supabaseDbService = {
                 const obj = toSnakeCase(n);
                 if (!obj.id) obj.id = genId();
                 if (!obj.organization_id) obj.organization_id = orgId;
+                if (!obj.academic_year) obj.academic_year = currentYear;
                 return obj;
             });
         }
@@ -312,6 +317,7 @@ export const supabaseDbService = {
                 const obj = toSnakeCase(a);
                 if (!obj.id) obj.id = genId();
                 if (!obj.organization_id) obj.organization_id = orgId;
+                if (!obj.academic_year) obj.academic_year = currentYear;
                 return obj;
             });
         }
@@ -324,7 +330,6 @@ export const supabaseDbService = {
         const teacherIds = new Set((data.teachers || []).map((t) => t.id).filter(Boolean));
         const roomIds = new Set((data.rooms || []).map((r) => r.id).filter(Boolean));
         const hasReferenceTables = !!(data.classes || data.subjects || data.teachers || data.rooms);
-        const currentYear = data.settings?.currentYear || new Date().getFullYear();
 
         const mapScheduleItem = (item: ScheduleItem, semester: number) => {
             // Whitelist only DB columns. Full toSnakeCase also copies createdAt/updatedAt
@@ -434,6 +439,7 @@ export const supabaseDbService = {
                     const obj = toSnakeCase(s as unknown as Record<string, unknown>);
                     if (!obj.id) obj.id = genId();
                     if (!obj.organization_id) obj.organization_id = orgId;
+                    if (!obj.academic_year) obj.academic_year = currentYear;
                     return obj;
                 })
                 .filter(filterSubstitution);
@@ -470,6 +476,7 @@ export const supabaseDbService = {
                     const obj = toSnakeCase(s);
                     if (!obj.id) obj.id = genId();
                     if (!obj.organization_id) obj.organization_id = orgId;
+                    if (!obj.academic_year) obj.academic_year = currentYear;
                     return filterSubstitution(obj) ? obj : null;
                 });
             }
