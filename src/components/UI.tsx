@@ -83,9 +83,9 @@ export const ToastContainer = ({ toasts, onRemoveToast }: ToastContainerProps) =
     if (toasts.length === 0) return null;
 
     return (
-        <div className="fixed top-4 right-4 z-[70] space-y-2 md:top-4 md:right-4 md:left-auto md:w-auto left-4 right-4 w-auto app-mobile-toast-stack">
+        <div className="fixed top-4 right-3 z-[70] flex flex-col items-end gap-2 w-[min(22rem,calc(100vw-1.5rem))] max-w-sm pointer-events-none app-mobile-toast-stack">
             {toasts.length > 1 && (
-                <div className="flex justify-end mb-2">
+                <div className="flex justify-end w-full pointer-events-auto">
                     <button
                         onClick={clearAllToasts}
                         className="text-xs text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300 underline transition-colors"
@@ -95,15 +95,16 @@ export const ToastContainer = ({ toasts, onRemoveToast }: ToastContainerProps) =
                 </div>
             )}
             {toasts.map((toast) => (
-                <Toast
-                    key={toast.id}
-                    id={toast.id}
-                    type={toast.type}
-                    title={toast.title}
-                    message={toast.message}
-                    duration={toast.duration}
-                    onClose={onRemoveToast}
-                />
+                <div key={toast.id} className="w-full pointer-events-auto">
+                    <Toast
+                        id={toast.id}
+                        type={toast.type}
+                        title={toast.title}
+                        message={toast.message}
+                        duration={toast.duration}
+                        onClose={onRemoveToast}
+                    />
+                </div>
             ))}
         </div>
     );
@@ -177,6 +178,8 @@ interface ModalProps {
     onClose: () => void;
     title: string;
     children?: React.ReactNode;
+    /** Always-visible actions (e.g. Save) pinned under the scrollable body */
+    footer?: React.ReactNode;
     maxWidth?: string;
 }
 
@@ -192,7 +195,7 @@ interface ToastProps {
 // Глобальный Set открытых модалок для корректной блокировки скролла
 const activeModals = new Set<string>();
 
-export const Modal = ({ isOpen, onClose, title, children, maxWidth = 'max-w-lg' }: ModalProps) => {
+export const Modal = ({ isOpen, onClose, title, children, footer, maxWidth = 'max-w-lg' }: ModalProps) => {
     const modalRef = useRef<HTMLDivElement>(null);
     const previousActiveElement = useRef<HTMLElement | null>(null);
     const modalId = useId();
@@ -276,9 +279,9 @@ export const Modal = ({ isOpen, onClose, title, children, maxWidth = 'max-w-lg' 
             onClick={(e) => e.target === e.currentTarget && onClose()}
         >
             <div
-                className={`float-panel w-full ${maxWidth} flex flex-col max-h-[92dvh] sm:max-h-[86vh] rounded-t-2xl sm:rounded-2xl transition-all duration-300`}
+                className={`float-panel w-full ${maxWidth} flex flex-col max-h-[min(92dvh,100%)] sm:max-h-[min(86vh,100%)] rounded-t-2xl sm:rounded-2xl transition-all duration-300 min-h-0`}
             >
-                <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200/70 dark:border-slate-700/70">
+                <div className="flex items-center justify-between px-5 py-3 sm:py-4 border-b border-slate-200/70 dark:border-slate-700/70 shrink-0">
                     <h2 id="modal-title" className="text-lg md:text-xl font-semibold text-slate-800 dark:text-white tracking-tight">{title}</h2>
                     <button
                         onClick={onClose}
@@ -288,7 +291,12 @@ export const Modal = ({ isOpen, onClose, title, children, maxWidth = 'max-w-lg' 
                         <Icon name="X" size={20} />
                     </button>
                 </div>
-                <div className="p-5 md:p-6 overflow-y-auto custom-scrollbar-2026">{children}</div>
+                <div className="p-5 md:p-6 overflow-y-auto overscroll-contain custom-scrollbar-2026 min-h-0 flex-1">{children}</div>
+                {footer != null && (
+                    <div className="px-5 py-3 sm:px-6 sm:py-4 border-t border-slate-200/70 dark:border-slate-700/70 shrink-0 bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+                        {footer}
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -409,7 +417,7 @@ export const Toast = ({ id, type, title, message, duration = 5000, onClose }: To
 
     return (
         <div
-            className={`max-w-sm md:max-w-xs w-full animate-slide-up-fade ${isExiting ? 'animate-fade-out' : ''}`}
+            className={`w-full max-w-full animate-slide-up-fade ${isExiting ? 'animate-fade-out' : ''}`}
             style={{
                 transform: `translateX(${swipeX}px)`,
                 transition: swipeX === 0 ? 'transform 0.3s ease' : 'none',

@@ -10,6 +10,36 @@ import { useAuth } from '../context/AuthContext';
 
 type DirectoryTabId = 'teachers' | 'subjects' | 'classes' | 'rooms';
 
+/** Палитра цветов предметов (фон ячеек расписания + акценты) */
+const SUBJECT_COLOR_PRESETS = [
+    '#e0e7ff', // indigo-100
+    '#dbeafe', // blue-100
+    '#e0f2fe', // sky-100
+    '#cffafe', // cyan-100
+    '#d1fae5', // emerald-100
+    '#dcfce7', // green-100
+    '#fef9c3', // yellow-100
+    '#fef3c7', // amber-100
+    '#ffedd5', // orange-100
+    '#fee2e2', // red-100
+    '#fce7f3', // pink-100
+    '#f3e8ff', // purple-100
+    '#ede9fe', // violet-100
+    '#c7d2fe', // indigo-200
+    '#a5b4fc', // indigo-300
+    '#c038ff', // vivid purple
+    '#6366f1', // indigo-500
+    '#0ea5e9', // sky-500
+    '#10b981', // emerald-500
+    '#f59e0b', // amber-500
+    '#ef4444', // red-500
+    '#ec4899', // pink-500
+    '#8b5cf6', // violet-500
+    '#334155' // slate-700
+];
+
+const normalizeHex = (value: string) => value.trim().toLowerCase();
+
 export const DirectoryPage = () => {
     const { subjects, teachers, classes, rooms, saveStaticData } = useStaticData();
     const { addToast } = useToast();
@@ -275,16 +305,22 @@ export const DirectoryPage = () => {
                                 onDragOver={canEditDirectory ? onDragOver : undefined}
                                 onDrop={canEditDirectory ? (e) => onDrop(e, i) : undefined}
                                 className={`modern-card p-4 flex items-center justify-between group border-l-4 ${canEditDirectory ? 'cursor-grab active:cursor-grabbing' : ''}`}
-                                style={{ borderLeftColor: s.color }}
+                                style={{ borderLeftColor: s.color || '#e0e7ff' }}
                             >
-                                <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-3 min-w-0">
                                     <Icon
                                         name="GripVertical"
-                                        className="text-slate-300 dark:text-slate-600"
+                                        className="text-slate-300 dark:text-slate-600 shrink-0"
                                         size={16}
                                     />
-                                    <div>
-                                        <div className="font-bold text-slate-700 dark:text-slate-200">{s.name}</div>
+                                    <span
+                                        className="w-4 h-4 rounded-full shrink-0 ring-1 ring-black/10 dark:ring-white/15 shadow-sm"
+                                        style={{ backgroundColor: s.color || '#e0e7ff' }}
+                                        title={s.color}
+                                        aria-hidden
+                                    />
+                                    <div className="min-w-0">
+                                        <div className="font-bold text-slate-700 dark:text-slate-200 truncate">{s.name}</div>
                                         <div className="text-xs text-slate-400">
                                             Сложность {s.difficulty} • {s.requiredRoomType}
                                         </div>
@@ -423,11 +459,22 @@ export const DirectoryPage = () => {
                 )}
             </div>
 
-            {/* Standard Modal for Forms */}
+            {/* Standard Modal for Forms — footer keeps Save visible on short viewports */}
             <Modal
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
                 title={editingId ? 'Редактировать' : 'Добавить'}
+                footer={
+                    <div className="flex justify-end">
+                        <button
+                            type="button"
+                            onClick={handleSave}
+                            className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 text-sm font-bold shadow-lg shadow-indigo-200 dark:shadow-none min-h-[44px]"
+                        >
+                            Сохранить
+                        </button>
+                    </div>
+                }
             >
                 <div className="space-y-4">
                     {activeTab === 'teachers' && (
@@ -527,6 +574,11 @@ export const DirectoryPage = () => {
                                                 });
                                             }}
                                         />
+                                        <span
+                                            className="w-2.5 h-2.5 rounded-full shrink-0 ring-1 ring-black/10"
+                                            style={{ backgroundColor: s.color || '#e0e7ff' }}
+                                            aria-hidden
+                                        />
                                         <span className="text-sm dark:text-slate-300">{s.name}</span>
                                     </label>
                                 ))}
@@ -542,14 +594,80 @@ export const DirectoryPage = () => {
                                 value={subjectForm.name || ''}
                                 onChange={(e) => setSubjectForm({ ...subjectForm, name: e.target.value })}
                             />
-                            <div className="flex items-center gap-4">
-                                <span className="text-sm font-bold text-slate-600 dark:text-slate-300">Цвет</span>
-                                <input
-                                    type="color"
-                                    className="w-20 h-10 cursor-pointer bg-transparent"
-                                    value={subjectForm.color || '#ffffff'}
-                                    onChange={(e) => setSubjectForm({ ...subjectForm, color: e.target.value })}
-                                />
+                            <div>
+                                <div className="flex items-center justify-between gap-3 mb-2">
+                                    <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">
+                                        Цвет
+                                    </span>
+                                    <div className="flex items-center gap-2">
+                                        <span
+                                            className="w-7 h-7 rounded-lg ring-1 ring-black/10 dark:ring-white/15 shadow-sm shrink-0"
+                                            style={{ backgroundColor: subjectForm.color || '#e0e7ff' }}
+                                            title={subjectForm.color}
+                                        />
+                                        <input
+                                            type="text"
+                                            className="w-[7.5rem] border border-slate-200 dark:border-slate-600 rounded-lg px-2 py-1.5 text-xs font-mono bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500 uppercase"
+                                            value={subjectForm.color || ''}
+                                            onChange={(e) => {
+                                                const raw = e.target.value;
+                                                setSubjectForm({
+                                                    ...subjectForm,
+                                                    color: raw.startsWith('#') ? raw : `#${raw.replace(/^#*/, '')}`
+                                                });
+                                            }}
+                                            placeholder="#E0E7FF"
+                                            maxLength={7}
+                                            aria-label="HEX-код цвета"
+                                        />
+                                        <label
+                                            className="relative w-8 h-8 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-600 cursor-pointer shrink-0 hover:border-indigo-400 transition-colors"
+                                            title="Свой цвет"
+                                        >
+                                            <span
+                                                className="absolute inset-0"
+                                                style={{ backgroundColor: subjectForm.color || '#e0e7ff' }}
+                                            />
+                                            <input
+                                                type="color"
+                                                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                                value={
+                                                    /^#[0-9a-fA-F]{6}$/.test(subjectForm.color || '')
+                                                        ? subjectForm.color!
+                                                        : '#e0e7ff'
+                                                }
+                                                onChange={(e) =>
+                                                    setSubjectForm({ ...subjectForm, color: e.target.value })
+                                                }
+                                            />
+                                        </label>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-8 sm:grid-cols-12 gap-1.5">
+                                    {SUBJECT_COLOR_PRESETS.map((c) => {
+                                        const selected =
+                                            normalizeHex(subjectForm.color || '') === normalizeHex(c);
+                                        return (
+                                            <button
+                                                key={c}
+                                                type="button"
+                                                onClick={() => setSubjectForm({ ...subjectForm, color: c })}
+                                                className={`aspect-square rounded-lg ring-offset-2 dark:ring-offset-slate-800 transition-all ${
+                                                    selected
+                                                        ? 'ring-2 ring-indigo-500 scale-105'
+                                                        : 'ring-1 ring-black/10 dark:ring-white/10 hover:scale-105'
+                                                }`}
+                                                style={{ backgroundColor: c }}
+                                                title={c}
+                                                aria-label={`Цвет ${c}`}
+                                                aria-pressed={selected}
+                                            />
+                                        );
+                                    })}
+                                </div>
+                                <p className="text-[10px] text-slate-400 mt-1.5">
+                                    Выберите цвет из палитры или укажите свой HEX / пипеткой
+                                </p>
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">
@@ -621,6 +739,7 @@ export const DirectoryPage = () => {
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                                 <button
+                                    type="button"
                                     onClick={() => setClassForm({ ...classForm, shift: Shift.First })}
                                     className={`p-3 rounded-xl border text-sm font-bold transition-all ${
                                         classForm.shift === Shift.First
@@ -631,6 +750,7 @@ export const DirectoryPage = () => {
                                     1 смена
                                 </button>
                                 <button
+                                    type="button"
                                     onClick={() => setClassForm({ ...classForm, shift: Shift.Second })}
                                     className={`p-3 rounded-xl border text-sm font-bold transition-all ${
                                         classForm.shift === Shift.Second
@@ -712,15 +832,6 @@ export const DirectoryPage = () => {
                             </div>
                         </>
                     )}
-
-                    <div className="flex justify-end pt-4">
-                        <button
-                            onClick={handleSave}
-                            className="px-6 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 text-sm font-bold shadow-lg shadow-indigo-200 dark:shadow-none"
-                        >
-                            Сохранить
-                        </button>
-                    </div>
                 </div>
             </Modal>
         </div>

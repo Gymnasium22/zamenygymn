@@ -327,13 +327,14 @@ html.dark .app-mobile-org-select {
     z-index: 30;
 }
 
-/* Тосты — под app-bar, не поверх заголовка */
+/* Тосты — справа под app-bar, не на всю ширину слева */
 html.app-mobile .app-mobile-toast-stack {
     top: calc(10px + env(safe-area-inset-top, 0px) + 56px) !important;
-    left: 10px !important;
+    left: auto !important;
     right: 10px !important;
+    width: min(22rem, calc(100vw - 20px)) !important;
+    max-width: min(22rem, calc(100vw - 20px)) !important;
     z-index: 55 !important;
-    max-width: none;
 }
 
 /* Широкие preview/export — только горизонтальный скролл контейнера, не body */
