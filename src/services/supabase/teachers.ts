@@ -189,6 +189,7 @@ export const supabaseSubjectsService = {
     },
 
     create: async (subject: Omit<Subject, 'id'>): Promise<Subject> => {
+        const now = new Date().toISOString();
         const { data, error } = await supabase
             .from('subjects')
             .insert({
@@ -198,7 +199,9 @@ export const supabaseSubjectsService = {
                 difficulty: subject.difficulty || null,
                 required_room_type: subject.requiredRoomType || null,
                 order: subject.order || null,
-                organization_id: subject.organizationId || null
+                organization_id: subject.organizationId || null,
+                created_at: now,
+                updated_at: now
             })
             .select()
             .single();

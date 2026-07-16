@@ -48,6 +48,20 @@ const asDateParam = (value: unknown): string | null => {
     return d || null;
 };
 
+/**
+ * PostgREST upsert: explicit null/missing timestamps override DEFAULT now() and fail NOT NULL.
+ * Keep a valid created_at when present; always refresh updated_at.
+ */
+const ensureTimestamps = (obj: Record<string, unknown>): Record<string, unknown> => {
+    const now = new Date().toISOString();
+    const created = obj.created_at;
+    if (typeof created !== 'string' || !String(created).trim()) {
+        obj.created_at = now;
+    }
+    obj.updated_at = now;
+    return obj;
+};
+
 // Fetch IDs that already exist in a table (used to validate foreign references at runtime)
 const fetchExistingIds = async (tableName: string, ids: string[]): Promise<Set<string>> => {
     const uniqueIds = Array.from(new Set(ids)).filter(Boolean);
@@ -267,7 +281,7 @@ export const supabaseDbService = {
                 const obj = toSnakeCase(s);
                 if (!obj.id) obj.id = genId();
                 if (!obj.organization_id) obj.organization_id = orgId;
-                return obj;
+                return ensureTimestamps(obj);
             });
         }
 
@@ -280,7 +294,7 @@ export const supabaseDbService = {
                 // M:N lives in teacher_subjects — do not write array column
                 delete obj.subject_ids;
                 obj.birth_date = asDateParam(obj.birth_date);
-                return obj;
+                return ensureTimestamps(obj);
             });
 
             // Rebuild teacher ↔ subject links for this org
@@ -311,7 +325,7 @@ export const supabaseDbService = {
                 if (!obj.id) obj.id = genId();
                 if (!obj.organization_id) obj.organization_id = orgId;
                 delete (obj as Record<string, unknown>).not_in_schedule;
-                return obj;
+                return ensureTimestamps(obj);
             });
         }
 
@@ -320,7 +334,7 @@ export const supabaseDbService = {
                 const obj = toSnakeCase(r);
                 if (!obj.id) obj.id = genId();
                 if (!obj.organization_id) obj.organization_id = orgId;
-                return obj;
+                return ensureTimestamps(obj);
             });
         }
 
@@ -330,7 +344,7 @@ export const supabaseDbService = {
                 const obj = toSnakeCase(z as unknown as Record<string, unknown>);
                 if (!obj.id) obj.id = genId();
                 if (!obj.organization_id) obj.organization_id = orgId;
-                return obj;
+                return ensureTimestamps(obj);
             });
             if (mapped.length > 0) {
                 const { error } = await supabase.from('duty_zones').upsert(mapped);
@@ -359,7 +373,7 @@ export const supabaseDbService = {
                     if (!obj.id) obj.id = genId();
                     if (!obj.organization_id) obj.organization_id = orgId;
                     if (!obj.academic_year) obj.academic_year = currentYear;
-                    return obj;
+                    return ensureTimestamps(obj);
                 });
             }
         }
@@ -371,7 +385,7 @@ export const supabaseDbService = {
                 if (!obj.organization_id) obj.organization_id = orgId;
                 if (!obj.academic_year) obj.academic_year = currentYear;
                 obj.date = asDateParam(obj.date);
-                return obj;
+                return ensureTimestamps(obj);
             });
         }
 
@@ -382,7 +396,7 @@ export const supabaseDbService = {
                 if (!obj.organization_id) obj.organization_id = orgId;
                 if (!obj.academic_year) obj.academic_year = currentYear;
                 obj.date = asDateParam(obj.date);
-                return obj;
+                return ensureTimestamps(obj);
             });
         }
 
@@ -543,7 +557,7 @@ export const supabaseDbService = {
                     if (!obj.organization_id) obj.organization_id = orgId;
                     if (!obj.academic_year) obj.academic_year = currentYear;
                     obj.date = asDateParam(obj.date);
-                    return filterSubstitution(obj) ? obj : null;
+                    return filterSubstitution(obj) ? ensureTimestamps(obj) : null;
                 });
             }
         }
