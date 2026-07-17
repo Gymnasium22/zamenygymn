@@ -1,0 +1,211 @@
+/**
+ * Design system 2026 — calm product UI
+ * Tokens + refined surfaces. Desktop layout/logic unchanged.
+ */
+
+:root {
+    --ds-radius-sm: 10px;
+    --ds-radius: 14px;
+    --ds-radius-lg: 18px;
+    --ds-radius-xl: 22px;
+    --ds-space: 8px;
+    --ds-surface: #ffffff;
+    --ds-surface-2: #f8fafc;
+    --ds-surface-3: #f1f5f9;
+    --ds-ink: #0f172a;
+    --ds-ink-muted: #64748b;
+    --ds-border: rgba(15, 23, 42, 0.08);
+    --ds-border-strong: rgba(15, 23, 42, 0.12);
+    --ds-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.03);
+    --ds-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 16px rgba(15, 23, 42, 0.05);
+    --ds-shadow-lg: 0 8px 28px rgba(15, 23, 42, 0.08);
+    --ds-accent: var(--theme-primary-600, #4f46e5);
+    --ds-accent-soft: color-mix(in srgb, var(--ds-accent) 12%, transparent);
+    --ds-ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --ds-duration: 180ms;
+}
+
+.dark {
+    --ds-surface: #0f172a;
+    --ds-surface-2: #111827;
+    --ds-surface-3: #1e293b;
+    --ds-ink: #f8fafc;
+    --ds-ink-muted: #94a3b8;
+    --ds-border: rgba(255, 255, 255, 0.08);
+    --ds-border-strong: rgba(255, 255, 255, 0.12);
+    --ds-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
+    --ds-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
+    --ds-shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.35);
+    --ds-accent-soft: color-mix(in srgb, var(--theme-primary-500, #6366f1) 18%, transparent);
+}
+
+/* ---- Calmer background (less “AI mesh rainbow”) ---- */
+.mesh-gradient-bg {
+    background-color: var(--ds-surface-2) !important;
+    background-image:
+        radial-gradient(ellipse 80% 50% at 0% -10%, color-mix(in srgb, var(--theme-primary-500, #6366f1) 10%, transparent), transparent 55%),
+        radial-gradient(ellipse 60% 40% at 100% 0%, color-mix(in srgb, var(--theme-primary-600, #4f46e5) 7%, transparent), transparent 50%) !important;
+    background-attachment: scroll !important;
+}
+
+.dark .mesh-gradient-bg {
+    background-color: #020617 !important;
+    background-image:
+        radial-gradient(ellipse 70% 45% at 10% -5%, color-mix(in srgb, var(--theme-primary-500, #6366f1) 14%, transparent), transparent 55%),
+        radial-gradient(ellipse 50% 35% at 100% 0%, color-mix(in srgb, var(--theme-primary-600, #4f46e5) 10%, transparent), transparent 50%) !important;
+}
+
+/* Noise quieter */
+.noise-overlay::after {
+    opacity: 0.035 !important;
+}
+.dark .noise-overlay::after {
+    opacity: 0.05 !important;
+}
+
+/* ---- Surfaces ---- */
+.modern-card {
+    background: var(--ds-surface) !important;
+    border: 1px solid var(--ds-border) !important;
+    border-radius: var(--ds-radius) !important;
+    box-shadow: var(--ds-shadow-sm) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    transition: border-color var(--ds-duration) var(--ds-ease), box-shadow var(--ds-duration) var(--ds-ease) !important;
+}
+
+.modern-card:hover {
+    transform: none !important;
+    border-color: var(--ds-border-strong) !important;
+    box-shadow: var(--ds-shadow) !important;
+}
+
+.bento-card {
+    background: var(--ds-surface) !important;
+    border: 1px solid var(--ds-border) !important;
+    border-radius: var(--ds-radius-lg) !important;
+    box-shadow: var(--ds-shadow-sm) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+.bento-card:hover {
+    transform: none !important;
+    box-shadow: var(--ds-shadow) !important;
+}
+
+.float-panel {
+    background: var(--ds-surface) !important;
+    border: 1px solid var(--ds-border) !important;
+    border-radius: var(--ds-radius-lg) !important;
+    box-shadow: var(--ds-shadow-lg) !important;
+    backdrop-filter: blur(12px) saturate(1.1) !important;
+    -webkit-backdrop-filter: blur(12px) saturate(1.1) !important;
+}
+
+.float-panel:hover {
+    transform: none !important;
+}
+
+.glass-panel {
+    background: color-mix(in srgb, var(--ds-surface) 92%, transparent) !important;
+    border: 1px solid var(--ds-border) !important;
+    border-radius: var(--ds-radius) !important;
+    box-shadow: var(--ds-shadow-sm) !important;
+    backdrop-filter: blur(8px) !important;
+}
+
+/* ---- Buttons: solid primary, quiet secondary ---- */
+.btn-primary {
+    background: var(--ds-accent) !important;
+    background-image: none !important;
+    border-radius: var(--ds-radius-sm) !important;
+    box-shadow: none !important;
+    font-weight: 600 !important;
+    letter-spacing: -0.01em;
+}
+
+.btn-primary:hover {
+    filter: brightness(1.05);
+    box-shadow: none !important;
+}
+
+.btn-secondary {
+    border-radius: var(--ds-radius-sm) !important;
+    border-color: var(--ds-border-strong) !important;
+    box-shadow: none !important;
+    font-weight: 500 !important;
+}
+
+.btn-success,
+.btn-danger {
+    border-radius: var(--ds-radius-sm) !important;
+    box-shadow: none !important;
+    background-image: none !important;
+}
+
+.btn-glow::after {
+    display: none !important;
+}
+
+/* ---- Typography: less shouty ---- */
+.display-large {
+    font-weight: 700 !important;
+    letter-spacing: -0.03em !important;
+}
+
+/* Prefer sentence case helper when needed */
+.label-caps {
+    text-transform: uppercase !important;
+    letter-spacing: 0.06em !important;
+    font-size: 0.6875rem !important;
+    font-weight: 600 !important;
+}
+
+/* ---- Motion: shorter, less bounce ---- */
+.animate-bounce-in {
+    animation: none !important;
+    opacity: 1 !important;
+}
+
+.animate-spring-scale {
+    animation: ds-fade-up 0.35s var(--ds-ease) both !important;
+}
+
+.animate-page-in {
+    animation: ds-fade-up 0.32s var(--ds-ease) both !important;
+}
+
+.animate-slide-up-fade {
+    animation: ds-fade-up 0.28s var(--ds-ease) both !important;
+}
+
+@keyframes ds-fade-up {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Card hover lifts off — only border/shadow */
+.card-hover:hover {
+    transform: none !important;
+}
+
+/* Spotlight / neon — quieter */
+.neon-glow {
+    box-shadow: 0 0 0 1px var(--ds-border) !important;
+}
+
+/* Scrollbars thinner neutral */
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1 !important;
+    border-radius: 999px !important;
+}
+.dark ::-webkit-scrollbar-thumb {
+    background: #334155 !important;
+}

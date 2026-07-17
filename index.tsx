@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import * as Sentry from '@sentry/react'
 import App from './src/App'
 import './src/index.css'
+import './src/styles/design-2026.css'
 
 // Initialize Sentry if DSN is provided
 if (import.meta.env.VITE_SENTRY_DSN) {

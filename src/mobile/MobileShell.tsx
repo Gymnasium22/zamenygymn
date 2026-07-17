@@ -240,7 +240,7 @@ export const MobileShell: React.FC<MobileShellProps> = ({
                     <div className="app-mobile-more__panel">
                         <div className="app-mobile-more__handle" aria-hidden />
                         <div className="app-mobile-more__head">
-                            <span>Все разделы</span>
+                            <span>Разделы</span>
                             <button
                                 type="button"
                                 className="app-mobile-icon-btn"

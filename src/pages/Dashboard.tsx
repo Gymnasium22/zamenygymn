@@ -1607,34 +1607,55 @@ export const DashboardPage = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-6 animate-fade-in w-full min-w-0">
                 <div className="lg:col-span-2 flex flex-col justify-end min-w-0 w-full">
                     {isMobileApp ? (
-                        <div className="flex items-center justify-between gap-2 min-w-0">
-                            <div className="min-w-0">
-                                <p className="text-sm font-semibold text-slate-800 dark:text-white truncate">
-                                    {greeting}, {displayName}
-                                </p>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate">
-                                    {formatDateLong(currentDate)}
-                                </p>
-                            </div>
-                            <div className="flex gap-1.5 shrink-0">
+                        <div className="space-y-3 w-full min-w-0">
+                            <div className="flex items-start justify-between gap-2 min-w-0">
+                                <div className="min-w-0">
+                                    <p className="text-[15px] font-semibold tracking-tight text-slate-900 dark:text-white truncate">
+                                        {greeting}, {displayName}
+                                    </p>
+                                    <p className="text-[13px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+                                        {formatDateLong(currentDate)}
+                                    </p>
+                                </div>
                                 <button
                                     type="button"
                                     onClick={() => setIsWidgetModalOpen(true)}
-                                    className="btn-secondary flex items-center justify-center p-2.5"
+                                    className="btn-secondary !px-2.5 !py-2 shrink-0"
                                     title="Настроить рабочий стол"
                                     aria-label="Настроить"
                                 >
                                     <Icon name="Settings" size={18} />
                                 </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setIsFeedbackModalOpen(true)}
-                                    className="btn-primary flex items-center justify-center p-2.5"
-                                    title="Обратная связь"
-                                    aria-label="Обратная связь"
+                            </div>
+                            {/* Quick actions — one primary task row */}
+                            <div className="grid grid-cols-3 gap-2">
+                                <NavLink
+                                    to="/substitutions"
+                                    className="modern-card flex flex-col items-center gap-1.5 px-2 py-3 text-center no-underline active:scale-[0.98] transition-transform"
                                 >
-                                    <Icon name="Send" size={18} />
-                                </button>
+                                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-50 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-300">
+                                        <Icon name="Repeat" size={18} />
+                                    </span>
+                                    <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-200">Замены</span>
+                                </NavLink>
+                                <NavLink
+                                    to="/schedule"
+                                    className="modern-card flex flex-col items-center gap-1.5 px-2 py-3 text-center no-underline active:scale-[0.98] transition-transform"
+                                >
+                                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                                        <Icon name="Calendar" size={18} />
+                                    </span>
+                                    <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-200">Расписание</span>
+                                </NavLink>
+                                <NavLink
+                                    to="/duty"
+                                    className="modern-card flex flex-col items-center gap-1.5 px-2 py-3 text-center no-underline active:scale-[0.98] transition-transform"
+                                >
+                                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                                        <Icon name="Shield" size={18} />
+                                    </span>
+                                    <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-200">Дежурство</span>
+                                </NavLink>
                             </div>
                         </div>
                     ) : (
@@ -1694,14 +1715,28 @@ export const DashboardPage = () => {
                 )}
             </div>
 
-            {/* Vacation Banner — one compact strip on mobile (details also in conflicts widget) */}
+            {/* Vacation Banner — compact chip on mobile */}
             {schoolStatus.type === 'vacation' && (
-                <div className="modern-card border-l-4 border-violet-500 p-3 sm:p-5 animate-fade-in flex items-center gap-3 sm:gap-5 bg-violet-50/70 dark:bg-violet-900/20">
-                    <div className="w-9 h-9 sm:w-12 sm:h-12 shrink-0 rounded-xl sm:rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/30">
-                        <Icon name="Sun" size={isMobileApp ? 18 : 24} />
+                <div
+                    className={`modern-card animate-fade-in flex items-center gap-3 ${
+                        isMobileApp
+                            ? 'p-3 border border-slate-200/80 dark:border-slate-700'
+                            : 'border-l-4 border-violet-500 p-5 bg-violet-50/70 dark:bg-violet-900/20 gap-5'
+                    }`}
+                >
+                    <div
+                        className={`shrink-0 flex items-center justify-center text-white ${
+                            isMobileApp
+                                ? 'w-9 h-9 rounded-full bg-indigo-600'
+                                : 'w-12 h-12 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 shadow-lg shadow-indigo-500/30'
+                        }`}
+                    >
+                        <Icon name="Sun" size={isMobileApp ? 16 : 24} />
                     </div>
                     <div className="flex-1 min-w-0">
-                        <h3 className="font-bold text-sm sm:text-lg text-indigo-800 dark:text-indigo-200">Сейчас каникулы</h3>
+                        <h3 className={`font-semibold tracking-tight ${isMobileApp ? 'text-sm text-slate-900 dark:text-white' : 'text-lg text-indigo-800 dark:text-indigo-200'}`}>
+                            Сейчас каникулы
+                        </h3>
                         {!isMobileApp && (
                             <p className="text-sm text-indigo-600/80 dark:text-indigo-300/80 mt-0.5">
                                 Текущий месяц не относится ни к одному семестру — расписание уроков неактивно.
@@ -1713,9 +1748,9 @@ export const DashboardPage = () => {
                             </p>
                         )}
                         {isMobileApp && (
-                            <p className="text-xs text-indigo-600/80 dark:text-indigo-300/80 mt-0.5">
+                            <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-0.5">
                                 Расписание неактивно ·{' '}
-                                <a href="#/settings" className="font-bold underline underline-offset-2">
+                                <a href="#/settings" className="font-medium text-indigo-600 dark:text-indigo-400 no-underline">
                                     Настройки
                                 </a>
                             </p>
