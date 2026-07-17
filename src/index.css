@@ -207,7 +207,7 @@ body {
     }
 }
 
-/* Mobile form optimization — только font/radius; padding задаёт компонент (pl-*/pr-*) */
+/* Mobile form optimization: only font/radius; horizontal padding stays on components */
 @media (max-width: 1024px) {
     input[type='text'],
     input[type='email'],
