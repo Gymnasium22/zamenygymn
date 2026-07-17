@@ -1062,8 +1062,8 @@ export const DashboardPage = () => {
                         ? `${schoolStatus.bell.period} урок · ${schoolStatus.bell.start}–${schoolStatus.bell.end}`
                         : schoolStatus.label;
                 return (
-                    <div className="p-3 sm:p-4 h-full bento-card bg-gradient-to-br from-indigo-50 to-white dark:from-indigo-950/40 dark:to-dark-800 border border-indigo-100 dark:border-indigo-900/40">
-                        <div className="flex items-center gap-2 mb-2 sm:mb-3">
+                    <div className="p-3 sm:p-4 h-full flex flex-col bento-card bg-gradient-to-br from-indigo-50 to-white dark:from-indigo-950/40 dark:to-dark-800 border border-indigo-100 dark:border-indigo-900/40">
+                        <div className="flex items-center gap-2 mb-2 sm:mb-3 pr-10">
                             <div className="bg-indigo-600 text-white p-1.5 sm:p-2 rounded-xl shadow-md shadow-indigo-500/20 shrink-0">
                                 <Icon name="Clock" size={16} />
                             </div>
@@ -1132,7 +1132,7 @@ export const DashboardPage = () => {
             case 'search':
                 return (
                     <div className="p-3 sm:p-5 flex flex-col h-full relative overflow-hidden bento-card">
-                        <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-5">
+                        <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-5 pr-10">
                             <div className="bg-indigo-600 text-white p-2 sm:p-3 rounded-xl sm:rounded-2xl shrink-0">
                                 <Icon name="Search" size={isMobileApp ? 18 : 22} />
                             </div>
@@ -1140,18 +1140,19 @@ export const DashboardPage = () => {
                         </div>
 
                         <div className="relative mb-2 sm:mb-4">
+                            <Icon
+                                name="Search"
+                                size={16}
+                                className="pointer-events-none absolute left-3.5 top-1/2 z-[1] -translate-y-1/2 text-slate-400"
+                                aria-hidden
+                            />
                             <input
                                 type="text"
                                 inputMode="search"
                                 placeholder="Учитель, класс или кабинет..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl py-2.5 sm:py-3 pl-10 sm:pl-11 pr-4 text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 dark:text-white transition-colors placeholder:text-slate-400"
-                            />
-                            <Icon
-                                name="Search"
-                                size={18}
-                                className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                                className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl py-2.5 sm:py-3 pl-11 pr-4 text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 dark:text-white transition-colors placeholder:text-slate-400"
                             />
                         </div>
 
@@ -1235,12 +1236,12 @@ export const DashboardPage = () => {
             case 'substitutions':
                 return (
                     <div
-                        className={`p-3 sm:p-5 flex flex-col h-full min-h-0 sm:min-h-[180px] relative bento-card ${unresolvedSubstitutions > 0 ? 'ring-1 ring-red-500/20 dark:ring-red-500/30' : ''}`}
+                        className={`p-3 sm:p-5 flex flex-col h-full min-h-0 relative bento-card ${unresolvedSubstitutions > 0 ? 'ring-1 ring-red-500/20 dark:ring-red-500/30' : ''}`}
                     >
                         {unresolvedSubstitutions > 0 && (
                             <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/10 blur-2xl -mr-10 -mt-10 rounded-full pointer-events-none"></div>
                         )}
-                        <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-4 relative z-10">
+                        <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-4 relative z-10 pr-10">
                             <div
                                 className={`p-2 sm:p-3 rounded-xl sm:rounded-2xl text-white shrink-0 ${unresolvedSubstitutions > 0 ? 'bg-red-500' : 'bg-emerald-600'}`}
                             >
@@ -1287,17 +1288,18 @@ export const DashboardPage = () => {
                     <div
                         className="p-3 sm:p-5 flex flex-col h-full bento-card"
                     >
-                        <div className="flex items-center justify-between mb-3 sm:mb-6">
-                            <div className="flex items-center gap-2 sm:gap-3">
-                                <div className="bg-blue-600 text-white p-2 sm:p-3 rounded-xl sm:rounded-2xl shrink-0">
-                                    <Icon name="PieChart" size={isMobileApp ? 18 : 22} />
-                                </div>
-                                <h3 className="font-semibold text-base sm:text-lg dark:text-white">Штат</h3>
+                        {/* pr-10: место под кнопку ширины виджета (absolute top-right на обёртке) */}
+                        <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4 pr-10">
+                            <div className="bg-blue-600 text-white p-2 sm:p-3 rounded-xl sm:rounded-2xl shrink-0">
+                                <Icon name="PieChart" size={isMobileApp ? 18 : 22} />
                             </div>
+                            <h3 className="font-semibold text-base sm:text-lg dark:text-white min-w-0 flex-1">Штат</h3>
                             <button
+                                type="button"
                                 onClick={() => setShowAbsentList(!showAbsentList)}
-                                className="btn-secondary p-2 text-slate-500 hover:text-indigo-600"
+                                className="btn-secondary p-2 text-slate-500 hover:text-indigo-600 shrink-0"
                                 title={showAbsentList ? 'Показать график' : 'Список отсутствующих'}
+                                aria-label={showAbsentList ? 'Показать график' : 'Список отсутствующих'}
                             >
                                 <Icon name={showAbsentList ? 'PieChart' : 'List'} size={18} />
                             </button>
@@ -1362,16 +1364,16 @@ export const DashboardPage = () => {
             case 'notes':
                 return (
                     <div
-                        className="p-6 bento-card group"
+                        className="p-3 sm:p-6 h-full flex flex-col bento-card group"
                     >
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="flex items-center gap-3">
-                                <div className="bg-gradient-to-br from-yellow-400 to-orange-500 text-white p-3 rounded-2xl shadow-lg shadow-orange-500/20">
-                                    <Icon name="Edit2" size={22} />
+                        <div className="flex items-center justify-between mb-3 sm:mb-4 pr-10 gap-2">
+                            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                                <div className="bg-gradient-to-br from-yellow-400 to-orange-500 text-white p-2 sm:p-3 rounded-xl sm:rounded-2xl shadow-lg shadow-orange-500/20 shrink-0">
+                                    <Icon name="Edit2" size={isMobileApp ? 18 : 22} />
                                 </div>
-                                <h3 className="font-bold text-xl dark:text-white">Заметки</h3>
+                                <h3 className="font-bold text-base sm:text-xl dark:text-white">Заметки</h3>
                             </div>
-                            <div className="flex gap-1">
+                            <div className="flex gap-1 shrink-0">
                                 <button
                                     type="button"
                                     onClick={() => setNotesCollapsed((c) => !c)}
@@ -1446,9 +1448,9 @@ export const DashboardPage = () => {
             case 'conflicts':
                 return (
                     <div
-                        className="p-3 sm:p-6 h-full bento-card"
+                        className="p-3 sm:p-6 h-full flex flex-col bento-card"
                     >
-                        <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-4">
+                        <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-4 pr-10">
                             <div className="bg-amber-100 dark:bg-amber-900/30 text-amber-600 p-2 rounded-xl shrink-0">
                                 <Icon name="AlertTriangle" size={18} />
                             </div>
@@ -1457,7 +1459,7 @@ export const DashboardPage = () => {
                                 <p className="text-[10px] text-slate-400 font-medium">Нажмите строку → расписание класса</p>
                             </div>
                         </div>
-                        <div className="space-y-2 max-h-40 sm:max-h-52 overflow-y-auto custom-scrollbar pr-1">
+                        <div className="space-y-2 flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-1">
                             {schoolStatus.type === 'vacation' ? (
                                 <div className="py-3 sm:p-4 text-center">
                                     <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-violet-100 dark:bg-violet-900/30 text-violet-500 flex items-center justify-center mx-auto mb-1.5">
@@ -1491,9 +1493,9 @@ export const DashboardPage = () => {
             case 'birthdays':
                 return (
                     <div
-                        className="p-3 sm:p-6 h-full bento-card"
+                        className="p-3 sm:p-6 h-full flex flex-col bento-card"
                     >
-                        <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-4">
+                        <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-4 pr-10">
                             <div className="bg-rose-100 dark:bg-rose-900/30 text-rose-600 p-2 rounded-xl shrink-0">
                                 <Icon name="Gift" size={18} />
                             </div>
@@ -1501,7 +1503,7 @@ export const DashboardPage = () => {
                                 {isMobileApp ? 'Праздники и ДР' : 'Ближайшие праздники и дни рождения'}
                             </h3>
                         </div>
-                        <div className="space-y-2 max-h-36 sm:max-h-40 overflow-y-auto custom-scrollbar pr-1">
+                        <div className="space-y-2 flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-1">
                             {upcomingCelebrations.length ? (
                                 upcomingCelebrations.map((item) => (
                                     <div
@@ -1539,15 +1541,15 @@ export const DashboardPage = () => {
             case 'kpi':
                 return (
                     <div
-                        className="p-3 sm:p-6 h-full bento-card"
+                        className="p-3 sm:p-6 h-full flex flex-col bento-card"
                     >
-                        <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-4">
+                        <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-4 pr-10">
                             <div className="bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 p-2 rounded-xl shrink-0">
                                 <Icon name="BarChart2" size={18} />
                             </div>
                             <h3 className="font-bold text-base sm:text-lg dark:text-white">Ключевые показатели</h3>
                         </div>
-                        <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                        <div className="grid grid-cols-2 gap-2 sm:gap-3 flex-1 content-start">
                             <div className="p-2.5 sm:p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-100 dark:border-slate-600">
                                 <div className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white">
                                     {kpiData.absentTeachers}
@@ -1733,8 +1735,8 @@ export const DashboardPage = () => {
                 </div>
             )}
 
-            {/* Dashboard widgets — плотная сетка; на узком PWA 1–2 колонки без «дыр» */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 auto-rows-min items-start">
+            {/* Одинаковая мин. высота строк; карточки растягиваются на всю ячейку */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 auto-rows-[minmax(15.5rem,auto)] sm:auto-rows-[minmax(16.5rem,auto)] items-stretch">
                 {filteredWidgets.filter((w) => w.visible).map((widget) => (
                     <div
                         key={widget.id}
@@ -1742,21 +1744,26 @@ export const DashboardPage = () => {
                         onDragStart={!isMobileApp ? (e) => handleDragStart(e, widget.id) : undefined}
                         onDragEnd={!isMobileApp ? handleDragEnd : undefined}
                         onDragOver={!isMobileApp ? (e) => handleDragOver(e, widget.id) : undefined}
-                        className={`transition-all relative group min-h-0 ${isMobileApp ? '' : 'cursor-grab active:cursor-grabbing'} ${draggedWidgetId === widget.id ? 'scale-95 z-50' : ''} ${getColSpanClass(widget.colSpan)}`}
+                        className={`transition-all relative group h-full min-h-0 flex flex-col ${isMobileApp ? '' : 'cursor-grab active:cursor-grabbing'} ${draggedWidgetId === widget.id ? 'scale-95 z-50' : ''} ${getColSpanClass(widget.colSpan)}`}
                     >
-                        <div className="absolute top-4 right-4 z-20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-                            <span className="text-[10px] font-bold text-slate-400 bg-white/90 dark:bg-slate-800 px-1.5 py-0.5 rounded">
+                        {/* Кнопка ширины — только справа сверху; контент виджетов имеет pr-10 */}
+                        <div className="absolute top-2.5 right-2.5 z-20 flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 transition-opacity">
+                            <span className="text-[10px] font-bold text-slate-400 bg-white/95 dark:bg-slate-800 px-1.5 py-0.5 rounded shadow-sm border border-slate-100 dark:border-slate-700">
                                 ×{widget.colSpan || 1}
                             </span>
                             <button
+                                type="button"
                                 onClick={(e) => { e.stopPropagation(); handleWidgetResize(widget.id); }}
-                                className="p-1.5 bg-slate-100 dark:bg-slate-700/80 backdrop-blur rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900 text-slate-500 hover:text-indigo-600 transition-colors shadow-sm"
+                                className="p-1.5 bg-white/95 dark:bg-slate-800 backdrop-blur rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900 text-slate-500 hover:text-indigo-600 transition-colors shadow-sm border border-slate-100 dark:border-slate-700"
                                 title="Ширина: 1 → 2 → 4 колонки"
+                                aria-label="Изменить ширину виджета"
                             >
                                 <Icon name="Maximize2" size={14} />
                             </button>
                         </div>
-                        {renderWidget(widget)}
+                        <div className="h-full min-h-0 flex flex-col [&>*]:h-full [&>*]:min-h-0">
+                            {renderWidget(widget)}
+                        </div>
                     </div>
                 ))}
             </div>
