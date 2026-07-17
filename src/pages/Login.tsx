@@ -96,14 +96,16 @@ export const LoginPage = () => {
                             Email
                         </label>
                         <div className="relative">
-                            <Icon name="User" className="absolute left-4 top-3.5 text-slate-400" size={18} />
+                            <span className="pointer-events-none absolute inset-y-0 left-0 flex w-12 items-center justify-center text-slate-400" aria-hidden>
+                                <Icon name="User" size={18} />
+                            </span>
                             <input
                                 type="email"
                                 inputMode="email"
                                 autoComplete="email"
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200/60 dark:border-white/10 bg-white/50 dark:bg-white/5 dark:text-white outline-none focus-glow transition-all font-medium input-glow"
+                                className="w-full pl-12 pr-4 py-3 rounded-xl border border-slate-200/60 dark:border-white/10 bg-white/50 dark:bg-white/5 dark:text-white outline-none focus-glow transition-all font-medium input-glow"
                                 placeholder="Введите email"
                                 autoFocus
                                 required
@@ -116,21 +118,23 @@ export const LoginPage = () => {
                             Пароль
                         </label>
                         <div className="relative">
-                            <Icon name="Lock" className="absolute left-4 top-3.5 text-slate-400" size={18} />
+                            <span className="pointer-events-none absolute inset-y-0 left-0 flex w-12 items-center justify-center text-slate-400" aria-hidden>
+                                <Icon name="Lock" size={18} />
+                            </span>
                             <input
                                 type={showPassword ? 'text' : 'password'}
                                 inputMode="text"
                                 autoComplete="current-password"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                className="w-full pl-11 pr-11 py-3 rounded-xl border border-slate-200/60 dark:border-white/10 bg-white/50 dark:bg-white/5 dark:text-white outline-none focus-glow transition-all font-medium input-glow"
+                                className="w-full pl-12 pr-12 py-3 rounded-xl border border-slate-200/60 dark:border-white/10 bg-white/50 dark:bg-white/5 dark:text-white outline-none focus-glow transition-all font-medium input-glow"
                                 placeholder="Введите пароль"
                                 required
                             />
                             <button
                                 type="button"
                                 onClick={() => setShowPassword((v) => !v)}
-                                className="absolute right-3 top-3 p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                                className="absolute inset-y-0 right-0 flex w-12 items-center justify-center rounded-r-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
                                 aria-label={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
                                 tabIndex={-1}
                             >
@@ -153,7 +157,7 @@ export const LoginPage = () => {
                         {loading || authLoading || (submitted && !role) ? (
                             <Icon name="Loader" className="animate-spin" size={20} />
                         ) : (
-                            <Icon name="LogOut" className="rotate-180" size={20} />
+                            <Icon name="LogIn" size={20} />
                         )}
                         {loading || (submitted && !role) ? 'Вход...' : 'Войти в систему'}
                     </button>

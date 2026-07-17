@@ -1140,12 +1140,12 @@ export const DashboardPage = () => {
                         </div>
 
                         <div className="relative mb-2 sm:mb-4">
-                            <Icon
-                                name="Search"
-                                size={16}
-                                className="pointer-events-none absolute left-3.5 top-1/2 z-[1] -translate-y-1/2 text-slate-400"
+                            <span
+                                className="pointer-events-none absolute inset-y-0 left-0 z-[1] flex w-11 items-center justify-center text-slate-400"
                                 aria-hidden
-                            />
+                            >
+                                <Icon name="Search" size={16} />
+                            </span>
                             <input
                                 type="text"
                                 inputMode="search"
@@ -1364,80 +1364,90 @@ export const DashboardPage = () => {
             case 'notes':
                 return (
                     <div
-                        className="p-3 sm:p-6 h-full flex flex-col bento-card group"
+                        className="p-3 sm:p-5 h-full flex flex-col bento-card group"
                     >
-                        <div className="flex items-center justify-between mb-3 sm:mb-4 pr-10 gap-2">
-                            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                                <div className="bg-gradient-to-br from-yellow-400 to-orange-500 text-white p-2 sm:p-3 rounded-xl sm:rounded-2xl shadow-lg shadow-orange-500/20 shrink-0">
-                                    <Icon name="Edit2" size={isMobileApp ? 18 : 22} />
-                                </div>
-                                <h3 className="font-bold text-base sm:text-xl dark:text-white">Заметки</h3>
+                        <div className="flex items-center gap-2 mb-2 sm:mb-3 min-w-0">
+                            <div className="bg-gradient-to-br from-yellow-400 to-orange-500 text-white p-2 sm:p-2.5 rounded-xl shadow-lg shadow-orange-500/20 shrink-0">
+                                <Icon name="Edit2" size={isMobileApp ? 16 : 20} />
                             </div>
-                            <div className="flex gap-1 shrink-0">
-                                <button
-                                    type="button"
-                                    onClick={() => setNotesCollapsed((c) => !c)}
-                                    className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg"
-                                    title={notesCollapsed ? 'Развернуть' : 'Свернуть'}
-                                >
-                                    <Icon name={notesCollapsed ? 'Rows' : 'Columns'} size={16} />
-                                </button>
-                                <button
-                                    onClick={saveNotes}
-                                    disabled={!notesChanged}
-                                    className={`p-2 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${notesChanged
-                                            ? 'text-amber-500 hover:text-emerald-600 hover:bg-slate-100 dark:hover:bg-slate-700 animate-pulse'
-                                            : 'text-slate-400 hover:text-emerald-600 hover:bg-slate-100 dark:hover:bg-slate-700'
-                                        }`}
-                                    title={notesChanged ? 'Сохранить изменения' : 'Заметки сохранены'}
-                                >
-                                    <Icon name="Save" size={16} />
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        navigator.clipboard.writeText(notes);
-                                        addToast({
-                                            type: 'success',
-                                            title: 'Скопировано',
-                                            message: 'Заметки скопированы в буфер обмена',
-                                            duration: 2000
-                                        });
-                                    }}
-                                    className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg"
-                                >
-                                    <Icon name="Copy" size={16} />
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        if (confirm('Очистить заметки?')) {
-                                            setNotes('');
-                                            safeLocalStorageSet(notesKey, '');
-                                            setNotesChanged(false);
-                                            addToast({ type: 'success', title: 'Заметки очищены', duration: 2000 });
-                                        }
-                                    }}
-                                    className="p-2 text-slate-400 hover:text-red-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg"
-                                >
-                                    <Icon name="Trash2" size={16} />
-                                </button>
-                            </div>
+                            <h3 className="font-bold text-base sm:text-lg dark:text-white min-w-0 truncate flex-1">
+                                Заметки
+                            </h3>
+                        </div>
+                        {/* Действия отдельной строкой — не пересекаются с кнопкой ширины виджета */}
+                        <div className="flex flex-wrap items-center gap-1 mb-2 sm:mb-3">
+                            <button
+                                type="button"
+                                onClick={() => setNotesCollapsed((c) => !c)}
+                                className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg"
+                                title={notesCollapsed ? 'Развернуть' : 'Свернуть'}
+                            >
+                                <Icon name={notesCollapsed ? 'Rows' : 'Columns'} size={14} />
+                                <span className="hidden sm:inline">{notesCollapsed ? 'Развернуть' : 'Свернуть'}</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={saveNotes}
+                                disabled={!notesChanged}
+                                className={`inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors ${notesChanged
+                                        ? 'text-amber-600 hover:text-emerald-600 hover:bg-slate-100 dark:hover:bg-slate-700 animate-pulse'
+                                        : 'text-slate-500 hover:text-emerald-600 hover:bg-slate-100 dark:hover:bg-slate-700'
+                                    }`}
+                                title={notesChanged ? 'Сохранить изменения' : 'Заметки сохранены'}
+                            >
+                                <Icon name="Save" size={14} />
+                                <span className="hidden sm:inline">Сохранить</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    navigator.clipboard.writeText(notes);
+                                    addToast({
+                                        type: 'success',
+                                        title: 'Скопировано',
+                                        message: 'Заметки скопированы в буфер обмена',
+                                        duration: 2000
+                                    });
+                                }}
+                                className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-indigo-600 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg"
+                                title="Копировать"
+                            >
+                                <Icon name="Copy" size={14} />
+                                <span className="hidden sm:inline">Копировать</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (confirm('Очистить заметки?')) {
+                                        setNotes('');
+                                        safeLocalStorageSet(notesKey, '');
+                                        setNotesChanged(false);
+                                        addToast({ type: 'success', title: 'Заметки очищены', duration: 2000 });
+                                    }
+                                }}
+                                className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-red-500 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg"
+                                title="Очистить"
+                            >
+                                <Icon name="Trash2" size={14} />
+                                <span className="hidden sm:inline">Очистить</span>
+                            </button>
                         </div>
                         {notesCollapsed ? (
                             <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2 px-1">
-                                {notes.trim() || 'Нет заметок — нажмите, чтобы развернуть'}
+                                {notes.trim() || 'Нет заметок — нажмите «Развернуть»'}
                             </p>
                         ) : (
-                            <div className="relative flex-1 min-h-[140px] bg-yellow-50/50 dark:bg-slate-800/50 rounded-2xl p-1">
+                            <div className="relative flex-1 min-h-0 bg-yellow-50/50 dark:bg-slate-800/50 rounded-2xl p-1">
                                 <textarea
                                     inputMode="text"
-                                    className="w-full h-36 p-4 bg-transparent border-none outline-none font-medium text-slate-700 dark:text-slate-200 resize-none text-sm leading-relaxed"
+                                    className="w-full h-full min-h-[6.5rem] p-3 bg-transparent border-none outline-none font-medium text-slate-700 dark:text-slate-200 resize-none text-sm leading-relaxed"
                                     placeholder="Напишите что-нибудь..."
                                     value={notes}
                                     onChange={(e) => handleNotesChange(e.target.value)}
                                     maxLength={10000}
                                 />
                                 {notesChanged && (
-                                    <div className="absolute bottom-3 right-3 text-[10px] font-bold uppercase tracking-widest text-amber-600 animate-pulse flex items-center gap-1 bg-white dark:bg-slate-800 px-2 py-1 rounded-full shadow-sm">
+                                    <div className="absolute bottom-2 right-2 text-[10px] font-bold uppercase tracking-widest text-amber-600 animate-pulse flex items-center gap-1 bg-white dark:bg-slate-800 px-2 py-1 rounded-full shadow-sm">
                                         <Icon name="Clock" size={10} /> Не сохранено
                                     </div>
                                 )}
@@ -1746,8 +1756,8 @@ export const DashboardPage = () => {
                         onDragOver={!isMobileApp ? (e) => handleDragOver(e, widget.id) : undefined}
                         className={`transition-all relative group h-full min-h-0 flex flex-col ${isMobileApp ? '' : 'cursor-grab active:cursor-grabbing'} ${draggedWidgetId === widget.id ? 'scale-95 z-50' : ''} ${getColSpanClass(widget.colSpan)}`}
                     >
-                        {/* Кнопка ширины — только справа сверху; контент виджетов имеет pr-10 */}
-                        <div className="absolute top-2.5 right-2.5 z-20 flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 transition-opacity">
+                        {/* Ширина виджета — справа снизу, не пересекается с шапкой/кнопками */}
+                        <div className="absolute bottom-2 right-2 z-20 flex items-center gap-1 opacity-90 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 transition-opacity">
                             <span className="text-[10px] font-bold text-slate-400 bg-white/95 dark:bg-slate-800 px-1.5 py-0.5 rounded shadow-sm border border-slate-100 dark:border-slate-700">
                                 ×{widget.colSpan || 1}
                             </span>

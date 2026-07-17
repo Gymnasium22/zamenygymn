@@ -192,12 +192,12 @@ body {
         text-size-adjust: 100%;
     }
 
-    /* Better input field handling */
+    /* Better input field handling — НЕ задаём padding: shorthand:
+       иначе перебиваются Tailwind pl-* / pr-* (иконки в полях наезжают на placeholder). */
     input,
     textarea,
     select {
         font-size: 16px; /* Prevent zoom on focus iOS */
-        padding: 12px 16px;
     }
 
     /* Disable auto-zoom on double-tap */
@@ -207,7 +207,7 @@ body {
     }
 }
 
-/* Mobile form optimization */
+/* Mobile form optimization — только font/radius; padding задаёт компонент (pl-*/pr-*) */
 @media (max-width: 1024px) {
     input[type='text'],
     input[type='email'],
@@ -218,7 +218,6 @@ body {
     select {
         font-size: 16px;
         border-radius: 12px;
-        padding: 14px 16px;
         line-height: 1.5;
     }
 
