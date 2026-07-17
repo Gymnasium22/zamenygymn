@@ -380,20 +380,20 @@ export const NutritionPage = () => {
                               : 'Ввод данных о питании'}
                     </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 w-full min-w-0">
                     <button
                         onClick={() => setViewMode(viewMode === 'day' ? 'month' : 'day')}
-                        className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors font-semibold"
+                        className="px-3 sm:px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors font-semibold text-sm shrink-0"
                     >
                         {viewMode === 'day' ? 'За месяц' : 'За день'}
                     </button>
                     {(isAdmin || isCanteen) && (
                         <button
                             onClick={exportToPDF}
-                            className="px-4 py-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition-colors font-semibold flex items-center gap-2"
+                            className="px-3 sm:px-4 py-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition-colors font-semibold flex items-center gap-2 text-sm min-w-0"
                         >
-                            <Icon name="Download" size={18} />
-                            Экспорт PDF
+                            <Icon name="Download" size={18} className="shrink-0" />
+                            <span className="truncate">Экспорт PDF</span>
                         </button>
                     )}
                 </div>

@@ -1087,12 +1087,12 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
                     >
                         <option value="">
                             {viewMode === 'class'
-                                ? 'Выберите класс'
+                                ? 'Класс…'
                                 : viewMode === 'teacher'
-                                  ? 'Выберите учителя'
+                                  ? 'Учитель…'
                                   : viewMode === 'week'
-                                    ? 'Выберите класс (неделя)'
-                                    : 'Выберите предмет'}
+                                    ? 'Класс (неделя)…'
+                                    : 'Предмет…'}
                         </option>
                         {(viewMode === 'class' || viewMode === 'week') &&
                             classes

@@ -8,6 +8,9 @@ html.app-mobile body {
     max-width: 100% !important;
     width: 100% !important;
     position: relative;
+    /* Long RU labels / emails — wrap, never clip horizontally */
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 html.app-mobile #root {
@@ -855,4 +858,80 @@ html.app-mobile .app-mobile-content .mb-8 {
 
 html.app-mobile .app-mobile-content .mb-6 {
     margin-bottom: 0.75rem !important;
+}
+
+/* ---- Text / layout safety (no overflow, no clipped labels) ---- */
+html.app-mobile .app-mobile-content,
+html.app-mobile .tg-shell-content,
+html.tg-mini-app .tg-shell-content {
+    overflow-x: hidden !important;
+}
+
+html.app-mobile .app-mobile-content h1,
+html.app-mobile .app-mobile-content h2,
+html.app-mobile .app-mobile-content h3,
+html.app-mobile .app-mobile-content p,
+html.app-mobile .app-mobile-content label,
+html.app-mobile .app-mobile-content span,
+html.tg-mini-app .tg-shell-content h1,
+html.tg-mini-app .tg-shell-content h2,
+html.tg-mini-app .tg-shell-content h3,
+html.tg-mini-app .tg-shell-content p,
+html.tg-mini-app .tg-shell-content label {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+/* Keep chip/tab rows scrollable instead of crushing text */
+html.app-mobile .app-mobile-content .flex.overflow-x-auto,
+html.app-mobile .app-mobile-content .overflow-x-auto,
+html.tg-mini-app .tg-shell-content .overflow-x-auto {
+    flex-wrap: nowrap !important;
+    max-width: 100%;
+}
+
+html.app-mobile .app-mobile-content .overflow-x-auto > button,
+html.app-mobile .app-mobile-content .overflow-x-auto > a,
+html.tg-mini-app .tg-shell-content .overflow-x-auto > button {
+    flex-shrink: 0;
+}
+
+/* Action toolbars wrap rather than overflow viewport */
+html.app-mobile .app-mobile-content .flex.flex-wrap,
+html.tg-mini-app .tg-shell-content .flex.flex-wrap {
+    max-width: 100%;
+}
+
+/* Tables: allow soft wrap in cells when not intentionally wide */
+html.app-mobile .app-mobile-content td,
+html.app-mobile .app-mobile-content th,
+html.tg-mini-app .tg-shell-content td,
+html.tg-mini-app .tg-shell-content th {
+    overflow-wrap: anywhere;
+}
+
+/* Fixed huge panels on phone */
+html.app-mobile .app-mobile-content .h-\[600px\],
+html.tg-mini-app .tg-shell-content .h-\[600px\] {
+    height: auto !important;
+    max-height: min(52dvh, 420px) !important;
+    min-height: 220px !important;
+}
+
+/* Select/option text readable */
+html.app-mobile select,
+html.tg-mini-app select {
+    max-width: 100%;
+    text-overflow: ellipsis;
+}
+
+/* Inputs never smaller than 16px (iOS zoom + layout jump) */
+html.app-mobile input:not([type='checkbox']):not([type='radio']),
+html.app-mobile textarea,
+html.app-mobile select,
+html.tg-mini-app input:not([type='checkbox']):not([type='radio']),
+html.tg-mini-app textarea,
+html.tg-mini-app select {
+    font-size: 16px !important;
 }

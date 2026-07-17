@@ -1288,12 +1288,11 @@ export const DashboardPage = () => {
                     <div
                         className="p-3 sm:p-5 flex flex-col h-full bento-card"
                     >
-                        {/* pr-10: место под кнопку ширины виджета (absolute top-right на обёртке) */}
-                        <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4 pr-10">
+                        <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4 min-w-0">
                             <div className="bg-blue-600 text-white p-2 sm:p-3 rounded-xl sm:rounded-2xl shrink-0">
                                 <Icon name="PieChart" size={isMobileApp ? 18 : 22} />
                             </div>
-                            <h3 className="font-semibold text-base sm:text-lg dark:text-white min-w-0 flex-1">Штат</h3>
+                            <h3 className="font-semibold text-base sm:text-lg dark:text-white min-w-0 flex-1 truncate">Штат</h3>
                             <button
                                 type="button"
                                 onClick={() => setShowAbsentList(!showAbsentList)}

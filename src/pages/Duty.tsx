@@ -649,7 +649,7 @@ export const DutyPage = () => {
                                         <Icon name="Edit2" size={16} />
                                     </button>
                                 </div>
-                                <div className="grid grid-cols-5 gap-1.5">
+                                <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-5">
                                     {DAYS.map((day) => {
                                         const teacher = getTeacher(zone.id, day, selectedShift);
                                         const hasConflict = teacher
@@ -660,7 +660,7 @@ export const DutyPage = () => {
                                                 key={`${zone.id}-${day}`}
                                                 type="button"
                                                 onClick={() => handleCellClick(zone.id, day)}
-                                                className={`rounded-lg p-1.5 text-center border transition min-h-[3.25rem] ${
+                                                className={`rounded-lg p-2 sm:p-1.5 text-left sm:text-center border transition min-h-[2.75rem] min-w-0 flex sm:flex-col items-center sm:items-stretch gap-2 sm:gap-0 ${
                                                     teacher
                                                         ? hasConflict
                                                             ? 'bg-red-50 border-red-200 text-red-700 dark:bg-red-900/30 dark:border-red-800 dark:text-red-300'
@@ -668,9 +668,11 @@ export const DutyPage = () => {
                                                         : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-600 text-slate-400'
                                                 }`}
                                             >
-                                                <div className="text-[10px] font-bold uppercase opacity-70 mb-0.5">{day}</div>
-                                                <div className="text-[10px] font-bold leading-tight line-clamp-2">
-                                                    {teacher ? teacher.name : '+'}
+                                                <div className="text-[11px] font-semibold opacity-70 shrink-0 w-8 sm:w-auto sm:mb-0.5">
+                                                    {day}
+                                                </div>
+                                                <div className="text-[12px] sm:text-[10px] font-semibold leading-snug min-w-0 truncate sm:line-clamp-2 sm:whitespace-normal">
+                                                    {teacher ? teacher.name : '—'}
                                                 </div>
                                             </button>
                                         );

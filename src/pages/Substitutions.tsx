@@ -1173,37 +1173,39 @@ export const SubstitutionsPage = () => {
                             </div>
                         </div>
 
-                        <div className="flex gap-2 mt-auto">
+                        <div className="flex flex-wrap gap-2 mt-auto w-full min-w-0">
                             <button
                                 onClick={sendSummaryToTelegram}
                                 disabled={isSendingSummary}
-                                className="h-[48px] px-5 rounded-xl bg-blue-600 text-white font-bold text-sm shadow-lg shadow-blue-200 hover:bg-blue-700 transition flex items-center gap-2 disabled:opacity-50"
+                                className="h-11 flex-1 min-w-[6.5rem] px-3 rounded-xl bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 transition flex items-center justify-center gap-1.5 disabled:opacity-50"
                             >
                                 {isSendingSummary ? (
-                                    <Icon name="Loader" className="animate-spin" size={18} />
+                                    <Icon name="Loader" className="animate-spin shrink-0" size={18} />
                                 ) : (
-                                    <Icon name="Send" size={18} />
-                                )}{' '}
-                                Telegram
+                                    <Icon name="Send" className="shrink-0" size={18} />
+                                )}
+                                <span className="truncate">Telegram</span>
                             </button>
                             <button
                                 onClick={copyToClipboard}
-                                className="h-[48px] px-5 rounded-xl bg-indigo-600 text-white font-bold text-sm shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition flex items-center gap-2"
+                                className="h-11 flex-1 min-w-[5.5rem] px-3 rounded-xl bg-indigo-600 text-white font-semibold text-sm hover:bg-indigo-700 transition flex items-center justify-center gap-1.5"
                             >
-                                <Icon name="Copy" size={18} /> Копия
+                                <Icon name="Copy" className="shrink-0" size={18} />
+                                <span className="truncate">Копия</span>
                             </button>
                             <button
                                 onClick={() => setIsHistoryModalOpen(true)}
-                                className="h-[48px] px-4 rounded-xl text-sm font-bold flex items-center justify-center gap-2 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 transition-colors"
+                                className="h-11 flex-1 min-w-[5.5rem] px-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-1.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 transition-colors"
                             >
-                                <Icon name="History" size={18} /> История
+                                <Icon name="History" className="shrink-0" size={18} />
+                                <span className="truncate">История</span>
                             </button>
                         </div>
                     </div>
                     {/* Day-level comment for all substitutions */}
                     <div className="mt-4">
-                        <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1 block">
-                            Общий комментарий ко всем заменам (опционально)
+                        <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1 block leading-snug">
+                            Общий комментарий (опционально)
                         </label>
                         <textarea
                             value={dayComment}
@@ -1218,16 +1220,16 @@ export const SubstitutionsPage = () => {
 
             {/* Vacation Banner */}
             {isVacationDate && (
-                <div className="bg-gradient-to-r from-violet-500/10 via-amber-500/5 to-sky-500/10 dark:from-violet-900/30 dark:via-amber-900/10 dark:to-sky-900/30 border border-violet-200 dark:border-violet-800 rounded-2xl p-4 flex items-center gap-4 animate-fade-in">
-                    <div className="w-10 h-10 shrink-0 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-500/20">
-                        <Icon name="Sun" size={20} />
+                <div className="modern-card border border-slate-200 dark:border-slate-700 p-3 sm:p-4 flex items-start gap-3 animate-fade-in min-w-0">
+                    <div className="w-9 h-9 shrink-0 rounded-full bg-indigo-600 text-white flex items-center justify-center">
+                        <Icon name="Sun" size={16} />
                     </div>
-                    <div className="flex-1">
-                        <p className="font-bold text-violet-800 dark:text-violet-200 text-sm">
-                            🏖️ Выбранная дата приходится на период каникул
+                    <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-slate-900 dark:text-white text-sm leading-snug">
+                            Дата в период каникул
                         </p>
-                        <p className="text-xs text-violet-600/80 dark:text-violet-300/80 mt-0.5">
-                            Расписание уроков за этот месяц неактивно. Замены можно создавать вручную, но уроки из расписания не будут подтягиваться автоматически.
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">
+                            Расписание за этот месяц неактивно. Замены можно создать вручную.
                         </p>
                     </div>
                 </div>
@@ -1256,9 +1258,10 @@ export const SubstitutionsPage = () => {
                 <div
                     className={`w-full md:w-80 flex-col gap-4 ${isMobile && mobileTab !== 'teachers' ? 'hidden' : 'flex'}`}
                 >
-                    <div className="bg-white dark:bg-dark-800 p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex-1 overflow-hidden flex flex-col h-[600px] md:h-auto">
-                        <h3 className="font-bold text-slate-800 dark:text-slate-100 mb-4 flex items-center gap-2">
-                            <Icon name="UserX" size={18} className="text-red-500" /> Отсутствующие
+                    <div className="bg-white dark:bg-dark-800 p-4 sm:p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex-1 overflow-hidden flex flex-col min-h-[220px] max-h-[min(52dvh,420px)] md:max-h-none md:h-auto">
+                        <h3 className="font-bold text-slate-800 dark:text-slate-100 mb-3 sm:mb-4 flex items-center gap-2 min-w-0">
+                            <Icon name="UserX" size={18} className="text-red-500 shrink-0" />
+                            <span className="truncate">Отсутствующие</span>
                         </h3>
 
                         <TeacherFilter

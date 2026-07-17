@@ -478,7 +478,10 @@ const Layout = () => {
                     onOpenAppearance={() => setIsAppearanceOpen(true)}
                     onOpenCommand={() => setIsCommandOpen(true)}
                 >
-                    <div key={location.pathname} className="animate-page-in min-h-0 w-full max-w-full min-w-0 box-border">
+                    <div
+                        key={location.pathname}
+                        className="animate-page-in min-h-0 h-full flex-1 flex flex-col w-full max-w-full min-w-0 box-border overflow-hidden"
+                    >
                         <MainContent />
                     </div>
                 </MobileShell>

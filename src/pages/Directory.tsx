@@ -197,8 +197,8 @@ export const DirectoryPage = () => {
 
     return (
         <div className="max-w-7xl mx-auto w-full h-full flex flex-col">
-            <div className="flex flex-wrap items-center justify-between gap-4 mb-8 shrink-0">
-                <div className="flex p-1 bg-white dark:bg-dark-800 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 overflow-x-auto">
+            <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between gap-3 mb-4 sm:mb-8 shrink-0 min-w-0">
+                <div className="flex p-1 bg-white dark:bg-dark-800 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 overflow-x-auto max-w-full no-scrollbar">
                     {[
                         { id: 'teachers', icon: 'Users', label: 'Учителя' },
                         { id: 'subjects', icon: 'BookOpen', label: 'Предметы' },
@@ -208,22 +208,23 @@ export const DirectoryPage = () => {
                         <button
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id as DirectoryTabId)}
-                            className={`px-5 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 transition-all ${
+                            className={`px-3 sm:px-5 py-2 sm:py-2.5 rounded-lg text-sm font-semibold flex items-center gap-1.5 sm:gap-2 transition-all shrink-0 whitespace-nowrap ${
                                 activeTab === tab.id
                                     ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 shadow-sm'
                                     : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-700'
                             }`}
                         >
-                            <Icon name={tab.icon} size={18} /> {tab.label}
+                            <Icon name={tab.icon} size={16} className="shrink-0" />
+                            <span>{tab.label}</span>
                         </button>
                     ))}
                 </div>
                 {canEditDirectory && (
                     <button
                         onClick={() => openModal()}
-                        className="btn-primary btn-touch flex items-center gap-2 px-5 py-2.5 text-sm"
+                        className="btn-primary btn-touch flex items-center justify-center gap-2 px-4 py-2.5 text-sm w-full sm:w-auto shrink-0"
                     >
-                        <Icon name="Plus" size={18} /> Добавить
+                        <Icon name="Plus" size={18} className="shrink-0" /> Добавить
                     </button>
                 )}
             </div>
