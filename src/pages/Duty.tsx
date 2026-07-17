@@ -516,27 +516,30 @@ export const DutyPage = () => {
 
     return (
         <div className="max-w-7xl mx-auto w-full pb-20">
-            <div className="bg-white dark:bg-dark-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 mb-6 no-print">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-                    <div>
+            <div className="bg-white dark:bg-dark-800 p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 mb-6 no-print">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4 sm:mb-6">
+                    <div className="app-mobile-page-head">
                         <h1 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
                             <Icon name="Shield" className="text-indigo-600 dark:text-indigo-400" />
                             График дежурств
                         </h1>
                         <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">{semester}-е полугодие</p>
                     </div>
+                    <p className="app-mobile-only text-sm font-semibold text-slate-500 dark:text-slate-400 mb-1">
+                        {semester}-е полугодие · {selectedShift === Shift.First ? '1 смена' : '2 смена'}
+                    </p>
 
-                    <div className="flex flex-wrap gap-3">
+                    <div className="flex flex-wrap gap-2 sm:gap-3 w-full md:w-auto">
                         <div className="flex bg-slate-100 dark:bg-slate-700 p-1 rounded-xl">
                             <button
                                 onClick={() => setSelectedShift(Shift.First)}
-                                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${selectedShift === Shift.First ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}
+                                className={`px-3 sm:px-4 py-2 rounded-lg text-sm font-bold transition-all ${selectedShift === Shift.First ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}
                             >
                                 1 смена
                             </button>
                             <button
                                 onClick={() => setSelectedShift(Shift.Second)}
-                                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${selectedShift === Shift.Second ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}
+                                className={`px-3 sm:px-4 py-2 rounded-lg text-sm font-bold transition-all ${selectedShift === Shift.Second ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}
                             >
                                 2 смена
                             </button>
@@ -555,31 +558,32 @@ export const DutyPage = () => {
                         </div>
                         <button
                             onClick={autoGenerate}
-                            className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition shadow-lg shadow-indigo-200 dark:shadow-none text-sm flex items-center gap-2"
+                            className="px-3 sm:px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition shadow-lg shadow-indigo-200 dark:shadow-none text-sm flex items-center gap-2"
                         >
                             <Icon name="Zap" size={16} /> Авто
                         </button>
                         <button
                             onClick={clearSchedule}
-                            className="px-4 py-2 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-100 dark:border-red-900 rounded-xl font-bold hover:bg-red-100 dark:hover:bg-red-900/50 transition text-sm"
+                            className="px-3 py-2 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 border border-red-100 dark:border-red-900 rounded-xl font-bold hover:bg-red-100 dark:hover:bg-red-900/50 transition text-sm"
+                            title="Очистить"
                         >
                             <Icon name="Trash2" size={16} />
                         </button>
                         <button
                             onClick={exportToPng}
-                            className="px-4 py-2 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900 rounded-xl font-bold hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition text-sm flex items-center gap-2"
+                            className="px-3 py-2 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900 rounded-xl font-bold hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition text-sm flex items-center gap-2"
                         >
                             <Icon name="Image" size={16} /> PNG
                         </button>
                         <button
                             onClick={exportPosterExcel}
-                            className="px-4 py-2 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900 rounded-xl font-bold hover:bg-blue-100 dark:hover:bg-blue-900/50 transition text-sm flex items-center gap-2"
+                            className="px-3 py-2 bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border border-blue-100 dark:border-blue-900 rounded-xl font-bold hover:bg-blue-100 dark:hover:bg-blue-900/50 transition text-sm flex items-center gap-2"
                         >
-                            <Icon name="Table" size={16} /> Плакат (XLS)
+                            <Icon name="Table" size={16} /> <span className="hidden sm:inline">Плакат</span>
                         </button>
                         <button
                             onClick={exportToExcel}
-                            className="px-4 py-2 bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400 border border-green-100 dark:border-green-900 rounded-xl font-bold hover:bg-green-100 dark:hover:bg-green-900/50 transition text-sm flex items-center gap-2"
+                            className="px-3 py-2 bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400 border border-green-100 dark:border-green-900 rounded-xl font-bold hover:bg-green-100 dark:hover:bg-green-900/50 transition text-sm flex items-center gap-2"
                         >
                             <Icon name="FileSpreadsheet" size={16} /> Excel
                         </button>
@@ -590,25 +594,94 @@ export const DutyPage = () => {
                     {dutyZones.map((z) => (
                         <div
                             key={z.id}
-                            className="flex items-center gap-2 bg-slate-50 dark:bg-slate-700 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 shrink-0"
+                            className="flex items-center gap-2 bg-slate-50 dark:bg-slate-700 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 shrink-0 max-w-[min(100%,16rem)]"
                         >
-                            <span className="text-sm font-bold text-slate-700 dark:text-slate-300">
-                                {z.name} <span className="text-slate-400 text-xs">({z.floor || '?'})</span>
+                            <span className="text-sm font-bold text-slate-700 dark:text-slate-300 truncate">
+                                {z.name}{' '}
+                                <span className="text-slate-400 text-xs font-medium">({z.floor || '?'})</span>
                             </span>
-                            <button onClick={() => openZoneModal(z)} className="text-slate-400 hover:text-indigo-600">
-                                <Icon name="Edit2" size={12} />
+                            <button
+                                onClick={() => openZoneModal(z)}
+                                className="text-slate-400 hover:text-indigo-600 shrink-0 p-1"
+                                aria-label="Редактировать зону"
+                            >
+                                <Icon name="Edit2" size={14} />
                             </button>
                         </div>
                     ))}
                     <button
                         onClick={() => openZoneModal()}
-                        className="px-3 py-1.5 rounded-lg border border-dashed border-slate-300 dark:border-slate-500 text-slate-400 hover:text-indigo-600 hover:border-indigo-600 text-sm font-bold flex items-center gap-1 transition-colors"
+                        className="px-3 py-1.5 rounded-lg border border-dashed border-slate-300 dark:border-slate-500 text-slate-400 hover:text-indigo-600 hover:border-indigo-600 text-sm font-bold flex items-center gap-1 transition-colors shrink-0"
                     >
                         <Icon name="Plus" size={14} /> Зона
                     </button>
                 </div>
 
-                <div className="overflow-x-auto custom-scrollbar border border-slate-200 dark:border-slate-700 rounded-xl -mx-1 px-0 max-w-full">
+                {/* Mobile: card list by zone (desktop table stays below) */}
+                <div className="duty-mobile-cards space-y-3 mb-2">
+                    {dutyZones.length === 0 ? (
+                        <div className="app-mobile-empty rounded-xl border border-dashed border-slate-200 dark:border-slate-600">
+                            <Icon name="Shield" size={28} className="text-indigo-400" />
+                            <p className="font-bold text-slate-700 dark:text-slate-200">Нет зон дежурства</p>
+                            <p className="text-sm">Добавьте зону кнопкой «+ Зона»</p>
+                        </div>
+                    ) : (
+                        dutyZones.map((zone) => (
+                            <div
+                                key={zone.id}
+                                className="rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50/80 dark:bg-slate-800/50 p-3"
+                            >
+                                <div className="flex items-start justify-between gap-2 mb-2">
+                                    <div className="min-w-0">
+                                        <div className="font-bold text-slate-800 dark:text-slate-100 truncate">{zone.name}</div>
+                                        <div className="text-[11px] text-indigo-500 font-medium">{zone.floor || 'Этаж не указан'}</div>
+                                        {zone.includedRooms?.length ? (
+                                            <div className="text-[10px] text-slate-400 mt-0.5 truncate">
+                                                {zone.includedRooms.join(', ')}
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => openZoneModal(zone)}
+                                        className="p-2 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-white dark:hover:bg-slate-700 shrink-0"
+                                    >
+                                        <Icon name="Edit2" size={16} />
+                                    </button>
+                                </div>
+                                <div className="grid grid-cols-5 gap-1.5">
+                                    {DAYS.map((day) => {
+                                        const teacher = getTeacher(zone.id, day, selectedShift);
+                                        const hasConflict = teacher
+                                            ? getConflict(zone.id, day, selectedShift, teacher.id)
+                                            : false;
+                                        return (
+                                            <button
+                                                key={`${zone.id}-${day}`}
+                                                type="button"
+                                                onClick={() => handleCellClick(zone.id, day)}
+                                                className={`rounded-lg p-1.5 text-center border transition min-h-[3.25rem] ${
+                                                    teacher
+                                                        ? hasConflict
+                                                            ? 'bg-red-50 border-red-200 text-red-700 dark:bg-red-900/30 dark:border-red-800 dark:text-red-300'
+                                                            : 'bg-indigo-50 border-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-200'
+                                                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-600 text-slate-400'
+                                                }`}
+                                            >
+                                                <div className="text-[10px] font-bold uppercase opacity-70 mb-0.5">{day}</div>
+                                                <div className="text-[10px] font-bold leading-tight line-clamp-2">
+                                                    {teacher ? teacher.name : '+'}
+                                                </div>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+
+                <div className="duty-desktop-table overflow-x-auto custom-scrollbar border border-slate-200 dark:border-slate-700 rounded-xl -mx-1 px-0 max-w-full">
                     <table className="w-full border-collapse min-w-[560px]">
                         <thead className="sticky top-0 z-10">
                             <tr className="bg-slate-50 dark:bg-slate-700/50">
@@ -673,7 +746,7 @@ export const DutyPage = () => {
                 </div>
             </div>
 
-            <div className="mt-8 bg-slate-100 dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-700">
+            <div className="mt-8 bg-slate-100 dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 duty-print-preview hidden lg:block">
                 <h3 className="font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest text-xs mb-4 flex items-center gap-2">
                     <Icon name="Image" size={16} /> Предпросмотр документа
                 </h3>

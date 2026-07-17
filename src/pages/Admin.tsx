@@ -77,7 +77,7 @@ export const AdminPage = () => {
         <div className="max-w-7xl mx-auto w-full pb-20">
             <div className="bg-white dark:bg-dark-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 mb-8">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-6">
-                    <h1 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
+                    <h1 className="app-mobile-page-head text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
                         <Icon name="Users" className="text-indigo-600 dark:text-indigo-400" />
                         Администрация и Поиск
                     </h1>

@@ -370,7 +370,7 @@ export const NutritionPage = () => {
     return (
         <div className="max-w-7xl mx-auto w-full pb-20">
             <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 mb-6">
-                <div>
+                <div className="app-mobile-page-head">
                     <h1 className="text-3xl font-black text-slate-800 dark:text-white mb-2">Питание</h1>
                     <p className="text-slate-500 dark:text-slate-400">
                         {isAdmin

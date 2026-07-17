@@ -7,6 +7,7 @@ import { Icon } from './components/Icons';
 import { StatusWidget, BottomNavigation, ToastProvider, CommandPalette, Modal } from './components/UI';
 import { AnnouncementModal } from './components/AnnouncementModal';
 import { PullToRefresh } from './components/PullToRefresh';
+import { PwaUpdateBanner } from './components/PwaUpdateBanner';
 import { useIsMobileApp } from './hooks/useIsMobileApp';
 import { DashboardPage } from './pages/Dashboard';
 import { SchedulePage } from './pages/Schedule';
@@ -747,6 +748,7 @@ export default function App() {
                         <ScheduleDataProvider>
                             <HashRouter>
                                 <TelegramHost />
+                                <PwaUpdateBanner />
                                 <React.Suspense fallback={<div className="h-screen flex items-center justify-center bg-slate-50 dark:bg-dark-950"><Icon name="Loader" className="animate-spin text-indigo-600" size={48} /></div>}>
                                     <Routes>
                                         <Route path="/login" element={<LoginPage />} />

@@ -230,6 +230,22 @@ export const DirectoryPage = () => {
 
             <div className="flex-1 overflow-y-auto pb-20 custom-scrollbar pr-2">
                 {activeTab === 'teachers' && (
+                    teachers.length === 0 ? (
+                        <div className="app-mobile-empty modern-card">
+                            <Icon name="Users" size={32} className="text-indigo-400" />
+                            <p className="font-bold text-slate-800 dark:text-white text-base">Нет учителей</p>
+                            <p className="text-sm max-w-xs">
+                                {canEditDirectory
+                                    ? 'Добавьте первого учителя кнопкой «Добавить»'
+                                    : 'Справочник пуст — обратитесь к администратору'}
+                            </p>
+                            {canEditDirectory && (
+                                <button type="button" onClick={() => openModal()} className="btn-primary mt-2 px-4 py-2 text-sm font-bold">
+                                    <Icon name="Plus" size={16} className="inline mr-1" /> Добавить
+                                </button>
+                            )}
+                        </div>
+                    ) : (
                     <StaggerContainer className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {[...teachers]
                             .sort((a, b) => a.name.localeCompare(b.name, 'ru', { sensitivity: 'base' }))
@@ -238,23 +254,25 @@ export const DirectoryPage = () => {
                                 key={t.id}
                                 className="modern-card p-4 group flex flex-col"
                             >
-                                <div className="flex justify-between items-start mb-2">
-                                    <div className="flex items-center gap-3">
-                                        <div className="font-bold text-slate-800 dark:text-slate-100 text-lg">
+                                <div className="flex justify-between items-start mb-2 gap-2">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <div className="font-bold text-slate-800 dark:text-slate-100 text-lg truncate">
                                             {t.name}
                                         </div>
                                     </div>
                                     {canEditDirectory && (
-                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <div className="flex gap-1 shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                                         <button
                                             onClick={() => openModal(t.id)}
                                             className="p-2 text-slate-600 dark:text-slate-300 hover:text-indigo-600 bg-slate-50 dark:bg-slate-700 rounded-full"
+                                            aria-label="Редактировать"
                                         >
                                             <Icon name="Edit2" size={16} />
                                         </button>
                                         <button
                                             onClick={() => handleDelete(t.id)}
                                             className="p-2 text-slate-600 dark:text-slate-300 hover:text-red-600 bg-slate-50 dark:bg-slate-700 rounded-full"
+                                            aria-label="Удалить"
                                         >
                                             <Icon name="Trash2" size={16} />
                                         </button>
@@ -293,9 +311,19 @@ export const DirectoryPage = () => {
                             </div>
                         ))}
                     </StaggerContainer>
+                    )
                 )}
 
                 {activeTab === 'subjects' && (
+                    subjects.length === 0 ? (
+                        <div className="app-mobile-empty modern-card">
+                            <Icon name="BookOpen" size={32} className="text-indigo-400" />
+                            <p className="font-bold text-slate-800 dark:text-white text-base">Нет предметов</p>
+                            <p className="text-sm max-w-xs">
+                                {canEditDirectory ? 'Добавьте предмет кнопкой «Добавить»' : 'Справочник пуст'}
+                            </p>
+                        </div>
+                    ) : (
                     <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                         {subjects.map((s, i) => (
                             <div
@@ -310,7 +338,7 @@ export const DirectoryPage = () => {
                                 <div className="flex items-center gap-3 min-w-0">
                                     <Icon
                                         name="GripVertical"
-                                        className="text-slate-300 dark:text-slate-600 shrink-0"
+                                        className="text-slate-300 dark:text-slate-600 shrink-0 hidden sm:block"
                                         size={16}
                                     />
                                     <span
@@ -327,16 +355,18 @@ export const DirectoryPage = () => {
                                     </div>
                                 </div>
                                 {canEditDirectory && (
-                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div className="flex gap-1 shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                                     <button
                                         onClick={() => openModal(s.id)}
                                         className="p-1.5 text-slate-600 dark:text-slate-300 hover:text-indigo-600"
+                                        aria-label="Редактировать"
                                     >
                                         <Icon name="Edit2" size={16} />
                                     </button>
                                     <button
                                         onClick={() => handleDelete(s.id)}
                                         className="p-1.5 text-slate-600 dark:text-slate-300 hover:text-red-600"
+                                        aria-label="Удалить"
                                     >
                                         <Icon name="Trash2" size={16} />
                                     </button>
@@ -345,9 +375,17 @@ export const DirectoryPage = () => {
                             </div>
                         ))}
                     </StaggerContainer>
+                    )
                 )}
 
                 {activeTab === 'classes' && (
+                    classes.length === 0 ? (
+                        <div className="app-mobile-empty modern-card">
+                            <Icon name="GraduationCap" size={32} className="text-indigo-400" />
+                            <p className="font-bold text-slate-800 dark:text-white text-base">Нет классов</p>
+                            <p className="text-sm">{canEditDirectory ? 'Добавьте класс кнопкой «Добавить»' : 'Справочник пуст'}</p>
+                        </div>
+                    ) : (
                     <StaggerContainer className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
                         {classes.map((c, i) => (
                             <div
@@ -388,16 +426,18 @@ export const DirectoryPage = () => {
                                     </div>
                                 )}
                                 {canEditDirectory && (
-                                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div className="absolute top-2 right-2 flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                                     <button
                                         onClick={() => openModal(c.id)}
                                         className="p-1 text-slate-600 dark:text-slate-300 hover:text-indigo-600"
+                                        aria-label="Редактировать"
                                     >
                                         <Icon name="Edit2" size={14} />
                                     </button>
                                     <button
                                         onClick={() => handleDelete(c.id)}
                                         className="p-1 text-slate-600 dark:text-slate-300 hover:text-red-600"
+                                        aria-label="Удалить"
                                     >
                                         <Icon name="Trash2" size={14} />
                                     </button>
@@ -406,9 +446,17 @@ export const DirectoryPage = () => {
                             </div>
                         ))}
                     </StaggerContainer>
+                    )
                 )}
 
                 {activeTab === 'rooms' && (
+                    rooms.length === 0 ? (
+                        <div className="app-mobile-empty modern-card">
+                            <Icon name="DoorOpen" size={32} className="text-indigo-400" />
+                            <p className="font-bold text-slate-800 dark:text-white text-base">Нет кабинетов</p>
+                            <p className="text-sm">{canEditDirectory ? 'Добавьте кабинет кнопкой «Добавить»' : 'Справочник пуст'}</p>
+                        </div>
+                    ) : (
                     <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                         {rooms.map((r, i) => (
                             <div
@@ -438,16 +486,18 @@ export const DirectoryPage = () => {
                                     </div>
                                 </div>
                                 {canEditDirectory && (
-                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <div className="flex gap-1 shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                                     <button
                                         onClick={() => openModal(r.id)}
                                         className="p-1.5 text-slate-600 dark:text-slate-300 hover:text-indigo-600"
+                                        aria-label="Редактировать"
                                     >
                                         <Icon name="Edit2" size={16} />
                                     </button>
                                     <button
                                         onClick={() => handleDelete(r.id)}
                                         className="p-1.5 text-slate-600 dark:text-slate-300 hover:text-red-600"
+                                        aria-label="Удалить"
                                     >
                                         <Icon name="Trash2" size={16} />
                                     </button>
@@ -456,6 +506,7 @@ export const DirectoryPage = () => {
                             </div>
                         ))}
                     </StaggerContainer>
+                    )
                 )}
             </div>
 

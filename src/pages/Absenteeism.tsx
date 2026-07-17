@@ -332,7 +332,7 @@ export const AbsenteeismPage = () => {
         <div className="space-y-6 max-w-7xl mx-auto">
             {/* Header */}
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white dark:bg-dark-800 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
-                <div>
+                <div className="app-mobile-page-head">
                     <h1 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
                         <div className="p-2 bg-rose-100 dark:bg-rose-900/30 rounded-lg text-rose-600 dark:text-rose-400">
                             <Icon name="UserX" size={24} />

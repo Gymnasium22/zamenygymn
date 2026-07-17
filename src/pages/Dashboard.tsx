@@ -1756,8 +1756,8 @@ export const DashboardPage = () => {
                         onDragOver={!isMobileApp ? (e) => handleDragOver(e, widget.id) : undefined}
                         className={`transition-all relative group h-full min-h-0 flex flex-col ${isMobileApp ? '' : 'cursor-grab active:cursor-grabbing'} ${draggedWidgetId === widget.id ? 'scale-95 z-50' : ''} ${getColSpanClass(widget.colSpan)}`}
                     >
-                        {/* Ширина виджета — справа снизу, не пересекается с шапкой/кнопками */}
-                        <div className="absolute bottom-2 right-2 z-20 flex items-center gap-1 opacity-90 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 transition-opacity">
+                        {/* Ширина виджета — только desktop; на PWA настройка через «Настроить» */}
+                        <div className={`absolute bottom-2 right-2 z-20 flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity ${isMobileApp ? 'hidden' : ''}`}>
                             <span className="text-[10px] font-bold text-slate-400 bg-white/95 dark:bg-slate-800 px-1.5 py-0.5 rounded shadow-sm border border-slate-100 dark:border-slate-700">
                                 ×{widget.colSpan || 1}
                             </span>

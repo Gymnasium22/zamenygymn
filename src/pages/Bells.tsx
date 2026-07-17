@@ -595,7 +595,7 @@ export const BellsPage = () => {
 
     return (
         <div className="max-w-7xl mx-auto w-full h-full flex flex-col">
-            <div className="flex flex-wrap items-center justify-between gap-4 mb-8 shrink-0">
+            <div className="flex flex-wrap items-center justify-between gap-4 mb-8 shrink-0 app-mobile-page-head">
                 <div className="flex items-center gap-3">
                     <div className="p-3 rounded-2xl bg-indigo-600 text-white shadow-md">
                         <Icon name="Bell" size={22} />

@@ -552,7 +552,7 @@ export const ReportsPage = () => {
         <div className="max-w-6xl mx-auto w-full pb-20">
             <div className="bg-white dark:bg-dark-800 p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 mb-6">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4">
-                    <h1 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
+                    <h1 className="app-mobile-page-head text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
                         <Icon name="BarChart2" className="text-indigo-600 dark:text-indigo-400" /> Отчёты
                     </h1>
 

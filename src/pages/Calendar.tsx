@@ -102,7 +102,7 @@ export const CalendarPage = () => {
         <div className="h-full flex flex-col w-full">
             <div className="shrink-0 mb-4">
                 <div className="flex items-center justify-between">
-                    <div>
+                    <div className="app-mobile-page-head">
                         <h1 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
                             <Icon name="Calendar" className="text-indigo-600 dark:text-indigo-400" />
                             Школьный календарь

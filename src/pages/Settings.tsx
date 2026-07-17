@@ -68,13 +68,16 @@ const PasswordInput: React.FC<{
                 value={value}
                 onChange={(e) => onChange(e.target.value)}
                 placeholder={placeholder}
-                className="w-full border border-slate-200 dark:border-slate-600 p-3 pr-10 rounded-xl text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500"
+                autoComplete="off"
+                spellCheck={false}
+                className="w-full border border-slate-200 dark:border-slate-600 p-3 pr-12 rounded-xl text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500 font-mono tracking-wide"
             />
             <button
                 type="button"
                 onClick={() => setShow(!show)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition"
+                className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition"
                 title={show ? 'Скрыть' : 'Показать'}
+                aria-label={show ? 'Скрыть секрет' : 'Показать секрет'}
             >
                 <Icon name={show ? 'EyeOff' : 'Eye'} size={18} />
             </button>
@@ -1020,7 +1023,7 @@ export const SettingsPage = () => {
 
     return (
         <div className="h-full flex flex-col max-w-7xl mx-auto w-full">
-            <div className="shrink-0 mb-4">
+            <div className="shrink-0 mb-4 app-mobile-page-head">
                 <h1 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
                     <Icon name="Settings" className="text-indigo-600 dark:text-indigo-400" />
                     Настройки

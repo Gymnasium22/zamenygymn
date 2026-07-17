@@ -79,6 +79,7 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
 
     const isMobile = useMedia({ maxWidth: 1023 });
     const [mobileListView, setMobileListView] = useState(true);
+    const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
 
     // --- Mobile Swipe Navigation for Days ---
     const swipeAreaRef = useRef<HTMLDivElement>(null);
@@ -985,79 +986,143 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
                     actions={contextActions}
                 />
             )}
-            <div className="bg-white dark:bg-dark-800 p-3 sm:p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 mb-4 sm:mb-6 flex flex-col xl:flex-row gap-3 sm:gap-4 items-stretch xl:items-center justify-between no-print w-full min-w-0">
-                <div className="flex flex-col gap-2 sm:gap-3 min-w-0 w-full">
-                    <div className="flex gap-2 sm:gap-3 items-center flex-wrap">
-                        <div className="flex bg-slate-100 dark:bg-slate-700 p-1 rounded-xl shrink-0">
-                            <button
-                                onClick={() => setSelectedShift(Shift.First)}
-                                className={`px-3 sm:px-4 py-2 rounded-lg text-sm font-bold transition-all ${selectedShift === Shift.First ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}
-                            >
-                                1 смена
-                            </button>
-                            <button
-                                onClick={() => setSelectedShift(Shift.Second)}
-                                className={`px-3 sm:px-4 py-2 rounded-lg text-sm font-bold transition-all ${selectedShift === Shift.Second ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}
-                            >
-                                2 смена
-                            </button>
-                        </div>
-                        {!readOnly && (
-                            <div className="flex bg-slate-100 dark:bg-slate-700 p-1 rounded-xl ml-auto sm:ml-0">
-                                <button
-                                    onClick={undo}
-                                    disabled={!canUndo}
-                                    className="p-2 text-slate-500 disabled:opacity-30 hover:bg-white dark:hover:bg-slate-600 rounded-lg transition"
-                                >
-                                    <Icon name="RotateCcw" size={18} />
-                                </button>
-                                <button
-                                    onClick={redo}
-                                    disabled={!canRedo}
-                                    className="p-2 text-slate-500 disabled:opacity-30 hover:bg-white dark:hover:bg-slate-600 rounded-lg transition"
-                                >
-                                    <Icon name="RotateCw" size={18} />
-                                </button>
-                            </div>
-                        )}
+            <div className="bg-white dark:bg-dark-800 p-3 sm:p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 mb-4 sm:mb-6 flex flex-col gap-3 no-print w-full min-w-0">
+                {/* Primary row: shift + undo + mobile tools toggle */}
+                <div className="flex gap-2 items-center flex-wrap">
+                    <div className="flex bg-slate-100 dark:bg-slate-700 p-1 rounded-xl shrink-0">
+                        <button
+                            onClick={() => setSelectedShift(Shift.First)}
+                            className={`px-3 sm:px-4 py-2 rounded-lg text-sm font-bold transition-all ${selectedShift === Shift.First ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}
+                        >
+                            1 смена
+                        </button>
+                        <button
+                            onClick={() => setSelectedShift(Shift.Second)}
+                            className={`px-3 sm:px-4 py-2 rounded-lg text-sm font-bold transition-all ${selectedShift === Shift.Second ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}
+                        >
+                            2 смена
+                        </button>
                     </div>
-                    {viewMode !== 'week' && (
-                        <div className="flex items-center gap-1 w-full min-w-0">
-                            {isMobile && (
-                                <button
-                                    onClick={goToPrevDay}
-                                    disabled={DAYS.indexOf(selectedDay) === 0}
-                                    className="lg:hidden p-1.5 rounded-lg text-slate-400 disabled:opacity-30 hover:bg-slate-100 dark:hover:bg-slate-700 transition shrink-0"
-                                    aria-label="Предыдущий день"
-                                >
-                                    <Icon name="ChevronLeft" size={18} />
-                                </button>
-                            )}
-                            <div className="flex overflow-x-auto pb-0.5 gap-1 flex-1 min-w-0 hide-scrollbar">
-                                {DAYS.map((day) => (
-                                    <button
-                                        key={day}
-                                        onClick={() => setSelectedDay(day)}
-                                        className={`whitespace-nowrap px-3 sm:px-4 py-2 rounded-xl text-sm font-bold transition-all shrink-0 ${selectedDay === day ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
-                                    >
-                                        {day}
-                                    </button>
-                                ))}
-                            </div>
-                            {isMobile && (
-                                <button
-                                    onClick={goToNextDay}
-                                    disabled={DAYS.indexOf(selectedDay) === DAYS.length - 1}
-                                    className="lg:hidden p-1.5 rounded-lg text-slate-400 disabled:opacity-30 hover:bg-slate-100 dark:hover:bg-slate-700 transition shrink-0"
-                                    aria-label="Следующий день"
-                                >
-                                    <Icon name="ChevronRight" size={18} />
-                                </button>
-                            )}
+                    {!readOnly && (
+                        <div className="flex bg-slate-100 dark:bg-slate-700 p-1 rounded-xl">
+                            <button
+                                onClick={undo}
+                                disabled={!canUndo}
+                                className="p-2 text-slate-500 disabled:opacity-30 hover:bg-white dark:hover:bg-slate-600 rounded-lg transition"
+                                title="Отменить"
+                            >
+                                <Icon name="RotateCcw" size={18} />
+                            </button>
+                            <button
+                                onClick={redo}
+                                disabled={!canRedo}
+                                className="p-2 text-slate-500 disabled:opacity-30 hover:bg-white dark:hover:bg-slate-600 rounded-lg transition"
+                                title="Повторить"
+                            >
+                                <Icon name="RotateCw" size={18} />
+                            </button>
                         </div>
                     )}
+                    {isMobile && (
+                        <button
+                            type="button"
+                            onClick={() => setMobileToolsOpen((v) => !v)}
+                            className={`ml-auto flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-bold border transition ${
+                                mobileToolsOpen
+                                    ? 'bg-indigo-50 border-indigo-200 text-indigo-700 dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-300'
+                                    : 'bg-slate-50 border-slate-200 text-slate-600 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-300'
+                            }`}
+                            aria-expanded={mobileToolsOpen}
+                        >
+                            <Icon name="Settings" size={16} />
+                            Ещё
+                        </button>
+                    )}
                 </div>
-                <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
+
+                {/* Days */}
+                {viewMode !== 'week' && (
+                    <div className="flex items-center gap-1 w-full min-w-0">
+                        {isMobile && (
+                            <button
+                                onClick={goToPrevDay}
+                                disabled={DAYS.indexOf(selectedDay) === 0}
+                                className="lg:hidden p-1.5 rounded-lg text-slate-400 disabled:opacity-30 hover:bg-slate-100 dark:hover:bg-slate-700 transition shrink-0"
+                                aria-label="Предыдущий день"
+                            >
+                                <Icon name="ChevronLeft" size={18} />
+                            </button>
+                        )}
+                        <div className="flex overflow-x-auto pb-0.5 gap-1 flex-1 min-w-0 hide-scrollbar">
+                            {DAYS.map((day) => (
+                                <button
+                                    key={day}
+                                    onClick={() => setSelectedDay(day)}
+                                    className={`whitespace-nowrap px-3 sm:px-4 py-2 rounded-xl text-sm font-bold transition-all shrink-0 ${selectedDay === day ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}
+                                >
+                                    {day}
+                                </button>
+                            ))}
+                        </div>
+                        {isMobile && (
+                            <button
+                                onClick={goToNextDay}
+                                disabled={DAYS.indexOf(selectedDay) === DAYS.length - 1}
+                                className="lg:hidden p-1.5 rounded-lg text-slate-400 disabled:opacity-30 hover:bg-slate-100 dark:hover:bg-slate-700 transition shrink-0"
+                                aria-label="Следующий день"
+                            >
+                                <Icon name="ChevronRight" size={18} />
+                            </button>
+                        )}
+                    </div>
+                )}
+
+                {/* Main filter — always visible, full width on phone */}
+                <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl p-2 pl-3 w-full min-w-0">
+                    <Icon name="Filter" size={16} className="text-slate-400 shrink-0" />
+                    <select
+                        value={filterId}
+                        onChange={(e) => setFilterId(e.target.value)}
+                        className="bg-transparent text-sm font-bold text-slate-700 dark:text-slate-200 outline-none w-full min-w-0"
+                    >
+                        <option value="">
+                            {viewMode === 'class'
+                                ? 'Выберите класс'
+                                : viewMode === 'teacher'
+                                  ? 'Выберите учителя'
+                                  : viewMode === 'week'
+                                    ? 'Выберите класс (неделя)'
+                                    : 'Выберите предмет'}
+                        </option>
+                        {(viewMode === 'class' || viewMode === 'week') &&
+                            classes
+                                .filter((c) => c.shift === selectedShift)
+                                .map((c) => (
+                                    <option key={c.id} value={c.id}>
+                                        {c.name}
+                                    </option>
+                                ))}
+                        {viewMode === 'teacher' &&
+                            teachers.map((t) => (
+                                <option key={t.id} value={t.id}>
+                                    {t.name}
+                                </option>
+                            ))}
+                        {viewMode === 'subject' &&
+                            subjects.map((s) => (
+                                <option key={s.id} value={s.id}>
+                                    {s.name}
+                                </option>
+                            ))}
+                    </select>
+                </div>
+
+                {/* Advanced tools: always on desktop; toggle on mobile */}
+                <div
+                    className={`flex flex-wrap items-center gap-2 sm:gap-3 w-full ${
+                        isMobile ? `schedule-advanced-tools ${mobileToolsOpen ? 'is-open' : ''}` : ''
+                    }`}
+                >
                     <div className="flex bg-slate-100 dark:bg-slate-700 p-1 rounded-lg">
                         <button
                             onClick={() => {
@@ -1100,74 +1165,33 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
                             <Icon name="Calendar" size={18} />
                         </button>
                     </div>
-
-                    <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg p-1.5 pl-3 flex-1">
-                        <Icon name="Filter" size={16} className="text-slate-400" />
-                        <select
-                            value={filterId}
-                            onChange={(e) => setFilterId(e.target.value)}
-                            className="bg-transparent text-sm font-bold text-slate-700 dark:text-slate-200 outline-none w-full xl:w-32"
-                        >
-                            <option value="">
-                                Все{' '}
-                                {viewMode === 'class'
-                                    ? 'классы'
-                                    : viewMode === 'teacher'
-                                        ? 'учителя'
-                                        : viewMode === 'week'
-                                            ? 'классы (неделя)'
-                                            : 'предметы'}
-                            </option>
-                            {(viewMode === 'class' || viewMode === 'week') &&
-                                classes
-                                    .filter((c) => c.shift === selectedShift)
-                                    .map((c) => (
-                                        <option key={c.id} value={c.id}>
-                                            {c.name}
-                                        </option>
-                                    ))}
-                            {viewMode === 'teacher' &&
-                                teachers.map((t) => (
-                                    <option key={t.id} value={t.id}>
-                                        {t.name}
-                                    </option>
-                                ))}
-                            {viewMode === 'subject' &&
-                                subjects.map((s) => (
-                                    <option key={s.id} value={s.id}>
-                                        {s.name}
-                                    </option>
-                                ))}
-                        </select>
-                    </div>
                     <input
-                        placeholder="Каб..."
+                        placeholder="Кабинет"
                         value={filterRoom}
                         onChange={(e) => setFilterRoom(e.target.value)}
-                        className="w-24 sm:w-20 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg p-2 text-xs font-bold"
+                        className="w-full sm:w-24 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg p-2 text-xs font-bold"
                     />
                     <input
-                        placeholder="Проф..."
+                        placeholder="Профиль"
                         value={filterDirection}
                         onChange={(e) => setFilterDirection(e.target.value)}
-                        className="w-24 sm:w-20 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg p-2 text-xs font-bold"
+                        className="w-full sm:w-24 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg p-2 text-xs font-bold"
                     />
-
                     {!readOnly && (
                         <button
                             onClick={() => setIsMassOperationsModalOpen(true)}
-                            className="flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-bold shadow-lg shadow-red-200 dark:shadow-none transition-all"
+                            className="flex items-center gap-2 px-3 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg text-sm font-bold shadow-lg shadow-red-200 dark:shadow-none transition-all"
                         >
                             <Icon name="List" size={16} /> Масс. опер.
                         </button>
                     )}
-
                     {(filterId || viewMode === 'week') && (
                         <button
                             onClick={() => setIsPrintModalOpen(true)}
                             className="btn-primary btn-ripple text-sm flex items-center gap-2"
                         >
                             <Icon name="Printer" size={16} />
+                            {!isMobile && <span>Печать</span>}
                         </button>
                     )}
                 </div>

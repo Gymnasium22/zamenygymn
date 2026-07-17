@@ -743,3 +743,89 @@ html.app-mobile [data-overlay='session'] > div {
     border-radius: 1.5rem !important;
     max-width: 24rem !important;
 }
+
+/* ---- Page titles: shell already shows title — hide desktop H1 blocks ---- */
+html.app-mobile .app-mobile-page-head {
+    display: none !important;
+}
+
+/* Show only inside mobile shell */
+.app-mobile-only {
+    display: none !important;
+}
+html.app-mobile .app-mobile-only {
+    display: block !important;
+}
+html.app-mobile .app-mobile-only-flex {
+    display: flex !important;
+}
+.app-mobile-only-flex {
+    display: none !important;
+}
+
+/* Touch: action buttons always visible (no hover-only) */
+html.app-mobile .group .opacity-0.group-hover\:opacity-100,
+html.app-mobile .group-hover\:opacity-100 {
+    opacity: 1 !important;
+}
+
+/* Directory / cards: keep actions tappable */
+html.app-mobile .modern-card .group-hover\:opacity-100 {
+    opacity: 1 !important;
+}
+
+/* Empty-state helper */
+.app-mobile-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 2rem 1.25rem;
+    gap: 0.5rem;
+    color: #64748b;
+}
+
+html.dark .app-mobile-empty {
+    color: #94a3b8;
+}
+
+/* PWA update banner — над tab bar */
+html.app-mobile .app-mobile-pwa-update {
+    bottom: calc(var(--m-nav-h, 64px) + var(--m-safe-b, 0px) + 10px) !important;
+}
+
+.app-mobile-pwa-update {
+    bottom: 1rem;
+}
+
+/* Duty mobile: hide wide table, show cards */
+html.app-mobile .duty-desktop-table {
+    display: none !important;
+}
+
+html.app-mobile .duty-mobile-cards {
+    display: block !important;
+}
+
+.duty-mobile-cards {
+    display: none;
+}
+
+/* Schedule: advanced tools panel */
+html.app-mobile .schedule-advanced-tools {
+    display: none;
+}
+
+html.app-mobile .schedule-advanced-tools.is-open {
+    display: flex;
+}
+
+/* Compact page padding on mobile shell */
+html.app-mobile .app-mobile-content .mb-8 {
+    margin-bottom: 0.75rem !important;
+}
+
+html.app-mobile .app-mobile-content .mb-6 {
+    margin-bottom: 0.75rem !important;
+}
