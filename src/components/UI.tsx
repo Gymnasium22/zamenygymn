@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef, useMemo, useCallback, createContext, useContext, ReactNode, useId } from 'react';
+import { createPortal } from 'react-dom';
 import { Icon } from './Icons';
 import { useStaticData, useScheduleData } from '../context/DataContext';
 import { DayOfWeek, PageId, Shift } from '../types';
@@ -268,18 +269,20 @@ export const Modal = ({ isOpen, onClose, title, children, footer, maxWidth = 'ma
 
     if (!isOpen) return null;
 
-    return (
+    // Portal to body: inside MobileShell pages are under overflow:hidden ancestors,
+    // so fixed modals were clipped and the Save footer sat under the tab bar.
+    const modalTree = (
         <div
             ref={modalRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="modal-title"
             tabIndex={-1}
-            className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-slate-950/35 backdrop-blur-sm p-0 sm:p-3 md:p-4 animate-fade-in no-print"
+            className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center bg-slate-950/40 backdrop-blur-sm p-0 sm:p-3 md:p-4 animate-fade-in no-print"
             onClick={(e) => e.target === e.currentTarget && onClose()}
         >
             <div
-                className={`float-panel w-full ${maxWidth} flex flex-col max-h-[min(92dvh,100%)] sm:max-h-[min(86vh,100%)] rounded-t-2xl sm:rounded-2xl transition-all duration-300 min-h-0`}
+                className={`float-panel w-full ${maxWidth} flex flex-col max-h-[min(92dvh,100%)] sm:max-h-[min(86vh,100%)] rounded-t-2xl sm:rounded-2xl transition-all duration-300 min-h-0 overflow-hidden shadow-2xl`}
             >
                 <div className="flex items-center justify-between px-5 py-3 sm:py-4 border-b border-slate-200/70 dark:border-slate-700/70 shrink-0">
                     <h2 id="modal-title" className="text-lg md:text-xl font-semibold text-slate-800 dark:text-white tracking-tight">{title}</h2>
@@ -293,13 +296,15 @@ export const Modal = ({ isOpen, onClose, title, children, footer, maxWidth = 'ma
                 </div>
                 <div className="p-5 md:p-6 overflow-y-auto overscroll-contain custom-scrollbar-2026 min-h-0 flex-1">{children}</div>
                 {footer != null && (
-                    <div className="px-5 py-3 sm:px-6 sm:py-4 border-t border-slate-200/70 dark:border-slate-700/70 shrink-0 bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+                    <div className="px-5 py-3 sm:px-6 sm:py-4 border-t border-slate-200/70 dark:border-slate-700/70 shrink-0 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm pb-[max(0.75rem,env(safe-area-inset-bottom,0px))]">
                         {footer}
                     </div>
                 )}
             </div>
         </div>
     );
+
+    return createPortal(modalTree, document.body);
 };
 
 
