@@ -3,11 +3,24 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { getTelegramWebApp, initTelegramMiniApp, isInsideTelegram } from './telegram';
 import './miniapp.css';
 
+/** Primary mini-app tabs where Telegram Back should be hidden */
+const MINI_PRIMARY_PATHS = new Set([
+    '/tg',
+    '/tg/',
+    '/tg/dashboard',
+    '/tg/substitutions',
+    '/tg/schedule',
+    '/tg/schedule2',
+    '/tg/duty',
+    '/tg/nutrition',
+    '/mini'
+]);
+
 /**
- * Глобальная интеграция Telegram WebApp с полным приложением:
+ * Глобальная интеграция Telegram WebApp:
  * — expand / тема
- * — кнопка «Назад» = history.back()
- * — safe-area для notch
+ * — BackButton
+ * — safe-area
  */
 export const TelegramHost = () => {
     const location = useLocation();
@@ -23,9 +36,11 @@ export const TelegramHost = () => {
         const wa = getTelegramWebApp();
         if (!wa?.BackButton) return;
 
+        const path = location.pathname.replace(/\/$/, '') || '/';
+        const inMini = path === '/tg' || path.startsWith('/tg/');
+
         const onBack = () => {
-            // Не уходим с логина / корня в никуда
-            if (location.pathname === '/login' || location.pathname === '/tg' || location.pathname === '/mini') {
+            if (path === '/login' || path === '/tg' || path === '/mini') {
                 try {
                     wa.close();
                 } catch {
@@ -33,25 +48,40 @@ export const TelegramHost = () => {
                 }
                 return;
             }
+
+            // Primary mini tabs: close mini app rather than jump to desktop
+            if (MINI_PRIMARY_PATHS.has(path) || MINI_PRIMARY_PATHS.has(path + '/')) {
+                try {
+                    wa.close();
+                } catch {
+                    navigate(inMini ? '/tg/dashboard' : '/dashboard', { replace: true });
+                }
+                return;
+            }
+
             if (window.history.length > 1) {
                 navigate(-1);
             } else {
-                navigate('/dashboard', { replace: true });
+                navigate(inMini ? '/tg/dashboard' : '/dashboard', { replace: true });
             }
         };
 
-        // В mini shell «корень» — любой /tg/* с bottom-nav; Back прячем на главных вкладках
-        const miniRoot =
-            location.pathname === '/tg' ||
-            location.pathname === '/tg/dashboard' ||
-            location.pathname === '/mini';
-        const isRoot =
-            miniRoot ||
-            location.pathname === '/' ||
-            location.pathname === '/dashboard' ||
-            location.pathname === '/login';
+        // Hide Back on primary surfaces
+        const isPrimary =
+            MINI_PRIMARY_PATHS.has(path) ||
+            path === '/' ||
+            path === '/dashboard' ||
+            path === '/login' ||
+            path === '/substitutions' ||
+            path === '/schedule' ||
+            path === '/schedule2';
 
-        if (isRoot) {
+        if (isPrimary) {
+            try {
+                wa.BackButton.offClick(onBack);
+            } catch {
+                /* ignore */
+            }
             wa.BackButton.hide();
         } else {
             wa.BackButton.show();

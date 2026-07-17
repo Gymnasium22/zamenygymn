@@ -4,7 +4,13 @@ import { useAuth } from '../context/AuthContext';
 import { authAdapter } from '../services/authAdapter';
 import { Icon } from '../components/Icons';
 import { MiniShell } from './MiniShell';
-import { getTelegramUserName, hapticLight, initTelegramMiniApp, isInsideTelegram } from './telegram';
+import {
+    getTelegramUserName,
+    hapticLight,
+    initTelegramMiniApp,
+    isInsideTelegram,
+    openExternalAppUrl
+} from './telegram';
 import './miniapp.css';
 
 /**
@@ -132,11 +138,22 @@ export const MiniApp: React.FC = () => {
                 </form>
 
                 <p className="tg-entry__hint">
-                    После входа — все разделы в компактном интерфейсе Mini App (не десктопная вёрстка).
+                    После входа — все разделы в компактном интерфейсе Mini App.
                 </p>
 
-                <button type="button" className="tg-entry__link" onClick={() => navigate('/login')}>
-                    Полная версия (ПК)
+                <button
+                    type="button"
+                    className="tg-entry__link"
+                    onClick={() => {
+                        hapticLight();
+                        if (isInsideTelegram()) {
+                            openExternalAppUrl('/login');
+                        } else {
+                            navigate('/login');
+                        }
+                    }}
+                >
+                    Полная версия (браузер)
                 </button>
             </div>
         </div>

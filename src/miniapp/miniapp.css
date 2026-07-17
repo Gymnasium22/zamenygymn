@@ -1,49 +1,52 @@
-/* ========== Telegram Mini App shell (компактный, не «десктоп в Telegram») ========== */
+/* ========== Telegram Mini App shell (2026 parity with PWA mobile) ========== */
 
 html.tg-mini-app,
 body.tg-mini-app {
     overscroll-behavior-y: none;
-    background: #f1f5f9;
+    touch-action: manipulation;
+    background: var(--tg-theme-secondary-bg-color, var(--ds-surface-2, #f8fafc));
 }
 
 html.dark.tg-mini-app,
-html.dark body.tg-mini-app,
-body.tg-mini-app.dark {
-    background: #0f172a;
+html.dark body.tg-mini-app {
+    background: var(--tg-theme-secondary-bg-color, #0f172a);
 }
 
 .tg-shell-root {
-    --tg-header-h: 56px;
+    --tg-header-h: 52px;
     --tg-nav-h: 60px;
     --tg-safe-b: env(safe-area-inset-bottom, 0px);
     --tg-safe-t: env(safe-area-inset-top, 0px);
     display: flex;
     flex-direction: column;
     height: 100dvh;
-    height: 100vh;
-    max-width: 100vw;
+    max-height: 100dvh;
+    max-width: 100%;
+    width: 100%;
     overflow: hidden;
-    background: #f1f5f9;
-    color: #0f172a;
+    background: var(--tg-theme-secondary-bg-color, var(--ds-surface-2, #f8fafc));
+    color: var(--tg-theme-text-color, var(--ds-ink, #0f172a));
+    -webkit-font-smoothing: antialiased;
 }
 
 html.dark .tg-shell-root {
-    background: #0f172a;
-    color: #f1f5f9;
+    background: var(--tg-theme-secondary-bg-color, #020617);
+    color: var(--tg-theme-text-color, #f8fafc);
 }
 
 .tg-shell-header {
     flex-shrink: 0;
-    padding: calc(8px + var(--tg-safe-t)) 12px 8px;
-    background: rgba(255, 255, 255, 0.92);
-    backdrop-filter: blur(12px);
-    border-bottom: 1px solid #e2e8f0;
+    padding: calc(4px + var(--tg-safe-t)) 12px 6px;
+    background: color-mix(in srgb, var(--tg-theme-bg-color, var(--ds-surface, #fff)) 90%, transparent);
+    backdrop-filter: blur(20px) saturate(1.2);
+    -webkit-backdrop-filter: blur(20px) saturate(1.2);
+    border-bottom: 1px solid var(--ds-border, rgba(15, 23, 42, 0.06));
     z-index: 30;
 }
 
 html.dark .tg-shell-header {
-    background: rgba(15, 23, 42, 0.92);
-    border-bottom-color: #1e293b;
+    background: color-mix(in srgb, var(--tg-theme-bg-color, #0f172a) 90%, transparent);
+    border-bottom-color: rgba(255, 255, 255, 0.06);
 }
 
 .tg-shell-header__top {
@@ -55,30 +58,33 @@ html.dark .tg-shell-header {
 
 .tg-shell-header__org {
     font-size: 11px;
-    font-weight: 700;
-    color: #64748b;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
+    font-weight: 600;
+    color: var(--tg-theme-hint-color, var(--ds-ink-muted, #64748b));
+    text-transform: none;
+    letter-spacing: 0.01em;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    line-height: 1.2;
 }
 
 .tg-shell-header__title {
-    font-size: 16px;
-    font-weight: 800;
-    letter-spacing: -0.02em;
-    line-height: 1.2;
+    font-size: 1.0625rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1.25;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    color: var(--tg-theme-text-color, var(--ds-ink, #0f172a));
 }
 
 .tg-shell-header__badge {
     margin-top: 4px;
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 600;
-    color: #6366f1;
+    color: var(--tg-theme-accent-text-color, var(--tg-theme-link-color, #4f46e5));
+    letter-spacing: -0.01em;
 }
 
 .tg-shell-org-select {
@@ -87,9 +93,9 @@ html.dark .tg-shell-header {
     font-size: 11px;
     font-weight: 600;
     border-radius: 10px;
-    border: 1px solid #e2e8f0;
-    background: #fff;
-    color: #334155;
+    border: 1px solid var(--ds-border-strong, #e2e8f0);
+    background: var(--tg-theme-bg-color, #fff);
+    color: var(--tg-theme-text-color, #334155);
     padding: 0 6px;
 }
 
@@ -100,22 +106,23 @@ html.dark .tg-shell-org-select {
 }
 
 .tg-shell-icon-btn {
-    width: 36px;
-    height: 36px;
+    width: 40px;
+    height: 40px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     border: none;
-    border-radius: 10px;
+    border-radius: 12px;
     background: transparent;
-    color: #64748b;
+    color: var(--tg-theme-hint-color, #64748b);
     cursor: pointer;
     flex-shrink: 0;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .tg-shell-icon-btn:active {
-    background: rgba(99, 102, 241, 0.1);
-    color: #4f46e5;
+    background: var(--ds-accent-soft, rgba(99, 102, 241, 0.1));
+    color: var(--tg-theme-button-color, #4f46e5);
 }
 
 .tg-shell-main {
@@ -131,12 +138,13 @@ html.dark .tg-shell-org-select {
     min-height: 0;
     overflow: auto;
     -webkit-overflow-scrolling: touch;
-    padding: 10px 10px calc(12px + var(--tg-nav-h) + var(--tg-safe-b));
+    overscroll-behavior-y: contain;
+    padding: 8px 10px calc(12px + var(--tg-nav-h) + var(--tg-safe-b));
 }
 
-/* Страницы внутри mini — чуть плотнее, без «десктопных» полей */
 .tg-shell-content > * {
     max-width: 100% !important;
+    min-width: 0 !important;
 }
 
 .tg-shell-content .max-w-7xl,
@@ -150,18 +158,18 @@ html.dark .tg-shell-org-select {
 }
 
 .tg-shell-content .text-3xl {
-    font-size: 1.35rem !important;
+    font-size: 1.25rem !important;
     line-height: 1.3 !important;
 }
 
 .tg-shell-content .text-2xl {
-    font-size: 1.2rem !important;
+    font-size: 1.125rem !important;
 }
 
 .tg-shell-content .lg\:p-8,
 .tg-shell-content .p-8,
 .tg-shell-content .p-6 {
-    padding: 0.75rem !important;
+    padding: 0.65rem !important;
 }
 
 .tg-shell-content .pb-20,
@@ -169,7 +177,7 @@ html.dark .tg-shell-org-select {
     padding-bottom: 0.5rem !important;
 }
 
-/* Нижняя навигация Mini App */
+/* ---- Bottom nav (pill active like PWA 2026) ---- */
 .tg-shell-nav {
     position: fixed;
     left: 0;
@@ -180,17 +188,18 @@ html.dark .tg-shell-org-select {
     align-items: stretch;
     justify-content: space-around;
     min-height: calc(var(--tg-nav-h) + var(--tg-safe-b));
-    padding: 4px 4px calc(4px + var(--tg-safe-b));
-    background: rgba(255, 255, 255, 0.96);
-    backdrop-filter: blur(14px);
-    border-top: 1px solid #e2e8f0;
-    box-shadow: 0 -4px 20px rgba(15, 23, 42, 0.06);
+    padding: 6px 6px calc(6px + var(--tg-safe-b));
+    background: color-mix(in srgb, var(--tg-theme-bg-color, #fff) 92%, transparent);
+    backdrop-filter: blur(22px) saturate(1.25);
+    -webkit-backdrop-filter: blur(22px) saturate(1.25);
+    border-top: 1px solid var(--ds-border, #e2e8f0);
+    box-shadow: 0 -12px 32px rgba(15, 23, 42, 0.04);
 }
 
 html.dark .tg-shell-nav {
-    background: rgba(15, 23, 42, 0.96);
-    border-top-color: #1e293b;
-    box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+    background: color-mix(in srgb, var(--tg-theme-bg-color, #0f172a) 92%, transparent);
+    border-top-color: rgba(255, 255, 255, 0.06);
+    box-shadow: 0 -12px 32px rgba(0, 0, 0, 0.28);
 }
 
 .tg-shell-nav__item {
@@ -199,36 +208,63 @@ html.dark .tg-shell-nav {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 2px;
+    gap: 3px;
     min-width: 0;
-    padding: 6px 2px;
+    min-height: 48px;
+    padding: 4px 2px;
     border: none;
     background: transparent;
-    color: #94a3b8;
+    color: var(--tg-theme-hint-color, #94a3b8);
     font-size: 10px;
     font-weight: 600;
+    letter-spacing: -0.01em;
     text-decoration: none;
     cursor: pointer;
-    border-radius: 12px;
+    border-radius: 14px;
     -webkit-tap-highlight-color: transparent;
+    transition: color 0.18s ease;
 }
 
-.tg-shell-nav__item.is-active {
-    color: #4f46e5;
-}
-
-html.dark .tg-shell-nav__item.is-active {
-    color: #a5b4fc;
-}
-
-.tg-shell-nav__item span {
+.tg-shell-nav__item span:last-child {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 100%;
+    line-height: 1.1;
 }
 
-/* Лист «Ещё» */
+.tg-shell-nav__item.is-active {
+    color: var(--tg-theme-button-color, var(--theme-primary-600, #4f46e5));
+}
+
+html.dark .tg-shell-nav__item.is-active {
+    color: var(--tg-theme-button-color, #c7d2fe);
+}
+
+.tg-shell-nav__icon {
+    width: 48px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    transition: background 0.18s ease, color 0.18s ease, transform 0.15s ease;
+}
+
+.tg-shell-nav__item.is-active .tg-shell-nav__icon {
+    background: color-mix(
+        in srgb,
+        var(--tg-theme-button-color, var(--theme-primary-600, #4f46e5)) 14%,
+        transparent
+    );
+    color: var(--tg-theme-button-color, var(--theme-primary-600, #4f46e5));
+}
+
+.tg-shell-nav__item:active .tg-shell-nav__icon {
+    transform: scale(0.94);
+}
+
+/* ---- More sheet ---- */
 .tg-more {
     position: fixed;
     inset: 0;
@@ -241,6 +277,7 @@ html.dark .tg-shell-nav__item.is-active {
     border: none;
     background: rgba(15, 23, 42, 0.45);
     backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
     cursor: pointer;
 }
 
@@ -249,28 +286,68 @@ html.dark .tg-shell-nav__item.is-active {
     left: 0;
     right: 0;
     bottom: 0;
-    max-height: 72dvh;
-    overflow: auto;
-    padding: 12px 14px calc(16px + var(--tg-nav-h) + var(--tg-safe-b));
-    border-radius: 20px 20px 0 0;
-    background: #fff;
-    box-shadow: 0 -8px 40px rgba(15, 23, 42, 0.15);
+    max-height: min(78dvh, 640px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0;
+    border-radius: var(--ds-radius-xl, 22px) var(--ds-radius-xl, 22px) 0 0;
+    background: var(--tg-theme-bg-color, var(--ds-surface, #fff));
+    box-shadow: 0 -8px 40px rgba(15, 23, 42, 0.12);
+    border: 1px solid var(--ds-border, rgba(15, 23, 42, 0.06));
+    border-bottom: none;
+    padding-bottom: calc(10px + var(--tg-nav-h) + var(--tg-safe-b));
+    animation: tgSheetIn 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 html.dark .tg-more__panel {
-    background: #1e293b;
+    background: var(--tg-theme-bg-color, #0f172a);
+    box-shadow: 0 -12px 48px rgba(0, 0, 0, 0.4);
+}
+
+@keyframes tgSheetIn {
+    from {
+        opacity: 0.6;
+        transform: translateY(24px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.tg-more__handle {
+    width: 36px;
+    height: 4px;
+    border-radius: 100px;
+    background: #cbd5e1;
+    margin: 10px auto 6px;
+    flex-shrink: 0;
+}
+
+html.dark .tg-more__handle {
+    background: #475569;
 }
 
 .tg-more__head {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 12px;
+    padding: 4px 16px 10px;
+    flex-shrink: 0;
     font-size: 13px;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: #64748b;
+    font-weight: 600;
+    text-transform: none;
+    letter-spacing: -0.02em;
+    color: var(--tg-theme-text-color, var(--ds-ink, #0f172a));
+}
+
+.tg-more__scroll {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 0 12px 8px;
+    min-height: 0;
+    flex: 1;
 }
 
 .tg-more__grid {
@@ -283,59 +360,123 @@ html.dark .tg-more__panel {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 6px;
-    padding: 12px 6px;
-    border: 1px solid #e2e8f0;
-    border-radius: 14px;
-    background: #f8fafc;
+    gap: 8px;
+    padding: 14px 6px 12px;
+    border: 1px solid var(--ds-border, #e2e8f0);
+    border-radius: var(--ds-radius, 14px);
+    background: var(--ds-surface, #fff);
     color: #334155;
     font-size: 11px;
     font-weight: 600;
+    letter-spacing: -0.01em;
     text-align: center;
     cursor: pointer;
-    line-height: 1.25;
+    line-height: 1.2;
+    min-height: 80px;
+    box-shadow: var(--ds-shadow-sm, none);
+    -webkit-tap-highlight-color: transparent;
 }
 
 html.dark .tg-more__item {
-    background: #0f172a;
-    border-color: #334155;
+    background: #1e293b;
+    border-color: rgba(255, 255, 255, 0.08);
     color: #e2e8f0;
 }
 
+.tg-more__item:active {
+    transform: scale(0.97);
+}
+
+.tg-more__item.is-active {
+    border-color: color-mix(in srgb, var(--tg-theme-button-color, #6366f1) 45%, transparent);
+    background: color-mix(in srgb, var(--tg-theme-button-color, #6366f1) 12%, transparent);
+    color: var(--tg-theme-button-color, #4338ca);
+    box-shadow: none;
+}
+
 .tg-more__item-icon {
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: #eef2ff;
-    color: #4f46e5;
+    background: var(--ds-surface-3, #f1f5f9);
+    color: var(--tg-theme-button-color, #4f46e5);
 }
 
 html.dark .tg-more__item-icon {
-    background: #312e81;
-    color: #c7d2fe;
+    background: #0f172a;
+    color: #a5b4fc;
 }
 
-.tg-more__full,
-.tg-more__desktop {
-    width: 100%;
-    margin-top: 10px;
+.tg-more__item.is-active .tg-more__item-icon {
+    background: var(--tg-theme-button-color, #4f46e5);
+    color: var(--tg-theme-button-text-color, #fff);
+}
+
+.tg-more__footer {
+    flex-shrink: 0;
+    padding: 10px 16px 0;
+    border-top: 1px solid var(--ds-border, #e2e8f0);
+    margin-top: 4px;
+}
+
+html.dark .tg-more__footer {
+    border-top-color: rgba(255, 255, 255, 0.06);
+}
+
+.tg-more__user {
+    font-size: 12px;
+    color: var(--tg-theme-hint-color, #64748b);
+    margin-bottom: 8px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tg-more__actions {
+    display: flex;
+    gap: 8px;
+}
+
+.tg-more__action {
+    flex: 1;
     height: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
     border-radius: 12px;
-    border: 1px solid #e2e8f0;
-    background: #f8fafc;
+    border: 1px solid var(--ds-border-strong, #e2e8f0);
+    background: var(--ds-surface-2, #f8fafc);
     color: #475569;
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
 }
 
-.tg-more__desktop {
-    border: none;
-    background: transparent;
-    color: #6366f1;
+html.dark .tg-more__action {
+    background: #0f172a;
+    border-color: #334155;
+    color: #cbd5e1;
+}
+
+.tg-more__action:active {
+    transform: scale(0.97);
+}
+
+.tg-more__action--danger {
+    color: #dc2626;
+    border-color: #fecaca;
+    background: #fef2f2;
+}
+
+html.dark .tg-more__action--danger {
+    color: #fca5a5;
+    border-color: #7f1d1d;
+    background: rgba(127, 29, 29, 0.35);
 }
 
 /* ========== Login entry ========== */
@@ -346,18 +487,22 @@ html.dark .tg-more__item-icon {
     align-items: center;
     justify-content: center;
     padding: 20px 16px calc(20px + env(safe-area-inset-bottom, 0px));
-    background: linear-gradient(165deg, #eef2ff 0%, #f8fafc 50%, #faf5ff 100%);
+    background: var(--tg-theme-secondary-bg-color, #f8fafc);
     position: relative;
 }
 
 html.dark .tg-entry {
-    background: linear-gradient(165deg, #0f172a 0%, #1e1b4b 55%, #0f172a 100%);
+    background: var(--tg-theme-secondary-bg-color, #0f172a);
 }
 
 .tg-entry__bg {
     position: absolute;
     inset: 0;
-    background: radial-gradient(ellipse 70% 45% at 15% 0%, rgba(99, 102, 241, 0.2), transparent);
+    background: radial-gradient(
+        ellipse 80% 40% at 50% -10%,
+        color-mix(in srgb, var(--tg-theme-button-color, #6366f1) 14%, transparent),
+        transparent 55%
+    );
     pointer-events: none;
 }
 
@@ -365,16 +510,16 @@ html.dark .tg-entry {
     position: relative;
     width: 100%;
     max-width: 380px;
-    background: rgba(255, 255, 255, 0.95);
-    border: 1px solid #e2e8f0;
-    border-radius: 20px;
+    background: var(--tg-theme-bg-color, var(--ds-surface, #fff));
+    border: 1px solid var(--ds-border, #e2e8f0);
+    border-radius: var(--ds-radius-xl, 20px);
     padding: 24px 20px 18px;
-    box-shadow: 0 16px 40px -12px rgba(79, 70, 229, 0.18);
+    box-shadow: var(--ds-shadow-lg, 0 16px 40px -12px rgba(15, 23, 42, 0.1));
 }
 
 html.dark .tg-entry__card {
-    background: rgba(30, 41, 59, 0.95);
-    border-color: #334155;
+    background: var(--tg-theme-bg-color, #0f172a);
+    border-color: rgba(255, 255, 255, 0.08);
 }
 
 .tg-entry__brand {
@@ -388,8 +533,8 @@ html.dark .tg-entry__card {
     width: 48px;
     height: 48px;
     border-radius: 14px;
-    background: linear-gradient(135deg, #4f46e5, #7c3aed);
-    color: #fff;
+    background: var(--tg-theme-button-color, #4f46e5);
+    color: var(--tg-theme-button-text-color, #fff);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -397,14 +542,16 @@ html.dark .tg-entry__card {
 
 .tg-entry__brand h1 {
     margin: 0;
-    font-size: 1.15rem;
-    font-weight: 800;
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--tg-theme-text-color, inherit);
 }
 
 .tg-entry__brand p {
     margin: 2px 0 0;
     font-size: 0.8rem;
-    color: #64748b;
+    color: var(--tg-theme-hint-color, #64748b);
 }
 
 .tg-entry__form {
@@ -419,29 +566,28 @@ html.dark .tg-entry__card {
     gap: 6px;
     font-size: 0.75rem;
     font-weight: 600;
-    color: #64748b;
+    color: var(--tg-theme-hint-color, #64748b);
 }
 
 .tg-entry__input {
     height: 44px;
     padding: 0 12px;
     border-radius: 12px;
-    border: 1.5px solid #e2e8f0;
-    font-size: 0.95rem;
-    background: #fff;
-    color: #0f172a;
+    border: 1.5px solid var(--ds-border-strong, #e2e8f0);
+    font-size: 16px; /* no iOS zoom */
+    background: var(--tg-theme-secondary-bg-color, #fff);
+    color: var(--tg-theme-text-color, #0f172a);
     outline: none;
 }
 
 html.dark .tg-entry__input {
-    background: #0f172a;
+    background: #1e293b;
     border-color: #334155;
     color: #f1f5f9;
 }
 
 .tg-entry__input:focus {
-    border-color: #6366f1;
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+    border-color: var(--tg-theme-button-color, #6366f1);
 }
 
 .tg-entry__pass-wrap {
@@ -449,75 +595,113 @@ html.dark .tg-entry__input {
 }
 
 .tg-entry__pass-wrap .tg-entry__input {
-    padding-right: 40px;
     width: 100%;
+    padding-right: 44px;
 }
 
 .tg-entry__eye {
     position: absolute;
-    right: 6px;
-    top: 50%;
-    transform: translateY(-50%);
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 44px;
     border: none;
     background: transparent;
-    color: #94a3b8;
-    padding: 6px;
+    color: var(--tg-theme-hint-color, #94a3b8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
 }
 
 .tg-entry__submit {
-    height: 44px;
+    height: 48px;
     margin-top: 4px;
     border: none;
     border-radius: 12px;
-    background: linear-gradient(135deg, #4f46e5, #7c3aed);
-    color: #fff;
-    font-weight: 700;
+    background: var(--tg-theme-button-color, #4f46e5);
+    color: var(--tg-theme-button-text-color, #fff);
     font-size: 0.95rem;
+    font-weight: 600;
     cursor: pointer;
 }
 
 .tg-entry__submit:disabled {
-    opacity: 0.6;
+    opacity: 0.65;
+    cursor: not-allowed;
+}
+
+.tg-entry__submit:active:not(:disabled) {
+    transform: scale(0.98);
 }
 
 .tg-entry__error {
     margin-bottom: 12px;
     padding: 10px 12px;
-    border-radius: 10px;
+    border-radius: 12px;
     background: #fef2f2;
-    border: 1px solid #fecaca;
     color: #b91c1c;
     font-size: 0.85rem;
+    font-weight: 600;
+}
+
+html.dark .tg-entry__error {
+    background: rgba(127, 29, 29, 0.35);
+    color: #fca5a5;
 }
 
 .tg-entry__hint {
     margin: 14px 0 0;
-    text-align: center;
     font-size: 0.75rem;
-    color: #94a3b8;
+    color: var(--tg-theme-hint-color, #94a3b8);
     line-height: 1.4;
+    text-align: center;
+}
+
+.tg-entry__link {
+    display: block;
+    width: 100%;
+    margin-top: 10px;
+    height: 40px;
+    border: none;
+    background: transparent;
+    color: var(--tg-theme-link-color, #4f46e5);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
 }
 
 .tg-entry__loader {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 12px;
-    color: #64748b;
+    text-align: center;
+    color: var(--tg-theme-hint-color, #64748b);
 }
 
 .tg-entry__spinner {
-    width: 32px;
-    height: 32px;
+    width: 36px;
+    height: 36px;
+    margin: 0 auto 12px;
     border: 3px solid #e2e8f0;
-    border-top-color: #6366f1;
+    border-top-color: var(--tg-theme-button-color, #4f46e5);
     border-radius: 50%;
-    animation: tg-spin 0.7s linear infinite;
+    animation: tgSpin 0.7s linear infinite;
 }
 
-@keyframes tg-spin {
+@keyframes tgSpin {
     to {
         transform: rotate(360deg);
     }
+}
+
+/* Modals as sheets inside mini (same as app-mobile) */
+html.tg-mini-app [role='dialog'].fixed.inset-0 {
+    align-items: flex-end !important;
+    padding: 0 !important;
+}
+
+html.tg-mini-app [role='dialog'].fixed.inset-0 > div {
+    max-height: min(92dvh, 900px) !important;
+    border-radius: 20px 20px 0 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
 }
