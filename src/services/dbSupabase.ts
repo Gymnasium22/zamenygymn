@@ -62,6 +62,21 @@ const ensureTimestamps = (obj: Record<string, unknown>): Record<string, unknown>
     return obj;
 };
 
+/** order: 0 is valid — never use `x || null` */
+const asOrder = (value: unknown): number | null => {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value))) return Number(value);
+    return null;
+};
+
+const sortByOrder = <T extends { order?: number; name?: string }>(items: T[]): T[] =>
+    [...items].sort((a, b) => {
+        const ao = typeof a.order === 'number' ? a.order : Number.MAX_SAFE_INTEGER;
+        const bo = typeof b.order === 'number' ? b.order : Number.MAX_SAFE_INTEGER;
+        if (ao !== bo) return ao - bo;
+        return String(a.name || '').localeCompare(String(b.name || ''), 'ru', { sensitivity: 'base' });
+    });
+
 // Fetch IDs that already exist in a table (used to validate foreign references at runtime)
 const fetchExistingIds = async (tableName: string, ids: string[]): Promise<Set<string>> => {
     const uniqueIds = Array.from(new Set(ids)).filter(Boolean);
@@ -154,9 +169,27 @@ export const supabaseDbService = {
                             birthDate: toDateOnly(t.birth_date)
                         } as Teacher;
                     }),
-                    subjects: (subjectsRes.data || []).map((s: Record<string, unknown>) => ({ ...fromSnakeCase(s), id: s.id })) as Subject[],
-                    classes: (classesRes.data || []).map((c: Record<string, unknown>) => ({ ...fromSnakeCase(c), id: c.id })) as ClassEntity[],
-                    rooms: (roomsRes.data || []).map((r: Record<string, unknown>) => ({ ...fromSnakeCase(r), id: r.id })) as Room[],
+                    subjects: sortByOrder(
+                        (subjectsRes.data || []).map((s: Record<string, unknown>) => ({
+                            ...fromSnakeCase(s),
+                            id: s.id,
+                            order: typeof s.order === 'number' ? s.order : Number(s.order) || 0
+                        })) as Subject[]
+                    ),
+                    classes: sortByOrder(
+                        (classesRes.data || []).map((c: Record<string, unknown>) => ({
+                            ...fromSnakeCase(c),
+                            id: c.id,
+                            order: typeof c.order === 'number' ? c.order : Number(c.order) || 0
+                        })) as ClassEntity[]
+                    ),
+                    rooms: sortByOrder(
+                        (roomsRes.data || []).map((r: Record<string, unknown>) => ({
+                            ...fromSnakeCase(r),
+                            id: r.id,
+                            order: typeof r.order === 'number' ? r.order : Number(r.order) || 0
+                        })) as Room[]
+                    ),
                     schedule: (schedule1Res.data || []).map((s: Record<string, unknown>) => ({ ...fromSnakeCase(s), id: s.id })) as ScheduleItem[],
                     schedule2: (schedule2Res.data || []).map((s: Record<string, unknown>) => ({ ...fromSnakeCase(s), id: s.id })) as ScheduleItem[],
                     substitutions: (substitutionsRes.data || []).map((s: Record<string, unknown>) => {
@@ -281,6 +314,9 @@ export const supabaseDbService = {
                 const obj = toSnakeCase(s);
                 if (!obj.id) obj.id = genId();
                 if (!obj.organization_id) obj.organization_id = orgId;
+                const ord = asOrder(obj.order);
+                if (ord !== null) obj.order = ord;
+                else delete obj.order;
                 return ensureTimestamps(obj);
             });
         }
@@ -325,6 +361,9 @@ export const supabaseDbService = {
                 if (!obj.id) obj.id = genId();
                 if (!obj.organization_id) obj.organization_id = orgId;
                 delete (obj as Record<string, unknown>).not_in_schedule;
+                const ord = asOrder(obj.order);
+                if (ord !== null) obj.order = ord;
+                else delete obj.order;
                 return ensureTimestamps(obj);
             });
         }
@@ -334,6 +373,9 @@ export const supabaseDbService = {
                 const obj = toSnakeCase(r);
                 if (!obj.id) obj.id = genId();
                 if (!obj.organization_id) obj.organization_id = orgId;
+                const ord = asOrder(obj.order);
+                if (ord !== null) obj.order = ord;
+                else delete obj.order;
                 return ensureTimestamps(obj);
             });
         }
@@ -353,8 +395,23 @@ export const supabaseDbService = {
         }
 
         // 3. Other tables
-        // Academic year for year-scoped tables (must be NOT NULL in schema)
-        const currentYear = data.settings?.currentYear || new Date().getFullYear();
+        // Academic year for year-scoped tables — take from payload settings OR DB
+        // (schedule-only saves do not include settings, so without this we fall back to calendar year)
+        let academicYearValue: number | null =
+            typeof data.settings?.currentYear === 'number' && data.settings.currentYear > 0
+                ? data.settings.currentYear
+                : null;
+        if (academicYearValue == null) {
+            const { data: yearRow } = await supabase
+                .from('settings')
+                .select('current_year')
+                .eq('organization_id', orgId)
+                .maybeSingle();
+            const y = yearRow?.current_year;
+            if (typeof y === 'number' && y > 0) academicYearValue = y;
+            else if (typeof y === 'string' && Number(y) > 0) academicYearValue = Number(y);
+        }
+        const currentYear = academicYearValue ?? new Date().getFullYear();
 
         if (data.dutySchedule) {
             const zoneIds = new Set((data.dutyZones || []).map((z) => z.id));
@@ -429,7 +486,8 @@ export const supabaseDbService = {
                 teacher_id: raw.teacherId || null,
                 room_id: raw.roomId || null,
                 direction: raw.direction || null,
-                academic_year: raw.academicYear || currentYear,
+                // Always stamp active institution year from settings (not stale row year)
+                academic_year: currentYear,
                 created_at: createdAt,
                 updated_at: now
             };

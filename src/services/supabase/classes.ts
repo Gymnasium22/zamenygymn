@@ -23,7 +23,11 @@ export const supabaseClassesService = {
     },
 
     getAll: async (): Promise<ClassEntity[]> => {
-        const { data, error } = await supabase.from('classes').select('*').order('name');
+        const { data, error } = await supabase
+            .from('classes')
+            .select('*')
+            .order('order', { ascending: true, nullsFirst: false })
+            .order('name', { ascending: true });
         if (error) throw error;
         return (data || []).map(mapClass);
     },
@@ -37,7 +41,7 @@ export const supabaseClassesService = {
             grade: cls.grade || null,
             class_teacher_id: cls.classTeacherId || null,
             exclude_from_reports: cls.excludeFromReports || false,
-            order: cls.order || null,
+            order: typeof cls.order === 'number' ? cls.order : null,
             organization_id: cls.organizationId || null
         }).select().single();
         if (error) throw error;
@@ -52,7 +56,7 @@ export const supabaseClassesService = {
         if (changes.grade !== undefined) updates.grade = changes.grade || null;
         if (changes.classTeacherId !== undefined) updates.class_teacher_id = changes.classTeacherId || null;
         if (changes.excludeFromReports !== undefined) updates.exclude_from_reports = changes.excludeFromReports;
-        if (changes.order !== undefined) updates.order = changes.order || null;
+        if (changes.order !== undefined) updates.order = typeof changes.order === 'number' ? changes.order : null;
         updates.updated_at = new Date().toISOString();
 
         const { error } = await supabase.from('classes').update(updates).eq('id', id);
@@ -74,7 +78,7 @@ function mapClass(data: Record<string, unknown>): ClassEntity {
         grade: (data.grade as string) || undefined,
         classTeacherId: (data.class_teacher_id as string) || undefined,
         excludeFromReports: (data.exclude_from_reports as boolean) || false,
-        order: (data.order as number) || undefined,
+        order: typeof data.order === 'number' ? data.order : Number(data.order) || 0,
         organizationId: data.organization_id as string
     };
 }
@@ -100,7 +104,11 @@ export const supabaseRoomsService = {
     },
 
     getAll: async (): Promise<Room[]> => {
-        const { data, error } = await supabase.from('rooms').select('*').order('name');
+        const { data, error } = await supabase
+            .from('rooms')
+            .select('*')
+            .order('order', { ascending: true, nullsFirst: false })
+            .order('name', { ascending: true });
         if (error) throw error;
         return (data || []).map((r: Record<string, unknown>) => ({
             id: r.id as string,
@@ -108,7 +116,7 @@ export const supabaseRoomsService = {
             floor: (r.floor as number) || undefined,
             capacity: (r.capacity as number) || undefined,
             type: (r.type as string) || undefined,
-            order: (r.order as number) || undefined,
+            order: typeof r.order === 'number' ? r.order : Number(r.order) || 0,
             organizationId: r.organization_id as string
         }));
     },
@@ -120,7 +128,7 @@ export const supabaseRoomsService = {
             floor: room.floor || null,
             capacity: room.capacity || null,
             type: room.type || null,
-            order: room.order || null,
+            order: typeof room.order === 'number' ? room.order : null,
             organization_id: room.organizationId || null
         }).select().single();
         if (error) throw error;
@@ -130,7 +138,7 @@ export const supabaseRoomsService = {
             floor: (data.floor as number) || undefined,
             capacity: (data.capacity as number) || undefined,
             type: (data.type as string) || undefined,
-            order: (data.order as number) || undefined,
+            order: typeof data.order === 'number' ? data.order : Number(data.order) || 0,
             organizationId: data.organization_id as string
         };
     },
@@ -141,7 +149,7 @@ export const supabaseRoomsService = {
         if (changes.floor !== undefined) updates.floor = changes.floor || null;
         if (changes.capacity !== undefined) updates.capacity = changes.capacity || null;
         if (changes.type !== undefined) updates.type = changes.type || null;
-        if (changes.order !== undefined) updates.order = changes.order || null;
+        if (changes.order !== undefined) updates.order = typeof changes.order === 'number' ? changes.order : null;
         updates.updated_at = new Date().toISOString();
 
         const { error } = await supabase.from('rooms').update(updates).eq('id', id);

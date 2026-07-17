@@ -162,6 +162,13 @@ export const DirectoryPage = () => {
         e.preventDefault();
     };
 
+    const byOrder = <T extends { order?: number; name?: string }>(items: T[]) =>
+        [...items].sort(
+            (a, b) =>
+                (a.order ?? 1e9) - (b.order ?? 1e9) ||
+                String(a.name || '').localeCompare(String(b.name || ''), 'ru', { sensitivity: 'base' })
+        );
+
     const onDrop = async (_e: React.DragEvent, index: number) => {
         if (!canEditDirectory) return;
         if (draggedIdx === null || draggedIdx === index) return;
@@ -170,24 +177,25 @@ export const DirectoryPage = () => {
             const newList = [...items];
             const [movedItem] = newList.splice(draggedIdx, 1);
             newList.splice(index, 0, movedItem);
+            // 0,1,2… — валидные order (нельзя писать `order || null`)
             return newList.map((item, idx) => ({ ...item, order: idx }));
         };
 
         switch (activeTab) {
             case 'teachers': {
-                await saveStaticData({ teachers: reorderWithUpdate(teachers) });
+                await saveStaticData({ teachers: reorderWithUpdate(byOrder(teachers)) });
                 break;
             }
             case 'subjects': {
-                await saveStaticData({ subjects: reorderWithUpdate(subjects) });
+                await saveStaticData({ subjects: reorderWithUpdate(byOrder(subjects)) });
                 break;
             }
             case 'classes': {
-                await saveStaticData({ classes: reorderWithUpdate(classes) });
+                await saveStaticData({ classes: reorderWithUpdate(byOrder(classes)) });
                 break;
             }
             case 'rooms': {
-                await saveStaticData({ rooms: reorderWithUpdate(rooms) });
+                await saveStaticData({ rooms: reorderWithUpdate(byOrder(rooms)) });
                 break;
             }
         }
@@ -326,7 +334,7 @@ export const DirectoryPage = () => {
                         </div>
                     ) : (
                     <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                        {subjects.map((s, i) => (
+                        {byOrder(subjects).map((s, i) => (
                             <div
                                 key={s.id}
                                 draggable={canEditDirectory}
@@ -388,7 +396,7 @@ export const DirectoryPage = () => {
                         </div>
                     ) : (
                     <StaggerContainer className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                        {classes.map((c, i) => (
+                        {byOrder(classes).map((c, i) => (
                             <div
                                 key={c.id}
                                 draggable={canEditDirectory}
@@ -459,7 +467,7 @@ export const DirectoryPage = () => {
                         </div>
                     ) : (
                     <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                        {rooms.map((r, i) => (
+                        {byOrder(rooms).map((r, i) => (
                             <div
                                 key={r.id}
                                 draggable={canEditDirectory}

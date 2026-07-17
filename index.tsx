@@ -4,6 +4,7 @@ import * as Sentry from '@sentry/react'
 import App from './src/App'
 import './src/index.css'
 import './src/styles/design-2026.css'
+/* desktop-2026 intentionally not loaded — desktop keeps original chrome */
 
 // Initialize Sentry if DSN is provided
 if (import.meta.env.VITE_SENTRY_DSN) {

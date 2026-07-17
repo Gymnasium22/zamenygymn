@@ -175,7 +175,11 @@ export const supabaseSubjectsService = {
     },
 
     getAll: async (): Promise<Subject[]> => {
-        const { data, error } = await supabase.from('subjects').select('*').order('name');
+        const { data, error } = await supabase
+            .from('subjects')
+            .select('*')
+            .order('order', { ascending: true, nullsFirst: false })
+            .order('name', { ascending: true });
         if (error) throw error;
         return (data || []).map((s: Record<string, unknown>) => ({
             id: s.id as string,
@@ -183,7 +187,7 @@ export const supabaseSubjectsService = {
             color: (s.color as string) || undefined,
             difficulty: (s.difficulty as number) || undefined,
             requiredRoomType: (s.required_room_type as string) || undefined,
-            order: (s.order as number) || undefined,
+            order: typeof s.order === 'number' ? s.order : Number(s.order) || 0,
             organizationId: s.organization_id as string
         }));
     },
@@ -198,7 +202,7 @@ export const supabaseSubjectsService = {
                 color: subject.color || null,
                 difficulty: subject.difficulty || null,
                 required_room_type: subject.requiredRoomType || null,
-                order: subject.order || null,
+                order: typeof subject.order === 'number' ? subject.order : null,
                 organization_id: subject.organizationId || null,
                 created_at: now,
                 updated_at: now
@@ -212,7 +216,7 @@ export const supabaseSubjectsService = {
             color: (data.color as string) || undefined,
             difficulty: (data.difficulty as number) || undefined,
             requiredRoomType: (data.required_room_type as string) || undefined,
-            order: (data.order as number) || undefined,
+            order: typeof data.order === 'number' ? data.order : Number(data.order) || 0,
             organizationId: data.organization_id as string
         };
     },
@@ -223,7 +227,7 @@ export const supabaseSubjectsService = {
         if (changes.color !== undefined) updates.color = changes.color || null;
         if (changes.difficulty !== undefined) updates.difficulty = changes.difficulty || null;
         if (changes.requiredRoomType !== undefined) updates.required_room_type = changes.requiredRoomType || null;
-        if (changes.order !== undefined) updates.order = changes.order || null;
+        if (changes.order !== undefined) updates.order = typeof changes.order === 'number' ? changes.order : null;
         updates.updated_at = new Date().toISOString();
 
         const { error } = await supabase.from('subjects').update(updates).eq('id', id);
