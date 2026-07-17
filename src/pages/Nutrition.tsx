@@ -407,7 +407,7 @@ export const NutritionPage = () => {
                         <DateInput
                             value={selectedDate}
                             onChange={setSelectedDate}
-                            className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white"
+                            className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white shrink-0"
                         />
                         {dayLockedForStaff && (
                             <div className="flex items-center gap-2 text-sm font-semibold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 px-3 py-1.5 rounded-xl">

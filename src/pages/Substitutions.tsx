@@ -43,7 +43,6 @@ export const SubstitutionsPage = () => {
 
     const location = useLocation();
     const [selectedDate, setSelectedDate] = useState(formatDateISO());
-    const dateInputRef = useRef<HTMLInputElement>(null);
 
     // UI State
     const [activeTab, setActiveTab] = useState<'pending' | 'resolved'>('pending');
@@ -218,11 +217,6 @@ export const SubstitutionsPage = () => {
         setSelectedDate(formatDateISO(new Date()));
     };
 
-    const openCalendar = () => {
-        if (dateInputRef.current) {
-            dateInputRef.current.showPicker();
-        }
-    };
 
     const filteredTeachersList = useMemo(() => {
         return teachers.filter((t) => {
@@ -1145,19 +1139,11 @@ export const SubstitutionsPage = () => {
                                         <span className="capitalize">{formatDateLong(selectedDate)}</span>
                                     </div>
                                     <DateInput
-                                        ref={dateInputRef}
                                         value={selectedDate}
                                         onChange={setSelectedDate}
                                         className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-dark-800 text-sm font-semibold w-[9.5rem]"
                                     />
                                 </div>
-                                <button
-                                    onClick={openCalendar}
-                                    className="p-2 bg-white dark:bg-slate-600 text-slate-600 dark:text-slate-300 rounded-lg hover:text-indigo-600 shadow-sm border border-slate-200 dark:border-slate-500"
-                                    title="Открыть календарь"
-                                >
-                                    <Icon name="Calendar" size={16} />
-                                </button>
                                 <button
                                     onClick={() => setToday()}
                                     className="px-3 py-1.5 text-xs font-bold bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition-colors"
