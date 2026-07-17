@@ -1053,7 +1053,7 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
                                 <Icon name="ChevronLeft" size={18} />
                             </button>
                         )}
-                        <div className="flex overflow-x-auto pb-0.5 gap-1 flex-1 min-w-0 hide-scrollbar">
+                        <div className="flex overflow-x-auto pb-0.5 gap-1 flex-1 min-w-0 no-scrollbar">
                             {DAYS.map((day) => (
                                 <button
                                     key={day}
