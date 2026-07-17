@@ -10,6 +10,7 @@ import { weatherService, WeatherData, ForecastItem } from '../services/weatherSe
 import { escapeMarkdown } from '../utils/escapeHtml';
 import { safeLocalStorageGet, safeLocalStorageSet } from '../utils/localStorage';
 import { logger } from '../utils/logger';
+import { useIsMobileApp } from '../hooks/useIsMobileApp';
 
 // Enhanced interfaces for Live Search
 interface EntityStatus {
@@ -278,6 +279,7 @@ export const DashboardPage = () => {
     const { role, profile, organizationId } = useAuth();
     const navigate = useNavigate();
     const { addToast } = useToast();
+    const isMobileApp = useIsMobileApp();
 
     const notesKey = organizationId ? `gym_notes_${organizationId}` : 'gym_notes';
     const [notes, setNotes] = useState(safeLocalStorageGet(notesKey) || '');
@@ -1026,9 +1028,9 @@ export const DashboardPage = () => {
     const getColSpanClass = (span: number = 1) => {
         switch (span) {
             case 4:
-                return 'md:col-span-2 lg:col-span-4';
+                return 'sm:col-span-2 lg:col-span-4';
             case 2:
-                return 'md:col-span-2 lg:col-span-2';
+                return 'sm:col-span-2 lg:col-span-2';
             case 1:
             default:
                 return 'col-span-1';
@@ -1060,34 +1062,34 @@ export const DashboardPage = () => {
                         ? `${schoolStatus.bell.period} урок · ${schoolStatus.bell.start}–${schoolStatus.bell.end}`
                         : schoolStatus.label;
                 return (
-                    <div className="p-4 h-full bento-card bg-gradient-to-br from-indigo-50 to-white dark:from-indigo-950/40 dark:to-dark-800 border border-indigo-100 dark:border-indigo-900/40">
-                        <div className="flex items-center gap-2.5 mb-3">
-                            <div className="bg-indigo-600 text-white p-2 rounded-xl shadow-md shadow-indigo-500/20">
-                                <Icon name="Clock" size={18} />
+                    <div className="p-3 sm:p-4 h-full bento-card bg-gradient-to-br from-indigo-50 to-white dark:from-indigo-950/40 dark:to-dark-800 border border-indigo-100 dark:border-indigo-900/40">
+                        <div className="flex items-center gap-2 mb-2 sm:mb-3">
+                            <div className="bg-indigo-600 text-white p-1.5 sm:p-2 rounded-xl shadow-md shadow-indigo-500/20 shrink-0">
+                                <Icon name="Clock" size={16} />
                             </div>
                             <div className="min-w-0">
-                                <h3 className="font-bold text-base text-slate-800 dark:text-white">Сегодня</h3>
-                                <p className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-300 truncate">{lessonHint}</p>
+                                <h3 className="font-bold text-sm sm:text-base text-slate-800 dark:text-white">Сегодня</h3>
+                                <p className="text-[10px] sm:text-[11px] font-semibold text-indigo-600 dark:text-indigo-300 truncate">{lessonHint}</p>
                             </div>
                         </div>
-                        <div className="grid grid-cols-3 gap-1.5 mb-3">
-                            <div className="rounded-lg bg-white/80 dark:bg-slate-800/80 p-2 text-center border border-slate-100 dark:border-slate-700">
-                                <div className="text-xl font-black text-slate-800 dark:text-white">{kpiData.todayLessons}</div>
+                        <div className="grid grid-cols-3 gap-1.5 mb-2 sm:mb-3">
+                            <div className="rounded-lg bg-white/80 dark:bg-slate-800/80 p-1.5 sm:p-2 text-center border border-slate-100 dark:border-slate-700">
+                                <div className="text-lg sm:text-xl font-black text-slate-800 dark:text-white">{kpiData.todayLessons}</div>
                                 <div className="text-[9px] font-bold uppercase text-slate-400">уроков</div>
                             </div>
                             <NavLink
                                 to="/substitutions"
-                                className="rounded-lg bg-white/80 dark:bg-slate-800/80 p-2 text-center border border-slate-100 dark:border-slate-700 hover:border-amber-300 transition"
+                                className="rounded-lg bg-white/80 dark:bg-slate-800/80 p-1.5 sm:p-2 text-center border border-slate-100 dark:border-slate-700 hover:border-amber-300 transition"
                             >
-                                <div className="text-xl font-black text-amber-600">{todaySubsCount}</div>
+                                <div className="text-lg sm:text-xl font-black text-amber-600">{todaySubsCount}</div>
                                 <div className="text-[9px] font-bold uppercase text-slate-400">замен</div>
                             </NavLink>
                             <button
                                 type="button"
                                 onClick={() => setShowAbsentList(true)}
-                                className="rounded-lg bg-white/80 dark:bg-slate-800/80 p-2 text-center border border-slate-100 dark:border-slate-700 hover:border-rose-300 transition"
+                                className="rounded-lg bg-white/80 dark:bg-slate-800/80 p-1.5 sm:p-2 text-center border border-slate-100 dark:border-slate-700 hover:border-rose-300 transition"
                             >
-                                <div className="text-xl font-black text-rose-600">{occupancyStats.absentCount}</div>
+                                <div className="text-lg sm:text-xl font-black text-rose-600">{occupancyStats.absentCount}</div>
                                 <div className="text-[9px] font-bold uppercase text-slate-400">нет</div>
                             </button>
                         </div>
@@ -1129,27 +1131,27 @@ export const DashboardPage = () => {
             }
             case 'search':
                 return (
-                    <div className="p-5 flex flex-col h-full relative overflow-hidden bento-card">
-                        <div className="flex items-center gap-3 mb-5">
-                            <div className="bg-indigo-600 text-white p-3 rounded-2xl">
-                                <Icon name="Search" size={22} />
+                    <div className="p-3 sm:p-5 flex flex-col h-full relative overflow-hidden bento-card">
+                        <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-5">
+                            <div className="bg-indigo-600 text-white p-2 sm:p-3 rounded-xl sm:rounded-2xl shrink-0">
+                                <Icon name="Search" size={isMobileApp ? 18 : 22} />
                             </div>
-                            <h3 className="font-semibold text-lg text-slate-800 dark:text-white">Поиск</h3>
+                            <h3 className="font-semibold text-base sm:text-lg text-slate-800 dark:text-white">Поиск</h3>
                         </div>
 
-                        <div className="relative mb-4">
+                        <div className="relative mb-2 sm:mb-4">
                             <input
                                 type="text"
                                 inputMode="search"
                                 placeholder="Учитель, класс или кабинет..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl py-3 pl-11 pr-4 text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 dark:text-white transition-colors placeholder:text-slate-400"
+                                className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl py-2.5 sm:py-3 pl-10 sm:pl-11 pr-4 text-sm outline-none focus:ring-2 focus:ring-indigo-500/20 dark:text-white transition-colors placeholder:text-slate-400"
                             />
                             <Icon
                                 name="Search"
                                 size={18}
-                                className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                                className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-slate-400"
                             />
                         </div>
 
@@ -1233,31 +1235,31 @@ export const DashboardPage = () => {
             case 'substitutions':
                 return (
                     <div
-                        className={`p-5 flex flex-col h-full min-h-[220px] relative bento-card ${unresolvedSubstitutions > 0 ? 'ring-1 ring-red-500/20 dark:ring-red-500/30' : ''}`}
+                        className={`p-3 sm:p-5 flex flex-col h-full min-h-0 sm:min-h-[180px] relative bento-card ${unresolvedSubstitutions > 0 ? 'ring-1 ring-red-500/20 dark:ring-red-500/30' : ''}`}
                     >
                         {unresolvedSubstitutions > 0 && (
                             <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/10 blur-2xl -mr-10 -mt-10 rounded-full pointer-events-none"></div>
                         )}
-                        <div className="flex items-center gap-3 mb-4 relative z-10">
+                        <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-4 relative z-10">
                             <div
-                                className={`p-3 rounded-2xl text-white ${unresolvedSubstitutions > 0 ? 'bg-red-500' : 'bg-emerald-600'}`}
+                                className={`p-2 sm:p-3 rounded-xl sm:rounded-2xl text-white shrink-0 ${unresolvedSubstitutions > 0 ? 'bg-red-500' : 'bg-emerald-600'}`}
                             >
-                                <Icon name={unresolvedSubstitutions > 0 ? 'AlertTriangle' : 'CheckCircle'} size={22} />
+                                <Icon name={unresolvedSubstitutions > 0 ? 'AlertTriangle' : 'CheckCircle'} size={isMobileApp ? 18 : 22} />
                             </div>
-                            <h3 className="font-semibold text-lg dark:text-white">Замены</h3>
+                            <h3 className="font-semibold text-base sm:text-lg dark:text-white">Замены</h3>
                         </div>
-                        <div className="flex-1 flex flex-col items-center justify-center text-center relative z-10 min-h-[120px]">
+                        <div className="flex-1 flex flex-col items-center justify-center text-center relative z-10 min-h-[72px] sm:min-h-[100px] py-2">
                             {unresolvedSubstitutions > 0 ? (
                                 <>
-                                    <div className="text-5xl sm:text-6xl font-black text-slate-800 dark:text-white mb-2 tracking-tighter">
+                                    <div className="text-4xl sm:text-6xl font-black text-slate-800 dark:text-white mb-1 sm:mb-2 tracking-tighter">
                                         {unresolvedSubstitutions}
                                     </div>
-                                    <div className="text-sm font-bold text-red-500 uppercase tracking-wider mb-4">
+                                    <div className="text-xs sm:text-sm font-bold text-red-500 uppercase tracking-wider mb-2 sm:mb-4">
                                         Требуют внимания
                                     </div>
                                     <button
                                         onClick={() => navigate('/substitutions')}
-                                        className="w-full py-3 btn-primary rounded-2xl font-semibold flex items-center justify-center gap-2 group"
+                                        className="w-full py-2.5 sm:py-3 btn-primary rounded-2xl font-semibold flex items-center justify-center gap-2 group text-sm"
                                     >
                                         Перейти{' '}
                                         <Icon
@@ -1269,10 +1271,10 @@ export const DashboardPage = () => {
                                 </>
                             ) : (
                                 <>
-                                    <div className="text-slate-200 dark:text-slate-700 mb-3 opacity-50">
-                                        <Icon name="CheckCircle" size={56} />
+                                    <div className="text-emerald-500/40 dark:text-emerald-400/30 mb-1 sm:mb-2">
+                                        <Icon name="CheckCircle" size={isMobileApp ? 36 : 48} />
                                     </div>
-                                    <p className="text-base font-medium text-slate-500 dark:text-slate-400">
+                                    <p className="text-sm sm:text-base font-medium text-slate-500 dark:text-slate-400">
                                         Все замены разрешены
                                     </p>
                                 </>
@@ -1283,26 +1285,26 @@ export const DashboardPage = () => {
             case 'occupancy':
                 return (
                     <div
-                        className="p-5 flex flex-col h-full bento-card"
+                        className="p-3 sm:p-5 flex flex-col h-full bento-card"
                     >
-                        <div className="flex items-center justify-between mb-6">
-                            <div className="flex items-center gap-3">
-                                <div className="bg-blue-600 text-white p-3 rounded-2xl">
-                                    <Icon name="PieChart" size={22} />
+                        <div className="flex items-center justify-between mb-3 sm:mb-6">
+                            <div className="flex items-center gap-2 sm:gap-3">
+                                <div className="bg-blue-600 text-white p-2 sm:p-3 rounded-xl sm:rounded-2xl shrink-0">
+                                    <Icon name="PieChart" size={isMobileApp ? 18 : 22} />
                                 </div>
-                                <h3 className="font-semibold text-lg dark:text-white">Штат</h3>
+                                <h3 className="font-semibold text-base sm:text-lg dark:text-white">Штат</h3>
                             </div>
                             <button
                                 onClick={() => setShowAbsentList(!showAbsentList)}
-                                className="btn-secondary p-2.5 text-slate-500 hover:text-indigo-600"
+                                className="btn-secondary p-2 text-slate-500 hover:text-indigo-600"
                                 title={showAbsentList ? 'Показать график' : 'Список отсутствующих'}
                             >
-                                <Icon name={showAbsentList ? 'PieChart' : 'List'} size={20} />
+                                <Icon name={showAbsentList ? 'PieChart' : 'List'} size={18} />
                             </button>
                         </div>
 
                         {showAbsentList ? (
-                            <div className="flex-1 overflow-y-auto custom-scrollbar animate-fade-in -mr-2 pr-2">
+                            <div className="flex-1 overflow-y-auto custom-scrollbar animate-fade-in -mr-2 pr-2 min-h-[80px]">
                                 {occupancyStats.absentTeachersList.length > 0 ? (
                                     <div className="space-y-3">
                                         {occupancyStats.absentTeachersList.map((t) => (
@@ -1320,34 +1322,34 @@ export const DashboardPage = () => {
                                         ))}
                                     </div>
                                 ) : (
-                                    <div className="h-full flex flex-col items-center justify-center text-center text-slate-400">
+                                    <div className="flex flex-col items-center justify-center text-center text-slate-400 py-4">
                                         <p className="text-sm font-medium">Все учителя на месте</p>
                                     </div>
                                 )}
                             </div>
                         ) : (
-                            <div className="flex items-center justify-between flex-1 animate-fade-in px-2">
-                                <div className="relative w-28 h-28 flex items-center justify-center drop-shadow-md">
+                            <div className="flex items-center justify-between gap-3 flex-1 animate-fade-in px-0 sm:px-2 min-h-0">
+                                <div className="relative w-20 h-20 sm:w-28 sm:h-28 flex items-center justify-center drop-shadow-md shrink-0">
                                     <div
                                         className="absolute inset-0 rounded-full"
                                         style={{
                                             background: `conic-gradient(#3b82f6 ${occupancyStats.presentPercent * 3.6}deg, #e2e8f0 0deg)`
                                         }}
                                     />
-                                    <div className="absolute inset-[10px] bg-white dark:bg-slate-800 rounded-full flex flex-col items-center justify-center">
-                                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                                    <div className="absolute inset-[8px] sm:inset-[10px] bg-white dark:bg-slate-800 rounded-full flex flex-col items-center justify-center">
+                                        <span className="text-[9px] sm:text-[10px] text-slate-400 font-bold uppercase tracking-wider">
                                             На месте
                                         </span>
-                                        <span className="text-2xl font-black text-slate-800 dark:text-white">
+                                        <span className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white">
                                             {occupancyStats.presentPercent}%
                                         </span>
                                     </div>
                                 </div>
-                                <div className="text-right">
-                                    <div className="text-4xl font-black text-slate-800 dark:text-white mb-1">
+                                <div className="text-right min-w-0">
+                                    <div className="text-3xl sm:text-4xl font-black text-slate-800 dark:text-white mb-0.5">
                                         {occupancyStats.absentCount}
                                     </div>
-                                    <div className="text-xs text-slate-400 font-bold uppercase leading-tight">
+                                    <div className="text-[10px] sm:text-xs text-slate-400 font-bold uppercase leading-tight">
                                         Отсутствуют
                                         <br />
                                         сегодня
@@ -1444,22 +1446,22 @@ export const DashboardPage = () => {
             case 'conflicts':
                 return (
                     <div
-                        className="p-6 h-full bento-card"
+                        className="p-3 sm:p-6 h-full bento-card"
                     >
-                        <div className="flex items-center gap-3 mb-4">
-                            <div className="bg-amber-100 dark:bg-amber-900/30 text-amber-600 p-2 rounded-xl">
-                                <Icon name="AlertTriangle" size={20} />
+                        <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-4">
+                            <div className="bg-amber-100 dark:bg-amber-900/30 text-amber-600 p-2 rounded-xl shrink-0">
+                                <Icon name="AlertTriangle" size={18} />
                             </div>
-                            <div className="flex-1">
-                                <h3 className="font-bold text-lg dark:text-white">Возможные конфликты</h3>
+                            <div className="flex-1 min-w-0">
+                                <h3 className="font-bold text-base sm:text-lg dark:text-white">Возможные конфликты</h3>
                                 <p className="text-[10px] text-slate-400 font-medium">Нажмите строку → расписание класса</p>
                             </div>
                         </div>
-                        <div className="space-y-2 max-h-52 overflow-y-auto custom-scrollbar pr-2">
+                        <div className="space-y-2 max-h-40 sm:max-h-52 overflow-y-auto custom-scrollbar pr-1">
                             {schoolStatus.type === 'vacation' ? (
-                                <div className="p-4 text-center">
-                                    <div className="w-10 h-10 rounded-2xl bg-violet-100 dark:bg-violet-900/30 text-violet-500 flex items-center justify-center mx-auto mb-2">
-                                        <Icon name="Sun" size={20} />
+                                <div className="py-3 sm:p-4 text-center">
+                                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-violet-100 dark:bg-violet-900/30 text-violet-500 flex items-center justify-center mx-auto mb-1.5">
+                                        <Icon name="Sun" size={18} />
                                     </div>
                                     <p className="text-sm font-bold text-violet-600 dark:text-violet-400">Каникулы</p>
                                     <p className="text-xs text-slate-400 mt-1">Расписание неактивно — конфликты не проверяются</p>
@@ -1489,20 +1491,22 @@ export const DashboardPage = () => {
             case 'birthdays':
                 return (
                     <div
-                        className="p-6 h-full bento-card"
+                        className="p-3 sm:p-6 h-full bento-card"
                     >
-                        <div className="flex items-center gap-3 mb-4">
-                            <div className="bg-rose-100 dark:bg-rose-900/30 text-rose-600 p-2 rounded-xl">
-                                <Icon name="Gift" size={20} />
+                        <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-4">
+                            <div className="bg-rose-100 dark:bg-rose-900/30 text-rose-600 p-2 rounded-xl shrink-0">
+                                <Icon name="Gift" size={18} />
                             </div>
-                            <h3 className="font-bold text-lg dark:text-white">Ближайшие праздники и дни рождения</h3>
+                            <h3 className="font-bold text-base sm:text-lg dark:text-white leading-snug">
+                                {isMobileApp ? 'Праздники и ДР' : 'Ближайшие праздники и дни рождения'}
+                            </h3>
                         </div>
-                        <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar pr-2">
+                        <div className="space-y-2 max-h-36 sm:max-h-40 overflow-y-auto custom-scrollbar pr-1">
                             {upcomingCelebrations.length ? (
                                 upcomingCelebrations.map((item) => (
                                     <div
                                         key={`${item.type}-${item.id}`}
-                                        className="flex justify-between items-center p-3 glass-panel rounded-xl border border-slate-100 dark:border-slate-700"
+                                        className="flex justify-between items-center gap-2 p-2.5 sm:p-3 glass-panel rounded-xl border border-slate-100 dark:border-slate-700"
                                     >
                                         <span
                                             className="flex-1 min-w-0 font-medium text-slate-700 dark:text-slate-300 text-sm break-words leading-snug"
@@ -1525,7 +1529,7 @@ export const DashboardPage = () => {
                                     </div>
                                 ))
                             ) : (
-                                <div className="p-4 text-center text-slate-400 text-sm italic">
+                                <div className="py-3 sm:p-4 text-center text-slate-400 text-sm italic">
                                     Нет праздников и дней рождения в ближайший месяц
                                 </div>
                             )}
@@ -1535,34 +1539,34 @@ export const DashboardPage = () => {
             case 'kpi':
                 return (
                     <div
-                        className="p-6 h-full bento-card"
+                        className="p-3 sm:p-6 h-full bento-card"
                     >
-                        <div className="flex items-center gap-3 mb-4">
-                            <div className="bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 p-2 rounded-xl">
-                                <Icon name="BarChart2" size={20} />
+                        <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-4">
+                            <div className="bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 p-2 rounded-xl shrink-0">
+                                <Icon name="BarChart2" size={18} />
                             </div>
-                            <h3 className="font-bold text-lg dark:text-white">Ключевые показатели</h3>
+                            <h3 className="font-bold text-base sm:text-lg dark:text-white">Ключевые показатели</h3>
                         </div>
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-100 dark:border-slate-600">
-                                <div className="text-2xl font-black text-slate-800 dark:text-white">
+                        <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                            <div className="p-2.5 sm:p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-100 dark:border-slate-600">
+                                <div className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white">
                                     {kpiData.absentTeachers}
                                     <span className="text-sm font-medium text-slate-400 dark:text-slate-500">/{kpiData.totalTeachers}</span>
                                 </div>
-                                <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Отсутствуют учителей</div>
+                                <div className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium leading-snug">Нет на месте</div>
                             </div>
-                            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-100 dark:border-slate-600">
-                                <div className="text-2xl font-black text-slate-800 dark:text-white">{kpiData.substitutionsTomorrow}</div>
-                                <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Замен на завтра</div>
+                            <div className="p-2.5 sm:p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-100 dark:border-slate-600">
+                                <div className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white">{kpiData.substitutionsTomorrow}</div>
+                                <div className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium leading-snug">Замен на завтра</div>
                             </div>
-                            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-100 dark:border-slate-600">
-                                <div className="text-2xl font-black text-slate-800 dark:text-white">{kpiData.todayLessons}</div>
-                                <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Уроков сегодня</div>
+                            <div className="p-2.5 sm:p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-100 dark:border-slate-600">
+                                <div className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white">{kpiData.todayLessons}</div>
+                                <div className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium leading-snug">Уроков сегодня</div>
                             </div>
-                            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-100 dark:border-slate-600">
-                                <div className="text-2xl font-black text-slate-800 dark:text-white">{kpiData.roomUtilization}%</div>
-                                <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">Кабинеты занято</div>
-                                <div className="mt-2 h-1.5 w-full bg-slate-200 dark:bg-slate-600 rounded-full overflow-hidden">
+                            <div className="p-2.5 sm:p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-100 dark:border-slate-600">
+                                <div className="text-xl sm:text-2xl font-black text-slate-800 dark:text-white">{kpiData.roomUtilization}%</div>
+                                <div className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium leading-snug">Занятость кабинетов</div>
+                                <div className="mt-1.5 sm:mt-2 h-1.5 w-full bg-slate-200 dark:bg-slate-600 rounded-full overflow-hidden">
                                     <div
                                         className="h-full bg-emerald-500 rounded-full transition-all"
                                         style={{ width: `${kpiData.roomUtilization}%` }}
@@ -1580,45 +1584,83 @@ export const DashboardPage = () => {
         }
     };
 
-    return (
-        <div className="max-w-7xl mx-auto space-y-8 pb-20 w-full min-w-0 box-border">
-            {/* NEW Header Layout */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fade-in w-full min-w-0">
-                <div className="lg:col-span-2 flex flex-col justify-end min-w-0 w-full">
-                    <h1 className="text-3xl lg:text-4xl font-semibold text-slate-800 dark:text-white tracking-tight mb-1 break-words">
-                        {greeting}, {profile?.firstName || profile?.displayName || (role === 'superadmin' ? 'Суперадмин' : role === 'admin' ? 'Администратор' : role === 'canteen' ? 'Столовая' : 'Учитель')}!
-                    </h1>
-                    <p className="text-slate-500 dark:text-slate-400 text-base md:text-lg font-medium mb-4">
-                        Сегодня{' '}
-                        {formatDateLong(currentDate)}
-                    </p>
+    const displayName =
+        profile?.firstName ||
+        profile?.displayName ||
+        (role === 'superadmin' ? 'Суперадмин' : role === 'admin' ? 'Администратор' : role === 'canteen' ? 'Столовая' : 'Учитель');
 
-                    <div className="flex flex-wrap gap-2">
-                        <button
-                            onClick={() => setIsWidgetModalOpen(true)}
-                            className="btn-secondary flex items-center gap-2 px-4 py-2 text-sm"
-                            title="Настроить рабочий стол"
-                        >
-                            <Icon name="Settings" size={18} />
-                            <span>Настроить</span>
-                        </button>
-                        <button
-                            onClick={() => setIsFeedbackModalOpen(true)}
-                            className="btn-primary flex items-center gap-2 px-4 py-2 text-sm"
-                        >
-                            <Icon name="Send" size={18} /> Обратная связь
-                        </button>
-                    </div>
+    return (
+        <div className="max-w-7xl mx-auto space-y-3 sm:space-y-6 lg:space-y-8 pb-4 sm:pb-20 w-full min-w-0 box-border">
+            {/* Header: compact on PWA/mobile shell (title already in app bar) */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-6 animate-fade-in w-full min-w-0">
+                <div className="lg:col-span-2 flex flex-col justify-end min-w-0 w-full">
+                    {isMobileApp ? (
+                        <div className="flex items-center justify-between gap-2 min-w-0">
+                            <div className="min-w-0">
+                                <p className="text-sm font-semibold text-slate-800 dark:text-white truncate">
+                                    {greeting}, {displayName}
+                                </p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate">
+                                    {formatDateLong(currentDate)}
+                                </p>
+                            </div>
+                            <div className="flex gap-1.5 shrink-0">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsWidgetModalOpen(true)}
+                                    className="btn-secondary flex items-center justify-center p-2.5"
+                                    title="Настроить рабочий стол"
+                                    aria-label="Настроить"
+                                >
+                                    <Icon name="Settings" size={18} />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsFeedbackModalOpen(true)}
+                                    className="btn-primary flex items-center justify-center p-2.5"
+                                    title="Обратная связь"
+                                    aria-label="Обратная связь"
+                                >
+                                    <Icon name="Send" size={18} />
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <>
+                            <h1 className="text-3xl lg:text-4xl font-semibold text-slate-800 dark:text-white tracking-tight mb-1 break-words">
+                                {greeting}, {displayName}!
+                            </h1>
+                            <p className="text-slate-500 dark:text-slate-400 text-base md:text-lg font-medium mb-4">
+                                Сегодня {formatDateLong(currentDate)}
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                                <button
+                                    onClick={() => setIsWidgetModalOpen(true)}
+                                    className="btn-secondary flex items-center gap-2 px-4 py-2 text-sm"
+                                    title="Настроить рабочий стол"
+                                >
+                                    <Icon name="Settings" size={18} />
+                                    <span>Настроить</span>
+                                </button>
+                                <button
+                                    onClick={() => setIsFeedbackModalOpen(true)}
+                                    className="btn-primary flex items-center gap-2 px-4 py-2 text-sm"
+                                >
+                                    <Icon name="Send" size={18} /> Обратная связь
+                                </button>
+                            </div>
+                        </>
+                    )}
 
                     {/* Admin Broadcast */}
                     {settings?.adminAnnouncement?.active && (
-                        <div className="mt-6 modern-card p-4 border-l-4 border-amber-500 bg-amber-50/80 dark:bg-amber-900/20">
-                            <div className="flex items-start gap-4">
-                                <div className="text-amber-600 dark:text-amber-400 shrink-0 mt-1">
-                                    <Icon name="Bell" size={20} />
+                        <div className="mt-3 sm:mt-6 modern-card p-3 sm:p-4 border-l-4 border-amber-500 bg-amber-50/80 dark:bg-amber-900/20">
+                            <div className="flex items-start gap-3 sm:gap-4">
+                                <div className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5">
+                                    <Icon name="Bell" size={18} />
                                 </div>
-                                <div>
-                                    <h3 className="font-bold text-base text-amber-800 dark:text-amber-100 mb-1">
+                                <div className="min-w-0">
+                                    <h3 className="font-bold text-sm sm:text-base text-amber-800 dark:text-amber-100 mb-0.5">
                                         Объявление
                                     </h3>
                                     <p className="text-slate-800 dark:text-slate-200 text-sm whitespace-pre-wrap leading-relaxed">
@@ -1640,22 +1682,32 @@ export const DashboardPage = () => {
                 )}
             </div>
 
-            {/* Vacation Banner */}
+            {/* Vacation Banner — one compact strip on mobile (details also in conflicts widget) */}
             {schoolStatus.type === 'vacation' && (
-                <div className="modern-card border-l-4 border-violet-500 p-5 animate-fade-in flex items-center gap-5 bg-violet-50/70 dark:bg-violet-900/20">
-                    <div className="w-12 h-12 shrink-0 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/30">
-                        <Icon name="Sun" size={24} />
+                <div className="modern-card border-l-4 border-violet-500 p-3 sm:p-5 animate-fade-in flex items-center gap-3 sm:gap-5 bg-violet-50/70 dark:bg-violet-900/20">
+                    <div className="w-9 h-9 sm:w-12 sm:h-12 shrink-0 rounded-xl sm:rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 text-white flex items-center justify-center shadow-lg shadow-indigo-500/30">
+                        <Icon name="Sun" size={isMobileApp ? 18 : 24} />
                     </div>
-                    <div className="flex-1">
-                        <h3 className="font-bold text-lg text-indigo-800 dark:text-indigo-200">🏖️ Сейчас каникулы</h3>
-                        <p className="text-sm text-indigo-600/80 dark:text-indigo-300/80 mt-0.5">
-                            Текущий месяц не относится ни к одному семестру — расписание уроков неактивно.
-                            Конфигурацию семестров можно изменить в{' '}
-                            <a href="#/settings" className="font-bold underline underline-offset-2 hover:text-indigo-800 dark:hover:text-indigo-100 transition-colors">
-                                Настройках → Расписание
-                            </a>
-                            .
-                        </p>
+                    <div className="flex-1 min-w-0">
+                        <h3 className="font-bold text-sm sm:text-lg text-indigo-800 dark:text-indigo-200">Сейчас каникулы</h3>
+                        {!isMobileApp && (
+                            <p className="text-sm text-indigo-600/80 dark:text-indigo-300/80 mt-0.5">
+                                Текущий месяц не относится ни к одному семестру — расписание уроков неактивно.
+                                Конфигурацию семестров можно изменить в{' '}
+                                <a href="#/settings" className="font-bold underline underline-offset-2 hover:text-indigo-800 dark:hover:text-indigo-100 transition-colors">
+                                    Настройках → Расписание
+                                </a>
+                                .
+                            </p>
+                        )}
+                        {isMobileApp && (
+                            <p className="text-xs text-indigo-600/80 dark:text-indigo-300/80 mt-0.5">
+                                Расписание неактивно ·{' '}
+                                <a href="#/settings" className="font-bold underline underline-offset-2">
+                                    Настройки
+                                </a>
+                            </p>
+                        )}
                     </div>
                 </div>
             )}
@@ -1681,16 +1733,16 @@ export const DashboardPage = () => {
                 </div>
             )}
 
-            {/* Dashboard widgets — плотная сетка, виджеты не раздувают страницу */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 auto-rows-min">
+            {/* Dashboard widgets — плотная сетка; на узком PWA 1–2 колонки без «дыр» */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 auto-rows-min items-start">
                 {filteredWidgets.filter((w) => w.visible).map((widget) => (
                     <div
                         key={widget.id}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, widget.id)}
-                        onDragEnd={handleDragEnd}
-                        onDragOver={(e) => handleDragOver(e, widget.id)}
-                        className={`cursor-grab active:cursor-grabbing transition-all relative group min-h-0 ${draggedWidgetId === widget.id ? 'scale-95 z-50' : ''} ${getColSpanClass(widget.colSpan)}`}
+                        draggable={!isMobileApp}
+                        onDragStart={!isMobileApp ? (e) => handleDragStart(e, widget.id) : undefined}
+                        onDragEnd={!isMobileApp ? handleDragEnd : undefined}
+                        onDragOver={!isMobileApp ? (e) => handleDragOver(e, widget.id) : undefined}
+                        className={`transition-all relative group min-h-0 ${isMobileApp ? '' : 'cursor-grab active:cursor-grabbing'} ${draggedWidgetId === widget.id ? 'scale-95 z-50' : ''} ${getColSpanClass(widget.colSpan)}`}
                     >
                         <div className="absolute top-4 right-4 z-20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
                             <span className="text-[10px] font-bold text-slate-400 bg-white/90 dark:bg-slate-800 px-1.5 py-0.5 rounded">
