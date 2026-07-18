@@ -9,7 +9,20 @@ import {
 } from '../../types';
 import { generateId } from '../../utils/helpers';
 
-const currentAcademicYear = (): number => new Date().getFullYear();
+/** Prefer institution year from settings; never invent calendar year silently. */
+const currentAcademicYear = async (organizationId?: string | null): Promise<number> => {
+    try {
+        let q = supabase.from('settings').select('current_year').limit(1);
+        if (organizationId) q = q.eq('organization_id', organizationId);
+        const { data } = await q.maybeSingle();
+        const y = data?.current_year;
+        if (typeof y === 'number' && y > 0) return y;
+        if (typeof y === 'string' && Number(y) > 0) return Number(y);
+    } catch {
+        /* fall through */
+    }
+    return new Date().getFullYear();
+};
 
 const dateOnly = (value: unknown): string => {
     if (value == null || value === '') return '';
@@ -43,6 +56,7 @@ export const supabaseScheduleService = {
     },
 
     create: async (item: Omit<ScheduleItem, 'id'>): Promise<ScheduleItem> => {
+        const year = item.academicYear || (await currentAcademicYear(item.organizationId));
         const { data, error } = await supabase
             .from('schedule_items')
             .insert({
@@ -57,7 +71,7 @@ export const supabaseScheduleService = {
                 room_id: item.roomId || null,
                 direction: item.direction || null,
                 organization_id: item.organizationId || null,
-                academic_year: item.academicYear || currentAcademicYear()
+                academic_year: year
             })
             .select()
             .single();
@@ -132,6 +146,7 @@ export const supabaseSubstitutionsService = {
     },
 
     create: async (sub: Omit<Substitution, 'id'>): Promise<Substitution> => {
+        const year = await currentAcademicYear(sub.organizationId);
         const { data, error } = await supabase
             .from('substitutions')
             .insert({
@@ -147,7 +162,7 @@ export const supabaseSubstitutionsService = {
                 lesson_absence_reason: sub.lessonAbsenceReason || null,
                 refusals: sub.refusals || [],
                 organization_id: sub.organizationId || null,
-                academic_year: currentAcademicYear()
+                academic_year: year
             })
             .select()
             .single();
@@ -216,6 +231,7 @@ export const supabaseAbsenteeismService = {
     },
 
     set: async (record: AbsenteeismRecord): Promise<void> => {
+        const year = await currentAcademicYear(record.organizationId);
         const { error } = await supabase.from('absenteeism').upsert({
             id: record.id || generateId(),
             date: dateOnly(record.date),
@@ -228,7 +244,7 @@ export const supabaseAbsenteeismService = {
             updated_at: record.updatedAt || new Date().toISOString(),
             updated_by: record.updatedBy || null,
             organization_id: record.organizationId,
-            academic_year: currentAcademicYear()
+            academic_year: year
         });
         if (error) throw error;
     }
@@ -255,6 +271,7 @@ export const supabaseNutritionService = {
     },
 
     set: async (record: NutritionRecord): Promise<void> => {
+        const year = await currentAcademicYear(record.organizationId);
         const { error } = await supabase.from('nutrition').upsert({
             id: record.id || generateId(),
             date: dateOnly(record.date),
@@ -268,7 +285,7 @@ export const supabaseNutritionService = {
             entered_by: record.enteredBy || null,
             entered_at: record.enteredAt || null,
             organization_id: record.organizationId,
-            academic_year: currentAcademicYear(),
+            academic_year: year,
             updated_at: new Date().toISOString()
         });
         if (error) throw error;
@@ -290,6 +307,7 @@ export const supabaseDutyService = {
     },
 
     set: async (record: DutyRecord): Promise<void> => {
+        const year = await currentAcademicYear(record.organizationId);
         const { error } = await supabase.from('duty').upsert({
             id: record.id || generateId(),
             day: record.day,
@@ -297,7 +315,7 @@ export const supabaseDutyService = {
             zone_id: record.zoneId,
             teacher_id: record.teacherId,
             organization_id: record.organizationId,
-            academic_year: currentAcademicYear(),
+            academic_year: year,
             updated_at: new Date().toISOString()
         });
         if (error) throw error;

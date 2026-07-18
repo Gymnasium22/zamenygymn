@@ -70,7 +70,9 @@ describe('MobileShell', () => {
 
         fireEvent.click(screen.getByText('Ещё'));
         // Полный набор разделов (16)
-        expect(screen.getByText('Все разделы')).toBeInTheDocument();
+        // Sheet title is «Разделы»; aria-label on dialog remains «Все разделы»
+        expect(screen.getByLabelText('Все разделы')).toBeInTheDocument();
+        expect(screen.getByText('Разделы')).toBeInTheDocument();
         expect(screen.getByText('Настройки')).toBeInTheDocument();
         expect(screen.getByText('Справочники')).toBeInTheDocument();
         expect(screen.getByText('Дежурство')).toBeInTheDocument();

@@ -159,16 +159,19 @@ export const supabaseDbService = {
 
                 const data: AppData = {
                     ...INITIAL_DATA,
-                    teachers: (teachersRes.data || []).map((t: Record<string, unknown>) => {
-                        const obj = fromSnakeCase(t) as Record<string, unknown>;
-                        delete obj.subjectIds;
-                        return {
-                            ...obj,
-                            id: t.id,
-                            subjectIds: subjectsByTeacher.get(t.id as string) || [],
-                            birthDate: toDateOnly(t.birth_date)
-                        } as Teacher;
-                    }),
+                    teachers: sortByOrder(
+                        (teachersRes.data || []).map((t: Record<string, unknown>) => {
+                            const obj = fromSnakeCase(t) as Record<string, unknown>;
+                            delete obj.subjectIds;
+                            return {
+                                ...obj,
+                                id: t.id,
+                                subjectIds: subjectsByTeacher.get(t.id as string) || [],
+                                birthDate: toDateOnly(t.birth_date),
+                                order: typeof t.order === 'number' ? t.order : Number(t.order) || 0
+                            } as Teacher;
+                        })
+                    ),
                     subjects: sortByOrder(
                         (subjectsRes.data || []).map((s: Record<string, unknown>) => ({
                             ...fromSnakeCase(s),
@@ -330,6 +333,9 @@ export const supabaseDbService = {
                 // M:N lives in teacher_subjects — do not write array column
                 delete obj.subject_ids;
                 obj.birth_date = asDateParam(obj.birth_date);
+                const ord = asOrder(obj.order);
+                if (ord !== null) obj.order = ord;
+                else delete obj.order;
                 return ensureTimestamps(obj);
             });
 
@@ -666,13 +672,13 @@ export const supabaseDbService = {
             delete (snake as Record<string, unknown>).created_at;
             delete (snake as Record<string, unknown>).updated_at;
 
-            console.log('[DB Save] Settings payload keys:', Object.keys(snake));
-            console.log('[DB Save] semester_config:', snake.semester_config);
+            logger.log('[DB Save] Settings payload keys:', Object.keys(snake));
+            logger.log('[DB Save] semester_config:', snake.semester_config);
 
             const { data: existingSettings } = await supabase.from('settings').select('id').eq('organization_id', orgId).maybeSingle();
             delete (snake as Record<string, unknown>).organization_id;
             if (existingSettings?.id) {
-                console.log('[DB Save] Updating settings for org:', orgId);
+                logger.log('[DB Save] Updating settings for org:', orgId);
                 const { error } = await supabase.from('settings').update(snake).eq('organization_id', orgId);
                 if (error) {
                     console.error('[DB Save] Settings update error:', error);
