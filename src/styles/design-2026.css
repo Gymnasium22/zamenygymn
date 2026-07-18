@@ -1,117 +1,634 @@
 /**
- * Design tokens + calm mobile/TG UI only.
- * Desktop keeps original glass/gradient styles from index.css.
+ * Gymnasium Manager — Product Design System 2026
+ * Applies globally (desktop + PWA + Telegram Mini App).
+ * Goal: premium calm SaaS, not flat grey, not neon chaos.
  */
 
+/* ========== Tokens ========== */
 :root {
+    --ds-radius-xs: 8px;
     --ds-radius-sm: 10px;
     --ds-radius: 14px;
     --ds-radius-lg: 18px;
-    --ds-radius-xl: 22px;
+    --ds-radius-xl: 24px;
+    --ds-radius-2xl: 28px;
+
     --ds-space: 8px;
+
     --ds-surface: #ffffff;
-    --ds-surface-2: #f8fafc;
-    --ds-surface-3: #f1f5f9;
-    --ds-ink: #0f172a;
+    --ds-surface-2: #f6f7fb;
+    --ds-surface-3: #eef1f7;
+    --ds-ink: #0b1220;
+    --ds-ink-secondary: #334155;
     --ds-ink-muted: #64748b;
     --ds-border: rgba(15, 23, 42, 0.08);
-    --ds-border-strong: rgba(15, 23, 42, 0.12);
-    --ds-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.03);
-    --ds-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 16px rgba(15, 23, 42, 0.05);
-    --ds-shadow-lg: 0 8px 28px rgba(15, 23, 42, 0.08);
+    --ds-border-strong: rgba(15, 23, 42, 0.14);
+    --ds-border-soft: rgba(15, 23, 42, 0.05);
+
+    --ds-shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.04);
+    --ds-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 12px rgba(15, 23, 42, 0.04);
+    --ds-shadow: 0 2px 4px rgba(15, 23, 42, 0.04), 0 12px 28px rgba(15, 23, 42, 0.06);
+    --ds-shadow-lg: 0 8px 16px rgba(15, 23, 42, 0.06), 0 24px 48px rgba(15, 23, 42, 0.08);
+    --ds-shadow-glow: 0 8px 28px color-mix(in srgb, var(--theme-primary-600, #4f46e5) 22%, transparent);
+
     --ds-accent: var(--theme-primary-600, #4f46e5);
-    --ds-accent-soft: color-mix(in srgb, var(--ds-accent) 12%, transparent);
+    --ds-accent-soft: color-mix(in srgb, var(--theme-primary-500, #6366f1) 12%, transparent);
+    --ds-accent-ring: color-mix(in srgb, var(--theme-primary-500, #6366f1) 28%, transparent);
+
     --ds-ease: cubic-bezier(0.22, 1, 0.36, 1);
+    --ds-ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
     --ds-duration: 180ms;
+    --ds-duration-slow: 280ms;
+
+    --ds-font: 'Manrope', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --ds-tracking-tight: -0.025em;
+    --ds-tracking-display: -0.035em;
 }
 
 .dark {
     --ds-surface: #0f172a;
-    --ds-surface-2: #111827;
+    --ds-surface-2: #0b1220;
     --ds-surface-3: #1e293b;
     --ds-ink: #f8fafc;
+    --ds-ink-secondary: #cbd5e1;
     --ds-ink-muted: #94a3b8;
     --ds-border: rgba(255, 255, 255, 0.08);
-    --ds-border-strong: rgba(255, 255, 255, 0.12);
-    --ds-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.25);
+    --ds-border-strong: rgba(255, 255, 255, 0.14);
+    --ds-border-soft: rgba(255, 255, 255, 0.04);
+    --ds-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.25);
+    --ds-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2), 0 4px 14px rgba(0, 0, 0, 0.22);
     --ds-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
-    --ds-shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.35);
+    --ds-shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.4);
+    --ds-shadow-glow: 0 8px 32px color-mix(in srgb, var(--theme-primary-500, #6366f1) 28%, transparent);
     --ds-accent-soft: color-mix(in srgb, var(--theme-primary-500, #6366f1) 18%, transparent);
+    --ds-accent-ring: color-mix(in srgb, var(--theme-primary-500, #6366f1) 35%, transparent);
 }
 
-/* ========== ONLY mobile PWA + Telegram Mini App ========== */
-html.app-mobile .mesh-gradient-bg,
-html.tg-mini-app .mesh-gradient-bg {
-    background-color: var(--ds-surface-2) !important;
+/* ========== Base polish ========== */
+html {
+    font-family: var(--ds-font);
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+    background-color: var(--ds-surface-2);
+    color: var(--ds-ink);
+}
+
+::selection {
+    background: color-mix(in srgb, var(--theme-primary-500, #6366f1) 28%, transparent);
+    color: inherit;
+}
+
+/* Focus for keyboard users */
+:focus-visible {
+    outline: 2px solid var(--theme-primary-500, #6366f1);
+    outline-offset: 2px;
+}
+
+/* ========== Ambient shell ========== */
+.mesh-gradient-bg {
+    background-color: #f3f5fa !important;
     background-image:
-        radial-gradient(ellipse 80% 50% at 0% -10%, color-mix(in srgb, var(--theme-primary-500, #6366f1) 10%, transparent), transparent 55%),
-        radial-gradient(ellipse 60% 40% at 100% 0%, color-mix(in srgb, var(--theme-primary-600, #4f46e5) 7%, transparent), transparent 50%) !important;
-    background-attachment: scroll !important;
+        radial-gradient(ellipse 70% 55% at 0% -10%, color-mix(in srgb, var(--theme-primary-500, #6366f1) 16%, transparent), transparent 58%),
+        radial-gradient(ellipse 55% 45% at 100% 0%, color-mix(in srgb, var(--theme-accent-500, #a855f7) 12%, transparent), transparent 52%),
+        radial-gradient(ellipse 45% 40% at 100% 100%, rgba(56, 189, 248, 0.1), transparent 50%),
+        radial-gradient(ellipse 40% 35% at 0% 100%, rgba(244, 114, 182, 0.08), transparent 48%) !important;
+    background-attachment: fixed !important;
 }
 
-html.app-mobile.dark .mesh-gradient-bg,
-html.dark.app-mobile .mesh-gradient-bg,
-html.tg-mini-app.dark .mesh-gradient-bg,
-html.dark.tg-mini-app .mesh-gradient-bg {
-    background-color: #020617 !important;
+.dark .mesh-gradient-bg {
+    background-color: #060a12 !important;
     background-image:
-        radial-gradient(ellipse 70% 45% at 10% -5%, color-mix(in srgb, var(--theme-primary-500, #6366f1) 14%, transparent), transparent 55%),
-        radial-gradient(ellipse 50% 35% at 100% 0%, color-mix(in srgb, var(--theme-primary-600, #4f46e5) 10%, transparent), transparent 50%) !important;
+        radial-gradient(ellipse 65% 50% at 8% -8%, color-mix(in srgb, var(--theme-primary-500, #6366f1) 18%, transparent), transparent 55%),
+        radial-gradient(ellipse 50% 40% at 100% 0%, color-mix(in srgb, var(--theme-accent-500, #a855f7) 12%, transparent), transparent 50%),
+        radial-gradient(ellipse 40% 35% at 90% 100%, rgba(56, 189, 248, 0.08), transparent 48%) !important;
 }
 
-html.app-mobile .noise-overlay::after,
-html.tg-mini-app .noise-overlay::after {
-    opacity: 0.035 !important;
+.noise-overlay::after {
+    opacity: 0.045 !important;
+}
+.dark .noise-overlay::after {
+    opacity: 0.07 !important;
 }
 
-html.app-mobile .modern-card,
-html.tg-mini-app .modern-card {
-    background: var(--ds-surface) !important;
-    border: 1px solid var(--ds-border) !important;
-    border-radius: var(--ds-radius) !important;
-    box-shadow: var(--ds-shadow-sm) !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-}
-
-html.app-mobile .modern-card:hover,
-html.tg-mini-app .modern-card:hover {
-    transform: none !important;
-    border-color: var(--ds-border-strong) !important;
-    box-shadow: var(--ds-shadow) !important;
-}
-
-html.app-mobile .bento-card,
-html.tg-mini-app .bento-card {
-    background: var(--ds-surface) !important;
+/* ========== Surfaces ========== */
+.modern-card {
+    background: color-mix(in srgb, var(--ds-surface) 92%, transparent) !important;
     border: 1px solid var(--ds-border) !important;
     border-radius: var(--ds-radius-lg) !important;
     box-shadow: var(--ds-shadow-sm) !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
+    backdrop-filter: blur(12px) saturate(1.15) !important;
+    -webkit-backdrop-filter: blur(12px) saturate(1.15) !important;
+    transition:
+        border-color var(--ds-duration) var(--ds-ease),
+        box-shadow var(--ds-duration) var(--ds-ease),
+        transform var(--ds-duration) var(--ds-ease) !important;
+}
+
+.modern-card:hover {
+    border-color: var(--ds-border-strong) !important;
+    box-shadow: var(--ds-shadow) !important;
+    transform: translateY(-1px) !important;
+}
+
+.bento-card {
+    background: color-mix(in srgb, var(--ds-surface) 94%, transparent) !important;
+    border: 1px solid var(--ds-border) !important;
+    border-radius: var(--ds-radius-lg) !important;
+    box-shadow: var(--ds-shadow-sm) !important;
+    backdrop-filter: blur(14px) saturate(1.12) !important;
+    -webkit-backdrop-filter: blur(14px) saturate(1.12) !important;
+    transition:
+        border-color var(--ds-duration) var(--ds-ease),
+        box-shadow var(--ds-duration-slow) var(--ds-ease),
+        transform var(--ds-duration-slow) var(--ds-ease) !important;
+}
+
+.bento-card:hover {
+    transform: translateY(-2px) !important;
+    border-color: color-mix(in srgb, var(--theme-primary-500, #6366f1) 22%, var(--ds-border)) !important;
+    box-shadow: var(--ds-shadow), 0 0 0 1px color-mix(in srgb, var(--theme-primary-500, #6366f1) 8%, transparent) !important;
+}
+
+.float-panel {
+    background: color-mix(in srgb, var(--ds-surface) 92%, transparent) !important;
+    border: 1px solid var(--ds-border) !important;
+    border-radius: var(--ds-radius-xl) !important;
+    box-shadow: var(--ds-shadow-lg) !important;
+    backdrop-filter: blur(18px) saturate(1.2) !important;
+    -webkit-backdrop-filter: blur(18px) saturate(1.2) !important;
+}
+
+.float-panel:hover {
+    transform: none !important; /* login card shouldn't jump */
+}
+
+.glass-panel {
+    background: color-mix(in srgb, var(--ds-surface) 88%, transparent) !important;
+    border: 1px solid var(--ds-border) !important;
+    border-radius: var(--ds-radius) !important;
+    box-shadow: var(--ds-shadow-sm) !important;
+    backdrop-filter: blur(12px) saturate(1.1) !important;
+    -webkit-backdrop-filter: blur(12px) saturate(1.1) !important;
+}
+
+/* Generic white panels used across pages */
+main .bg-white.dark\:bg-dark-800,
+main .bg-white\/95,
+main .bg-white\/90 {
+    border-color: var(--ds-border) !important;
+}
+
+/* ========== Typography ========== */
+main h1.text-3xl,
+main h1.text-2xl,
+main h1.text-4xl,
+.display-large,
+.display-hero {
+    letter-spacing: var(--ds-tracking-display) !important;
+    font-weight: 700 !important;
+    color: var(--ds-ink) !important;
+}
+
+/* Soften ultra-black UI weights on screen (print/export keep heavy type) */
+@media screen {
+    main .font-black {
+        font-weight: 700 !important;
+        letter-spacing: -0.03em;
+    }
+}
+
+.bento-card h3,
+.modern-card h3 {
+    letter-spacing: var(--ds-tracking-tight);
+    font-weight: 600;
+}
+
+main label.text-xs.font-bold.uppercase,
+main .text-xs.font-bold.uppercase {
+    text-transform: none !important;
+    letter-spacing: -0.01em !important;
+    font-weight: 600 !important;
+    font-size: 0.75rem !important;
+    color: var(--ds-ink-muted) !important;
+}
+
+/* ========== Buttons ========== */
+.btn-primary {
+    background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--theme-primary-500, #6366f1) 100%, white 8%) 0%,
+        var(--theme-primary-600, #4f46e5) 100%
+    ) !important;
+    border: 1px solid color-mix(in srgb, var(--theme-primary-700, #4338ca) 35%, transparent) !important;
+    border-radius: var(--ds-radius-sm) !important;
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.18) inset,
+        0 1px 2px rgba(15, 23, 42, 0.08),
+        0 6px 16px color-mix(in srgb, var(--theme-primary-600, #4f46e5) 28%, transparent) !important;
+    font-weight: 600 !important;
+    letter-spacing: -0.01em;
+    transition:
+        transform var(--ds-duration) var(--ds-ease),
+        box-shadow var(--ds-duration) var(--ds-ease),
+        filter var(--ds-duration) var(--ds-ease) !important;
+}
+
+.btn-primary:hover {
+    filter: brightness(1.04);
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.2) inset,
+        0 2px 4px rgba(15, 23, 42, 0.08),
+        0 10px 22px color-mix(in srgb, var(--theme-primary-600, #4f46e5) 34%, transparent) !important;
+}
+
+.btn-primary:active {
+    transform: translateY(1px) scale(0.99) !important;
+    filter: brightness(0.98);
+}
+
+.btn-secondary {
+    border-radius: var(--ds-radius-sm) !important;
+    border-color: var(--ds-border-strong) !important;
+    box-shadow: var(--ds-shadow-xs) !important;
+    background: var(--ds-surface) !important;
+}
+
+.btn-glow {
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-glow::after {
+    opacity: 0 !important;
+    display: none !important; /* soft product, not neon halo */
+}
+
+.btn-glow:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--ds-shadow-glow) !important;
+}
+
+/* Common indigo action buttons across pages */
+button.bg-indigo-600,
+a.bg-indigo-600,
+.bg-indigo-600.hover\:bg-indigo-700 {
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.14) inset,
+        0 6px 16px color-mix(in srgb, var(--theme-primary-600, #4f46e5) 26%, transparent) !important;
+    border-radius: 12px;
+}
+
+button.bg-indigo-600:hover,
+a.bg-indigo-600:hover {
+    filter: brightness(1.03);
+}
+
+/* ========== Forms ========== */
+/* Soft focus only — do not force border/bg (breaks themed/colored fields) */
+input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']),
+textarea,
+select {
+    transition:
+        border-color var(--ds-duration) var(--ds-ease),
+        box-shadow var(--ds-duration) var(--ds-ease),
+        background-color var(--ds-duration) var(--ds-ease);
+}
+
+input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+    border-color: var(--theme-primary-500, #6366f1);
+    box-shadow: 0 0 0 3px var(--ds-accent-ring);
+    outline: none;
+}
+
+.input-glow:focus {
+    border-color: var(--theme-primary-500, #6366f1) !important;
+    box-shadow: 0 0 0 3px var(--ds-accent-ring), 0 8px 24px color-mix(in srgb, var(--theme-primary-500, #6366f1) 12%, transparent) !important;
+}
+
+/* ========== Tables ========== */
+main table {
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+main table thead th {
+    font-weight: 600 !important;
+    text-transform: none !important;
+    letter-spacing: -0.01em !important;
+    font-size: 0.75rem !important;
+    color: var(--ds-ink-muted) !important;
+    background: color-mix(in srgb, var(--ds-surface-2) 90%, var(--ds-surface)) !important;
+    border-bottom: 1px solid var(--ds-border) !important;
+}
+
+main table tbody td {
+    font-size: 0.875rem !important;
+    border-bottom: 1px solid var(--ds-border-soft) !important;
+}
+
+main table tbody tr:hover td {
+    background: color-mix(in srgb, var(--theme-primary-500, #6366f1) 4%, transparent);
+}
+
+/* ========== Sidebar (shared base) ========== */
+.sidebar-2026 {
+    background: color-mix(in srgb, var(--ds-surface) 88%, transparent) !important;
+    backdrop-filter: blur(18px) saturate(1.25) !important;
+    -webkit-backdrop-filter: blur(18px) saturate(1.25) !important;
+    border-right: 1px solid var(--ds-border) !important;
+    box-shadow: 4px 0 24px rgba(15, 23, 42, 0.04) !important;
+}
+
+.dark .sidebar-2026 {
+    background: color-mix(in srgb, #0b1220 92%, transparent) !important;
+    border-right-color: var(--ds-border) !important;
+    box-shadow: 4px 0 28px rgba(0, 0, 0, 0.35) !important;
+}
+
+.sidebar-2026 .neon-glow {
+    box-shadow: 0 8px 20px color-mix(in srgb, var(--theme-primary-600, #4f46e5) 35%, transparent) !important;
+    background: linear-gradient(145deg, var(--theme-primary-500, #6366f1), var(--theme-primary-700, #4338ca)) !important;
+    border-radius: 14px !important;
+}
+
+.sidebar-2026 nav a.group {
+    border-radius: 12px !important;
+    font-weight: 500 !important;
+    letter-spacing: -0.01em;
+    transition:
+        background-color var(--ds-duration) var(--ds-ease),
+        color var(--ds-duration) var(--ds-ease),
+        box-shadow var(--ds-duration) var(--ds-ease) !important;
+}
+
+.sidebar-2026 nav a.group:hover {
+    background: color-mix(in srgb, var(--ds-surface-3) 70%, transparent) !important;
+}
+
+.sidebar-2026 nav a.group.bg-white\/60,
+.sidebar-2026 nav a[class*='bg-white/60'],
+.sidebar-2026 nav a.bg-white\/60 {
+    background: linear-gradient(
+        90deg,
+        color-mix(in srgb, var(--theme-primary-500, #6366f1) 14%, transparent),
+        color-mix(in srgb, var(--theme-primary-500, #6366f1) 6%, transparent)
+    ) !important;
+    border: 1px solid color-mix(in srgb, var(--theme-primary-500, #6366f1) 16%, transparent) !important;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.35) inset !important;
+    color: var(--theme-primary-700, #4338ca) !important;
+    font-weight: 600 !important;
+}
+
+.dark .sidebar-2026 nav a.group.bg-white\/60,
+.dark .sidebar-2026 nav a[class*='bg-white/60'] {
+    color: #c7d2fe !important;
+    box-shadow: none !important;
+}
+
+.sidebar-2026 .sidebar-indicator {
+    background: linear-gradient(180deg, var(--theme-primary-500, #6366f1), var(--theme-primary-700, #4338ca)) !important;
+    box-shadow: 0 0 12px color-mix(in srgb, var(--theme-primary-500, #6366f1) 45%, transparent) !important;
+    width: 3px !important;
+    border-radius: 999px !important;
+}
+
+/* ========== Bottom nav ========== */
+.bottom-nav-2026 {
+    background: color-mix(in srgb, var(--ds-surface) 92%, transparent) !important;
+    backdrop-filter: blur(18px) saturate(1.25) !important;
+    -webkit-backdrop-filter: blur(18px) saturate(1.25) !important;
+    border-top: 1px solid var(--ds-border) !important;
+    box-shadow: 0 -8px 28px rgba(15, 23, 42, 0.06) !important;
+}
+
+.bottom-nav-active::before {
+    background: linear-gradient(90deg, var(--theme-primary-500, #6366f1), var(--theme-accent-500, #a855f7)) !important;
+    box-shadow: 0 0 14px color-mix(in srgb, var(--theme-primary-500, #6366f1) 55%, transparent) !important;
+    width: 28px !important;
+    height: 3px !important;
+}
+
+/* ========== Chips / rows / status ========== */
+.ui-list-row {
+    border-radius: var(--ds-radius) !important;
+    border-color: var(--ds-border) !important;
+    box-shadow: var(--ds-shadow-xs);
+    transition:
+        border-color var(--ds-duration) var(--ds-ease),
+        box-shadow var(--ds-duration) var(--ds-ease),
+        transform var(--ds-duration) var(--ds-ease) !important;
+}
+
+.ui-list-row:hover {
+    border-color: color-mix(in srgb, var(--theme-primary-500, #6366f1) 28%, var(--ds-border)) !important;
+    box-shadow: var(--ds-shadow-sm);
+}
+
+.ui-chip {
+    border: 1px solid var(--ds-border);
+    background: var(--ds-surface-2) !important;
+}
+
+.ui-empty-state {
+    border-radius: var(--ds-radius-lg) !important;
+    border-color: var(--ds-border) !important;
+    background: color-mix(in srgb, var(--ds-surface-2) 80%, transparent) !important;
+}
+
+/* ========== Modals / toast ========== */
+.toast-island {
+    border-radius: 18px !important;
+    border: 1px solid var(--ds-border) !important;
+    box-shadow: var(--ds-shadow-lg) !important;
+    backdrop-filter: blur(20px) saturate(1.3) !important;
+}
+
+/* Portal modals often use fixed overlays — polish common inner panels */
+.animate-scale-in {
+    animation: ds-scale-in 0.32s var(--ds-ease) forwards !important;
+}
+
+@keyframes ds-scale-in {
+    from {
+        opacity: 0;
+        transform: scale(0.96) translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.animate-page-in {
+    animation: ds-page-in 0.35s var(--ds-ease) both;
+}
+
+@keyframes ds-page-in {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ========== Scrollbars ========== */
+.custom-scrollbar-2026::-webkit-scrollbar,
+.custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.custom-scrollbar-2026::-webkit-scrollbar-thumb,
+.custom-scrollbar::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, #94a3b8 55%, transparent);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+}
+
+.custom-scrollbar-2026::-webkit-scrollbar-thumb:hover,
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in srgb, var(--theme-primary-500, #6366f1) 55%, transparent);
+    background-clip: padding-box;
+    border: 2px solid transparent;
+}
+
+/* ========== Text gradient / display stats ========== */
+.text-gradient,
+.display-stat {
+    background: linear-gradient(
+        135deg,
+        var(--theme-primary-600, #4f46e5) 0%,
+        var(--theme-accent-500, #a855f7) 100%
+    ) !important;
+    -webkit-background-clip: text !important;
+    background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+}
+
+/* ========== Mobile / Mini App denser calm overrides ========== */
+html.app-mobile .mesh-gradient-bg,
+html.tg-mini-app .mesh-gradient-bg {
+    background-attachment: scroll !important;
 }
 
 html.app-mobile .bento-card:hover,
-html.tg-mini-app .bento-card:hover {
+html.tg-mini-app .bento-card:hover,
+html.app-mobile .modern-card:hover,
+html.tg-mini-app .modern-card:hover,
+html.app-mobile .card-hover:hover,
+html.tg-mini-app .card-hover:hover {
     transform: none !important;
-    box-shadow: var(--ds-shadow) !important;
 }
 
 html.app-mobile .btn-primary,
 html.tg-mini-app .btn-primary {
-    background: var(--ds-accent) !important;
-    background-image: none !important;
-    border-radius: var(--ds-radius-sm) !important;
-    box-shadow: none !important;
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.12) inset,
+        0 4px 12px color-mix(in srgb, var(--theme-primary-600, #4f46e5) 22%, transparent) !important;
+}
+
+/* Prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* ========== Shared page chrome ========== */
+/* Icon badges in headers (Пропуски, etc.) */
+main h1 > div.p-2.rounded-lg,
+main h1 > .p-2.rounded-lg {
+    border-radius: 12px !important;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.5) inset;
+}
+
+/* Soft elevation for common slate/indigo panel rows */
+main .rounded-2xl.border.border-slate-200,
+main .rounded-2xl.border.border-slate-100,
+main .rounded-xl.border.border-slate-200 {
+    box-shadow: var(--ds-shadow-xs);
+}
+
+/* Primary CTA row buttons on substitutions / tools */
+main button.bg-blue-600,
+main button.bg-indigo-600 {
+    letter-spacing: -0.01em;
+    font-weight: 600;
+}
+
+/* Date navigation pill (substitutions etc.) */
+main .bg-slate-50.dark\:bg-slate-700.p-1\.5.rounded-xl.border {
+    background: color-mix(in srgb, var(--ds-surface) 88%, var(--ds-surface-3)) !important;
+    border-color: var(--ds-border) !important;
+    box-shadow: var(--ds-shadow-xs);
+}
+
+/* Directory / list cards */
+main .group.rounded-xl.border:hover,
+main button.group.rounded-xl.border:hover {
+    border-color: color-mix(in srgb, var(--theme-primary-500, #6366f1) 28%, var(--ds-border));
+}
+
+/* Mobile shell header slightly richer when design tokens present */
+html.app-mobile .app-mobile-header,
+html.tg-mini-app .app-mobile-header {
+    background: color-mix(in srgb, var(--ds-surface) 90%, transparent) !important;
+    border-bottom-color: var(--ds-border) !important;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.5) inset, 0 8px 24px rgba(15, 23, 42, 0.03);
+}
+
+html.app-mobile .bottom-nav-2026,
+html.tg-mini-app .bottom-nav-2026,
+html.app-mobile .app-mobile-tabbar {
+    box-shadow: 0 -10px 30px rgba(15, 23, 42, 0.05) !important;
+}
+
+/* Bottom nav labels: title case, not shouty uppercase */
+.bottom-nav-2026 span.uppercase,
+.bottom-nav-2026 .uppercase {
+    text-transform: none !important;
+    letter-spacing: -0.01em !important;
     font-weight: 600 !important;
 }
 
-html.app-mobile .btn-glow::after,
-html.tg-mini-app .btn-glow::after {
-    display: none !important;
+/* Command palette / overlays */
+[data-overlay='command-palette'] .float-panel {
+    border-radius: 20px !important;
+    box-shadow: var(--ds-shadow-lg) !important;
 }
 
-html.app-mobile .card-hover:hover,
-html.tg-mini-app .card-hover:hover {
-    transform: none !important;
+/* Soft indigo secondary buttons used as chips */
+main button.bg-indigo-100,
+main .bg-indigo-100.text-indigo-700 {
+    border: 1px solid color-mix(in srgb, var(--theme-primary-500, #6366f1) 18%, transparent);
+}
+
+/* Print safe: don't force fancy backgrounds */
+@media print {
+    .mesh-gradient-bg,
+    .noise-overlay::after {
+        background: white !important;
+        background-image: none !important;
+    }
+    .float-panel,
+    .modern-card,
+    .bento-card,
+    .sidebar-2026 {
+        box-shadow: none !important;
+        backdrop-filter: none !important;
+    }
 }

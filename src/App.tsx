@@ -508,13 +508,13 @@ const Layout = () => {
                 className={`fixed inset-y-0 left-0 z-50 w-64 sidebar-2026 transform transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} no-print overflow-hidden shrink-0`}
             >
                 <div className="h-full flex flex-col relative">
-                    <div className="p-5 flex items-center gap-3 border-b border-white/20 dark:border-white/5 pt-6">
-                        <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-2.5 rounded-2xl text-white relative shadow-lg shadow-indigo-500/30 dark:shadow-none transition-colors duration-500 neon-glow">
-                            <Icon name="GraduationCap" size={24} />
+                    <div className="p-5 flex items-center gap-3 border-b border-slate-200/60 dark:border-white/5 pt-6">
+                        <div className="bg-gradient-to-br from-indigo-500 to-violet-600 p-2.5 rounded-[14px] text-white relative shadow-lg shadow-indigo-500/25 dark:shadow-indigo-900/40 transition-colors duration-500 neon-glow">
+                            <Icon name="GraduationCap" size={22} />
                         </div>
                         <div className="min-w-0">
-                            <h1 className="text-lg font-black text-slate-800 dark:text-white tracking-tight truncate max-w-[150px]" title={organizationName}>{organizationName}</h1>
-                            <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Управление учреждением</p>
+                            <h1 className="text-[0.98rem] font-bold text-slate-900 dark:text-white tracking-tight truncate max-w-[150px]" title={organizationName}>{organizationName}</h1>
+                            <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">Управление учреждением</p>
                         </div>
                     </div>
 

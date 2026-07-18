@@ -278,14 +278,14 @@ export const Modal = ({ isOpen, onClose, title, children, footer, maxWidth = 'ma
             aria-modal="true"
             aria-labelledby="modal-title"
             tabIndex={-1}
-            className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center bg-slate-950/40 backdrop-blur-sm p-0 sm:p-3 md:p-4 animate-fade-in no-print"
+            className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center bg-slate-950/45 backdrop-blur-[6px] p-0 sm:p-3 md:p-4 animate-fade-in no-print"
             onClick={(e) => e.target === e.currentTarget && onClose()}
         >
             <div
-                className={`float-panel w-full ${maxWidth} flex flex-col max-h-[min(92dvh,100%)] sm:max-h-[min(86vh,100%)] rounded-t-2xl sm:rounded-2xl transition-all duration-300 min-h-0 overflow-hidden shadow-2xl`}
+                className={`float-panel animate-scale-in w-full ${maxWidth} flex flex-col max-h-[min(92dvh,100%)] sm:max-h-[min(86vh,100%)] rounded-t-2xl sm:rounded-[1.25rem] transition-all duration-300 min-h-0 overflow-hidden`}
             >
-                <div className="flex items-center justify-between px-5 py-3 sm:py-4 border-b border-slate-200/70 dark:border-slate-700/70 shrink-0">
-                    <h2 id="modal-title" className="text-lg md:text-xl font-semibold text-slate-800 dark:text-white tracking-tight">{title}</h2>
+                <div className="flex items-center justify-between px-5 py-3.5 sm:py-4 border-b border-slate-200/70 dark:border-slate-700/70 shrink-0 bg-white/40 dark:bg-white/[0.02]">
+                    <h2 id="modal-title" className="text-lg md:text-xl font-bold text-slate-900 dark:text-white tracking-tight">{title}</h2>
                     <button
                         onClick={onClose}
                         className="btn-secondary !px-2 !py-2 text-slate-500 hover:text-slate-700 dark:text-slate-300 dark:hover:text-white"

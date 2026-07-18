@@ -1658,17 +1658,20 @@ export const DashboardPage = () => {
                             </div>
                         </div>
                     ) : (
-                        <>
-                            <h1 className="text-3xl lg:text-4xl font-semibold text-slate-800 dark:text-white tracking-tight mb-1 break-words">
-                                {greeting}, {displayName}!
+                        <div className="desktop-dash-hero">
+                            <p className="text-sm font-semibold text-indigo-600/90 dark:text-indigo-300 mb-1.5 tracking-tight">
+                                Рабочий стол
+                            </p>
+                            <h1 className="text-3xl lg:text-[2.15rem] font-bold text-slate-900 dark:text-white tracking-tight mb-1.5 break-words">
+                                {greeting}, {displayName}
                             </h1>
-                            <p className="text-slate-500 dark:text-slate-400 text-base md:text-lg font-medium mb-4">
+                            <p className="text-slate-500 dark:text-slate-400 text-base md:text-[1.05rem] font-medium mb-5">
                                 Сегодня {formatDateLong(currentDate)}
                             </p>
-                            <div className="flex flex-wrap gap-2">
+                            <div className="flex flex-wrap gap-2.5">
                                 <button
                                     onClick={() => setIsWidgetModalOpen(true)}
-                                    className="btn-secondary flex items-center gap-2 px-4 py-2 text-sm"
+                                    className="btn-secondary flex items-center gap-2 !px-4 !py-2.5 text-sm !rounded-xl"
                                     title="Настроить рабочий стол"
                                 >
                                     <Icon name="Settings" size={18} />
@@ -1676,12 +1679,12 @@ export const DashboardPage = () => {
                                 </button>
                                 <button
                                     onClick={() => setIsFeedbackModalOpen(true)}
-                                    className="btn-primary flex items-center gap-2 px-4 py-2 text-sm"
+                                    className="btn-primary flex items-center gap-2 !px-4 !py-2.5 text-sm !rounded-xl"
                                 >
                                     <Icon name="Send" size={18} /> Обратная связь
                                 </button>
                             </div>
-                        </>
+                        </div>
                     )}
 
                     {/* Admin Broadcast */}

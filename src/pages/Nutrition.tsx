@@ -369,10 +369,12 @@ export const NutritionPage = () => {
 
     return (
         <div className="max-w-7xl mx-auto w-full pb-20">
-            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 mb-6">
+            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 mb-6 bg-white dark:bg-dark-800 p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
                 <div className="app-mobile-page-head">
-                    <h1 className="text-3xl font-black text-slate-800 dark:text-white mb-2">Питание</h1>
-                    <p className="text-slate-500 dark:text-slate-400">
+                    <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-1 tracking-tight">
+                        Питание
+                    </h1>
+                    <p className="text-slate-500 dark:text-slate-400 text-sm sm:text-base">
                         {isAdmin
                             ? 'Управление питанием и статистика'
                             : isCanteen
@@ -380,17 +382,17 @@ export const NutritionPage = () => {
                               : 'Ввод данных о питании'}
                     </p>
                 </div>
-                <div className="flex flex-wrap items-center gap-2 w-full min-w-0">
+                <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto min-w-0">
                     <button
                         onClick={() => setViewMode(viewMode === 'day' ? 'month' : 'day')}
-                        className="px-3 sm:px-4 py-2 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors font-semibold text-sm shrink-0"
+                        className="px-3 sm:px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors font-semibold text-sm shrink-0"
                     >
                         {viewMode === 'day' ? 'За месяц' : 'За день'}
                     </button>
                     {(isAdmin || isCanteen) && (
                         <button
                             onClick={exportToPDF}
-                            className="px-3 sm:px-4 py-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition-colors font-semibold flex items-center gap-2 text-sm min-w-0"
+                            className="px-3 sm:px-4 py-2.5 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition-colors font-semibold flex items-center gap-2 text-sm min-w-0 shadow-sm shadow-indigo-500/25"
                         >
                             <Icon name="Download" size={18} className="shrink-0" />
                             <span className="truncate">Экспорт PDF</span>

@@ -1,62 +1,32 @@
 /**
- * Desktop layout 2026 — only when NOT mobile shell / NOT telegram mini.
- * Keeps phone & mini app styles intact.
+ * Desktop 2026 shell — only outside mobile PWA / Telegram Mini App.
+ * Premium workspace chrome without flattening the product.
  */
 
-html:not(.app-mobile):not(.tg-mini-app) {
-    /* denser, calmer workspace */
+/* ---- Main content padding ---- */
+html:not(.app-mobile):not(.tg-mini-app) main.flex-1 > div.animate-page-in {
+    padding: 1.5rem 1.85rem 2.25rem !important;
+    max-width: 100%;
 }
 
-/* ---- Shell background ---- */
-html:not(.app-mobile):not(.tg-mini-app) .spotlight-container.mesh-gradient-bg {
-    background-color: #f4f5f7 !important;
-    background-image:
-        radial-gradient(ellipse 50% 40% at 0% 0%, color-mix(in srgb, var(--theme-primary-500, #6366f1) 7%, transparent), transparent 60%),
-        radial-gradient(ellipse 40% 30% at 100% 0%, color-mix(in srgb, var(--theme-primary-600, #4f46e5) 5%, transparent), transparent 55%) !important;
+html:not(.app-mobile):not(.tg-mini-app) main.flex-1 {
+    min-width: 0;
 }
 
-html.dark:not(.app-mobile):not(.tg-mini-app) .spotlight-container.mesh-gradient-bg,
-html:not(.app-mobile):not(.tg-mini-app).dark .spotlight-container.mesh-gradient-bg {
-    background-color: #070b14 !important;
-}
-
-html:not(.app-mobile):not(.tg-mini-app) .noise-overlay::after {
-    opacity: 0.02 !important;
-}
-
-/* ---- Sidebar ---- */
+/* ---- Sidebar desktop density ---- */
 html:not(.app-mobile):not(.tg-mini-app) .sidebar-2026 {
-    background: #ffffff !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-    border-right: 1px solid var(--ds-border, rgba(15, 23, 42, 0.08)) !important;
-    box-shadow: none !important;
-    width: 15.5rem; /* slightly tighter */
+    width: 16rem;
 }
 
-html.dark:not(.app-mobile):not(.tg-mini-app) .sidebar-2026,
-html:not(.app-mobile):not(.tg-mini-app).dark .sidebar-2026 {
-    background: #0b1220 !important;
-    border-right-color: rgba(255, 255, 255, 0.06) !important;
-}
-
-/* Brand block */
 html:not(.app-mobile):not(.tg-mini-app) .sidebar-2026 > div > div.p-5 {
-    padding: 1.25rem 1rem 1rem !important;
-    border-bottom-color: var(--ds-border, rgba(15, 23, 42, 0.06)) !important;
-}
-
-html:not(.app-mobile):not(.tg-mini-app) .sidebar-2026 .neon-glow {
-    box-shadow: none !important;
-    background: var(--theme-primary-600, #4f46e5) !important;
-    background-image: none !important;
-    border-radius: 12px !important;
+    padding: 1.35rem 1.1rem 1.1rem !important;
 }
 
 html:not(.app-mobile):not(.tg-mini-app) .sidebar-2026 h1 {
     font-weight: 700 !important;
-    font-size: 0.95rem !important;
-    letter-spacing: -0.02em !important;
+    font-size: 0.98rem !important;
+    letter-spacing: -0.03em !important;
+    line-height: 1.25 !important;
 }
 
 html:not(.app-mobile):not(.tg-mini-app) .sidebar-2026 h1 + p,
@@ -68,44 +38,23 @@ html:not(.app-mobile):not(.tg-mini-app) .sidebar-2026 p.text-\[10px\] {
     color: var(--ds-ink-muted, #64748b) !important;
 }
 
-/* Superadmin org switcher — less loud */
-html:not(.app-mobile):not(.tg-mini-app) .sidebar-2026 .bg-indigo-50\/90,
-html:not(.app-mobile):not(.tg-mini-app) .sidebar-2026 .dark\:bg-indigo-950\/40 {
-    background: var(--ds-surface-2, #f8fafc) !important;
-    border: 1px solid var(--ds-border, #e2e8f0) !important;
-    border-width: 1px !important;
-    box-shadow: none !important;
-}
-
-/* Nav items */
 html:not(.app-mobile):not(.tg-mini-app) .sidebar-2026 nav a.group {
-    font-weight: 500 !important;
-    border-radius: 10px !important;
-    padding-top: 0.45rem !important;
-    padding-bottom: 0.45rem !important;
-}
-
-html:not(.app-mobile):not(.tg-mini-app) .sidebar-2026 nav a.group.bg-white\/60,
-html:not(.app-mobile):not(.tg-mini-app) .sidebar-2026 nav a[class*='bg-white/60'] {
-    background: var(--ds-accent-soft, rgba(79, 70, 229, 0.1)) !important;
-    border-color: transparent !important;
-    box-shadow: none !important;
-    color: var(--theme-primary-700, #4338ca) !important;
-}
-
-html:not(.app-mobile):not(.tg-mini-app) .sidebar-2026 .sidebar-indicator {
-    background: var(--theme-primary-600, #4f46e5) !important;
-    box-shadow: none !important;
-    height: 1rem !important;
-    width: 3px !important;
-    border-radius: 2px !important;
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
+    margin-bottom: 2px;
 }
 
 html:not(.app-mobile):not(.tg-mini-app) .sidebar-2026 nav a.group svg {
     transform: none !important;
+    opacity: 0.88;
 }
 
-/* User footer */
+html:not(.app-mobile):not(.tg-mini-app) .sidebar-2026 nav a.group.bg-white\/60 svg,
+html:not(.app-mobile):not(.tg-mini-app) .sidebar-2026 nav a[class*='bg-white/60'] svg {
+    opacity: 1;
+    color: var(--theme-primary-600, #4f46e5);
+}
+
 html:not(.app-mobile):not(.tg-mini-app) .sidebar-2026 .uppercase.truncate {
     text-transform: none !important;
     font-weight: 500 !important;
@@ -113,112 +62,105 @@ html:not(.app-mobile):not(.tg-mini-app) .sidebar-2026 .uppercase.truncate {
     letter-spacing: 0 !important;
 }
 
-/* ---- Main content area ---- */
-html:not(.app-mobile):not(.tg-mini-app) main.flex-1 > div.animate-page-in {
-    padding: 1.5rem 1.75rem 2rem !important;
-    max-width: 100%;
+/* Superadmin org switcher */
+html:not(.app-mobile):not(.tg-mini-app) .sidebar-2026 .bg-indigo-50\/90,
+html:not(.app-mobile):not(.tg-mini-app) .sidebar-2026 .dark\:bg-indigo-950\/40 {
+    background: var(--ds-accent-soft) !important;
+    border: 1px solid color-mix(in srgb, var(--theme-primary-500, #6366f1) 18%, transparent) !important;
+    box-shadow: none !important;
+    border-radius: 12px !important;
 }
 
-/* Page titles */
-html:not(.app-mobile):not(.tg-mini-app) main h1.text-3xl,
-html:not(.app-mobile):not(.tg-mini-app) main h1.text-2xl,
-html:not(.app-mobile):not(.tg-mini-app) main h1.text-4xl {
-    font-weight: 600 !important;
-    letter-spacing: -0.03em !important;
-    color: var(--ds-ink, #0f172a);
-}
-
-/* Soften uppercase micro labels on desktop toolbars */
-html:not(.app-mobile):not(.tg-mini-app) main label.text-xs.font-bold.uppercase,
-html:not(.app-mobile):not(.tg-mini-app) main .text-xs.font-bold.uppercase {
-    text-transform: none !important;
-    letter-spacing: -0.01em !important;
-    font-weight: 600 !important;
-    font-size: 0.75rem !important;
-    color: var(--ds-ink-muted, #64748b) !important;
-}
-
-/* Toolbars / filter panels */
+/* ---- Page headers: common white cards ---- */
 html:not(.app-mobile):not(.tg-mini-app) main .bg-white.dark\:bg-dark-800.rounded-2xl.shadow-sm,
 html:not(.app-mobile):not(.tg-mini-app) main .bg-white.dark\:bg-dark-800.p-4.rounded-2xl,
 html:not(.app-mobile):not(.tg-mini-app) main .bg-white.dark\:bg-dark-800.p-5.rounded-2xl,
 html:not(.app-mobile):not(.tg-mini-app) main .bg-white.dark\:bg-dark-800.p-6.rounded-2xl {
-    border-radius: var(--ds-radius-lg, 16px) !important;
+    border-radius: var(--ds-radius-lg, 18px) !important;
     box-shadow: var(--ds-shadow-sm) !important;
     border-color: var(--ds-border) !important;
+    background: color-mix(in srgb, var(--ds-surface) 96%, transparent) !important;
+    backdrop-filter: blur(10px);
 }
 
-/* Tables denser & calmer */
-html:not(.app-mobile):not(.tg-mini-app) main table thead th {
-    font-weight: 600 !important;
-    text-transform: none !important;
-    letter-spacing: -0.01em !important;
-    font-size: 0.75rem !important;
-    color: var(--ds-ink-muted, #64748b) !important;
-    background: var(--ds-surface-2, #f8fafc) !important;
+/* ---- Dashboard hero ---- */
+html:not(.app-mobile):not(.tg-mini-app) .desktop-dash-hero h1 {
+    font-size: 1.95rem !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.04em !important;
+    line-height: 1.15 !important;
 }
 
-html:not(.app-mobile):not(.tg-mini-app) main table tbody td {
-    font-size: 0.875rem !important;
+html:not(.app-mobile):not(.tg-mini-app) .desktop-dash-hero .desktop-quick-row a {
+    border-radius: 14px;
+    border: 1px solid var(--ds-border);
+    background: color-mix(in srgb, var(--ds-surface) 92%, transparent);
+    box-shadow: var(--ds-shadow-sm);
+    transition:
+        border-color 0.18s var(--ds-ease),
+        background 0.18s var(--ds-ease),
+        transform 0.18s var(--ds-ease),
+        box-shadow 0.18s var(--ds-ease);
 }
 
-/* Primary buttons on desktop — solid, no glow */
-html:not(.app-mobile):not(.tg-mini-app) .btn-primary,
-html:not(.app-mobile):not(.tg-mini-app) .btn-glow {
-    box-shadow: none !important;
-    border-radius: 10px !important;
+html:not(.app-mobile):not(.tg-mini-app) .desktop-dash-hero .desktop-quick-row a:hover {
+    border-color: color-mix(in srgb, var(--theme-primary-500, #6366f1) 30%, var(--ds-border));
+    background: var(--ds-surface);
+    transform: translateY(-1px);
+    box-shadow: var(--ds-shadow);
 }
 
-html:not(.app-mobile):not(.tg-mini-app) .btn-glow::after {
-    display: none !important;
-}
-
-/* Dashboard widget grid */
+/* ---- Bento grid breathing room ---- */
 html:not(.app-mobile):not(.tg-mini-app) .bento-card {
-    border-radius: 16px !important;
+    border-radius: 18px !important;
 }
 
 html:not(.app-mobile):not(.tg-mini-app) .bento-card h3 {
     font-weight: 600 !important;
-    letter-spacing: -0.02em;
+    letter-spacing: -0.025em;
 }
 
-/* Command palette / modals already float-panel */
+/* ---- Segmented controls (День/Месяц etc.) ---- */
+html:not(.app-mobile):not(.tg-mini-app) main .bg-slate-100.dark\:bg-dark-700.p-1.rounded-xl,
+html:not(.app-mobile):not(.tg-mini-app) main .bg-slate-100.dark\:bg-slate-700.p-1.rounded-xl {
+    background: var(--ds-surface-3) !important;
+    border: 1px solid var(--ds-border);
+    box-shadow: inset 0 1px 1px rgba(15, 23, 42, 0.03);
+}
 
-/* Scrollbars */
+/* ---- Scrollbars desktop ---- */
 html:not(.app-mobile):not(.tg-mini-app) .custom-scrollbar-2026::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 9px;
+    height: 9px;
 }
+
 html:not(.app-mobile):not(.tg-mini-app) .custom-scrollbar-2026::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
+    background: #c5cdd8;
     border-radius: 999px;
     border: 2px solid transparent;
     background-clip: padding-box;
 }
 
-/* Desktop dashboard hero */
-html:not(.app-mobile):not(.tg-mini-app) .desktop-dash-hero h1 {
-    font-size: 1.875rem !important;
-    font-weight: 600 !important;
-    letter-spacing: -0.035em !important;
-    line-height: 1.2 !important;
+/* ---- Login page (desktop) ---- */
+html:not(.app-mobile):not(.tg-mini-app) .login-2026-card {
+    border-radius: 28px !important;
+    box-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.6) inset,
+        0 24px 64px rgba(15, 23, 42, 0.12),
+        0 8px 24px rgba(79, 70, 229, 0.08) !important;
 }
 
-html:not(.app-mobile):not(.tg-mini-app) .desktop-dash-hero .desktop-quick-row a {
-    border-radius: 12px;
-    border: 1px solid var(--ds-border);
-    background: var(--ds-surface);
-    box-shadow: var(--ds-shadow-sm);
-    transition: border-color 0.15s ease, background 0.15s ease;
+html:not(.app-mobile):not(.tg-mini-app) .login-2026-orb {
+    filter: blur(48px);
+    opacity: 0.55;
 }
 
-html:not(.app-mobile):not(.tg-mini-app) .desktop-dash-hero .desktop-quick-row a:hover {
-    border-color: var(--ds-border-strong);
-    background: var(--ds-surface-2);
+/* ---- Compact density (optional class on html) ---- */
+html.compact:not(.app-mobile):not(.tg-mini-app) main.flex-1 > div.animate-page-in {
+    padding: 1rem 1.25rem 1.5rem !important;
 }
 
-/* Status widget in sidebar — quieter */
-html:not(.app-mobile):not(.tg-mini-app) .sidebar-2026 .modern-card {
-    box-shadow: none !important;
+html.compact:not(.app-mobile):not(.tg-mini-app) .sidebar-2026 nav a.group {
+    padding-top: 0.35rem !important;
+    padding-bottom: 0.35rem !important;
 }

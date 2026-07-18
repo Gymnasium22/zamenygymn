@@ -331,15 +331,17 @@ export const AbsenteeismPage = () => {
     return (
         <div className="space-y-6 max-w-7xl mx-auto">
             {/* Header */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white dark:bg-dark-800 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white dark:bg-dark-800 p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700">
                 <div className="app-mobile-page-head">
-                    <h1 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
-                        <div className="p-2 bg-rose-100 dark:bg-rose-900/30 rounded-lg text-rose-600 dark:text-rose-400">
-                            <Icon name="UserX" size={24} />
+                    <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-3 tracking-tight">
+                        <div className="p-2.5 bg-rose-100 dark:bg-rose-900/30 rounded-xl text-rose-600 dark:text-rose-400 shadow-sm">
+                            <Icon name="UserX" size={22} />
                         </div>
                         Пропуски занятий
                     </h1>
-                    <p className="text-slate-500 dark:text-slate-400 mt-1">Учет отсутствующих учащихся</p>
+                    <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm sm:text-base">
+                        Учёт отсутствующих учащихся
+                    </p>
                 </div>
 
                 <div className="flex flex-nowrap items-center justify-end gap-3 w-full md:w-auto">

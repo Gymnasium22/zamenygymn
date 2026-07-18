@@ -78,11 +78,11 @@ html.dark.app-mobile .mesh-gradient-bg {
     flex-shrink: 0;
     z-index: 35;
     padding: calc(4px + var(--m-safe-t)) max(12px, var(--m-safe-r)) 6px max(12px, var(--m-safe-l));
-    background: color-mix(in srgb, var(--ds-surface, #fff) 86%, transparent);
-    backdrop-filter: blur(20px) saturate(1.2);
-    -webkit-backdrop-filter: blur(20px) saturate(1.2);
+    background: color-mix(in srgb, var(--ds-surface, #fff) 90%, transparent);
+    backdrop-filter: blur(22px) saturate(1.25);
+    -webkit-backdrop-filter: blur(22px) saturate(1.25);
     border-bottom: 1px solid var(--ds-border, rgba(15, 23, 42, 0.06));
-    box-shadow: none;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.55) inset, 0 6px 18px rgba(15, 23, 42, 0.03);
 }
 
 html.dark .app-mobile-header {
