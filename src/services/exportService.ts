@@ -1,5 +1,63 @@
 import DOMPurify from 'dompurify';
 import { logger } from '../utils/logger';
+import { isInsideTelegram } from '../miniapp/telegram';
+
+const UNSAFE_COLOR = /oklch|oklab|lch\(|lab\(|color-mix|color\(/i;
+
+const asCssColor = (value: string, fallback: string): string => {
+    if (!value || value === 'none' || UNSAFE_COLOR.test(value)) return fallback;
+    return value;
+};
+
+/** html2canvas cannot parse color-mix / oklch used by the 2026 theme. Inline rgb() from computed styles. */
+const flattenPaintStyles = (source: HTMLElement, target: HTMLElement) => {
+    const apply = (src: Element, dst: Element) => {
+        if (src instanceof HTMLElement && dst instanceof HTMLElement) {
+            const cs = window.getComputedStyle(src);
+            dst.style.color = asCssColor(cs.color, '#0f172a');
+            dst.style.backgroundColor = asCssColor(cs.backgroundColor, 'transparent');
+            dst.style.backgroundImage = 'none';
+            dst.style.boxShadow = 'none';
+            dst.style.textShadow = 'none';
+            dst.style.filter = 'none';
+            dst.style.backdropFilter = 'none';
+            dst.style.borderTopColor = asCssColor(cs.borderTopColor, 'transparent');
+            dst.style.borderRightColor = asCssColor(cs.borderRightColor, 'transparent');
+            dst.style.borderBottomColor = asCssColor(cs.borderBottomColor, 'transparent');
+            dst.style.borderLeftColor = asCssColor(cs.borderLeftColor, 'transparent');
+            dst.style.outlineColor = asCssColor(cs.outlineColor, 'transparent');
+            dst.style.textDecorationColor = asCssColor(cs.textDecorationColor, dst.style.color);
+        }
+        const srcKids = src.children;
+        const dstKids = dst.children;
+        for (let i = 0; i < srcKids.length && i < dstKids.length; i++) {
+            apply(srcKids[i], dstKids[i]);
+        }
+    };
+    apply(source, target);
+};
+
+const canvasScaleFor = (width: number, height: number): number => {
+    const w = Math.max(1, width);
+    const h = Math.max(1, height);
+    const maxSide = 4096;
+    const maxArea = 16_777_216;
+    const bySide = Math.min(maxSide / w, maxSide / h);
+    const byArea = Math.sqrt(maxArea / (w * h));
+    return Math.max(1, Math.min(2, bySide, byArea));
+};
+
+const triggerAnchorDownload = (blob: Blob, fileName: string) => {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    link.rel = 'noopener';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.setTimeout(() => URL.revokeObjectURL(url), 2500);
+};
 
 /**
  * Service for handling data exports to various formats (Excel, PNG, CSV).
@@ -59,6 +117,66 @@ export const exportService = {
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
+    },
+
+    /**
+     * Rasterize a DOM node to PNG and save it.
+     * Isolates the clone from theme CSS (color-mix/oklch) that html2canvas cannot parse.
+     * In Telegram uses the system share sheet (download attribute is ignored there).
+     */
+    captureAndDownloadPng: async (element: HTMLElement, fileName: string): Promise<void> => {
+        const { default: html2canvas } = await import('html2canvas');
+        const clone = element.cloneNode(true) as HTMLElement;
+        flattenPaintStyles(element, clone);
+        clone.style.position = 'fixed';
+        clone.style.left = '-12000px';
+        clone.style.top = '0';
+        clone.style.zIndex = '-1';
+        clone.style.margin = '0';
+        clone.style.backgroundColor = '#ffffff';
+        clone.style.boxShadow = 'none';
+        clone.style.width = `${Math.max(element.scrollWidth, element.offsetWidth, 800)}px`;
+        clone.style.maxWidth = 'none';
+        document.body.appendChild(clone);
+
+        try {
+            const scale = canvasScaleFor(clone.scrollWidth || 800, clone.scrollHeight || 600);
+            const canvas = await html2canvas(clone, {
+                scale,
+                backgroundColor: '#ffffff',
+                logging: false,
+                useCORS: true,
+                allowTaint: false,
+                foreignObjectRendering: false,
+                onclone: (_doc, clonedEl) => {
+                    clonedEl.style.backgroundColor = '#ffffff';
+                    clonedEl.style.boxShadow = 'none';
+                }
+            });
+            const blob = await new Promise<Blob>((resolve, reject) => {
+                canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob returned empty'))), 'image/png');
+            });
+
+            const file = new File([blob], fileName, { type: 'image/png' });
+            const canShareFiles =
+                typeof navigator.share === 'function' &&
+                typeof navigator.canShare === 'function' &&
+                navigator.canShare({ files: [file] });
+
+            if (isInsideTelegram() && canShareFiles) {
+                try {
+                    await navigator.share({ files: [file], title: fileName });
+                    return;
+                } catch (shareErr) {
+                    if ((shareErr as { name?: string }).name === 'AbortError') return;
+                    logger.warn('Share failed, falling back to download', shareErr);
+                }
+            }
+
+            triggerAnchorDownload(blob, fileName);
+        } finally {
+            clone.remove();
+        }
     },
 
     /**

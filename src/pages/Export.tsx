@@ -1283,22 +1283,15 @@ export const ExportPage = () => {
                 addToast({ type: 'warning', title: 'Внимание', message: 'Нет замен для 1-й смены.' });
                 return;
             }
-
-            const { default: html2canvas } = await import('html2canvas');
-            const canvas1 = await html2canvas(printRef1.current, {
-                scale: 2,
-                backgroundColor: '#ffffff',
-                logging: false
-            });
-            const link = document.createElement('a');
-            link.href = canvas1.toDataURL('image/png');
-            link.download = `Замены_${exportDate}_1смена.png`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            await exportService.captureAndDownloadPng(printRef1.current, `Замены_${exportDate}_1смена.png`);
+            addToast({ type: 'success', title: 'Готово', message: 'Изображение 1-й смены сформировано' });
         } catch (e) {
             logger.error(e);
-            addToast({ type: 'danger', title: 'Ошибка', message: 'Ошибка при создании изображения' });
+            addToast({
+                type: 'danger',
+                title: 'Ошибка',
+                message: 'Не удалось создать изображение. Попробуйте ещё раз или используйте Excel.'
+            });
         } finally {
             setIsGenerating(false);
         }
@@ -1311,22 +1304,15 @@ export const ExportPage = () => {
                 addToast({ type: 'warning', title: 'Внимание', message: 'Нет замен для 2-й смены.' });
                 return;
             }
-
-            const { default: html2canvas } = await import('html2canvas');
-            const canvas2 = await html2canvas(printRef2.current, {
-                scale: 2,
-                backgroundColor: '#ffffff',
-                logging: false
-            });
-            const link = document.createElement('a');
-            link.href = canvas2.toDataURL('image/png');
-            link.download = `Замены_${exportDate}_2смена.png`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            await exportService.captureAndDownloadPng(printRef2.current, `Замены_${exportDate}_2смена.png`);
+            addToast({ type: 'success', title: 'Готово', message: 'Изображение 2-й смены сформировано' });
         } catch (e) {
             logger.error(e);
-            addToast({ type: 'danger', title: 'Ошибка', message: 'Ошибка при создании изображения' });
+            addToast({
+                type: 'danger',
+                title: 'Ошибка',
+                message: 'Не удалось создать изображение. Попробуйте ещё раз или используйте Excel.'
+            });
         } finally {
             setIsGenerating(false);
         }
