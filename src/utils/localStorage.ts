@@ -6,6 +6,15 @@
 
 import { logger } from './logger';
 
+export const LOCAL_BACKUP_KEY_BASE = 'gym_data_local_backup_v2';
+export const SYNC_QUEUE_KEY_BASE = 'gym_sync_queue_backup';
+
+export const localBackupKey = (organizationId?: string | null): string =>
+    organizationId ? `${LOCAL_BACKUP_KEY_BASE}_${organizationId}` : LOCAL_BACKUP_KEY_BASE;
+
+export const syncQueueKey = (organizationId?: string | null): string =>
+    organizationId ? `${SYNC_QUEUE_KEY_BASE}_${organizationId}` : SYNC_QUEUE_KEY_BASE;
+
 export const safeLocalStorageGet = (key: string): string | null => {
     try {
         return localStorage.getItem(key);

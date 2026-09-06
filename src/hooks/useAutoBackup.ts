@@ -1,18 +1,31 @@
 import { useEffect, useRef } from 'react';
-import { useStaticData } from '../context/DataContext';
+import { useData } from '../context/DataContext';
 import { formatDateISO, formatDateEuropean } from '../utils/helpers';
 import { AppData } from '../types';
-import { safeLocalStorageGet, safeLocalStorageSet } from '../utils/localStorage';
+import { safeLocalStorageGet, safeLocalStorageSet, localBackupKey } from '../utils/localStorage';
 import { logger } from '../utils/logger';
+import { useAuth } from '../context/AuthContext';
 
 const LAST_BACKUP_KEY = 'gym_last_auto_backup_date';
 
+const serializeBackup = (appData: AppData, organizationId: string | null | undefined): string | null => {
+    try {
+        const live = JSON.stringify(appData);
+        if (live && live.length > 2) return live;
+    } catch (e) {
+        logger.warn('Failed to serialize live data for backup', e);
+    }
+    return safeLocalStorageGet(localBackupKey(organizationId));
+};
+
 const performBackup = async (
+    appData: AppData,
+    organizationId: string | null | undefined,
     settings: AppData['settings'],
     privateSettings: AppData['privateSettings'],
     signal: AbortSignal
 ) => {
-    const data = safeLocalStorageGet('gym_data_local_backup_v2');
+    const data = serializeBackup(appData, organizationId);
     if (!data) return;
 
     const blob = new Blob([data], { type: 'application/json' });
@@ -42,7 +55,10 @@ const performBackup = async (
 };
 
 export const useAutoBackup = () => {
-    const { settings, privateSettings } = useStaticData();
+    const { data } = useData();
+    const { organizationId } = useAuth();
+    const settings = data.settings;
+    const privateSettings = data.privateSettings;
     const lastCheckRef = useRef<number>(-1);
     const abortRef = useRef<AbortController | null>(null);
 
@@ -68,7 +84,7 @@ export const useAutoBackup = () => {
                     safeLocalStorageSet(LAST_BACKUP_KEY, todayStr);
                     abortRef.current?.abort();
                     abortRef.current = new AbortController();
-                    performBackup(settings, privateSettings, abortRef.current.signal);
+                    performBackup(data, organizationId, settings, privateSettings, abortRef.current.signal);
                 }
             }
         }, 30000); // Check every 30 seconds
@@ -77,5 +93,5 @@ export const useAutoBackup = () => {
             clearInterval(interval);
             abortRef.current?.abort();
         };
-    }, [settings, privateSettings]);
+    }, [data, organizationId, settings, privateSettings]);
 };

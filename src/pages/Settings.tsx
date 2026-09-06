@@ -19,7 +19,8 @@ import { INITIAL_DATA, getInitialData } from '../constants';
 import { formatDateEuropean, formatDateISO, formatDateTimeEuropean, formatTimeHM, generateId } from '../utils/helpers';
 import { auditLog } from '../services/auditLog';
 import { logger } from '../utils/logger';
-import { safeLocalStorageGet, safeLocalStorageRemove } from '../utils/localStorage';
+import { safeLocalStorageGet, safeLocalStorageRemove, localBackupKey, syncQueueKey, LOCAL_BACKUP_KEY_BASE, SYNC_QUEUE_KEY_BASE } from '../utils/localStorage';
+import { isInsideTelegram } from '../miniapp/telegram';
 import { stripDangerousKeys } from '../utils/safeMerge';
 import { formatAnnouncement } from '../utils/announcementFormat';
 import { SemesterConfig } from '../components/settings/SemesterConfig';
@@ -369,9 +370,9 @@ export const SettingsPage = () => {
         nutritionRecords,
         absenteeismRecords
     } = useScheduleData();
-    const { saveData } = useData();
+    const { saveData, data } = useData();
     const { addToast } = useToast();
-    const { role } = useAuth();
+    const { role, organizationId } = useAuth();
 
     const visibleSections = role === 'superadmin'
         ? SECTIONS
@@ -1663,6 +1664,8 @@ export const SettingsPage = () => {
                                 <BackupControls
                                     settings={settings}
                                     privateSettings={privateSettings}
+                                    backupPayload={JSON.stringify(data)}
+                                    organizationId={organizationId}
                                     autoBackup={autoBackup}
                                     backupTime={backupTime}
                                     onAutoBackupChange={setAutoBackup}
@@ -1916,8 +1919,10 @@ export const SettingsPage = () => {
                                 <button
                                     onClick={() => {
                                         if (window.confirm('Очистить локальный кэш? Данные в облаке останутся, но после очистки потребуется повторная загрузка.')) {
-                                            safeLocalStorageRemove('gym_data_local_backup_v2');
-                                            safeLocalStorageRemove('gym_sync_queue_backup');
+                                            safeLocalStorageRemove(localBackupKey(organizationId));
+                                            safeLocalStorageRemove(LOCAL_BACKUP_KEY_BASE);
+                                            safeLocalStorageRemove(syncQueueKey(organizationId));
+                                            safeLocalStorageRemove(SYNC_QUEUE_KEY_BASE);
                                             safeLocalStorageRemove('gym_calendar_events');
                                             addToast({ type: 'success', title: 'Кэш очищен', message: 'Локальные данные удалены' });
                                         }
@@ -1951,45 +1956,86 @@ export const SettingsPage = () => {
 const BackupControls: React.FC<{
     settings: AppData['settings'];
     privateSettings: AppData['privateSettings'];
+    backupPayload: string;
+    organizationId: string | null;
     autoBackup: boolean;
     backupTime: string;
     onAutoBackupChange: (v: boolean) => void;
     onBackupTimeChange: (v: string) => void;
     onSave: () => void;
     isSaving: boolean;
-}> = ({ settings, privateSettings, autoBackup, backupTime, onAutoBackupChange, onBackupTimeChange, onSave, isSaving }) => {
+}> = ({
+    settings,
+    privateSettings,
+    backupPayload,
+    organizationId,
+    autoBackup,
+    backupTime,
+    onAutoBackupChange,
+    onBackupTimeChange,
+    onSave,
+    isSaving
+}) => {
     const { addToast } = useToast();
     const [isBackingUp, setIsBackingUp] = useState(false);
 
     const handleBackupNow = async () => {
         setIsBackingUp(true);
         try {
-            const data = safeLocalStorageGet('gym_data_local_backup_v2');
+            const data =
+                (backupPayload && backupPayload.length > 2 ? backupPayload : null) ||
+                safeLocalStorageGet(localBackupKey(organizationId)) ||
+                safeLocalStorageGet(LOCAL_BACKUP_KEY_BASE);
             if (!data) {
                 addToast({ type: 'warning', title: 'Бэкап', message: 'Нет данных для бэкапа' });
                 return;
             }
+            const fileName = `gymnasium_backup_${formatDateISO()}.json`;
             const blob = new Blob([data], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `gymnasium_backup_${formatDateISO()}.json`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
+            const file = new File([blob], fileName, { type: 'application/json' });
 
-            // Send to Telegram if configured
+            const canShareFiles =
+                typeof navigator.share === 'function' &&
+                typeof navigator.canShare === 'function' &&
+                navigator.canShare({ files: [file] });
+
+            if (isInsideTelegram() && canShareFiles) {
+                try {
+                    await navigator.share({ files: [file], title: fileName });
+                } catch (shareErr) {
+                    if ((shareErr as { name?: string }).name !== 'AbortError') {
+                        logger.warn('Backup share failed', shareErr);
+                    }
+                }
+            } else {
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = fileName;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            }
+
             if (privateSettings.telegramToken && settings.feedbackChatId) {
                 const formData = new FormData();
                 formData.append('chat_id', settings.feedbackChatId);
-                formData.append('caption', `Автобэкап ${formatDateEuropean(new Date())}`);
-                formData.append('document', new File([blob], `backup_${formatDateISO()}.json`, { type: 'application/json' }));
-                await fetch(
+                formData.append('caption', `Бэкап ${formatDateEuropean(new Date())}`);
+                formData.append('document', file);
+                const tgRes = await fetch(
                     `https://api.telegram.org/bot${privateSettings.telegramToken}/sendDocument`,
                     { method: 'POST', body: formData }
                 );
-                addToast({ type: 'success', title: 'Бэкап', message: 'Файл сохранён и отправлен в Telegram' });
+                if (!tgRes.ok) {
+                    addToast({
+                        type: 'warning',
+                        title: 'Бэкап',
+                        message: 'Файл сформирован, но отправка в Telegram не удалась'
+                    });
+                } else {
+                    addToast({ type: 'success', title: 'Бэкап', message: 'Файл сохранён и отправлен в Telegram' });
+                }
             } else {
                 addToast({ type: 'success', title: 'Бэкап', message: 'Файл сохранён' });
             }

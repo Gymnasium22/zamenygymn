@@ -14,7 +14,7 @@ import { useAuth } from './AuthContext';
 import { getActiveSemester, generateId } from '../utils/helpers';
 import { produce } from 'immer';
 import { auditLog } from '../services/auditLog';
-import { safeLocalStorageGet, safeLocalStorageSet } from '../utils/localStorage';
+import { safeLocalStorageGet, safeLocalStorageSet, localBackupKey, syncQueueKey, SYNC_QUEUE_KEY_BASE } from '../utils/localStorage';
 import { logger } from '../utils/logger';
 
 interface FullDataContextType {
@@ -42,12 +42,8 @@ interface DataMetaContextType {
 const FullDataContext = createContext<FullDataContextType | undefined>(undefined);
 const DataMetaContext = createContext<DataMetaContextType | undefined>(undefined);
 
-const LOCAL_STORAGE_KEY = 'gym_data_local_backup_v2';
-const PERSISTENT_QUEUE_KEY = 'gym_sync_queue_backup';
-const getLocalStorageKey = (organizationId: string | null | undefined) =>
-    organizationId ? `${LOCAL_STORAGE_KEY}_${organizationId}` : LOCAL_STORAGE_KEY;
-const getQueueKey = (organizationId: string | null | undefined) =>
-    organizationId ? `${PERSISTENT_QUEUE_KEY}_${organizationId}` : PERSISTENT_QUEUE_KEY;
+const getLocalStorageKey = localBackupKey;
+const getQueueKey = syncQueueKey;
 
 
 // Вспомогательные функции для безопасной работы с localStorage
@@ -73,7 +69,7 @@ const syncQueue = {
     isProcessing: false,
 
     load: (queueKey?: string) => {
-        const stored = safeLocalStorageGet(queueKey || PERSISTENT_QUEUE_KEY);
+        const stored = safeLocalStorageGet(queueKey || SYNC_QUEUE_KEY_BASE);
         if (stored) {
             try {
                 const parsed = JSON.parse(stored);
@@ -88,7 +84,7 @@ const syncQueue = {
 
     save: (queueKey?: string) => {
         try {
-            safeLocalStorageSet(queueKey || PERSISTENT_QUEUE_KEY, JSON.stringify(syncQueue.items));
+            safeLocalStorageSet(queueKey || SYNC_QUEUE_KEY_BASE, JSON.stringify(syncQueue.items));
         } catch (e) {
             logger.warn('Failed to save sync queue', e);
         }
