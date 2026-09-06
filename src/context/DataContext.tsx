@@ -489,10 +489,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                         const isDataError =
                             err.code === '23503' ||
                             err.code === '23505' ||
+                            err.code === '23514' ||
+                            err.code === '22P02' ||
+                            err.code === '42501' ||
                             err.code === 'PGRST204' ||
+                            err.code === 'PGRST301' ||
                             err.message?.includes('Could not find') ||
                             err.message?.includes('Conflict') ||
-                            err.message?.includes('violates foreign key');
+                            err.message?.includes('violates foreign key') ||
+                            err.message?.includes('row-level security') ||
+                            err.message?.includes('invalid input syntax');
                         if (isDataError) {
                             handleError.log('Data validation error (not queued):', dbError);
                             const isSchemaError = err.code === 'PGRST204' || err.message?.includes('Could not find');

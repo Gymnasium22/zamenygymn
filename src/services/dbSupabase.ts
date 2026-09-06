@@ -69,6 +69,39 @@ const asOrder = (value: unknown): number | null => {
     return null;
 };
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Empty string is not a valid UUID — sending it makes PostgREST reject the whole batch. */
+const asUuid = (value: unknown): string | null => {
+    if (typeof value !== 'string') return null;
+    const s = value.trim();
+    return UUID_RE.test(s) ? s : null;
+};
+
+const pickColumns = (obj: Record<string, unknown>, keys: string[]): Record<string, unknown> => {
+    const out: Record<string, unknown> = {};
+    for (const key of keys) {
+        if (obj[key] !== undefined) out[key] = obj[key];
+    }
+    return out;
+};
+
+const TEACHER_COLUMNS = [
+    'id',
+    'organization_id',
+    'name',
+    'shifts',
+    'max_periods',
+    'class_teacher_of',
+    'unavailable_dates',
+    'absence_reasons',
+    'birth_date',
+    'telegram_chat_id',
+    'order',
+    'created_at',
+    'updated_at'
+];
+
 const sortByOrder = <T extends { order?: number; name?: string }>(items: T[]): T[] =>
     [...items].sort((a, b) => {
         const ao = typeof a.order === 'number' ? a.order : Number.MAX_SAFE_INTEGER;
@@ -273,16 +306,18 @@ export const supabaseDbService = {
         }
         const genId = generateId;
 
-        // Helper to sync a table: delete removed rows, then upsert the rest
+        // Helper to sync a table: upsert first, then delete rows missing from the payload.
+        // Delete-then-insert used to wipe the table if the following insert/upsert failed
+        // (invalid UUID, extra column, FK) — data vanished after refresh.
         const syncTable = async (
             tableName: string,
             items: Array<Record<string, unknown>>,
-            mapItem: (item: Record<string, unknown>) => Record<string, unknown> | null
+            mapItem: (item: Record<string, unknown>) => Record<string, unknown> | null,
+            options?: { allowEmptyWipe?: boolean }
         ) => {
             if (!items) return;
             const mapped = items.map(mapItem).filter((item): item is Record<string, unknown> => item !== null);
 
-            // Get existing IDs from DB for this organization
             const { data: existing, error: fetchError } = await supabase
                 .from(tableName)
                 .select('id')
@@ -293,8 +328,21 @@ export const supabaseDbService = {
             const existingIds = new Set((existing || []).map((r: Record<string, unknown>) => r.id as string));
             const newIds = new Set(mapped.map((item) => item.id as string).filter(Boolean));
 
-            const idsToDelete = Array.from(existingIds).filter((id) => !newIds.has(id));
+            if (mapped.length === 0 && existingIds.size > 0 && !options?.allowEmptyWipe) {
+                logger.error(
+                    `[dbSupabase] Refusing to wipe ${tableName}: empty payload but ${existingIds.size} rows exist`
+                );
+                throw new Error(
+                    `Пустой список ${tableName} не записан — в базе уже есть данные. Обновите страницу и повторите.`
+                );
+            }
 
+            if (mapped.length > 0) {
+                const { error: upsertError } = await supabase.from(tableName).upsert(mapped);
+                if (upsertError) throw upsertError;
+            }
+
+            const idsToDelete = Array.from(existingIds).filter((id) => !newIds.has(id));
             if (idsToDelete.length > 0) {
                 const { error: deleteError } = await supabase
                     .from(tableName)
@@ -302,11 +350,6 @@ export const supabaseDbService = {
                     .eq('organization_id', orgId)
                     .in('id', idsToDelete);
                 if (deleteError) throw deleteError;
-            }
-
-            if (mapped.length > 0) {
-                const { error: upsertError } = await supabase.from(tableName).upsert(mapped);
-                if (upsertError) throw upsertError;
             }
         };
 
@@ -329,35 +372,51 @@ export const supabaseDbService = {
             await syncTable('teachers', teachers as unknown as Record<string, unknown>[], (t) => {
                 const obj = toSnakeCase(t);
                 if (!obj.id) obj.id = genId();
+                obj.id = asUuid(obj.id) || genId();
                 if (!obj.organization_id) obj.organization_id = orgId;
-                // M:N lives in teacher_subjects — do not write array column
-                delete obj.subject_ids;
+                obj.class_teacher_of = asUuid(obj.class_teacher_of);
                 obj.birth_date = asDateParam(obj.birth_date);
                 const ord = asOrder(obj.order);
                 if (ord !== null) obj.order = ord;
                 else delete obj.order;
-                return ensureTimestamps(obj);
+                if (!Array.isArray(obj.shifts)) obj.shifts = [];
+                if (!Array.isArray(obj.unavailable_dates)) obj.unavailable_dates = [];
+                if (obj.absence_reasons == null || typeof obj.absence_reasons !== 'object') obj.absence_reasons = {};
+                return ensureTimestamps(pickColumns(obj, TEACHER_COLUMNS));
             });
-
-            // Rebuild teacher ↔ subject links for this org
-            const { error: delLinksError } = await supabase
-                .from('teacher_subjects')
-                .delete()
-                .eq('organization_id', orgId);
-            if (delLinksError) throw delLinksError;
 
             const links: { teacher_id: string; subject_id: string; organization_id: string }[] = [];
             for (const t of teachers) {
-                const tid = t.id;
+                const tid = asUuid(t.id);
                 if (!tid) continue;
                 for (const sid of t.subjectIds || []) {
-                    if (!sid) continue;
-                    links.push({ teacher_id: tid, subject_id: sid, organization_id: orgId });
+                    const subjectId = asUuid(sid);
+                    if (!subjectId) continue;
+                    links.push({ teacher_id: tid, subject_id: subjectId, organization_id: orgId });
                 }
             }
             if (links.length > 0) {
                 const { error: insLinksError } = await supabase.from('teacher_subjects').upsert(links);
                 if (insLinksError) throw insLinksError;
+            }
+            const keepPairs = new Set(links.map((l) => `${l.teacher_id}:${l.subject_id}`));
+            const { data: existingLinks, error: fetchLinksError } = await supabase
+                .from('teacher_subjects')
+                .select('teacher_id, subject_id')
+                .eq('organization_id', orgId);
+            if (fetchLinksError) throw fetchLinksError;
+            const stale = (existingLinks || []).filter(
+                (row: { teacher_id: string; subject_id: string }) =>
+                    !keepPairs.has(`${row.teacher_id}:${row.subject_id}`)
+            );
+            for (const row of stale) {
+                const { error: delLinkError } = await supabase
+                    .from('teacher_subjects')
+                    .delete()
+                    .eq('organization_id', orgId)
+                    .eq('teacher_id', row.teacher_id)
+                    .eq('subject_id', row.subject_id);
+                if (delLinkError) throw delLinkError;
             }
         }
 
@@ -481,22 +540,47 @@ export const supabaseDbService = {
             const createdAt =
                 typeof raw.createdAt === 'string' && raw.createdAt.trim() ? raw.createdAt : now;
             return {
-                id: raw.id || genId(),
-                organization_id: raw.organizationId || orgId,
+                id: asUuid(raw.id) || genId(),
+                organization_id: asUuid(raw.organizationId) || orgId,
                 semester,
                 day: raw.day,
                 period: raw.period,
                 shift: raw.shift,
-                class_id: raw.classId || null,
-                subject_id: raw.subjectId || null,
-                teacher_id: raw.teacherId || null,
-                room_id: raw.roomId || null,
+                class_id: asUuid(raw.classId),
+                subject_id: asUuid(raw.subjectId),
+                teacher_id: asUuid(raw.teacherId),
+                room_id: asUuid(raw.roomId),
                 direction: raw.direction || null,
-                // Always stamp active institution year from settings (not stale row year)
                 academic_year: currentYear,
                 created_at: createdAt,
                 updated_at: now
             };
+        };
+
+        const syncScheduleSemester = async (semester: 1 | 2, rows: ScheduleItem[]) => {
+            const items = rows.map((s) => mapScheduleItem(s, semester)).filter(filterScheduleItem);
+            const { data: existing, error: fetchError } = await supabase
+                .from('schedule_items')
+                .select('id')
+                .eq('organization_id', orgId)
+                .eq('semester', semester);
+            if (fetchError) throw fetchError;
+            const existingIds = new Set((existing || []).map((r: { id: string }) => r.id));
+            if (items.length > 0) {
+                const { error: upsertError } = await supabase.from('schedule_items').upsert(items);
+                if (upsertError) throw upsertError;
+            }
+            const newIds = new Set(items.map((i) => i.id as string));
+            const idsToDelete = Array.from(existingIds).filter((id) => !newIds.has(id));
+            if (idsToDelete.length > 0) {
+                const { error: deleteError } = await supabase
+                    .from('schedule_items')
+                    .delete()
+                    .eq('organization_id', orgId)
+                    .eq('semester', semester)
+                    .in('id', idsToDelete);
+                if (deleteError) throw deleteError;
+            }
         };
 
         // During full imports, skip rows that reference classes/subjects/teachers/rooms
@@ -551,69 +635,26 @@ export const supabaseDbService = {
         };
 
         if (data.substitutions && (data.schedule || data.schedule2)) {
-            // Full backup restore: clear and insert with original IDs so AppData stays in sync
-            await supabase.from('schedule_items').delete().eq('organization_id', orgId);
+            if (data.schedule) await syncScheduleSemester(1, data.schedule);
+            if (data.schedule2) await syncScheduleSemester(2, data.schedule2);
 
-            if (data.schedule) {
-                const items = data.schedule
-                    .map((s) => mapScheduleItem(s, 1))
-                    .filter(filterScheduleItem);
-                if (items.length > 0) {
-                    const { error: insError } = await supabase.from('schedule_items').insert(items);
-                    if (insError) throw insError;
-                }
-            }
-
-            if (data.schedule2) {
-                const items = data.schedule2
-                    .map((s) => mapScheduleItem(s, 2))
-                    .filter(filterScheduleItem);
-                if (items.length > 0) {
-                    const { error: insError } = await supabase.from('schedule_items').insert(items);
-                    if (insError) throw insError;
-                }
-            }
-
-            await supabase.from('substitutions').delete().eq('organization_id', orgId);
-
-            const subItems = data.substitutions
-                .map((s) => {
-                    const obj = toSnakeCase(s as unknown as Record<string, unknown>);
+            await syncTable(
+                'substitutions',
+                data.substitutions as unknown as Record<string, unknown>[],
+                (s) => {
+                    const obj = toSnakeCase(s);
                     if (!obj.id) obj.id = genId();
+                    obj.id = asUuid(obj.id) || genId();
                     if (!obj.organization_id) obj.organization_id = orgId;
                     if (!obj.academic_year) obj.academic_year = currentYear;
                     obj.date = asDateParam(obj.date);
-                    return obj;
-                })
-                .filter(filterSubstitution);
-            if (subItems.length > 0) {
-                const { error: insError } = await supabase.from('substitutions').insert(subItems);
-                if (insError) throw insError;
-            }
+                    return filterSubstitution(obj) ? ensureTimestamps(obj) : null;
+                },
+                { allowEmptyWipe: true }
+            );
         } else {
-            // Normal incremental update
-            if (data.schedule) {
-                const { error: delError } = await supabase.from('schedule_items').delete().eq('semester', 1).eq('organization_id', orgId);
-                if (delError) throw delError;
-                const items = data.schedule
-                    .map((s) => mapScheduleItem(s, 1))
-                    .filter(filterScheduleItem);
-                if (items.length > 0) {
-                    const { error: insError } = await supabase.from('schedule_items').insert(items);
-                    if (insError) throw insError;
-                }
-            }
-            if (data.schedule2) {
-                const { error: delError } = await supabase.from('schedule_items').delete().eq('semester', 2).eq('organization_id', orgId);
-                if (delError) throw delError;
-                const items = data.schedule2
-                    .map((s) => mapScheduleItem(s, 2))
-                    .filter(filterScheduleItem);
-                if (items.length > 0) {
-                    const { error: insError } = await supabase.from('schedule_items').insert(items);
-                    if (insError) throw insError;
-                }
-            }
+            if (data.schedule) await syncScheduleSemester(1, data.schedule);
+            if (data.schedule2) await syncScheduleSemester(2, data.schedule2);
             if (data.substitutions) {
                 await syncTable('substitutions', data.substitutions as unknown as Record<string, unknown>[], (s) => {
                     const obj = toSnakeCase(s);
