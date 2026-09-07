@@ -856,6 +856,27 @@ html.app-mobile .subs-lesson-assign {
     min-width: 44px;
 }
 
+/* Substitutions: chrome compact, list fills the rest of the screen */
+html.app-mobile .app-mobile-content .pull-to-refresh:has(.subs-page) {
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    padding-bottom: calc(6px + var(--m-nav-h) + var(--m-safe-b));
+}
+
+html.app-mobile .subs-page {
+    flex: 1 1 auto;
+    min-height: 0;
+    height: 100%;
+    max-height: 100%;
+    overflow: hidden;
+    gap: 0.4rem !important;
+}
+
+html.app-mobile .subs-page .subs-mobile-chrome {
+    flex-shrink: 0;
+}
+
 /* Compact page padding on mobile shell */
 html.app-mobile .app-mobile-content .mb-8 {
     margin-bottom: 0.75rem !important;

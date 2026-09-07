@@ -17,8 +17,6 @@ import {
 import { escapeMarkdown } from '../utils/escapeHtml';
 import { logger } from '../utils/logger';
 import useMedia from 'use-media';
-import { VirtualList } from '../components/VirtualList';
-
 // Subcomponents
 import { TeacherCard } from '../components/Substitutions/TeacherCard';
 import { LessonCard } from '../components/Substitutions/LessonCard';
@@ -107,6 +105,8 @@ export const SubstitutionsPage = () => {
     const isMobile = useMedia({ maxWidth: 1023 });
     const [mobileTab, setMobileTab] = useState<'lessons' | 'teachers'>('lessons');
     const [dayCommentOpen, setDayCommentOpen] = useState(false);
+    const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
+    const [teacherFiltersOpen, setTeacherFiltersOpen] = useState(false);
 
     useEffect(() => {
         if (isMobile) setIsCompactMode(true);
@@ -1122,8 +1122,104 @@ export const SubstitutionsPage = () => {
     };
 
     return (
-        <div className="h-full flex flex-col gap-6">
-            {/* Top Bar with Actions */}
+        <div className={`h-full flex flex-col min-h-0 ${isMobile ? 'subs-page gap-2' : 'gap-6'}`}>
+            {isMobile ? (
+                <div className="subs-mobile-chrome shrink-0">
+                    <div className="flex items-center gap-1 bg-white dark:bg-dark-800 rounded-xl border border-slate-100 dark:border-slate-700 px-1 py-1">
+                        <button
+                            type="button"
+                            onClick={() => changeDate(-1)}
+                            className="min-h-[40px] min-w-[40px] flex items-center justify-center text-slate-500 rounded-lg"
+                            aria-label="Предыдущий день"
+                        >
+                            <Icon name="ArrowRight" className="rotate-180" size={18} />
+                        </button>
+                        <DateInput
+                            value={selectedDate}
+                            onChange={setSelectedDate}
+                            className="flex-1 min-w-0 px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-sm font-semibold text-center"
+                        />
+                        <button
+                            type="button"
+                            onClick={() => setToday()}
+                            className="px-2 min-h-[40px] text-[11px] font-bold text-indigo-700 dark:text-indigo-300"
+                        >
+                            Сегодня
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => changeDate(1)}
+                            className="min-h-[40px] min-w-[40px] flex items-center justify-center text-slate-500 rounded-lg"
+                            aria-label="Следующий день"
+                        >
+                            <Icon name="ArrowRight" size={18} />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setMobileToolsOpen((v) => !v)}
+                            className="min-h-[40px] min-w-[40px] flex items-center justify-center text-slate-600 dark:text-slate-300 rounded-lg"
+                            aria-label="Ещё действия"
+                            aria-expanded={mobileToolsOpen}
+                        >
+                            <Icon name="Menu" size={18} />
+                        </button>
+                    </div>
+                    {mobileToolsOpen && (
+                        <div className="mt-1.5 grid grid-cols-3 gap-1.5">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    sendSummaryToTelegram();
+                                    setMobileToolsOpen(false);
+                                }}
+                                disabled={isSendingSummary}
+                                className="h-10 rounded-xl bg-blue-600 text-white text-xs font-bold flex items-center justify-center gap-1 disabled:opacity-50"
+                            >
+                                <Icon name="Send" size={14} />
+                                Telegram
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    copyToClipboard();
+                                    setMobileToolsOpen(false);
+                                }}
+                                className="h-10 rounded-xl bg-indigo-600 text-white text-xs font-bold flex items-center justify-center gap-1"
+                            >
+                                <Icon name="Copy" size={14} />
+                                Копия
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setIsHistoryModalOpen(true);
+                                    setMobileToolsOpen(false);
+                                }}
+                                className="h-10 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center justify-center gap-1"
+                            >
+                                <Icon name="History" size={14} />
+                                История
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setDayCommentOpen((v) => !v)}
+                                className="col-span-3 h-9 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-500 text-xs font-semibold"
+                            >
+                                Комментарий к дню{dayComment.trim() ? ' · есть' : ''}
+                            </button>
+                        </div>
+                    )}
+                    {dayCommentOpen && (
+                        <textarea
+                            value={dayComment}
+                            onChange={(e) => setDayComment(e.target.value)}
+                            className="w-full mt-1.5 p-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm outline-none"
+                            rows={2}
+                            placeholder="Комментарий к дню для отчёта и PNG"
+                        />
+                    )}
+                </div>
+            ) : (
             <div className="flex flex-col gap-4">
                 <div className="bg-white dark:bg-dark-800 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
                     <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center">
@@ -1139,12 +1235,10 @@ export const SubstitutionsPage = () => {
                                     <Icon name="ArrowRight" className="rotate-180" size={18} />
                                 </button>
                                 <div className="flex-1 flex flex-col sm:flex-row items-center justify-center gap-2 font-bold text-slate-700 dark:text-slate-200 min-w-0">
-                                    {!isMobile && (
-                                        <div className="flex items-center gap-2">
-                                            <Icon name="Calendar" size={18} className="text-indigo-500" />
-                                            <span className="capitalize">{formatDateLong(selectedDate)}</span>
-                                        </div>
-                                    )}
+                                    <div className="flex items-center gap-2">
+                                        <Icon name="Calendar" size={18} className="text-indigo-500" />
+                                        <span className="capitalize">{formatDateLong(selectedDate)}</span>
+                                    </div>
                                     <DateInput
                                         value={selectedDate}
                                         onChange={setSelectedDate}
@@ -1196,70 +1290,42 @@ export const SubstitutionsPage = () => {
                         </div>
                     </div>
                     <div className="mt-3 sm:mt-4">
-                        {isMobile ? (
-                            <>
-                                <button
-                                    type="button"
-                                    onClick={() => setDayCommentOpen((v) => !v)}
-                                    className="w-full flex items-center justify-between gap-2 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 py-1"
-                                >
-                                    <span>
-                                        Комментарий к дню
-                                        {dayComment.trim() ? ' · есть' : ''}
-                                    </span>
-                                    <Icon
-                                        name="ChevronRight"
-                                        size={16}
-                                        className={dayCommentOpen ? '-rotate-90' : 'rotate-90'}
-                                    />
-                                </button>
-                                {dayCommentOpen && (
-                                    <textarea
-                                        value={dayComment}
-                                        onChange={(e) => setDayComment(e.target.value)}
-                                        className="w-full mt-1 p-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-sm text-slate-800 dark:text-slate-100 outline-none focus:ring-1 ring-indigo-500"
-                                        rows={2}
-                                        placeholder="Например: педсовет — попадёт в отчёт и PNG"
-                                    />
-                                )}
-                            </>
-                        ) : (
-                            <>
-                                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1 block leading-snug">
-                                    Общий комментарий (опционально)
-                                </label>
-                                <textarea
-                                    value={dayComment}
-                                    onChange={(e) => setDayComment(e.target.value)}
-                                    className="w-full mt-1 p-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-sm text-slate-800 dark:text-slate-100 outline-none focus:ring-1 ring-indigo-500"
-                                    rows={2}
-                                    placeholder='Например: "Замены связаны с педсоветом" — будет показано в отчёте и PNG.'
-                                />
-                            </>
-                        )}
+                        <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1 block leading-snug">
+                            Общий комментарий (опционально)
+                        </label>
+                        <textarea
+                            value={dayComment}
+                            onChange={(e) => setDayComment(e.target.value)}
+                            className="w-full mt-1 p-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-sm text-slate-800 dark:text-slate-100 outline-none focus:ring-1 ring-indigo-500"
+                            rows={2}
+                            placeholder='Например: "Замены связаны с педсоветом" — будет показано в отчёте и PNG.'
+                        />
                     </div>
                 </div>
             </div>
+            )}
 
             {/* Vacation Banner */}
             {isVacationDate && (
-                <div className="modern-card border border-slate-200 dark:border-slate-700 p-3 sm:p-4 flex items-start gap-3 animate-fade-in min-w-0">
-                    <div className="w-9 h-9 shrink-0 rounded-full bg-indigo-600 text-white flex items-center justify-center">
-                        <Icon name="Sun" size={16} />
+                <div className={`modern-card border border-slate-200 dark:border-slate-700 flex items-start gap-3 animate-fade-in min-w-0 shrink-0 ${isMobile ? 'p-2' : 'p-3 sm:p-4'}`}>
+                    <div className="w-8 h-8 shrink-0 rounded-full bg-indigo-600 text-white flex items-center justify-center">
+                        <Icon name="Sun" size={14} />
                     </div>
                     <div className="flex-1 min-w-0">
                         <p className="font-semibold text-slate-900 dark:text-white text-sm leading-snug">
                             Дата в период каникул
                         </p>
+                        {!isMobile && (
                         <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">
                             Расписание за этот месяц неактивно. Замены можно создать вручную.
                         </p>
+                        )}
                     </div>
                 </div>
             )}
 
             {/* Mobile Tabs Switcher */}
-            <div className="md:hidden flex bg-white dark:bg-dark-800 p-1 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 shrink-0 sticky top-0 z-10">
+            <div className="md:hidden flex bg-white dark:bg-dark-800 p-0.5 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 shrink-0">
                 <button
                     onClick={() => setMobileTab('lessons')}
                     className={`flex-1 min-h-[44px] py-2.5 text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${mobileTab === 'lessons' ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
@@ -1281,17 +1347,29 @@ export const SubstitutionsPage = () => {
                 </button>
             </div>
 
-            <div className="flex-1 flex flex-col md:flex-row gap-6 min-h-0">
+            <div className="flex-1 flex flex-col md:flex-row gap-6 min-h-0 overflow-hidden">
                 {/* Left Column: Teachers List */}
                 <div
-                    className={`w-full md:w-80 flex-col gap-4 ${isMobile && mobileTab !== 'teachers' ? 'hidden' : 'flex'}`}
+                    className={`w-full md:w-80 flex-col gap-4 min-h-0 ${isMobile && mobileTab !== 'teachers' ? 'hidden' : 'flex'}`}
                 >
-                    <div className="bg-white dark:bg-dark-800 p-4 sm:p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex-1 overflow-hidden flex flex-col min-h-0 md:min-h-[220px] max-h-none">
-                        <h3 className="font-bold text-slate-800 dark:text-slate-100 mb-3 sm:mb-4 flex items-center gap-2 min-w-0">
-                            <Icon name="UserX" size={18} className="text-red-500 shrink-0" />
-                            <span className="truncate">Отсутствующие</span>
-                        </h3>
+                    <div className="bg-white dark:bg-dark-800 p-3 sm:p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex-1 overflow-hidden flex flex-col min-h-0">
+                        <div className="flex items-center justify-between gap-2 mb-2 sm:mb-4 shrink-0">
+                            <h3 className="font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2 min-w-0">
+                                <Icon name="UserX" size={18} className="text-red-500 shrink-0" />
+                                <span className="truncate">Отсутствующие</span>
+                            </h3>
+                            {isMobile && (
+                                <button
+                                    type="button"
+                                    onClick={() => setTeacherFiltersOpen((v) => !v)}
+                                    className="text-xs font-bold text-indigo-600 dark:text-indigo-400 min-h-[36px] px-2"
+                                >
+                                    {teacherFiltersOpen ? 'Скрыть фильтр' : 'Фильтр'}
+                                </button>
+                            )}
+                        </div>
 
+                        {(!isMobile || teacherFiltersOpen) && (
                         <TeacherFilter
                             shiftFilter={teacherShiftFilter}
                             onShiftChange={setTeacherShiftFilter}
@@ -1301,48 +1379,28 @@ export const SubstitutionsPage = () => {
                             searchQuery={teacherSearch}
                             onSearchChange={setTeacherSearch}
                         />
+                        )}
 
-                        <div className="flex-1 overflow-hidden pr-1">
-                            {filteredTeachersList.length > 20 ? (
-                                <VirtualList
-                                    items={filteredTeachersList}
-                                    itemHeight={92}
-                                    containerHeight={400}
-                                    renderItem={(t) => (
-                                        <TeacherCard
-                                            teacher={t}
-                                            isAbsent={t.unavailableDates.includes(selectedDate)}
-                                            absenceReason={t.absenceReasons ? t.absenceReasons[selectedDate] : ''}
-                                            selectedDate={selectedDate}
-                                            onOpenAbsenceModal={openAbsenceModal}
-                                            onRemoveAbsence={removeAbsence}
-                                            onDragStart={handleDragStart}
-                                        />
-                                    )}
+                        <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 min-h-0 space-y-2">
+                            {filteredTeachersList.map((t) => (
+                                <TeacherCard
+                                    key={t.id}
+                                    teacher={t}
+                                    isAbsent={t.unavailableDates.includes(selectedDate)}
+                                    absenceReason={t.absenceReasons ? t.absenceReasons[selectedDate] : ''}
+                                    selectedDate={selectedDate}
+                                    onOpenAbsenceModal={openAbsenceModal}
+                                    onRemoveAbsence={removeAbsence}
+                                    onDragStart={handleDragStart}
                                 />
-                            ) : (
-                                <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 space-y-2">
-                                    {filteredTeachersList.map((t) => (
-                                        <TeacherCard
-                                            key={t.id}
-                                            teacher={t}
-                                            isAbsent={t.unavailableDates.includes(selectedDate)}
-                                            absenceReason={t.absenceReasons ? t.absenceReasons[selectedDate] : ''}
-                                            selectedDate={selectedDate}
-                                            onOpenAbsenceModal={openAbsenceModal}
-                                            onRemoveAbsence={removeAbsence}
-                                            onDragStart={handleDragStart}
-                                        />
-                                    ))}
-                                </div>
-                            )}
+                            ))}
                         </div>
                     </div>
                 </div>
 
                 {/* Right Column: Lessons */}
                 <div
-                    className={`flex-1 bg-white dark:bg-dark-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col overflow-hidden ${isMobile && mobileTab !== 'lessons' ? 'hidden' : 'flex'}`}
+                    className={`flex-1 bg-white dark:bg-dark-800 p-3 sm:p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col overflow-hidden min-h-0 ${isMobile && mobileTab !== 'lessons' ? 'hidden' : 'flex'}`}
                 >
                     <div className="flex items-center justify-between gap-2 mb-3 sm:mb-4 min-w-0">
                         <div className="flex flex-1 min-w-0 bg-slate-100 dark:bg-slate-700 p-1 rounded-xl">
@@ -1396,7 +1454,7 @@ export const SubstitutionsPage = () => {
                         </div>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3">
+                    <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 min-h-0 space-y-2 sm:space-y-3">
                         {(activeTab === 'pending' ? pendingLessons : resolvedLessons).map((l) => (
                             <LessonCard
                                 key={l.id}
