@@ -38,58 +38,59 @@ const MultiPick: React.FC<{
     const filtered = options.filter((o) => !query || o.label.toLowerCase().includes(query));
     const toggle = (id: string) =>
         onChange(values.includes(id) ? values.filter((x) => x !== id) : [...values, id]);
-    const byId = new Map(options.map((o) => [o.value, o.label]));
     return (
-        <div>
-            <div className="flex items-center justify-between gap-2 mb-2">
-                <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">{label}</label>
+        <div className="min-w-0 flex flex-col">
+            <div className="flex items-center gap-2 mb-1.5">
+                <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    {label}
+                </span>
+                <span className="text-[11px] font-black text-indigo-600 dark:text-indigo-300">
+                    {values.length || '—'}
+                </span>
+                <button
+                    type="button"
+                    className="ml-auto text-[10px] font-bold text-slate-400 hover:text-indigo-600"
+                    onClick={() => onChange(filtered.map((o) => o.value))}
+                >
+                    все
+                </button>
                 {values.length > 0 && (
-                    <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-300">
-                        выбрано {values.length}
-                    </span>
+                    <button
+                        type="button"
+                        className="text-[10px] font-bold text-slate-400 hover:text-red-500"
+                        onClick={() => onChange([])}
+                    >
+                        сброс
+                    </button>
                 )}
             </div>
-            {values.length > 0 && (
-                <div className="flex flex-wrap gap-1 mb-1.5">
-                    {values.map((id) => (
-                        <button
-                            key={id}
-                            type="button"
-                            onClick={() => toggle(id)}
-                            className="px-2 py-0.5 rounded-lg text-[11px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200"
-                        >
-                            {byId.get(id) || id} ×
-                        </button>
-                    ))}
-                </div>
-            )}
             <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder={placeholder || 'Поиск и отметка нескольких…'}
-                className="w-full border border-slate-200 dark:border-slate-600 p-2.5 rounded-xl text-sm outline-none bg-white dark:bg-slate-700 dark:text-white focus:border-indigo-500 mb-1"
+                placeholder={placeholder || 'Поиск'}
+                className="w-full border border-slate-200 dark:border-slate-600 px-2.5 py-1.5 rounded-lg text-xs outline-none bg-white dark:bg-slate-700 dark:text-white focus:border-indigo-500 mb-1.5"
             />
-            <div className="max-h-28 overflow-y-auto custom-scrollbar rounded-xl border border-slate-100 dark:border-slate-600 divide-y divide-slate-50 dark:divide-slate-700">
-                {filtered.slice(0, 60).map((o) => {
+            <div className="flex flex-wrap gap-1 content-start max-h-[9.5rem] overflow-y-auto custom-scrollbar p-1 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700">
+                {filtered.map((o) => {
                     const on = values.includes(o.value);
                     return (
                         <button
                             key={o.value}
                             type="button"
                             onClick={() => toggle(o.value)}
-                            className={`w-full text-left px-3 py-1.5 text-sm ${
+                            className={`px-2 py-1 rounded-lg text-[11px] font-semibold leading-tight max-w-full truncate ${
                                 on
-                                    ? 'bg-indigo-50 dark:bg-indigo-900/30 font-bold text-indigo-700 dark:text-indigo-200'
-                                    : 'text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/50'
+                                    ? 'bg-indigo-600 text-white shadow-sm'
+                                    : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-200 border border-slate-200 dark:border-slate-600'
                             }`}
+                            title={o.label}
                         >
-                            {on ? '✓ ' : ''}
                             {o.label}
                         </button>
                     );
                 })}
                 {filtered.length === 0 && (
-                    <div className="px-3 py-2 text-xs text-slate-400">Ничего не найдено</div>
+                    <span className="px-2 py-1 text-[11px] text-slate-400">Ничего не найдено</span>
                 )}
             </div>
         </div>
@@ -1510,50 +1511,89 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
             <Modal
                 isOpen={isEditorOpen}
                 onClose={() => setIsEditorOpen(false)}
-                title={tempItem.id ? 'Редактирование урока' : 'Добавить урок'}
-            >
-                <div className="space-y-4">
-                    {/* Top Info Bar */}
-                    <div className="bg-slate-50 dark:bg-slate-700/50 p-3 rounded-xl flex items-center gap-4 text-sm font-bold text-slate-600 dark:text-slate-300">
-                        <span>День: {tempItem.day}</span>
-                        <span>Урок: {tempItem.period}</span>
-                        <span>Смена: {tempItem.shift === Shift.First ? '1 смена' : '2 смена'}</span>
+                title={lessonCombos.length > 1 ? 'Составить уроки' : tempItem.id ? 'Урок' : 'Новый урок'}
+                maxWidth="max-w-4xl"
+                footer={
+                    <div className="flex items-center gap-3">
+                        <div className="text-xs font-semibold text-slate-500 dark:text-slate-400 min-w-0 truncate">
+                            {lessonCombos.length > 0 ? (
+                                <>
+                                    <span className="text-indigo-700 dark:text-indigo-300 font-black">
+                                        {lessonCombos.length}
+                                    </span>{' '}
+                                    ур.
+                                    {repeatDays.length > 1 ? ` · ${repeatDays.length} дн.` : ''}
+                                    {repeatClassIds.length > 1 ? ` · ${repeatClassIds.length} кл.` : ''}
+                                    {repeatSubjectIds.length > 1 ? ` · ${repeatSubjectIds.length} предм.` : ''}
+                                    {repeatTeacherIds.length > 1 ? ` · ${repeatTeacherIds.length} уч.` : ''}
+                                    <span className="hidden sm:inline text-slate-400">
+                                        {' '}
+                                        · {tempItem.shift === Shift.Second ? '2 смена' : '1 смена'}
+                                    </span>
+                                </>
+                            ) : (
+                                'Выберите день, класс, предмет и учителя'
+                            )}
+                        </div>
+                        <div className="ml-auto flex items-center gap-2 shrink-0">
+                            {tempItem.id && (
+                                <button
+                                    type="button"
+                                    onClick={() => handleDeleteItem()}
+                                    className="px-3 py-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg font-bold text-sm"
+                                >
+                                    Удалить
+                                </button>
+                            )}
+                            <button type="button" onClick={handleSaveItem} className="btn-primary btn-ripple">
+                                {lessonCombos.length > 1 ? `Сохранить ${lessonCombos.length}` : 'Сохранить'}
+                            </button>
+                        </div>
                     </div>
-
+                }
+            >
+                <div className="space-y-3">
                     <div>
-                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">
-                            Дни (один урок — несколько дней)
-                        </label>
-                        <div className="flex flex-wrap gap-1.5">
+                        <div className="flex items-center gap-2 mb-1.5">
+                            <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                                Дни и уроки
+                            </span>
+                            <button
+                                type="button"
+                                className="ml-auto text-[10px] font-bold text-slate-400 hover:text-indigo-600"
+                                onClick={() => setRepeatDays([...DAYS])}
+                            >
+                                вся неделя
+                            </button>
+                        </div>
+                        <div className="grid grid-cols-5 gap-1.5">
                             {DAYS.map((day) => {
                                 const on = repeatDays.includes(day);
                                 return (
-                                    <button
+                                    <div
                                         key={day}
-                                        type="button"
-                                        onClick={() =>
-                                            setRepeatDays((prev) =>
-                                                on ? prev.filter((d) => d !== day) : [...prev, day]
-                                            )
-                                        }
-                                        className={`min-w-[2.75rem] px-2 py-1.5 rounded-lg text-xs font-bold border ${
+                                        className={`rounded-xl border p-1.5 text-center ${
                                             on
-                                                ? 'bg-indigo-600 text-white border-indigo-600'
-                                                : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-600'
+                                                ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30'
+                                                : 'border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800'
                                         }`}
                                     >
-                                        {day}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                        {repeatDays.length > 1 && (
-                            <div className="mt-2 grid grid-cols-5 gap-1.5">
-                                {repeatDays.map((day) => (
-                                    <label key={day} className="flex flex-col gap-0.5 text-[10px] font-bold text-slate-500">
-                                        {day}
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                setRepeatDays((prev) =>
+                                                    on ? prev.filter((d) => d !== day) : [...prev, day]
+                                                )
+                                            }
+                                            className={`w-full text-xs font-black mb-1 ${
+                                                on ? 'text-indigo-700 dark:text-indigo-200' : 'text-slate-500'
+                                            }`}
+                                        >
+                                            {day}
+                                        </button>
                                         <select
-                                            className="border border-slate-200 dark:border-slate-600 rounded-lg px-1 py-1 text-xs font-semibold bg-white dark:bg-slate-700 dark:text-white"
+                                            disabled={!on}
+                                            className="w-full border-0 bg-transparent text-[11px] font-bold text-center outline-none disabled:opacity-40 dark:text-white"
                                             value={dayPeriods[day] ?? tempItem.period ?? 1}
                                             onChange={(e) =>
                                                 setDayPeriods((prev) => ({
@@ -1562,24 +1602,22 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
                                                 }))
                                             }
                                         >
-                                            {(SHIFT_PERIODS[(tempItem.shift || selectedShift) as Shift] || []).map((p) => (
-                                                <option key={p} value={p}>
-                                                    {p} ур.
-                                                </option>
-                                            ))}
+                                            {(SHIFT_PERIODS[(tempItem.shift || selectedShift) as Shift] || []).map(
+                                                (p) => (
+                                                    <option key={p} value={p}>
+                                                        {p} ур.
+                                                    </option>
+                                                )
+                                            )}
                                         </select>
-                                    </label>
-                                ))}
-                            </div>
-                        )}
-                        <p className="text-[11px] text-slate-400 mt-1.5">
-                            Отметьте дни и при необходимости разный номер урока. Ниже можно выбрать сразу несколько
-                            классов, предметов и учителей — сохранятся все сочетания.
-                        </p>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
 
                     {validationWarnings.length > 0 && (
-                        <div className="bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 p-3 rounded-lg text-sm border border-orange-100 dark:border-orange-900">
+                        <div className="bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 p-2 rounded-lg text-xs border border-orange-100 dark:border-orange-900">
                             {validationWarnings.map((w) => (
                                 <div key={w} className="flex items-center gap-2">
                                     <Icon name="AlertTriangle" size={14} />
@@ -1589,103 +1627,78 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
                         </div>
                     )}
 
-                    <MultiPick
-                        label="Классы"
-                        options={classes
-                            .filter((c) => c.shift === selectedShift)
-                            .map((c) => ({ value: c.id, label: c.name }))}
-                        values={repeatClassIds}
-                        onChange={(ids) => {
-                            setRepeatClassIds(ids);
-                            setTempItem({ ...tempItem, classId: ids[0] });
-                            updateValidation({ ...tempItem, classId: ids[0] });
-                        }}
-                        placeholder="Несколько классов — поиск и клик"
-                    />
-
-                    <MultiPick
-                        label="Предметы"
-                        options={subjects.map((s) => ({ value: s.id, label: s.name }))}
-                        values={repeatSubjectIds}
-                        onChange={(ids) => {
-                            setRepeatSubjectIds(ids);
-                            setTempItem({ ...tempItem, subjectId: ids[0] });
-                            updateValidation({ ...tempItem, subjectId: ids[0] });
-                        }}
-                        placeholder="Несколько предметов — поиск и клик"
-                    />
-
-                    <MultiPick
-                        label="Учителя"
-                        options={[
-                            ...recommendedTeachers.map((t) => ({ value: t.id, label: t.name })),
-                            ...otherTeachers.map((t) => ({ value: t.id, label: t.name }))
-                        ]}
-                        values={repeatTeacherIds}
-                        onChange={(ids) => {
-                            setRepeatTeacherIds(ids);
-                            setTempItem({ ...tempItem, teacherId: ids[0] });
-                        }}
-                        placeholder="Несколько учителей — поиск и клик"
-                    />
-
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">
-                            ГРУППА / НАПРАВЛЕНИЕ
-                        </label>
-                        <input
-                            className="w-full border border-slate-200 dark:border-slate-600 p-3 rounded-xl text-sm outline-none bg-white dark:bg-slate-700 dark:text-white focus:border-indigo-500"
-                            placeholder="Например: 1 гр. или Профиль"
-                            value={tempItem.direction || ''}
-                            onChange={(e) => setTempItem({ ...tempItem, direction: e.target.value })}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <MultiPick
+                            label="Классы"
+                            options={classes
+                                .filter((c) => c.shift === selectedShift)
+                                .map((c) => ({ value: c.id, label: c.name }))}
+                            values={repeatClassIds}
+                            onChange={(ids) => {
+                                setRepeatClassIds(ids);
+                                setTempItem({ ...tempItem, classId: ids[0] });
+                                updateValidation({ ...tempItem, classId: ids[0] });
+                            }}
+                            placeholder="Класс…"
+                        />
+                        <MultiPick
+                            label="Предметы"
+                            options={subjects.map((s) => ({ value: s.id, label: s.name }))}
+                            values={repeatSubjectIds}
+                            onChange={(ids) => {
+                                setRepeatSubjectIds(ids);
+                                setTempItem({ ...tempItem, subjectId: ids[0] });
+                                updateValidation({ ...tempItem, subjectId: ids[0] });
+                            }}
+                            placeholder="Предмет…"
+                        />
+                        <MultiPick
+                            label="Учителя"
+                            options={[
+                                ...recommendedTeachers.map((t) => ({ value: t.id, label: t.name })),
+                                ...otherTeachers.map((t) => ({ value: t.id, label: t.name }))
+                            ]}
+                            values={repeatTeacherIds}
+                            onChange={(ids) => {
+                                setRepeatTeacherIds(ids);
+                                setTempItem({ ...tempItem, teacherId: ids[0] });
+                            }}
+                            placeholder="Учитель…"
                         />
                     </div>
 
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">
-                            КАБИНЕТ
-                        </label>
-                        <select
-                            className="w-full border border-slate-200 dark:border-slate-600 p-3 rounded-xl text-sm outline-none bg-white dark:bg-slate-700 dark:text-white focus:border-indigo-500"
-                            value={tempItem.roomId || ''}
-                            onChange={(e) => {
-                                setTempItem({ ...tempItem, roomId: e.target.value });
-                                updateValidation({ ...tempItem, roomId: e.target.value });
-                            }}
-                        >
-                            <option value="">Без кабинета</option>
-                            {rooms.map((r) => (
-                                <option key={r.id} value={r.id}>
-                                    {r.name} ({r.capacity} мест)
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    {lessonCombos.length > 1 && (
-                        <div className="text-xs font-semibold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl px-3 py-2">
-                            Будет создано {lessonCombos.length} уроков
-                            {repeatDays.length > 1 ? ` · ${repeatDays.length} дн.` : ''}
-                            {repeatClassIds.length > 1 ? ` · ${repeatClassIds.length} кл.` : ''}
-                            {repeatSubjectIds.length > 1 ? ` · ${repeatSubjectIds.length} предм.` : ''}
-                            {repeatTeacherIds.length > 1 ? ` · ${repeatTeacherIds.length} уч.` : ''}
-                        </div>
-                    )}
-
-                    <div className="flex justify-end gap-2 mt-6">
-                        {tempItem.id && (
-                            <button
-                                onClick={() => handleDeleteItem()}
-                                className="px-4 py-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg font-bold text-sm"
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label className="block text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400 mb-1">
+                                Кабинет
+                            </label>
+                            <select
+                                className="w-full border border-slate-200 dark:border-slate-600 px-2.5 py-2 rounded-xl text-sm outline-none bg-white dark:bg-slate-700 dark:text-white focus:border-indigo-500"
+                                value={tempItem.roomId || ''}
+                                onChange={(e) => {
+                                    setTempItem({ ...tempItem, roomId: e.target.value });
+                                    updateValidation({ ...tempItem, roomId: e.target.value });
+                                }}
                             >
-                                Удалить
-                            </button>
-                        )}
-                        <button onClick={handleSaveItem} className="btn-primary btn-ripple">
-                            {lessonCombos.length > 1
-                                ? `Сохранить ${lessonCombos.length} ур.`
-                                : 'Сохранить'}
-                        </button>
+                                <option value="">Без кабинета</option>
+                                {rooms.map((r) => (
+                                    <option key={r.id} value={r.id}>
+                                        {r.name} ({r.capacity} мест)
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400 mb-1">
+                                Группа / профиль
+                            </label>
+                            <input
+                                className="w-full border border-slate-200 dark:border-slate-600 px-2.5 py-2 rounded-xl text-sm outline-none bg-white dark:bg-slate-700 dark:text-white focus:border-indigo-500"
+                                placeholder="необязательно"
+                                value={tempItem.direction || ''}
+                                onChange={(e) => setTempItem({ ...tempItem, direction: e.target.value })}
+                            />
+                        </div>
                     </div>
                 </div>
             </Modal>
