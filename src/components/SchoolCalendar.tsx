@@ -12,6 +12,7 @@ const EVENT_COLORS: Record<CalendarEvent['type'], string> = {
     exam: 'bg-amber-500 text-white border-amber-600 shadow-sm shadow-amber-500/20',
     meeting: 'bg-sky-500 text-white border-sky-600 shadow-sm shadow-sky-500/20',
     event: 'bg-violet-500 text-white border-violet-600 shadow-sm shadow-violet-500/20',
+    short_day: 'bg-cyan-500 text-white border-cyan-600 shadow-sm shadow-cyan-500/20',
     other: 'bg-slate-500 text-white border-slate-600 shadow-sm'
 };
 
@@ -22,6 +23,7 @@ const EVENT_DOT: Record<CalendarEvent['type'], string> = {
     exam: 'bg-amber-500',
     meeting: 'bg-sky-500',
     event: 'bg-violet-500',
+    short_day: 'bg-cyan-500',
     other: 'bg-slate-500'
 };
 
@@ -31,6 +33,7 @@ const EVENT_LABELS: Record<CalendarEvent['type'], string> = {
     exam: 'Экзамен/контрольная',
     meeting: 'Собрание',
     event: 'Мероприятие',
+    short_day: 'Сокращённый день',
     other: 'Другое'
 };
 

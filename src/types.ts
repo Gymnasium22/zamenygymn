@@ -177,6 +177,8 @@ export interface Settings {
     isScheduleLocked?: boolean; // Блокировка редактирования расписания
     allowTeacherEdit?: boolean; // Разрешить учителям редактировать расписание
     autoBackup?: boolean; // Автоматический бэкап по расписанию
+    /** Пресет звонков для дней с типом «сокращённый» в календаре */
+    shortDayBellPresetId?: string;
     backupTime?: string; // Время бэкапа в формате HH:MM
     organizationId?: string;
     // Supabase snake_case fields mapped during migration
@@ -369,7 +371,7 @@ export interface CalendarEvent {
     id: string;
     date: string; // YYYY-MM-DD
     title: string;
-    type: 'holiday' | 'celebration' | 'exam' | 'meeting' | 'event' | 'other';
+    type: 'holiday' | 'celebration' | 'exam' | 'meeting' | 'event' | 'short_day' | 'other';
     description?: string;
     showInWidget?: boolean;
 }

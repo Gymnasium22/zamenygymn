@@ -4,7 +4,12 @@ import { useStaticData, useScheduleData } from '../context/DataContext';
 import { Icon } from '../components/Icons';
 import { DateInput } from '../components/DateInput';
 import { Modal, useToast, EmptyState } from '../components/UI';
-import { DAYS, ScheduleItem, ClassEntity, Substitution, SubstitutionParams } from '../types';
+import { DAYS, ScheduleItem, ClassEntity, Substitution, SubstitutionParams, Shift } from '../types';
+import { exportService } from '../services/exportService';
+import {
+    SubstitutionExportSheet,
+    shiftHasExportableSubs
+} from '../components/SubstitutionExportSheet';
 import {
     formatDateISO,
     formatDateEuropean,
@@ -29,12 +34,15 @@ import {
     QuickViewScheduleModal
 } from '../components/Substitutions/Modals';
 import { AssignmentModal } from '../components/Substitutions/AssignmentModal';
+import { offerUndo } from '../components/CloudSaveStatus';
 
 export const SubstitutionsPage = () => {
     const { subjects, teachers, classes, rooms, settings, privateSettings, saveStaticData } = useStaticData();
-    const { schedule1, schedule2, substitutions, saveScheduleData } = useScheduleData();
+    const { schedule1, schedule2, substitutions, saveScheduleData, undo } = useScheduleData();
     const substitutionsRef = useRef(substitutions);
     substitutionsRef.current = substitutions;
+    const tgPrintRef1 = useRef<HTMLDivElement>(null);
+    const tgPrintRef2 = useRef<HTMLDivElement>(null);
     const settingsRef = useRef(settings);
     settingsRef.current = settings;
     const { addToast } = useToast();
@@ -46,6 +54,7 @@ export const SubstitutionsPage = () => {
     const [activeTab, setActiveTab] = useState<'pending' | 'resolved'>('pending');
     const [subMode, setSubMode] = useState<'teacher' | 'cancel' | 'advanced'>('teacher');
     const [isSendingSummary, setIsSendingSummary] = useState(false);
+    const [tgShiftPickOpen, setTgShiftPickOpen] = useState(false);
 
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -122,6 +131,24 @@ export const SubstitutionsPage = () => {
 
         return getScheduleForDate(getDateOrToday(selectedDate), mockData);
     }, [selectedDate, schedule1, schedule2, settings]);
+
+    const getScheduleItemById = useCallback(
+        (id: string) =>
+            activeSchedule.find((s) => s.id === id) ||
+            schedule1.find((s) => s.id === id) ||
+            schedule2.find((s) => s.id === id),
+        [activeSchedule, schedule1, schedule2]
+    );
+
+    const classesById = useMemo(() => new Map(classes.map((c) => [c.id, c])), [classes]);
+    const subjectsById = useMemo(() => new Map(subjects.map((s) => [s.id, s])), [subjects]);
+    const teachersById = useMemo(() => new Map(teachers.map((t) => [t.id, t])), [teachers]);
+    const roomsById = useMemo(() => new Map(rooms.map((r) => [r.id, r])), [rooms]);
+
+    const subsForTelegramDate = useMemo(
+        () => substitutions.filter((s) => s.date === selectedDate),
+        [substitutions, selectedDate]
+    );
 
     const isVacationDate = useMemo(() => {
         return getActiveSemester(getDateOrToday(selectedDate), settings) === null;
@@ -602,8 +629,9 @@ export const SubstitutionsPage = () => {
         async (id: string) => {
             const newSubs = substitutionsRef.current.filter((s) => !(s.scheduleItemId === id && s.date === selectedDate));
             await saveScheduleData({ substitutions: newSubs });
+            offerUndo('Замена снята', () => undo());
         },
-        [selectedDate, saveScheduleData]
+        [selectedDate, saveScheduleData, undo]
     );
 
     const handleEditSubstitution = (lesson: ScheduleItem, sub: Substitution) => {
@@ -721,32 +749,82 @@ export const SubstitutionsPage = () => {
         }
     };
 
-    const sendSummaryToTelegram = async () => {
+    const hasTgShift1 = shiftHasExportableSubs(subsForTelegramDate, Shift.First, getScheduleItemById);
+    const hasTgShift2 = shiftHasExportableSubs(subsForTelegramDate, Shift.Second, getScheduleItemById);
+
+    const requestSendTelegramSummary = () => {
+        if (!privateSettings.telegramToken || !settings.feedbackChatId) {
+            addToast({ type: 'warning', title: 'Ошибка', message: 'Telegram не настроен' });
+            return;
+        }
+        if (hasTgShift1 && hasTgShift2) {
+            setTgShiftPickOpen(true);
+            return;
+        }
+        void sendSummaryToTelegram(hasTgShift1 ? '1' : hasTgShift2 ? '2' : 'both');
+    };
+
+    const sendSummaryToTelegram = async (which: '1' | '2' | 'both') => {
         if (!privateSettings.telegramToken || !settings.feedbackChatId) {
             addToast({ type: 'warning', title: 'Ошибка', message: 'Telegram не настроен' });
             return;
         }
 
-        const text = generateSubstitutionText();
+        const dateStr = formatDateEuropean(selectedDate);
+        const token = privateSettings.telegramToken;
+        const chatId = settings.feedbackChatId;
+        setTgShiftPickOpen(false);
         setIsSendingSummary(true);
         try {
-            const response = await fetch(`https://api.telegram.org/bot${privateSettings.telegramToken}/sendMessage`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    chat_id: settings.feedbackChatId,
-                    text: text,
-                    parse_mode: 'Markdown'
-                })
+            await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+            const shots: { el: HTMLElement | null; name: string; caption: string; key: '1' | '2' }[] = [
+                {
+                    key: '1',
+                    el: tgPrintRef1.current,
+                    name: `Замены_${selectedDate}_1смена.png`,
+                    caption: `Замены на ${dateStr} · 1 смена`
+                },
+                {
+                    key: '2',
+                    el: tgPrintRef2.current,
+                    name: `Замены_${selectedDate}_2смена.png`,
+                    caption: `Замены на ${dateStr} · 2 смена`
+                }
+            ];
+            const ready = shots.filter((s) => s.el && (which === 'both' || s.key === which));
+            if (ready.length === 0) {
+                const text = generateSubstitutionText();
+                const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chat_id: chatId,
+                        text,
+                        parse_mode: 'Markdown'
+                    })
+                });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const result = await response.json();
+                if (!result.ok) throw new Error(result.description || 'Telegram API error');
+                addToast({
+                    type: 'info',
+                    title: 'Отправлено текстом',
+                    message: 'На этот день нет листа для картинки — ушла текстовая сводка'
+                });
+                return;
+            }
+            for (const shot of ready) {
+                const blob = await exportService.capturePngBlob(shot.el!);
+                await exportService.sendTelegramPhoto(token, chatId, blob, shot.name, shot.caption);
+            }
+            addToast({
+                type: 'success',
+                title: 'Отправлено',
+                message:
+                    ready.length === 2
+                        ? 'В Telegram ушли картинки 1-й и 2-й смены'
+                        : `В Telegram ушла картинка: ${ready[0].caption}`
             });
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
-            const result = await response.json();
-            if (!result.ok) {
-                throw new Error(result.description || 'Telegram API error');
-            }
-            addToast({ type: 'success', title: 'Отправлено', message: 'Сводка отправлена в Telegram' });
         } catch (e) {
             logger.error(e);
             addToast({ type: 'danger', title: 'Ошибка', message: `Не удалось отправить: ${e}` });
@@ -1169,7 +1247,7 @@ export const SubstitutionsPage = () => {
                             <button
                                 type="button"
                                 onClick={() => {
-                                    sendSummaryToTelegram();
+                                    requestSendTelegramSummary();
                                     setMobileToolsOpen(false);
                                 }}
                                 disabled={isSendingSummary}
@@ -1262,7 +1340,7 @@ export const SubstitutionsPage = () => {
 
                         <div className="flex flex-wrap gap-2 mt-auto grow basis-[16rem] min-w-[min(100%,16rem)]">
                             <button
-                                onClick={sendSummaryToTelegram}
+                                onClick={requestSendTelegramSummary}
                                 disabled={isSendingSummary}
                                 className="h-11 flex-1 min-w-[6.5rem] px-3 rounded-xl bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 transition flex items-center justify-center gap-1.5 disabled:opacity-50"
                             >
@@ -1745,6 +1823,80 @@ export const SubstitutionsPage = () => {
                             </tbody>
                         </table>
                     </div>
+                </div>
+            </Modal>
+
+            <div
+                aria-hidden
+                className="pointer-events-none"
+                style={{ position: 'fixed', left: -12000, top: 0, width: 1000 }}
+            >
+                {shiftHasExportableSubs(subsForTelegramDate, Shift.First, getScheduleItemById) && (
+                    <SubstitutionExportSheet
+                        ref={tgPrintRef1}
+                        exportDate={selectedDate}
+                        dayComment={dayComment}
+                        shift={Shift.First}
+                        substitutions={subsForTelegramDate}
+                        getScheduleItemById={getScheduleItemById}
+                        classesById={classesById}
+                        subjectsById={subjectsById}
+                        teachersById={teachersById}
+                        roomsById={roomsById}
+                    />
+                )}
+                {shiftHasExportableSubs(subsForTelegramDate, Shift.Second, getScheduleItemById) && (
+                    <SubstitutionExportSheet
+                        ref={tgPrintRef2}
+                        exportDate={selectedDate}
+                        dayComment={dayComment}
+                        shift={Shift.Second}
+                        substitutions={subsForTelegramDate}
+                        getScheduleItemById={getScheduleItemById}
+                        classesById={classesById}
+                        subjectsById={subjectsById}
+                        teachersById={teachersById}
+                        roomsById={roomsById}
+                    />
+                )}
+            </div>
+
+            <Modal
+                isOpen={tgShiftPickOpen}
+                onClose={() => setTgShiftPickOpen(false)}
+                title="Какую смену отправить?"
+            >
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+                    На этот день есть замены в обеих сменах. Можно отправить одну картинку или обе.
+                </p>
+                <div className="flex flex-col gap-2">
+                    <button
+                        type="button"
+                        disabled={isSendingSummary}
+                        onClick={() => sendSummaryToTelegram('1')}
+                        className="w-full p-4 rounded-xl border border-slate-200 dark:border-slate-600 text-left hover:bg-slate-50 dark:hover:bg-slate-700"
+                    >
+                        <div className="font-bold text-slate-800 dark:text-white">Только 1-я смена</div>
+                        <div className="text-xs text-slate-500">Одна картинка, как в экспорте PNG</div>
+                    </button>
+                    <button
+                        type="button"
+                        disabled={isSendingSummary}
+                        onClick={() => sendSummaryToTelegram('2')}
+                        className="w-full p-4 rounded-xl border border-slate-200 dark:border-slate-600 text-left hover:bg-slate-50 dark:hover:bg-slate-700"
+                    >
+                        <div className="font-bold text-slate-800 dark:text-white">Только 2-я смена</div>
+                        <div className="text-xs text-slate-500">Одна картинка, как в экспорте PNG</div>
+                    </button>
+                    <button
+                        type="button"
+                        disabled={isSendingSummary}
+                        onClick={() => sendSummaryToTelegram('both')}
+                        className="w-full p-4 rounded-xl bg-blue-600 text-white text-left hover:bg-blue-700"
+                    >
+                        <div className="font-bold">Обе смены</div>
+                        <div className="text-xs text-blue-100">Два сообщения с картинками</div>
+                    </button>
                 </div>
             </Modal>
 

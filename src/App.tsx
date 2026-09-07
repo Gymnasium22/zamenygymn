@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { HashRouter, Routes, Route, Navigate, NavLink, useLocation, useOutlet } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate, NavLink, useLocation, useOutlet, useSearchParams } from 'react-router-dom';
 import useMedia from 'use-media';
 import { DataProvider, useStaticData, StaticDataProvider, ScheduleDataProvider } from './context/DataContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { Icon } from './components/Icons';
 import { StatusWidget, BottomNavigation, ToastProvider, CommandPalette, Modal } from './components/UI';
+import { CloudSaveStatus } from './components/CloudSaveStatus';
 import { AnnouncementModal } from './components/AnnouncementModal';
 import { PullToRefresh } from './components/PullToRefresh';
 import { PwaUpdateBanner } from './components/PwaUpdateBanner';
@@ -92,6 +93,9 @@ const ProtectedRoute = ({
     }
 
     if (pageId && !canViewPage(pageId)) {
+        if (pageId === 'schedule' && canViewPage('schedule2')) {
+            return <>{children}</>;
+        }
         return <Navigate to={fallback} replace />;
     }
 
@@ -109,8 +113,7 @@ type MenuItemDef = { to: string; label: string; icon: string; pageId: PageId };
 
 const DEFAULT_MENU_ITEMS: MenuItemDef[] = [
     { to: '/dashboard', label: 'Рабочий стол', icon: 'Home', pageId: 'dashboard' },
-    { to: '/schedule', label: '1 полугодие', icon: 'Calendar', pageId: 'schedule' },
-    { to: '/schedule2', label: '2 полугодие', icon: 'Calendar', pageId: 'schedule2' },
+    { to: '/schedule', label: 'Расписание', icon: 'Calendar', pageId: 'schedule' },
     { to: '/duty', label: 'Дежурство', icon: 'Shield', pageId: 'duty' },
     { to: '/bells', label: 'Звонки', icon: 'Bell', pageId: 'bells' },
     { to: '/substitutions', label: 'Замены', icon: 'Repeat', pageId: 'substitutions' },
@@ -320,7 +323,10 @@ const Layout = () => {
     const byPageId = new Map(DEFAULT_MENU_ITEMS.map((i) => [i.pageId, i]));
     const filteredMenuItems = menuOrder
         .map((id) => byPageId.get(id))
-        .filter((item): item is MenuItemDef => !!item && canViewPage(item.pageId));
+        .filter(
+            (item): item is MenuItemDef =>
+                !!item && item.pageId !== 'schedule2' && (canViewPage(item.pageId) || (item.pageId === 'schedule' && canViewPage('schedule2')))
+        );
     // На случай новых pageId, которых ещё нет в сохранённом порядке
     DEFAULT_MENU_ITEMS.forEach((item) => {
         if (canViewPage(item.pageId) && !filteredMenuItems.some((m) => m.pageId === item.pageId)) {
@@ -672,7 +678,8 @@ const Layout = () => {
                         </div>
                     </nav>
 
-                    <div className="hidden lg:block mb-2 px-3">
+                    <div className="hidden lg:block mb-2 px-3 space-y-2">
+                        <CloudSaveStatus />
                         <StatusWidget />
                     </div>
 
@@ -771,18 +778,11 @@ export default function App() {
                                                 path="schedule"
                                                 element={
                                                     <ProtectedRoute pathBase="/tg" pageId="schedule">
-                                                        <SchedulePageWrapper semester={1} />
+                                                        <SchedulePageWrapper />
                                                     </ProtectedRoute>
                                                 }
                                             />
-                                            <Route
-                                                path="schedule2"
-                                                element={
-                                                    <ProtectedRoute pathBase="/tg" pageId="schedule2">
-                                                        <SchedulePageWrapper semester={2} />
-                                                    </ProtectedRoute>
-                                                }
-                                            />
+                                            <Route path="schedule2" element={<Navigate to="/schedule?semester=2" replace />} />
                                             <Route
                                                 path="substitutions"
                                                 element={
@@ -909,18 +909,11 @@ export default function App() {
                                                 path="schedule"
                                                 element={
                                                     <ProtectedRoute pageId="schedule">
-                                                        <SchedulePageWrapper semester={1} />
+                                                        <SchedulePageWrapper />
                                                     </ProtectedRoute>
                                                 }
                                             />
-                                            <Route
-                                                path="schedule2"
-                                                element={
-                                                    <ProtectedRoute pageId="schedule2">
-                                                        <SchedulePageWrapper semester={2} />
-                                                    </ProtectedRoute>
-                                                }
-                                            />
+                                            <Route path="schedule2" element={<Navigate to="/schedule?semester=2" replace />} />
                                             <Route
                                                 path="substitutions"
                                                 element={
@@ -1057,9 +1050,11 @@ const MainContent = () => {
     );
 };
 
-const SchedulePageWrapper = ({ semester = 1 }: { semester?: 1 | 2 }) => {
+const SchedulePageWrapper = () => {
     const { role, hasPermission } = useAuth();
     const { settings } = useStaticData();
+    const [params] = useSearchParams();
+    const semester: 1 | 2 = params.get('semester') === '2' ? 2 : 1;
     const canEdit = hasPermission('edit_schedule') || (role === 'teacher' && settings?.allowTeacherEdit);
     return <SchedulePage readOnly={!canEdit} semester={semester} />;
 };

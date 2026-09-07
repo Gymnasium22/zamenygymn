@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useStaticData } from '../context/DataContext';
+import React, { useMemo, useRef, useState } from 'react';
+import { useScheduleData, useStaticData } from '../context/DataContext';
 import { DateInput } from '../components/DateInput';
 import { Icon } from '../components/Icons';
 import { Modal, StaggerContainer, useToast } from '../components/UI';
@@ -7,6 +7,9 @@ import { Shift, ROOM_TYPES, Teacher, Subject, ClassEntity, Room } from '../types
 import { formatDateEuropean } from '../utils/helpers';
 import { generateId } from '../utils/helpers';
 import { useAuth } from '../context/AuthContext';
+import { findEntityUsage, UsageKind, UsageLine } from '../utils/entityUsage';
+import { parseDelimited, pick } from '../utils/csvImport';
+import { offerUndo } from '../components/CloudSaveStatus';
 
 type DirectoryTabId = 'teachers' | 'subjects' | 'classes' | 'rooms';
 
@@ -41,7 +44,8 @@ const SUBJECT_COLOR_PRESETS = [
 const normalizeHex = (value: string) => value.trim().toLowerCase();
 
 export const DirectoryPage = () => {
-    const { subjects, teachers, classes, rooms, saveStaticData, isLoading } = useStaticData();
+    const { subjects, teachers, classes, rooms, saveStaticData, isLoading, undo } = useStaticData();
+    const { schedule1, schedule2, substitutions, dutySchedule } = useScheduleData();
     const { addToast } = useToast();
     const { hasPermission } = useAuth();
     const canEditDirectory = hasPermission('edit_directory');
@@ -49,6 +53,19 @@ export const DirectoryPage = () => {
     const [activeTab, setActiveTab] = useState<DirectoryTabId>('teachers');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
+    const [query, setQuery] = useState('');
+    const [sortKey, setSortKey] = useState<'name' | 'parallel' | 'room'>('name');
+    const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+    const [usageModal, setUsageModal] = useState<{ id: string; kind: UsageKind; name: string; lines: UsageLine[] } | null>(
+        null
+    );
+    const [importPreview, setImportPreview] = useState<{
+        tab: DirectoryTabId;
+        rows: Record<string, string>[];
+        snapshot: unknown;
+    } | null>(null);
+    const [importRollback, setImportRollback] = useState<null | (() => Promise<void>)>(null);
+    const fileRef = useRef<HTMLInputElement>(null);
 
     const [teacherForm, setTeacherForm] = useState<Partial<Teacher>>({});
     const [subjectForm, setSubjectForm] = useState<Partial<Subject>>({});
@@ -135,10 +152,33 @@ export const DirectoryPage = () => {
         }
     };
 
-    const handleDelete = async (id: string) => {
-        if (!canEditDirectory) return;
-        if (!window.confirm('Удалить запись?')) return;
+    const usageBundle = {
+        schedule: schedule1,
+        schedule2,
+        substitutions,
+        dutySchedule,
+        classes,
+        subjects,
+        teachers,
+        rooms
+    };
 
+    const requestDelete = (id: string) => {
+        if (!canEditDirectory) return;
+        const kind: UsageKind =
+            activeTab === 'teachers' ? 'teacher' : activeTab === 'classes' ? 'class' : activeTab === 'rooms' ? 'room' : 'subject';
+        const name =
+            (kind === 'teacher' ? teachers : kind === 'class' ? classes : kind === 'room' ? rooms : subjects).find(
+                (x) => x.id === id
+            )?.name || id;
+        const lines = findEntityUsage(kind, id, usageBundle);
+        setUsageModal({ id, kind, name, lines });
+    };
+
+    const confirmDelete = async () => {
+        if (!usageModal) return;
+        const { id } = usageModal;
+        setUsageModal(null);
         try {
             switch (activeTab) {
                 case 'teachers':
@@ -155,8 +195,136 @@ export const DirectoryPage = () => {
                     break;
             }
             addToast({ type: 'success', title: 'Запись удалена' });
+            offerUndo('Запись удалена из справочника', () => undo());
         } catch {
             addToast({ type: 'danger', title: 'Ошибка удаления', message: 'Не удалось удалить запись из справочника' });
+        }
+    };
+
+    const handleDelete = (id: string) => requestDelete(id);
+
+    const q = query.trim().toLowerCase();
+    const cmpName = (a: string, b: string) =>
+        a.localeCompare(b, 'ru', { numeric: true, sensitivity: 'base' }) * (sortDir === 'asc' ? 1 : -1);
+    const parallelOf = (name: string) => parseInt(name.replace(/[^\d]/g, ''), 10) || 0;
+
+    const visibleTeachers = useMemo(() => {
+        let list = teachers.filter((t) => !q || t.name.toLowerCase().includes(q));
+        list = [...list].sort((a, b) => cmpName(a.name, b.name));
+        return list;
+    }, [teachers, q, sortDir]);
+
+    const visibleClasses = useMemo(() => {
+        let list = classes.filter((c) => !q || c.name.toLowerCase().includes(q) || String(c.grade || '').includes(q));
+        list = [...list].sort((a, b) => {
+            if (sortKey === 'parallel') {
+                const d = (parallelOf(a.name) - parallelOf(b.name)) * (sortDir === 'asc' ? 1 : -1);
+                return d || cmpName(a.name, b.name);
+            }
+            return cmpName(a.name, b.name);
+        });
+        return list;
+    }, [classes, q, sortKey, sortDir]);
+
+    const visibleRooms = useMemo(() => {
+        let list = rooms.filter(
+            (r) => !q || r.name.toLowerCase().includes(q) || (r.type || '').toLowerCase().includes(q)
+        );
+        list = [...list].sort((a, b) => cmpName(a.name, b.name));
+        return list;
+    }, [rooms, q, sortDir]);
+
+    const visibleSubjects = useMemo(() => {
+        let list = subjects.filter((s) => !q || s.name.toLowerCase().includes(q));
+        return [...list].sort((a, b) => cmpName(a.name, b.name));
+    }, [subjects, q, sortDir]);
+
+    const onPickImport = async (file: File) => {
+        const text = await file.text();
+        if (file.name.toLowerCase().endsWith('.xlsx') || text.includes('PK')) {
+            addToast({
+                type: 'warning',
+                title: 'Excel',
+                message: 'Сохраните книгу как CSV (разделитель ; или ,) и загрузите снова.'
+            });
+            return;
+        }
+        const rows = parseDelimited(text);
+        if (!rows.length) {
+            addToast({ type: 'danger', title: 'Пустой файл', message: 'Нужна строка заголовков и хотя бы одна запись' });
+            return;
+        }
+        const snapshot =
+            activeTab === 'teachers'
+                ? teachers
+                : activeTab === 'subjects'
+                  ? subjects
+                  : activeTab === 'classes'
+                    ? classes
+                    : rooms;
+        setImportPreview({ tab: activeTab, rows, snapshot });
+    };
+
+    const applyImport = async () => {
+        if (!importPreview || !canEditDirectory) return;
+        const { tab, rows, snapshot } = importPreview;
+        try {
+            if (tab === 'teachers') {
+                let maxOrder = teachers.reduce((m, t) => Math.max(m, t.order || 0), 0);
+                const extra: Teacher[] = rows.map((row) => ({
+                    id: generateId(),
+                    name: pick(row, ['фио', 'фамилия', 'name', 'учитель']),
+                    subjectIds: [],
+                    unavailableDates: [],
+                    shifts: [Shift.First, Shift.Second],
+                    order: ++maxOrder
+                })).filter((t) => t.name);
+                await saveStaticData({ teachers: [...teachers, ...extra] });
+                addToast({ type: 'success', title: 'Импорт', message: `Добавлено учителей: ${extra.length}` });
+            } else if (tab === 'classes') {
+                let maxOrder = classes.reduce((m, t) => Math.max(m, t.order || 0), 0);
+                const extra: ClassEntity[] = rows.map((row) => ({
+                    id: generateId(),
+                    name: pick(row, ['класс', 'name', 'название']),
+                    shift: /2|ii|втор/i.test(pick(row, ['смена', 'shift'])) ? Shift.Second : Shift.First,
+                    studentsCount: Number(pick(row, ['ученик', 'кол', 'count'])) || 25,
+                    order: ++maxOrder
+                })).filter((c) => c.name);
+                await saveStaticData({ classes: [...classes, ...extra] });
+                addToast({ type: 'success', title: 'Импорт', message: `Добавлено классов: ${extra.length}` });
+            } else if (tab === 'rooms') {
+                let maxOrder = rooms.reduce((m, t) => Math.max(m, t.order || 0), 0);
+                const extra: Room[] = rows.map((row) => ({
+                    id: generateId(),
+                    name: pick(row, ['кабинет', 'name', 'номер']),
+                    capacity: Number(pick(row, ['вмест', 'capacity'])) || 30,
+                    type: pick(row, ['тип', 'type']) || 'Обычный',
+                    order: ++maxOrder
+                })).filter((r) => r.name);
+                await saveStaticData({ rooms: [...rooms, ...extra] });
+                addToast({ type: 'success', title: 'Импорт', message: `Добавлено кабинетов: ${extra.length}` });
+            } else {
+                let maxOrder = subjects.reduce((m, t) => Math.max(m, t.order || 0), 0);
+                const extra: Subject[] = rows.map((row) => ({
+                    id: generateId(),
+                    name: pick(row, ['предмет', 'name', 'название']),
+                    color: '#e0e7ff',
+                    difficulty: 5,
+                    requiredRoomType: 'Обычный',
+                    order: ++maxOrder
+                })).filter((s) => s.name);
+                await saveStaticData({ subjects: [...subjects, ...extra] });
+                addToast({ type: 'success', title: 'Импорт', message: `Добавлено предметов: ${extra.length}` });
+            }
+            setImportPreview(null);
+            const snap = snapshot;
+            const rollback = async () => {
+                await saveStaticData({ [tab]: snap } as never);
+            };
+            setImportRollback(() => rollback);
+            offerUndo('Импорт справочника', rollback);
+        } catch {
+            addToast({ type: 'danger', title: 'Импорт', message: 'Не удалось записать данные' });
         }
     };
 
@@ -244,6 +412,72 @@ export const DirectoryPage = () => {
                     </button>
                 )}
             </div>
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+                <input
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder={
+                        activeTab === 'teachers'
+                            ? 'Поиск по фамилии…'
+                            : activeTab === 'classes'
+                              ? 'Поиск по классу / параллели…'
+                              : activeTab === 'rooms'
+                                ? 'Поиск по кабинету…'
+                                : 'Поиск…'
+                    }
+                    className="flex-1 min-w-[12rem] px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm"
+                />
+                <select
+                    value={`${sortKey}:${sortDir}`}
+                    onChange={(e) => {
+                        const [k, d] = e.target.value.split(':') as ['name' | 'parallel' | 'room', 'asc' | 'desc'];
+                        setSortKey(k);
+                        setSortDir(d);
+                    }}
+                    className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm"
+                >
+                    <option value="name:asc">А → Я</option>
+                    <option value="name:desc">Я → А</option>
+                    {activeTab === 'classes' && <option value="parallel:asc">Параллель 1→11</option>}
+                    {activeTab === 'classes' && <option value="parallel:desc">Параллель 11→1</option>}
+                    {activeTab === 'rooms' && <option value="name:asc">Кабинет А→Я</option>}
+                </select>
+                {canEditDirectory && (
+                    <>
+                        <input
+                            ref={fileRef}
+                            type="file"
+                            accept=".csv,.txt,.tsv"
+                            className="hidden"
+                            onChange={(e) => {
+                                const f = e.target.files?.[0];
+                                e.target.value = '';
+                                if (f) onPickImport(f);
+                            }}
+                        />
+                        <button
+                            type="button"
+                            onClick={() => fileRef.current?.click()}
+                            className="px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 text-sm font-semibold"
+                        >
+                            Импорт CSV
+                        </button>
+                        {importRollback && (
+                            <button
+                                type="button"
+                                onClick={async () => {
+                                    await importRollback();
+                                    setImportRollback(null);
+                                    addToast({ type: 'info', title: 'Импорт отменён' });
+                                }}
+                                className="px-3 py-2 rounded-xl text-sm font-semibold text-amber-700 bg-amber-50"
+                            >
+                                Откатить импорт
+                            </button>
+                        )}
+                    </>
+                )}
+            </div>
 
             <div className="flex-1 overflow-y-auto pb-20 custom-scrollbar pr-2">
                 {activeTab === 'teachers' && (
@@ -264,9 +498,7 @@ export const DirectoryPage = () => {
                         </div>
                     ) : (
                     <StaggerContainer className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {[...teachers]
-                            .sort((a, b) => a.name.localeCompare(b.name, 'ru', { sensitivity: 'base' }))
-                            .map((t) => (
+                        {visibleTeachers.map((t) => (
                             <div
                                 key={t.id}
                                 className="modern-card p-4 group flex flex-col"
@@ -342,7 +574,7 @@ export const DirectoryPage = () => {
                         </div>
                     ) : (
                     <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                        {byOrder(subjects).map((s, i) => (
+                        {(q ? visibleSubjects : byOrder(subjects)).map((s, i) => (
                             <div
                                 key={s.id}
                                 draggable={canEditDirectory}
@@ -404,7 +636,7 @@ export const DirectoryPage = () => {
                         </div>
                     ) : (
                     <StaggerContainer className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                        {byOrder(classes).map((c, i) => (
+                        {(q || sortKey === 'parallel' ? visibleClasses : byOrder(classes)).map((c, i) => (
                             <div
                                 key={c.id}
                                 draggable={canEditDirectory}
@@ -475,7 +707,7 @@ export const DirectoryPage = () => {
                         </div>
                     ) : (
                     <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                        {byOrder(rooms).map((r, i) => (
+                        {(q ? visibleRooms : byOrder(rooms)).map((r, i) => (
                             <div
                                 key={r.id}
                                 draggable={canEditDirectory}
@@ -901,6 +1133,93 @@ export const DirectoryPage = () => {
                         </>
                     )}
                 </div>
+            </Modal>
+
+            <Modal
+                isOpen={!!usageModal}
+                onClose={() => setUsageModal(null)}
+                title={usageModal ? `Удалить «${usageModal.name}»?` : 'Удаление'}
+                footer={
+                    <div className="flex justify-end gap-2">
+                        <button type="button" className="px-4 py-2 rounded-xl text-sm font-bold" onClick={() => setUsageModal(null)}>
+                            Отмена
+                        </button>
+                        <button
+                            type="button"
+                            className="px-4 py-2 rounded-xl text-sm font-bold bg-red-600 text-white"
+                            onClick={confirmDelete}
+                        >
+                            Удалить
+                        </button>
+                    </div>
+                }
+            >
+                {usageModal && (
+                    <div className="space-y-2 text-sm">
+                        {usageModal.lines.length === 0 ? (
+                            <p className="text-slate-500">Связанных уроков, замен и дежурств не найдено.</p>
+                        ) : (
+                            <>
+                                <p className="font-semibold text-amber-700 dark:text-amber-300">
+                                    Используется в {usageModal.lines.length} местах:
+                                </p>
+                                <ul className="max-h-48 overflow-auto space-y-1 text-slate-600 dark:text-slate-300">
+                                    {usageModal.lines.map((l, i) => (
+                                        <li key={i}>
+                                            <span className="font-bold">{l.where}:</span> {l.detail}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </>
+                        )}
+                    </div>
+                )}
+            </Modal>
+
+            <Modal
+                isOpen={!!importPreview}
+                onClose={() => setImportPreview(null)}
+                title="Предпросмотр импорта"
+                footer={
+                    <div className="flex justify-end gap-2">
+                        <button type="button" className="px-4 py-2 rounded-xl text-sm" onClick={() => setImportPreview(null)}>
+                            Отмена
+                        </button>
+                        <button type="button" className="px-4 py-2 rounded-xl text-sm font-bold bg-indigo-600 text-white" onClick={applyImport}>
+                            Добавить {importPreview?.rows.length || 0} записей
+                        </button>
+                    </div>
+                }
+            >
+                {importPreview && (
+                    <div className="overflow-auto max-h-64 text-xs">
+                        <table className="w-full border-collapse">
+                            <thead>
+                                <tr>
+                                    {Object.keys(importPreview.rows[0] || {}).map((h) => (
+                                        <th key={h} className="text-left p-1 border-b font-bold">
+                                            {h}
+                                        </th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {importPreview.rows.slice(0, 20).map((row, i) => (
+                                    <tr key={i}>
+                                        {Object.keys(importPreview.rows[0] || {}).map((h) => (
+                                            <td key={h} className="p-1 border-b">
+                                                {row[h]}
+                                            </td>
+                                        ))}
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                        {importPreview.rows.length > 20 && (
+                            <p className="mt-2 text-slate-400">Показаны первые 20 из {importPreview.rows.length}</p>
+                        )}
+                    </div>
+                )}
             </Modal>
         </div>
     );

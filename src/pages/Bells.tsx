@@ -8,7 +8,8 @@ import { Shift, SHIFT_PERIODS, Bell } from '../types';
 import { formatDateEuropean, formatTimeHM } from '../utils/helpers';
 import { exportService } from '../services/exportService';
 import { DEFAULT_BELLS } from '../constants';
-import { generateId } from '../utils/helpers';
+import { generateId, formatDateISO } from '../utils/helpers';
+import { findShortDayPreset, isShortDayOn } from '../utils/bellsForDate';
 
 
 // Helper functions for time manipulation
@@ -275,9 +276,21 @@ export const BellsPage = () => {
     const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
     const [newPresetName, setNewPresetName] = useState('');
 
+    const [shortDayHint, setShortDayHint] = useState<string | null>(null);
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
     const [exportDate, setExportDate] = useState<string>(new Date().toISOString().split('T')[0]);
     const exportRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const today = formatDateISO();
+        if (!isShortDayOn(today, settings.calendarEvents)) {
+            setShortDayHint(null);
+            return;
+        }
+        const preset = findShortDayPreset(settings);
+        setShortDayHint(preset?.name || 'сокращённый (пресет не найден — создайте режим с «сокращ» в названии)');
+        if (preset) setSelectedPresetId(preset.id);
+    }, [settings]);
 
     // Initialize bells on load
     useEffect(() => {
@@ -608,6 +621,11 @@ export const BellsPage = () => {
                     </div>
                 </div>
             </div>
+            {shortDayHint && (
+                <div className="mb-4 px-4 py-2.5 rounded-xl bg-cyan-50 dark:bg-cyan-900/20 text-cyan-800 dark:text-cyan-200 text-sm font-semibold border border-cyan-100 dark:border-cyan-800">
+                    Сегодня в календаре сокращённый день — показан режим «{shortDayHint}». Виджет звонков на рабочем столе тоже переключается.
+                </div>
+            )}
 
             <div className="flex-1 overflow-y-auto pb-20 custom-scrollbar pr-2">
                 <div className="flex flex-col gap-6">

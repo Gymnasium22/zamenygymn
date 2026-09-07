@@ -124,7 +124,7 @@ export const exportService = {
      * Isolates the clone from theme CSS (color-mix/oklch) that html2canvas cannot parse.
      * In Telegram uses the system share sheet (download attribute is ignored there).
      */
-    captureAndDownloadPng: async (element: HTMLElement, fileName: string): Promise<void> => {
+    capturePngBlob: async (element: HTMLElement): Promise<Blob> => {
         const { default: html2canvas } = await import('html2canvas');
         const clone = element.cloneNode(true) as HTMLElement;
         flattenPaintStyles(element, clone);
@@ -153,29 +153,56 @@ export const exportService = {
                     clonedEl.style.boxShadow = 'none';
                 }
             });
-            const blob = await new Promise<Blob>((resolve, reject) => {
+            return await new Promise<Blob>((resolve, reject) => {
                 canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob returned empty'))), 'image/png');
             });
-
-            const file = new File([blob], fileName, { type: 'image/png' });
-            const canShareFiles =
-                typeof navigator.share === 'function' &&
-                typeof navigator.canShare === 'function' &&
-                navigator.canShare({ files: [file] });
-
-            if (isInsideTelegram() && canShareFiles) {
-                try {
-                    await navigator.share({ files: [file], title: fileName });
-                    return;
-                } catch (shareErr) {
-                    if ((shareErr as { name?: string }).name === 'AbortError') return;
-                    logger.warn('Share failed, falling back to download', shareErr);
-                }
-            }
-
-            triggerAnchorDownload(blob, fileName);
         } finally {
             clone.remove();
+        }
+    },
+
+    captureAndDownloadPng: async (element: HTMLElement, fileName: string): Promise<void> => {
+        const blob = await exportService.capturePngBlob(element);
+        const file = new File([blob], fileName, { type: 'image/png' });
+        const canShareFiles =
+            typeof navigator.share === 'function' &&
+            typeof navigator.canShare === 'function' &&
+            navigator.canShare({ files: [file] });
+
+        if (isInsideTelegram() && canShareFiles) {
+            try {
+                await navigator.share({ files: [file], title: fileName });
+                return;
+            } catch (shareErr) {
+                if ((shareErr as { name?: string }).name === 'AbortError') return;
+                logger.warn('Share failed, falling back to download', shareErr);
+            }
+        }
+
+        triggerAnchorDownload(blob, fileName);
+    },
+
+    sendTelegramPhoto: async (
+        token: string,
+        chatId: string,
+        blob: Blob,
+        fileName: string,
+        caption?: string
+    ): Promise<void> => {
+        const form = new FormData();
+        form.append('chat_id', chatId);
+        form.append('photo', blob, fileName);
+        if (caption) form.append('caption', caption.slice(0, 1024));
+        const response = await fetch(`https://api.telegram.org/bot${token}/sendPhoto`, {
+            method: 'POST',
+            body: form
+        });
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+        const result = await response.json();
+        if (!result.ok) {
+            throw new Error(result.description || 'Telegram API error');
         }
     },
 

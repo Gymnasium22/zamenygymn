@@ -6,7 +6,10 @@ import { Modal, ContextMenu, useToast } from '../components/UI';
 import { Shift, DayOfWeek, DAYS, SHIFT_PERIODS, ScheduleItem } from '../types';
 import { formatDateEuropean, generateId } from '../utils/helpers';
 import useMedia from 'use-media';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { appendLessonHistory, formatHistoryTime, getLessonHistory } from '../utils/lessonHistory';
+import { offerUndo } from '../components/CloudSaveStatus';
 
 interface SchedulePageProps {
     readOnly?: boolean;
@@ -102,9 +105,13 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
     const readOnly = readOnlyProp || settings.isScheduleLocked;
     const { schedule1, schedule2, saveSemesterSchedule, canUndo, canRedo, undo, redo } = useScheduleData();
     const { addToast } = useToast();
+    const { user, organizationId } = useAuth();
+    const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const activeSemester: 1 | 2 = searchParams.get('semester') === '2' ? 2 : semester;
 
     // Выбираем нужный массив данных в зависимости от пропса semester
-    const schedule = semester === 2 ? schedule2 : schedule1;
+    const schedule = activeSemester === 2 ? schedule2 : schedule1;
 
     // Ref для предотвращения race condition при быстрых drag-and-drop / удалениях
     const scheduleRef = useRef(schedule);
@@ -115,7 +122,7 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
 
     // Вспомогательная функция для сохранения, которая знает о текущем семестре
     const saveCurrentSchedule = async (newScheduleData: ScheduleItem[]) => {
-        await saveSemesterSchedule(semester, newScheduleData);
+        await saveSemesterSchedule(activeSemester, newScheduleData);
     };
 
     const [selectedShift, setSelectedShift] = useState(Shift.First);
@@ -227,8 +234,6 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
     const [massOpSelectedClass, setMassOpSelectedClass] = useState<string>('');
 
     // --- NEW: URL Params Handling ---
-    const [searchParams] = useSearchParams();
-
     useEffect(() => {
         const view = searchParams.get('view');
         const id = searchParams.get('id');
@@ -588,6 +593,16 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
                 ...combo,
                 id: i === 0 && originalId ? originalId : generateId()
             };
+            const who = user?.email || user?.id || 'пользователь';
+            appendLessonHistory(
+                item.id,
+                {
+                    at: new Date().toISOString(),
+                    by: who,
+                    summary: `${classesById.get(item.classId)?.name || ''} · ${subjectsById.get(item.subjectId)?.name || ''} · ${item.day} ${item.period} ур.`
+                },
+                organizationId
+            );
             const idx = newSchedule.findIndex((s) => s.id === item.id);
             if (idx >= 0) newSchedule[idx] = item;
             else newSchedule.push(item);
@@ -659,6 +674,7 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
         const newSchedule = currentSchedule.filter((s) => s.id !== (id || tempItem.id));
         await saveCurrentSchedule(newSchedule);
         setIsEditorOpen(false);
+        offerUndo('Урок удалён из расписания', () => undo());
     };
 
     const handleContextMenu = (e: React.MouseEvent, item: ScheduleItem | null, cellInfo: CellInfo | null) => {
@@ -1159,10 +1175,24 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
             onTouchEnd={isMobile && viewMode !== 'week' ? handleTouchEnd : undefined}
         >
             {/* На mobile shell заголовок уже в app-bar — не дублируем */}
-            <div className="hidden lg:flex items-center gap-2 mb-4 px-4 pt-2">
-                <h2 className="text-xl font-bold text-slate-800 dark:text-white">
-                    {semester === 1 ? 'Расписание (1-е полугодие)' : 'Расписание (2-е полугодие)'}
-                </h2>
+            <div className="flex flex-wrap items-center gap-3 mb-4 px-4 pt-2">
+                <h2 className="text-xl font-bold text-slate-800 dark:text-white">Расписание</h2>
+                <div className="flex rounded-xl border border-slate-200 dark:border-slate-600 overflow-hidden text-sm font-bold">
+                    <button
+                        type="button"
+                        className={`px-3 py-1.5 ${activeSemester === 1 ? 'bg-indigo-600 text-white' : 'bg-white dark:bg-slate-800 text-slate-600'}`}
+                        onClick={() => navigate('/schedule?semester=1')}
+                    >
+                        1 полугодие
+                    </button>
+                    <button
+                        type="button"
+                        className={`px-3 py-1.5 ${activeSemester === 2 ? 'bg-indigo-600 text-white' : 'bg-white dark:bg-slate-800 text-slate-600'}`}
+                        onClick={() => navigate('/schedule?semester=2')}
+                    >
+                        2 полугодие
+                    </button>
+                </div>
             </div>
 
             {contextMenu.visible && (
@@ -1553,6 +1583,23 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
                 }
             >
                 <div className="space-y-3">
+                    {tempItem.id && getLessonHistory(tempItem.id, organizationId).length > 0 && (
+                        <div className="rounded-xl bg-slate-50 dark:bg-slate-800/60 p-2.5 text-[11px] text-slate-500 dark:text-slate-400">
+                            <div className="font-bold uppercase tracking-wide mb-1">История правок</div>
+                            <ul className="space-y-0.5 max-h-24 overflow-auto">
+                                {getLessonHistory(tempItem.id, organizationId)
+                                    .slice()
+                                    .reverse()
+                                    .slice(0, 8)
+                                    .map((h, i) => (
+                                        <li key={i}>
+                                            {formatHistoryTime(h.at)} · {h.by}
+                                            {h.summary ? ` · ${h.summary}` : ''}
+                                        </li>
+                                    ))}
+                            </ul>
+                        </div>
+                    )}
                     <div>
                         <div className="flex items-center gap-2 mb-1.5">
                             <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">

@@ -11,6 +11,7 @@ import { escapeMarkdown } from '../utils/escapeHtml';
 import { safeLocalStorageGet, safeLocalStorageSet } from '../utils/localStorage';
 import { logger } from '../utils/logger';
 import { useIsMobileApp } from '../hooks/useIsMobileApp';
+import { bellsForDate } from '../utils/bellsForDate';
 
 // Enhanced interfaces for Live Search
 interface EntityStatus {
@@ -472,8 +473,9 @@ export const DashboardPage = () => {
 
         if (!dayName) return { type: 'weekend', label: 'Выходной' };
 
-        let dailyBells = bellSchedule.filter((b) => b.day === dayName);
-        if (dailyBells.length === 0) dailyBells = bellSchedule.filter((b) => b.day === 'default');
+        const { bells: resolvedBells } = bellsForDate(now, bellSchedule, settings);
+        let dailyBells = resolvedBells.filter((b) => b.day === dayName);
+        if (dailyBells.length === 0) dailyBells = resolvedBells.filter((b) => b.day === 'default');
 
         const timeToMin = (t: string) => {
             const [h, m] = t.split(':').map(Number);

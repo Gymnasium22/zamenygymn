@@ -7,6 +7,15 @@ import { formatDateEuropean, generateId } from '../utils/helpers';
 import { useAuth } from '../context/AuthContext';
 import { plannerService, PlannerTask } from '../services/supabase/planner';
 import { logger } from '../utils/logger';
+import { useStaticData } from '../context/DataContext';
+import {
+    loadPlannerExtras,
+    PlannerExtras,
+    PlannerScope,
+    removePlannerExtra,
+    upsertPlannerExtra
+} from '../utils/plannerExtras';
+
 
 const PRIORITY_COLORS: Record<PlannerTask['priority'], string> = {
     low: 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600',
@@ -36,20 +45,24 @@ const LEGACY_STORAGE_KEY = 'gym_planner_tasks';
 
 export const PlannerPage = () => {
     const { addToast } = useToast();
-    const { organizationId, hasPermission } = useAuth();
+    const { organizationId, hasPermission, user } = useAuth();
+    const { teachers, settings, saveStaticData } = useStaticData();
     const canEditPlanner = hasPermission('edit_planner');
     const [tasks, setTasks] = useState<PlannerTask[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [filter, setFilter] = useState<PlannerTask['status'] | 'all'>('all');
+    const [scopeFilter, setScopeFilter] = useState<PlannerScope | 'all'>('all');
+    const [extras, setExtras] = useState<Record<string, PlannerExtras>>({});
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingTask, setEditingTask] = useState<PlannerTask | null>(null);
-    const [form, setForm] = useState<Partial<PlannerTask>>({
+    const [form, setForm] = useState<Partial<PlannerTask> & PlannerExtras>({
         title: '',
         description: '',
         priority: 'medium',
         status: 'todo',
-        deadline: ''
+        deadline: '',
+        scope: 'school'
     });
 
     const loadTasks = useCallback(async () => {
@@ -88,6 +101,7 @@ export const PlannerPage = () => {
             }
 
             setTasks(remote);
+            setExtras(loadPlannerExtras(organizationId));
         } catch (e) {
             logger.error('Failed to load planner tasks:', e);
             addToast({
@@ -108,14 +122,14 @@ export const PlannerPage = () => {
     const openAdd = () => {
         if (!canEditPlanner) return;
         setEditingTask(null);
-        setForm({ title: '', description: '', priority: 'medium', status: 'todo', deadline: '' });
+        setForm({ title: '', description: '', priority: 'medium', status: 'todo', deadline: '', scope: 'school', assigneeId: '', calendarEventId: '' } as Partial<PlannerTask> & PlannerExtras);
         setIsModalOpen(true);
     };
 
     const openEdit = (task: PlannerTask) => {
         if (!canEditPlanner) return;
         setEditingTask(task);
-        setForm({ ...task });
+        setForm({ ...task, ...(extras[task.id] || { scope: 'school' }) });
         setIsModalOpen(true);
     };
 
@@ -142,6 +156,33 @@ export const PlannerPage = () => {
         setSaving(true);
         try {
             await plannerService.upsert(newTask, organizationId);
+            const extra: PlannerExtras = {
+                scope: form.scope || 'school',
+                assigneeId: form.assigneeId || undefined,
+                calendarEventId: form.calendarEventId || undefined
+            };
+            upsertPlannerExtra(organizationId, newTask.id, extra);
+            setExtras((prev) => ({ ...prev, [newTask.id]: extra }));
+
+            if (form.deadline && form.scope === 'school') {
+                const events = [...(settings.calendarEvents || [])];
+                const existingId = extra.calendarEventId;
+                const ev = {
+                    id: existingId || generateId(),
+                    date: form.deadline,
+                    title: newTask.title,
+                    type: 'meeting' as const,
+                    description: newTask.description,
+                    showInWidget: true
+                };
+                const idx = events.findIndex((e) => e.id === ev.id);
+                if (idx >= 0) events[idx] = ev;
+                else events.push(ev);
+                extra.calendarEventId = ev.id;
+                upsertPlannerExtra(organizationId, newTask.id, extra);
+                await saveStaticData({ settings: { ...settings, calendarEvents: events } });
+            }
+
             setTasks((prev) => {
                 const exists = prev.some((t) => t.id === newTask.id);
                 return exists ? prev.map((t) => (t.id === newTask.id ? newTask : t)) : [newTask, ...prev];
@@ -165,6 +206,12 @@ export const PlannerPage = () => {
         if (!window.confirm('Удалить задачу?')) return;
         try {
             await plannerService.remove(id, organizationId);
+            removePlannerExtra(organizationId, id);
+            setExtras((prev) => {
+                const n = { ...prev };
+                delete n[id];
+                return n;
+            });
             setTasks((prev) => prev.filter((t) => t.id !== id));
             addToast({ type: 'success', title: 'Удалено', message: 'Задача удалена' });
         } catch (err) {
@@ -200,7 +247,15 @@ export const PlannerPage = () => {
         }
     };
 
-    const filteredTasks = tasks.filter((t) => (filter === 'all' ? true : t.status === filter));
+    const filteredTasks = tasks.filter((t) => {
+        if (filter !== 'all' && t.status !== filter) return false;
+        if (scopeFilter === 'all') return true;
+        const sc = extras[t.id]?.scope || 'school';
+        if (scopeFilter === 'personal') {
+            return sc === 'personal' || extras[t.id]?.assigneeId === user?.id;
+        }
+        return sc === 'school';
+    });
     const sortedTasks = [...filteredTasks].sort((a, b) => {
         const priorityOrder = { high: 0, medium: 1, low: 2 };
         if (priorityOrder[a.priority] !== priorityOrder[b.priority]) {
@@ -247,7 +302,7 @@ export const PlannerPage = () => {
                     <div className="app-mobile-page-head">
                         <h1 className="text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
                             <Icon name="CheckSquare" className="text-indigo-600 dark:text-indigo-400" />
-                            Планер администрации
+                            Планер
                         </h1>
                         <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
                             Статусы: к выполнению → в работе → готово (клик по кружку). Данные организации в облаке.
@@ -279,6 +334,28 @@ export const PlannerPage = () => {
                     </div>
                 </div>
 
+                <div className="flex flex-wrap gap-2 mb-2">
+                    {(
+                        [
+                            { id: 'all', label: 'Все' },
+                            { id: 'school', label: 'Школьные' },
+                            { id: 'personal', label: 'Личные' }
+                        ] as const
+                    ).map((f) => (
+                        <button
+                            key={f.id}
+                            type="button"
+                            onClick={() => setScopeFilter(f.id)}
+                            className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
+                                scopeFilter === f.id
+                                    ? 'bg-slate-800 text-white dark:bg-indigo-600'
+                                    : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700'
+                            }`}
+                        >
+                            {f.label}
+                        </button>
+                    ))}
+                </div>
                 <div className="flex gap-2">
                     {(
                         [
@@ -371,9 +448,16 @@ export const PlannerPage = () => {
                                             className={`text-xs mt-1 flex items-center gap-1 ${isOverdue(task) ? 'text-red-500 font-medium' : 'text-slate-400 dark:text-slate-500'}`}
                                         >
                                             <Icon name="Calendar" size={12} />
-                                            Дедлайн: {formatDateEuropean(task.deadline)}
+                                            Срок: {formatDateEuropean(task.deadline)}
+                                            {extras[task.id]?.calendarEventId ? ' · в календаре' : ''}
                                         </div>
                                     )}
+                                    <div className="text-[11px] text-slate-400 mt-1">
+                                        {(extras[task.id]?.scope || 'school') === 'personal' ? 'Личная' : 'Школьная'}
+                                        {extras[task.id]?.assigneeId
+                                            ? ` · ${teachers.find((t) => t.id === extras[task.id]?.assigneeId)?.name || 'ответственный'}`
+                                            : ''}
+                                    </div>
                                 </div>
                                 {canEditPlanner && (
                                     <div className="flex items-center gap-1">
@@ -476,6 +560,43 @@ export const PlannerPage = () => {
                                     onChange={(v) => setForm({ ...form, deadline: v })}
                                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-dark-700 text-slate-800 dark:text-slate-200 outline-none focus:border-indigo-500"
                                 />
+                                <p className="text-[11px] text-slate-400 mt-1">
+                                    Школьная задача с датой появится в календаре (тип «собрание»).
+                                </p>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                                        Тип
+                                    </label>
+                                    <select
+                                        value={form.scope || 'school'}
+                                        onChange={(e) =>
+                                            setForm({ ...form, scope: e.target.value as PlannerScope })
+                                        }
+                                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-dark-700 text-slate-800 dark:text-slate-200 outline-none"
+                                    >
+                                        <option value="school">Школьная</option>
+                                        <option value="personal">Личная</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                                        Ответственный
+                                    </label>
+                                    <select
+                                        value={form.assigneeId || ''}
+                                        onChange={(e) => setForm({ ...form, assigneeId: e.target.value })}
+                                        className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-dark-700 text-slate-800 dark:text-slate-200 outline-none"
+                                    >
+                                        <option value="">Не назначен</option>
+                                        {teachers.map((t) => (
+                                            <option key={t.id} value={t.id}>
+                                                {t.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
                             </div>
                             <div className="flex gap-3 pt-2">
                                 <button

@@ -19,6 +19,12 @@ import { exportService } from '../services/exportService';
 import { useToast } from '../components/UI';
 import { SanitaryScheduleTab } from '../components/SanitaryScheduleTab';
 import { PrintPreviewModal } from '../components/PrintPreviewModal';
+import {
+    SubstitutionExportSheet,
+    SubstitutionReportFooter,
+    SubstitutionReportHeader,
+    shiftHasExportableSubs
+} from '../components/SubstitutionExportSheet';
 
 // --- Хелперы ---
 
@@ -26,50 +32,6 @@ import { escapeHtml, sanitizeColor } from '../utils/escapeHtml';
 import { logger } from '../utils/logger';
 
 // --- Вынесенные компоненты печати (не пересоздаются на каждый рендер) ---
-
-interface ReportHeaderProps {
-    exportDate: string;
-    dayComment?: string;
-}
-
-const ReportHeader = ({ exportDate, dayComment }: ReportHeaderProps) => {
-    const { settings } = useStaticData();
-    return (
-    <div className="border-b-2 border-slate-800 pb-4 mb-6">
-        <div className="flex justify-between items-end gap-4">
-            <div>
-                <h1 className="text-3xl font-black uppercase tracking-tight mb-1 text-slate-800">
-                    Замена Учителей
-                </h1>
-                <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">
-                    {settings?.schoolName || 'Учреждение образования'} • Официальный документ
-                </p>
-            </div>
-            <div className="text-right">
-                <div className="text-xs text-slate-400 uppercase font-bold tracking-wider mb-1">Дата</div>
-                <div className="text-xl font-bold text-slate-800">
-                    {getDateOrToday(exportDate).toLocaleDateString('ru-BY', {
-                        day: 'numeric',
-                        month: 'long',
-                        year: 'numeric'
-                    })}
-                </div>
-            </div>
-        </div>
-        {dayComment && <div className="mt-3 text-xs text-slate-600 max-w-3xl">{dayComment}</div>}
-    </div>
-    );
-};
-
-const ReportFooter = () => (
-    <div className="mt-8 pt-4 border-t border-slate-100 flex justify-between items-end text-[10px] text-slate-400">
-        <div>Сформировано автоматически</div>
-        <div className="flex flex-col items-end gap-2">
-            <div className="h-px w-32 bg-slate-300"></div>
-            <div>Подпись администрации</div>
-        </div>
-    </div>
-);
 
 interface MatrixPrintContentProps {
     classes: ClassEntity[];
@@ -1327,221 +1289,15 @@ export const ExportPage = () => {
         return fromSubs || '';
     }, [settings.substitutionDayComments, exportDate, subsForDate]);
 
-    const subsForShift1 = useMemo(() => {
-        return (
-            subsForDate
-                .filter((sub) => {
-                    const s = getScheduleItemById(sub.scheduleItemId);
-                    return s && s.shift === Shift.First;
-                })
-                .filter((sub) => sub.replacementTeacherId !== 'conducted').length > 0
-        );
-    }, [subsForDate, getScheduleItemById]);
+    const subsForShift1 = useMemo(
+        () => shiftHasExportableSubs(subsForDate, Shift.First, getScheduleItemById),
+        [subsForDate, getScheduleItemById]
+    );
 
-    const subsForShift2 = useMemo(() => {
-        return (
-            subsForDate
-                .filter((sub) => {
-                    const s = getScheduleItemById(sub.scheduleItemId);
-                    return s && s.shift === Shift.Second;
-                })
-                .filter((sub) => sub.replacementTeacherId !== 'conducted').length > 0
-        );
-    }, [subsForDate, getScheduleItemById]);
-
-    const renderTableForShift = (shift: string) => {
-        // Group subs by scheduleItemId to handle merges
-        const shiftSubs = subsForDate
-            .filter((sub) => {
-                const s = getScheduleItemById(sub.scheduleItemId);
-                return s && s.shift === shift;
-            })
-            .filter((sub) => sub.replacementTeacherId !== 'conducted');
-
-        if (shiftSubs.length === 0) return null;
-
-        const uniqueLessonIds = Array.from(new Set(shiftSubs.map((s) => s.scheduleItemId))).sort((idA, idB) => {
-            const itemA = getScheduleItemById(idA);
-            const itemB = getScheduleItemById(idB);
-            return (itemA?.period ?? 0) - (itemB?.period ?? 0);
-        });
-
-        return (
-            <div>
-                <div className="text-xl font-bold bg-slate-100 text-slate-700 p-2 mb-2 uppercase tracking-wide border-l-4 border-indigo-500">
-                    {shift}
-                </div>
-                <table className="w-full text-left border-collapse">
-                    <thead>
-                        <tr className="border-b border-slate-200">
-                            <th className="py-3 px-2 font-black text-slate-400 text-xs uppercase tracking-wider w-16 text-center">
-                                Урок
-                            </th>
-                            <th className="py-3 px-2 font-black text-slate-400 text-xs uppercase tracking-wider w-24">
-                                Класс
-                            </th>
-                            <th className="py-3 px-2 font-black text-slate-400 text-xs uppercase tracking-wider">
-                                Предмет
-                            </th>
-                            <th className="py-3 px-2 font-black text-slate-400 text-xs uppercase tracking-wider w-1/4">
-                                Отсутствует
-                            </th>
-                            <th className="py-3 px-2 font-black text-slate-400 text-xs uppercase tracking-wider w-1/4">
-                                Заменяет
-                            </th>
-                            <th className="py-3 px-2 font-black text-slate-400 text-xs uppercase tracking-wider w-20 text-right">
-                                Каб.
-                            </th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                        {uniqueLessonIds.map((lessonId) => {
-                            const lessonSubs = shiftSubs.filter((s) => s.scheduleItemId === lessonId);
-                            const sub = lessonSubs[0];
-                            const s = getScheduleItemById(lessonId);
-                            if (!s) return null;
-                            const cls = classesById.get(s.classId);
-                            const subj = subjectsById.get(s.subjectId);
-                            const t1 = teachersById.get(sub.originalTeacherId);
-
-                            const newRoomId = sub.replacementRoomId;
-                            const oldRoomObj = s.roomId ? roomsById.get(s.roomId) : null;
-                            const oldRoomName = oldRoomObj ? oldRoomObj.name : s.roomId || '—';
-                            const newRoomObj = newRoomId ? roomsById.get(newRoomId) : null;
-                            const newRoomName = newRoomObj ? newRoomObj.name : newRoomId || '—';
-
-                            const isCancelled = sub.replacementTeacherId === 'cancelled';
-
-                            const dayReason = t1?.absenceReasons?.[exportDate];
-                            const lessonReason = sub.lessonAbsenceReason;
-                            const displayReason =
-                                lessonReason === 'Без записи'
-                                    ? lessonReason
-                                    : dayReason === 'Без записи'
-                                      ? dayReason
-                                      : '';
-
-                            const swappedClass = sub.replacementClassId
-                                ? classesById.get(sub.replacementClassId)
-                                : null;
-                            const swappedSubj = sub.replacementSubjectId
-                                ? subjectsById.get(sub.replacementSubjectId)
-                                : null;
-
-                            const isRoomChangeOnly =
-                                sub.replacementTeacherId === sub.originalTeacherId && newRoomId && !swappedClass;
-                            const isSwap = swappedClass && swappedSubj && !sub.isMerger;
-                            const isTeacherPresent = sub.replacementTeacherId === sub.originalTeacherId;
-                            const rowComment = sub.comment;
-
-                            return (
-                                <tr key={String(lessonId)}>
-                                    <td className="py-3 px-2 text-center font-bold text-slate-800 text-lg">
-                                        {s.period}
-                                    </td>
-                                    <td className="py-3 px-2 font-bold text-slate-700">{cls?.name}</td>
-                                    <td className="py-3 px-2">
-                                        <div className="font-semibold text-slate-800">{subj?.name}</div>
-                                        {s.direction && (
-                                            <div className="text-[10px] text-slate-500 bg-slate-100 inline-block px-1 rounded mt-0.5">
-                                                {s.direction}
-                                            </div>
-                                        )}
-                                    </td>
-                                    <td className="py-3 px-2">
-                                        {!isTeacherPresent && !isRoomChangeOnly && !isSwap && (
-                                            <>
-                                                <div className="relative inline-block text-red-400 text-sm font-medium">
-                                                    {t1?.name}
-                                                    <div className="absolute left-0 top-[85%] w-full h-px bg-red-300"></div>
-                                                </div>
-                                                {displayReason && (
-                                                    <span className="text-[10px] text-slate-500 block font-bold uppercase mt-0.5">
-                                                        {displayReason}
-                                                    </span>
-                                                )}
-                                            </>
-                                        )}
-                                    </td>
-                                    <td
-                                        className={`py-3 px-2 font-bold text-sm ${isCancelled ? 'text-red-600 uppercase font-black' : 'text-emerald-700'}`}
-                                    >
-                                        {isRoomChangeOnly ? (
-                                            <div className="flex flex-col">
-                                                <span className="text-slate-800">{t1?.name}</span>
-                                                <span className="text-[10px] text-indigo-600 font-bold uppercase tracking-wide mt-0.5">
-                                                    Смена кабинета
-                                                </span>
-                                            </div>
-                                        ) : isSwap ? (
-                                            <div className="flex flex-col">
-                                                <span className="text-slate-800">{t1?.name}</span>
-                                                <span className="text-[10px] text-purple-600 font-bold uppercase tracking-wide mt-0.5">
-                                                    Обмен уроками: {swappedClass?.name}
-                                                </span>
-                                            </div>
-                                        ) : isCancelled ? (
-                                            <div className="flex flex-col">
-                                                <span>УРОК СНЯТ</span>
-                                            </div>
-                                        ) : (
-                                            <div className="flex flex-col">
-                                                {lessonSubs.length > 1 || sub.isMerger ? (
-                                                    <>
-                                                        <span className="text-slate-800 text-xs">
-                                                            {lessonSubs
-                                                                .map((ls) => {
-                                                                    const tr = teachersById.get(ls.replacementTeacherId);
-                                                                    return tr ? tr.name : 'Неизвестно';
-                                                                })
-                                                                .join(', ')}
-                                                        </span>
-                                                        <span className="text-[9px] font-black text-purple-600 uppercase tracking-widest mt-0.5">
-                                                            ОБЪЕДИНЕНИЕ{' '}
-                                                            {sub.replacementClassId
-                                                                ? `(${classesById.get(sub.replacementClassId)?.name})`
-                                                                : ''}
-                                                        </span>
-                                                    </>
-                                                ) : (
-                                                    <span>
-                                                        {teachersById.get(sub.replacementTeacherId)?.name}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        )}
-                                        {rowComment && (
-                                            <div className="mt-1 text-[10px] text-slate-500 italic max-w-xs">
-                                                {rowComment}
-                                            </div>
-                                        )}
-                                    </td>
-                                    <td
-                                        className={`py-3 px-2 text-right font-mono font-black ${newRoomId ? 'text-indigo-600' : 'text-slate-700'}`}
-                                    >
-                                        {newRoomId && newRoomId !== s.roomId ? (
-                                            <div className="flex items-center justify-end gap-2 text-xl whitespace-nowrap">
-                                                <span className="text-slate-400 decoration-4 text-xl">
-                                                    {oldRoomName}
-                                                </span>
-                                                <span className="text-indigo-600 font-black text-2xl">&rarr;</span>
-                                                <span className="text-indigo-600 font-black text-2xl">
-                                                    {newRoomName}
-                                                </span>
-                                            </div>
-                                        ) : (
-                                            <span className="text-xl">{oldRoomName}</span>
-                                        )}
-                                    </td>
-                                </tr>
-                            );
-                        })}
-                    </tbody>
-                </table>
-            </div>
-        );
-    };
-
+    const subsForShift2 = useMemo(
+        () => shiftHasExportableSubs(subsForDate, Shift.Second, getScheduleItemById),
+        [subsForDate, getScheduleItemById]
+    );
 
     const subjectsById = useMemo(() => {
         const map = new Map<string, Subject>();
@@ -1655,33 +1411,41 @@ export const ExportPage = () => {
                         <div className="overflow-x-auto overflow-y-auto bg-slate-100 dark:bg-slate-900 p-3 sm:p-8 rounded-xl border border-slate-200 dark:border-slate-700 flex justify-start max-w-full">
                             {subsForDate.length === 0 ? (
                                 <div className="bg-white p-4 sm:p-8 min-w-[320px] sm:min-w-[800px] max-w-[1000px] shadow-xl text-slate-900 w-full sm:w-auto">
-                                    <ReportHeader exportDate={exportDate} dayComment={dayComment} />
+                                    <SubstitutionReportHeader exportDate={exportDate} dayComment={dayComment} />
                                     <div className="py-12 text-center border-2 border-dashed border-slate-200 rounded-xl bg-slate-50">
                                         <p className="text-slate-400 font-medium italic">Замен на этот день нет</p>
                                     </div>
-                                    <ReportFooter />
+                                    <SubstitutionReportFooter />
                                 </div>
                             ) : (
                                 <div className="flex flex-col lg:flex-row gap-8">
                                     {subsForShift1 && (
-                                        <div
+                                        <SubstitutionExportSheet
                                             ref={printRef1}
-                                            className="bg-white p-8 min-w-[800px] max-w-[1000px] shadow-xl text-slate-900"
-                                        >
-                                            <ReportHeader exportDate={exportDate} dayComment={dayComment} />
-                                            {renderTableForShift(Shift.First)}
-                                            <ReportFooter />
-                                        </div>
+                                            exportDate={exportDate}
+                                            dayComment={dayComment}
+                                            shift={Shift.First}
+                                            substitutions={subsForDate}
+                                            getScheduleItemById={getScheduleItemById}
+                                            classesById={classesById}
+                                            subjectsById={subjectsById}
+                                            teachersById={teachersById}
+                                            roomsById={roomsById}
+                                        />
                                     )}
                                     {subsForShift2 && (
-                                        <div
+                                        <SubstitutionExportSheet
                                             ref={printRef2}
-                                            className="bg-white p-8 min-w-[800px] max-w-[1000px] shadow-xl text-slate-900"
-                                        >
-                                            <ReportHeader exportDate={exportDate} dayComment={dayComment} />
-                                            {renderTableForShift(Shift.Second)}
-                                            <ReportFooter />
-                                        </div>
+                                            exportDate={exportDate}
+                                            dayComment={dayComment}
+                                            shift={Shift.Second}
+                                            substitutions={subsForDate}
+                                            getScheduleItemById={getScheduleItemById}
+                                            classesById={classesById}
+                                            subjectsById={subjectsById}
+                                            teachersById={teachersById}
+                                            roomsById={roomsById}
+                                        />
                                     )}
                                 </div>
                             )}

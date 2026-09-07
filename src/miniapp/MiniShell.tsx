@@ -15,8 +15,7 @@ type NavItem = { to: string; pageId: PageId; label: string; icon: string; short:
 const ALL_NAV: NavItem[] = [
     { to: 'dashboard', pageId: 'dashboard', label: 'Главная', icon: 'Home', short: 'Главная' },
     { to: 'substitutions', pageId: 'substitutions', label: 'Замены', icon: 'Repeat', short: 'Замены' },
-    { to: 'schedule', pageId: 'schedule', label: '1 полугодие', icon: 'Calendar', short: '1 пол.' },
-    { to: 'schedule2', pageId: 'schedule2', label: '2 полугодие', icon: 'Calendar', short: '2 пол.' },
+    { to: 'schedule', pageId: 'schedule', label: 'Расписание', icon: 'Calendar', short: 'Распис.' },
     { to: 'duty', pageId: 'duty', label: 'Дежурство', icon: 'Shield', short: 'Дежур.' },
     { to: 'nutrition', pageId: 'nutrition', label: 'Питание', icon: 'Coffee', short: 'Питание' },
     { to: 'absenteeism', pageId: 'absenteeism', label: 'Пропуски', icon: 'UserX', short: 'Проп.' },

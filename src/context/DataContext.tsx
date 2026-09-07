@@ -29,9 +29,15 @@ interface FullDataContextType {
     canRedo: boolean;
 }
 
+export type CloudSaveState = 'saved' | 'saving' | 'queued' | 'error' | 'offline';
+
 interface DataMetaContextType {
     isLoading: boolean;
     isSaving: boolean;
+    saveStatus: CloudSaveState;
+    lastSavedAt: number | null;
+    lastSaveError: string | null;
+    queueLength: number;
     undo: () => void;
     redo: () => void;
     canUndo: boolean;
@@ -143,6 +149,12 @@ const syncQueue = {
             }
             syncQueue.isProcessing = false;
 
+            window.dispatchEvent(
+                new CustomEvent('app-sync-queue', {
+                    detail: { length: syncQueue.items.length, processing: false }
+                })
+            );
+
             if (syncQueue.items.length > 0 && navigator.onLine) {
                 // Если остались элементы и сеть есть, попробуем снова через 5 секунд
                 setTimeout(() => syncQueue.process(dataProvider, user, organizationId), 5000);
@@ -248,6 +260,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
     const [data, setInternalData] = useState<AppData>(getInitialData());
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
+    const [saveStatus, setSaveStatus] = useState<CloudSaveState>('saved');
+    const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+    const [lastSaveError, setLastSaveError] = useState<string | null>(null);
+    const [queueLength, setQueueLength] = useState(0);
     const [history, setHistory] = useState<AppData[]>([]);
     const [historyPointer, setHistoryPointer] = useState(-1);
 
@@ -448,6 +464,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
     const saveData = useCallback(
         async (newData: Partial<AppData>, addToHistory = true) => {
             setIsSaving(true);
+            setSaveStatus('saving');
+            setLastSaveError(null);
 
             try {
                 // Используем refs для получения актуального состояния
@@ -480,6 +498,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                 if (!initialData && user) {
                     try {
                         await dataProvider.save(newData, user, organizationId);
+                        setSaveStatus(navigator.onLine ? 'saved' : 'offline');
+                        setLastSavedAt(Date.now());
+                        setLastSaveError(null);
                     } catch (dbError: unknown) {
                         const err = dbError as { code?: string; details?: string; message?: string };
                         const isDataError =
@@ -496,6 +517,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                             err.message?.includes('row-level security') ||
                             err.message?.includes('invalid input syntax');
                         if (isDataError) {
+                            setSaveStatus('error');
+                            setLastSaveError(err.message || err.details || 'целостность данных');
                             handleError.log('Data validation error (not queued):', dbError);
                             const isSchemaError = err.code === 'PGRST204' || err.message?.includes('Could not find');
                             window.dispatchEvent(
@@ -515,9 +538,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                         } else {
                             // При сетевой/временной ошибке Supabase — в очередь синхронизации, без отката UI
                             handleError.offline(dbError, 'сохранения данных', newData, organizationId);
+                            setSaveStatus('queued');
+                            setQueueLength(syncQueue.items.length);
                             // НЕ откатываем интерфейс - данные остались в localStorage и будут синхронизированы позже
                         }
                     }
+                } else {
+                    setSaveStatus(navigator.onLine ? 'saved' : 'offline');
+                    setLastSavedAt(Date.now());
                 }
 
                 // 4. Audit log
@@ -570,6 +598,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                 }
             } finally {
                 setIsSaving(false);
+                setQueueLength(syncQueue.items.length);
             }
         },
         [user, role, initialData, organizationId, dataProvider]
@@ -579,12 +608,35 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
     useEffect(() => {
         const handleOnline = () => {
             if (syncQueue.items.length > 0 && user && !initialData) {
+                setSaveStatus('saving');
                 syncQueue.process(dataProvider, user, organizationId);
+            } else if (syncQueue.items.length === 0) {
+                setSaveStatus('saved');
+            }
+        };
+        const handleOffline = () => {
+            setSaveStatus(syncQueue.items.length > 0 ? 'queued' : 'offline');
+        };
+        const handleQueue = (e: Event) => {
+            const d = (e as CustomEvent).detail as { length?: number };
+            const len = typeof d?.length === 'number' ? d.length : syncQueue.items.length;
+            setQueueLength(len);
+            if (len === 0) {
+                setSaveStatus('saved');
+                setLastSavedAt(Date.now());
+            } else {
+                setSaveStatus('queued');
             }
         };
 
         window.addEventListener('online', handleOnline);
-        return () => window.removeEventListener('online', handleOnline);
+        window.addEventListener('offline', handleOffline);
+        window.addEventListener('app-sync-queue', handleQueue);
+        return () => {
+            window.removeEventListener('online', handleOnline);
+            window.removeEventListener('offline', handleOffline);
+            window.removeEventListener('app-sync-queue', handleQueue);
+        };
     }, [user, role, initialData, dataProvider, organizationId]);
 
     // BroadcastChannel: синхронизация между вкладками
@@ -676,13 +728,29 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
         () => ({
             isLoading,
             isSaving,
+            saveStatus,
+            lastSavedAt,
+            lastSaveError,
+            queueLength,
             undo,
             redo,
             canUndo: historyPointer > 0,
             canRedo: historyPointer < history.length - 1,
             resetData
         }),
-        [isLoading, isSaving, undo, redo, historyPointer, history.length, resetData]
+        [
+            isLoading,
+            isSaving,
+            saveStatus,
+            lastSavedAt,
+            lastSaveError,
+            queueLength,
+            undo,
+            redo,
+            historyPointer,
+            history.length,
+            resetData
+        ]
     );
 
     return (
@@ -846,6 +914,10 @@ export const useStaticData = () => {
             ...safeContext,
             isLoading: metaContext.isLoading,
             isSaving: metaContext.isSaving,
+            saveStatus: metaContext.saveStatus,
+            lastSavedAt: metaContext.lastSavedAt,
+            lastSaveError: metaContext.lastSaveError,
+            queueLength: metaContext.queueLength,
             undo: metaContext.undo,
             redo: metaContext.redo,
             canUndo: metaContext.canUndo,
@@ -856,6 +928,10 @@ export const useStaticData = () => {
             safeContext,
             metaContext.isLoading,
             metaContext.isSaving,
+            metaContext.saveStatus,
+            metaContext.lastSavedAt,
+            metaContext.lastSaveError,
+            metaContext.queueLength,
             metaContext.undo,
             metaContext.redo,
             metaContext.canUndo,
@@ -892,6 +968,10 @@ export const useScheduleData = () => {
             ...safeContext,
             isLoading: metaContext.isLoading,
             isSaving: metaContext.isSaving,
+            saveStatus: metaContext.saveStatus,
+            lastSavedAt: metaContext.lastSavedAt,
+            lastSaveError: metaContext.lastSaveError,
+            queueLength: metaContext.queueLength,
             undo: metaContext.undo,
             redo: metaContext.redo,
             canUndo: metaContext.canUndo,
@@ -902,6 +982,10 @@ export const useScheduleData = () => {
             safeContext,
             metaContext.isLoading,
             metaContext.isSaving,
+            metaContext.saveStatus,
+            metaContext.lastSavedAt,
+            metaContext.lastSaveError,
+            metaContext.queueLength,
             metaContext.undo,
             metaContext.redo,
             metaContext.canUndo,

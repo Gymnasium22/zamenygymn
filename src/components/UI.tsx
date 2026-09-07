@@ -6,6 +6,8 @@ import { DayOfWeek, PageId, Shift } from '../types';
 import { formatDateEuropean, generateId, getActiveSemester } from '../utils/helpers';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { UndoBar } from './CloudSaveStatus';
+import { bellsForDate } from '../utils/bellsForDate';
 
 interface ToastData {
     id: string;
@@ -52,6 +54,7 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
         <ToastContext.Provider value={{ toasts, addToast, removeToast }}>
             {children}
             <ToastContainer toasts={toasts} onRemoveToast={removeToast} />
+            <UndoBar />
         </ToastContext.Provider>
     );
 };
@@ -625,8 +628,9 @@ export const StatusWidget = () => {
                 return h * 60 + m;
             };
             const minutesNow = now.getHours() * 60 + now.getMinutes();
-            let dailyBells = bellSchedule.filter((b) => b.day === todayName);
-            if (dailyBells.length === 0) dailyBells = bellSchedule.filter((b) => b.day === 'default');
+            const resolved = bellsForDate(now, bellSchedule, settings);
+            let dailyBells = resolved.bells.filter((b) => b.day === todayName);
+            if (dailyBells.length === 0) dailyBells = resolved.bells.filter((b) => b.day === 'default');
 
             dailyBells.sort((a, b) => timeToMin(a.start) - timeToMin(b.start));
 
@@ -1002,8 +1006,7 @@ interface BottomNavProps {
 
 const MORE_NAV_ITEMS: { to: string; icon: string; label: string; pageId: PageId }[] = [
     { to: '/dashboard', icon: 'Home', label: 'Рабочий стол', pageId: 'dashboard' },
-    { to: '/schedule', icon: 'Calendar', label: '1 полугодие', pageId: 'schedule' },
-    { to: '/schedule2', icon: 'Calendar', label: '2 полугодие', pageId: 'schedule2' },
+    { to: '/schedule', icon: 'Calendar', label: 'Расписание', pageId: 'schedule' },
     { to: '/duty', icon: 'Shield', label: 'Дежурство', pageId: 'duty' },
     { to: '/substitutions', icon: 'Repeat', label: 'Замены', pageId: 'substitutions' },
     { to: '/nutrition', icon: 'Coffee', label: 'Питание', pageId: 'nutrition' },
@@ -1197,8 +1200,7 @@ export const CommandPalette = ({ isOpen, onClose }: CommandPaletteProps) => {
         // Navigation Actions — фильтруем по правам доступа пользователя
         const allNavItems: Array<{ label: string; icon: string; path: string; pageId: PageId }> = [
             { label: 'Рабочий стол', icon: 'Home', path: '/dashboard', pageId: 'dashboard' },
-            { label: '1 полугодие', icon: 'Calendar', path: '/schedule', pageId: 'schedule' },
-            { label: '2 полугодие', icon: 'Calendar', path: '/schedule2', pageId: 'schedule2' },
+            { label: 'Расписание', icon: 'Calendar', path: '/schedule', pageId: 'schedule' },
             { label: 'Дежурство', icon: 'Shield', path: '/duty', pageId: 'duty' },
             { label: 'Замены', icon: 'Repeat', path: '/substitutions', pageId: 'substitutions' },
             { label: 'Питание', icon: 'Coffee', path: '/nutrition', pageId: 'nutrition' },

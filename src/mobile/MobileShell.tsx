@@ -6,6 +6,7 @@ import { Icon } from '../components/Icons';
 import { PageId } from '../types';
 import { getActiveSemester } from '../utils/helpers';
 import { FeedbackModal } from '../components/FeedbackModal';
+import { CloudSaveStatus } from '../components/CloudSaveStatus';
 import './mobile-app.css';
 
 type NavItem = {
@@ -19,8 +20,7 @@ type NavItem = {
 const ALL_NAV: NavItem[] = [
     { to: '/dashboard', pageId: 'dashboard', label: 'Рабочий стол', icon: 'Home', short: 'Главная' },
     { to: '/substitutions', pageId: 'substitutions', label: 'Замены', icon: 'Repeat', short: 'Замены' },
-    { to: '/schedule', pageId: 'schedule', label: '1 полугодие', icon: 'Calendar', short: '1 пол.' },
-    { to: '/schedule2', pageId: 'schedule2', label: '2 полугодие', icon: 'Calendar', short: '2 пол.' },
+    { to: '/schedule', pageId: 'schedule', label: 'Расписание', icon: 'Calendar', short: 'Распис.' },
     { to: '/duty', pageId: 'duty', label: 'Дежурство', icon: 'Shield', short: 'Дежур.' },
     { to: '/nutrition', pageId: 'nutrition', label: 'Питание', icon: 'Coffee', short: 'Питание' },
     { to: '/absenteeism', pageId: 'absenteeism', label: 'Пропуски', icon: 'UserX', short: 'Проп.' },
@@ -199,6 +199,7 @@ export const MobileShell: React.FC<MobileShellProps> = ({
                         </select>
                     )}
                     <div className="app-mobile-header__actions">
+                        <CloudSaveStatus compact />
                         <button
                             type="button"
                             className="app-mobile-icon-btn"
