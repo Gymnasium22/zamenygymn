@@ -155,7 +155,7 @@ export const SchoolCalendar: React.FC<SchoolCalendarProps> = ({ events, onEvents
                 </button>
             </div>
 
-            <div className="grid grid-cols-7 grid-rows-6 gap-1 flex-1 min-h-0">
+            <div className="grid grid-cols-7 grid-rows-6 gap-1 flex-1 min-h-0 lg:w-full lg:min-w-0 lg:overflow-x-hidden">
                 {['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'].map((d) => (
                     <div key={d} className="text-center text-xs font-bold text-slate-400 dark:text-slate-500 py-1 uppercase">
                         {d}
@@ -169,13 +169,13 @@ export const SchoolCalendar: React.FC<SchoolCalendarProps> = ({ events, onEvents
                             key={i}
                             onClick={() => !readOnly && day.isCurrentMonth && openAdd(day.dateStr)}
                             title={`${day.dateStr}${dayEvents.length ? ` • ${dayEvents.length} событий` : ''}`}
-                            className={`min-h-0 p-1.5 rounded-xl border transition-all cursor-pointer overflow-hidden flex flex-col ${
+                            className={`min-h-0 p-1.5 rounded-xl border transition-all cursor-pointer overflow-hidden flex flex-col lg:box-border lg:min-w-0 ${
                                 day.isCurrentMonth
                                     ? weekend
                                         ? 'bg-rose-50/50 dark:bg-rose-900/10 border-rose-100 dark:border-rose-900/30 hover:border-rose-200 dark:hover:border-rose-800'
                                         : 'bg-white dark:bg-dark-800 border-slate-100 dark:border-slate-700 hover:border-indigo-200 dark:hover:border-indigo-700'
                                     : 'bg-slate-50/50 dark:bg-slate-800/30 border-slate-50 dark:border-slate-800 opacity-50'
-                            } ${isToday(day.dateStr) ? 'ring-2 ring-indigo-500 ring-offset-1' : ''}`}
+                            } ${isToday(day.dateStr) ? 'ring-2 ring-indigo-500 ring-offset-1 lg:ring-0 lg:ring-offset-0 lg:shadow-[inset_0_0_0_2px_#6366f1]' : ''}`}
                         >
                             <div className={`text-sm font-bold mb-0.5 shrink-0 ${isToday(day.dateStr) ? 'text-indigo-600' : weekend && day.isCurrentMonth ? 'text-rose-500 dark:text-rose-400' : 'text-slate-700 dark:text-slate-300'}`}>
                                 {day.date}
