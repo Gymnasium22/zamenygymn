@@ -1,4 +1,5 @@
 import { supabase } from '../supabase';
+import { PlannerExtras } from '../../utils/plannerExtras';
 
 export type PlannerTaskPriority = 'low' | 'medium' | 'high';
 export type PlannerTaskStatus = 'todo' | 'in-progress' | 'done';
@@ -13,6 +14,19 @@ export interface PlannerTask {
     createdAt: string;
     completedAt?: string;
     organizationId?: string;
+    extras?: PlannerExtras;
+}
+
+function parseExtras(raw: unknown): PlannerExtras | undefined {
+    if (!raw || typeof raw !== 'object') return undefined;
+    const o = raw as Record<string, unknown>;
+    const scope = o.scope === 'personal' ? 'personal' : o.scope === 'school' ? 'school' : undefined;
+    if (!scope && !o.assigneeId && !o.calendarEventId) return undefined;
+    return {
+        scope: scope || 'school',
+        assigneeId: typeof o.assigneeId === 'string' ? o.assigneeId : undefined,
+        calendarEventId: typeof o.calendarEventId === 'string' ? o.calendarEventId : undefined
+    };
 }
 
 function mapRow(row: Record<string, unknown>): PlannerTask {
@@ -27,7 +41,8 @@ function mapRow(row: Record<string, unknown>): PlannerTask {
         status: (row.status as PlannerTaskStatus) || 'todo',
         createdAt: (row.created_at as string) || new Date().toISOString(),
         completedAt: (row.completed_at as string) || undefined,
-        organizationId: row.organization_id as string | undefined
+        organizationId: row.organization_id as string | undefined,
+        extras: parseExtras(row.extras)
     };
 }
 
@@ -42,7 +57,8 @@ function toRow(task: PlannerTask, organizationId: string): Record<string, unknow
         status: task.status,
         created_at: task.createdAt || new Date().toISOString(),
         completed_at: task.completedAt || null,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
+        extras: task.extras || {}
     };
 }
 

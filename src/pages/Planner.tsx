@@ -100,8 +100,20 @@ export const PlannerPage = () => {
                 }
             }
 
-            setTasks(remote);
-            setExtras(loadPlannerExtras(organizationId));
+            const localExtras = loadPlannerExtras(organizationId);
+            const merged = remote.map((t) =>
+                t.extras?.scope ? t : localExtras[t.id] ? { ...t, extras: localExtras[t.id] } : t
+            );
+            const toPush = merged.filter((t) => !remote.find((r) => r.id === t.id)?.extras?.scope && t.extras);
+            if (toPush.length > 0) {
+                await Promise.all(toPush.map((t) => plannerService.upsert(t, organizationId).catch((e) => logger.warn(e))));
+            }
+            setTasks(merged);
+            const extrasMap: Record<string, PlannerExtras> = { ...localExtras };
+            merged.forEach((t) => {
+                if (t.extras) extrasMap[t.id] = t.extras;
+            });
+            setExtras(extrasMap);
         } catch (e) {
             logger.error('Failed to load planner tasks:', e);
             addToast({
@@ -129,7 +141,7 @@ export const PlannerPage = () => {
     const openEdit = (task: PlannerTask) => {
         if (!canEditPlanner) return;
         setEditingTask(task);
-        setForm({ ...task, ...(extras[task.id] || { scope: 'school' }) });
+        setForm({ ...task, ...(task.extras || extras[task.id] || { scope: 'school' }) });
         setIsModalOpen(true);
     };
 
@@ -137,6 +149,12 @@ export const PlannerPage = () => {
         e.preventDefault();
         if (!canEditPlanner || !organizationId) return;
         if (!form.title?.trim()) return;
+
+        const extra: PlannerExtras = {
+            scope: form.scope || 'school',
+            assigneeId: form.assigneeId || undefined,
+            calendarEventId: form.calendarEventId || editingTask?.extras?.calendarEventId
+        };
 
         const newTask: PlannerTask = {
             id: editingTask?.id || generateId(),
@@ -150,20 +168,12 @@ export const PlannerPage = () => {
                 form.status === 'done'
                     ? editingTask?.completedAt || new Date().toISOString()
                     : undefined,
-            organizationId
+            organizationId,
+            extras: extra
         };
 
         setSaving(true);
         try {
-            await plannerService.upsert(newTask, organizationId);
-            const extra: PlannerExtras = {
-                scope: form.scope || 'school',
-                assigneeId: form.assigneeId || undefined,
-                calendarEventId: form.calendarEventId || undefined
-            };
-            upsertPlannerExtra(organizationId, newTask.id, extra);
-            setExtras((prev) => ({ ...prev, [newTask.id]: extra }));
-
             if (form.deadline && form.scope === 'school') {
                 const events = [...(settings.calendarEvents || [])];
                 const existingId = extra.calendarEventId;
@@ -179,9 +189,13 @@ export const PlannerPage = () => {
                 if (idx >= 0) events[idx] = ev;
                 else events.push(ev);
                 extra.calendarEventId = ev.id;
-                upsertPlannerExtra(organizationId, newTask.id, extra);
+                newTask.extras = extra;
                 await saveStaticData({ settings: { ...settings, calendarEvents: events } });
             }
+
+            await plannerService.upsert(newTask, organizationId);
+            upsertPlannerExtra(organizationId, newTask.id, extra);
+            setExtras((prev) => ({ ...prev, [newTask.id]: extra }));
 
             setTasks((prev) => {
                 const exists = prev.some((t) => t.id === newTask.id);
