@@ -1222,45 +1222,45 @@ export const SubstitutionsPage = () => {
             ) : (
             <div className="flex flex-col gap-4">
                 <div className="bg-white dark:bg-dark-800 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700">
-                    <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center">
-                        <div className="flex-1">
+                    <div className="flex flex-wrap gap-4 items-center">
+                        <div className="grow basis-[28rem] min-w-[min(100%,28rem)]">
                             <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2 block">
                                 Дата замены
                             </label>
-                            <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-700 p-1.5 rounded-xl border border-slate-200 dark:border-slate-600">
+                            <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-700 p-1.5 rounded-xl border border-slate-200 dark:border-slate-600 w-full">
                                 <button
                                     onClick={() => changeDate(-1)}
-                                    className="p-2 text-slate-500 hover:bg-white dark:hover:bg-slate-600 rounded-lg transition-colors"
+                                    className="p-2 shrink-0 text-slate-500 hover:bg-white dark:hover:bg-slate-600 rounded-lg transition-colors"
                                 >
                                     <Icon name="ArrowRight" className="rotate-180" size={18} />
                                 </button>
-                                <div className="flex-1 flex flex-col sm:flex-row items-center justify-center gap-2 font-bold text-slate-700 dark:text-slate-200 min-w-0">
-                                    <div className="flex items-center gap-2">
-                                        <Icon name="Calendar" size={18} className="text-indigo-500" />
-                                        <span className="capitalize">{formatDateLong(selectedDate)}</span>
-                                    </div>
+                                <div className="flex flex-1 items-center gap-3 font-bold text-slate-700 dark:text-slate-200 min-w-0">
+                                    <Icon name="Calendar" size={18} className="text-indigo-500 shrink-0" />
+                                    <span className="capitalize whitespace-nowrap shrink-0 min-w-[16rem]">
+                                        {formatDateLong(selectedDate)}
+                                    </span>
                                     <DateInput
                                         value={selectedDate}
                                         onChange={setSelectedDate}
-                                        className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-dark-800 text-sm font-semibold w-[9.5rem] max-w-full"
+                                        className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-dark-800 text-sm font-semibold w-[9.5rem] shrink-0"
                                     />
                                 </div>
                                 <button
                                     onClick={() => setToday()}
-                                    className="px-3 py-1.5 text-xs font-bold bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition-colors"
+                                    className="px-3 py-1.5 shrink-0 text-xs font-bold bg-indigo-100 text-indigo-700 rounded-lg hover:bg-indigo-200 transition-colors"
                                 >
                                     Сегодня
                                 </button>
                                 <button
                                     onClick={() => changeDate(1)}
-                                    className="p-2 text-slate-500 hover:bg-white dark:hover:bg-slate-600 rounded-lg transition-colors"
+                                    className="p-2 shrink-0 text-slate-500 hover:bg-white dark:hover:bg-slate-600 rounded-lg transition-colors"
                                 >
                                     <Icon name="ArrowRight" size={18} />
                                 </button>
                             </div>
                         </div>
 
-                        <div className="flex flex-wrap gap-2 mt-auto w-full min-w-0">
+                        <div className="flex flex-wrap gap-2 mt-auto grow basis-[16rem] min-w-[min(100%,16rem)]">
                             <button
                                 onClick={sendSummaryToTelegram}
                                 disabled={isSendingSummary}
