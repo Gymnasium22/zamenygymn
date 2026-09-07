@@ -305,6 +305,13 @@ export const supabaseDbService = {
             throw new Error("organizationId is required");
         }
         const genId = generateId;
+        const isFullRestore = !!(
+            data.subjects &&
+            data.teachers &&
+            data.classes &&
+            data.rooms &&
+            (data.schedule || data.schedule2)
+        );
 
         // Helper to sync a table: upsert first, then delete rows missing from the payload.
         // Delete-then-insert used to wipe the table if the following insert/upsert failed
@@ -381,7 +388,7 @@ export const supabaseDbService = {
                 if (ord !== null) obj.order = ord;
                 else delete obj.order;
                 return ensureTimestamps(obj);
-            });
+            }, { allowEmptyWipe: isFullRestore });
         }
 
         if (data.teachers) {
@@ -401,7 +408,7 @@ export const supabaseDbService = {
                 if (!Array.isArray(obj.unavailable_dates)) obj.unavailable_dates = [];
                 if (obj.absence_reasons == null || typeof obj.absence_reasons !== 'object') obj.absence_reasons = {};
                 return ensureTimestamps(pickColumns(obj, TEACHER_COLUMNS));
-            });
+            }, { allowEmptyWipe: isFullRestore });
 
             const links: { teacher_id: string; subject_id: string; organization_id: string }[] = [];
             for (const t of teachers) {
@@ -461,7 +468,7 @@ export const supabaseDbService = {
                 if (ord !== null) obj.order = ord;
                 else delete obj.order;
                 return ensureTimestamps(obj);
-            });
+            }, { allowEmptyWipe: isFullRestore });
         }
 
         if (data.rooms) {
@@ -473,7 +480,7 @@ export const supabaseDbService = {
                 if (ord !== null) obj.order = ord;
                 else delete obj.order;
                 return ensureTimestamps(obj);
-            });
+            }, { allowEmptyWipe: isFullRestore });
         }
 
         // 2. Duty zones (must be saved BEFORE duty_schedule because of FK constraints)
