@@ -343,6 +343,23 @@ export const supabaseDbService = {
             }
 
             const idsToDelete = Array.from(existingIds).filter((id) => !newIds.has(id));
+            const DIRECTORY_TABLES = new Set(['teachers', 'subjects', 'classes', 'rooms']);
+            if (DIRECTORY_TABLES.has(tableName) && idsToDelete.length > 0 && !options?.allowEmptyWipe) {
+                const looksLikeSeed =
+                    mapped.length > 0 &&
+                    mapped.every((m) => typeof m.id === 'string' && !UUID_RE.test(String(m.id)));
+                const bulkWipe =
+                    idsToDelete.length > 2 &&
+                    idsToDelete.length > Math.max(2, Math.ceil(existingIds.size * 0.1));
+                if (looksLikeSeed || bulkWipe) {
+                    logger.error(
+                        `[dbSupabase] Refusing bulk delete on ${tableName}: would remove ${idsToDelete.length} of ${existingIds.size} rows (payload ${mapped.length})`
+                    );
+                    throw new Error(
+                        `Сохранение ${tableName} не удалило ${idsToDelete.length} существующих записей — в запросе был неполный список. Обновите страницу, не сохраняйте справочник повторно.`
+                    );
+                }
+            }
             if (idsToDelete.length > 0) {
                 const { error: deleteError } = await supabase
                     .from(tableName)
@@ -372,7 +389,8 @@ export const supabaseDbService = {
             await syncTable('teachers', teachers as unknown as Record<string, unknown>[], (t) => {
                 const obj = toSnakeCase(t);
                 if (!obj.id) obj.id = genId();
-                obj.id = asUuid(obj.id) || genId();
+                const uuid = asUuid(obj.id);
+                if (uuid) obj.id = uuid;
                 if (!obj.organization_id) obj.organization_id = orgId;
                 obj.class_teacher_of = asUuid(obj.class_teacher_of);
                 obj.birth_date = asDateParam(obj.birth_date);
@@ -399,16 +417,29 @@ export const supabaseDbService = {
                 const { error: insLinksError } = await supabase.from('teacher_subjects').upsert(links);
                 if (insLinksError) throw insLinksError;
             }
+            const payloadTeacherIds = new Set(
+                teachers.map((t) => asUuid(t.id)).filter((id): id is string => Boolean(id))
+            );
             const keepPairs = new Set(links.map((l) => `${l.teacher_id}:${l.subject_id}`));
             const { data: existingLinks, error: fetchLinksError } = await supabase
                 .from('teacher_subjects')
                 .select('teacher_id, subject_id')
                 .eq('organization_id', orgId);
             if (fetchLinksError) throw fetchLinksError;
-            const stale = (existingLinks || []).filter(
-                (row: { teacher_id: string; subject_id: string }) =>
-                    !keepPairs.has(`${row.teacher_id}:${row.subject_id}`)
-            );
+            const linksByTeacher = new Map<string, number>();
+            for (const row of existingLinks || []) {
+                const tid = (row as { teacher_id: string }).teacher_id;
+                linksByTeacher.set(tid, (linksByTeacher.get(tid) || 0) + 1);
+            }
+            const stale = (existingLinks || []).filter((row: { teacher_id: string; subject_id: string }) => {
+                if (!payloadTeacherIds.has(row.teacher_id)) return false;
+                if (keepPairs.has(`${row.teacher_id}:${row.subject_id}`)) return false;
+                const incomingForTeacher = links.filter((l) => l.teacher_id === row.teacher_id).length;
+                const existingForTeacher = linksByTeacher.get(row.teacher_id) || 0;
+                // Empty subjectIds on a teacher who already has links = incomplete client state, not a wipe
+                if (incomingForTeacher === 0 && existingForTeacher > 0) return false;
+                return true;
+            });
             for (const row of stale) {
                 const { error: delLinkError } = await supabase
                     .from('teacher_subjects')
@@ -540,7 +571,7 @@ export const supabaseDbService = {
             const createdAt =
                 typeof raw.createdAt === 'string' && raw.createdAt.trim() ? raw.createdAt : now;
             return {
-                id: asUuid(raw.id) || genId(),
+                id: asUuid(raw.id) || raw.id || genId(),
                 organization_id: asUuid(raw.organizationId) || orgId,
                 semester,
                 day: raw.day,

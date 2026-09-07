@@ -41,7 +41,7 @@ const SUBJECT_COLOR_PRESETS = [
 const normalizeHex = (value: string) => value.trim().toLowerCase();
 
 export const DirectoryPage = () => {
-    const { subjects, teachers, classes, rooms, saveStaticData } = useStaticData();
+    const { subjects, teachers, classes, rooms, saveStaticData, isLoading } = useStaticData();
     const { addToast } = useToast();
     const { hasPermission } = useAuth();
     const canEditDirectory = hasPermission('edit_directory');
@@ -105,6 +105,14 @@ export const DirectoryPage = () => {
         const { list, form, key } = activeConfig;
 
         if (!form.name) return;
+        if (isLoading) {
+            addToast({
+                type: 'warning',
+                title: 'Подождите',
+                message: 'Данные ещё загружаются. Не сохраняйте справочник, пока не появятся все записи.'
+            });
+            return;
+        }
 
         let newList: (Teacher | Subject | ClassEntity | Room)[] = [...list];
         if (editingId) {
