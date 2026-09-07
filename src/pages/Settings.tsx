@@ -583,10 +583,11 @@ export const SettingsPage = () => {
                         }
                     } catch (error) {
                         logger.error('Full import failed:', error);
+                        const err = error as { message?: string; details?: string };
                         addToast({
                             type: 'danger',
                             title: 'Импорт не выполнен',
-                            message: 'Произошла ошибка при сохранении данных. Проверьте файл и попробуйте снова.'
+                            message: err.message || err.details || 'Произошла ошибка при сохранении данных. Проверьте файл и попробуйте снова.'
                         });
                     }
                 }

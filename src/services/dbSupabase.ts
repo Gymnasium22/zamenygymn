@@ -78,6 +78,24 @@ const asUuid = (value: unknown): string | null => {
     return UUID_RE.test(s) ? s : null;
 };
 
+/** Stable UUID for legacy string ids (duty zones like zone_2floor_1). */
+const uuidFromSeed = (seed: string): string => {
+    const s = `gymnasium-manager:${seed}`;
+    const hex: string[] = [];
+    for (let i = 0; i < 32; i++) {
+        let h = 2166136261;
+        for (let j = 0; j < s.length; j++) {
+            h ^= s.charCodeAt(j) + i;
+            h = Math.imul(h, 16777619);
+        }
+        hex.push(((h >>> 0) % 16).toString(16));
+    }
+    const x = hex.join('');
+    return `${x.slice(0, 8)}-${x.slice(8, 12)}-4${x.slice(13, 16)}-a${x.slice(17, 20)}-${x.slice(20, 32)}`;
+};
+
+const asUuidOrStable = (value: unknown): string => asUuid(value) || uuidFromSeed(String(value || generateId()));
+
 const pickColumns = (obj: Record<string, unknown>, keys: string[]): Record<string, unknown> => {
     const out: Record<string, unknown> = {};
     for (const key of keys) {
@@ -485,15 +503,26 @@ export const supabaseDbService = {
 
         // 2. Duty zones (must be saved BEFORE duty_schedule because of FK constraints)
         if (data.dutyZones) {
-            const mapped = data.dutyZones.map((z) => {
-                const obj = toSnakeCase(z as unknown as Record<string, unknown>);
-                if (!obj.id) obj.id = genId();
-                if (!obj.organization_id) obj.organization_id = orgId;
-                return ensureTimestamps(obj);
-            });
-            if (mapped.length > 0) {
-                const { error } = await supabase.from('duty_zones').upsert(mapped);
-                if (error) throw error;
+            try {
+                const mapped = data.dutyZones.map((z) => {
+                    const raw = z as unknown as Record<string, unknown>;
+                    const rooms = raw.includedRooms ?? raw.included_rooms;
+                    return ensureTimestamps({
+                        id: asUuidOrStable(raw.id),
+                        organization_id: orgId,
+                        name: raw.name,
+                        floor: raw.floor ?? null,
+                        description: raw.description ?? null,
+                        included_rooms: Array.isArray(rooms) ? rooms.map(String) : [],
+                        order: asOrder(raw.order)
+                    });
+                });
+                if (mapped.length > 0) {
+                    const { error } = await supabase.from('duty_zones').upsert(mapped);
+                    if (error) throw error;
+                }
+            } catch (e) {
+                logger.warn('duty_zones save failed, skipping:', e);
             }
         }
 
@@ -680,13 +709,28 @@ export const supabaseDbService = {
                 'substitutions',
                 data.substitutions as unknown as Record<string, unknown>[],
                 (s) => {
-                    const obj = toSnakeCase(s);
-                    if (!obj.id) obj.id = genId();
-                    obj.id = asUuid(obj.id) || genId();
-                    if (!obj.organization_id) obj.organization_id = orgId;
-                    if (!obj.academic_year) obj.academic_year = currentYear;
-                    obj.date = asDateParam(obj.date);
-                    return filterSubstitution(obj) ? ensureTimestamps(obj) : null;
+                    const raw = s as Record<string, unknown>;
+                    const repl = raw.replacementTeacherId ?? raw.replacement_teacher_id;
+                    const obj = ensureTimestamps({
+                        id: asUuid(raw.id) || genId(),
+                        organization_id: orgId,
+                        academic_year: raw.academicYear || raw.academic_year || currentYear,
+                        date: asDateParam(raw.date),
+                        schedule_item_id: asUuid(raw.scheduleItemId ?? raw.schedule_item_id),
+                        original_teacher_id: asUuid(raw.originalTeacherId ?? raw.original_teacher_id),
+                        replacement_teacher_id:
+                            repl === 'conducted' || repl === 'cancelled' ? repl : asUuid(repl),
+                        replacement_room_id: asUuid(raw.replacementRoomId ?? raw.replacement_room_id),
+                        replacement_class_id: asUuid(raw.replacementClassId ?? raw.replacement_class_id),
+                        replacement_subject_id: asUuid(raw.replacementSubjectId ?? raw.replacement_subject_id),
+                        is_merger: Boolean(raw.isMerger ?? raw.is_merger),
+                        lesson_absence_reason: raw.lessonAbsenceReason ?? raw.lesson_absence_reason ?? null,
+                        refusals: Array.isArray(raw.refusals) ? raw.refusals : [],
+                        comment: raw.comment || null,
+                        day_comment: raw.dayComment ?? raw.day_comment ?? null,
+                        is_read: Boolean(raw.isRead ?? raw.is_read)
+                    });
+                    return filterSubstitution(obj) ? obj : null;
                 },
                 { allowEmptyWipe: true }
             );
@@ -695,12 +739,28 @@ export const supabaseDbService = {
             if (data.schedule2) await syncScheduleSemester(2, data.schedule2);
             if (data.substitutions) {
                 await syncTable('substitutions', data.substitutions as unknown as Record<string, unknown>[], (s) => {
-                    const obj = toSnakeCase(s);
-                    if (!obj.id) obj.id = genId();
-                    if (!obj.organization_id) obj.organization_id = orgId;
-                    if (!obj.academic_year) obj.academic_year = currentYear;
-                    obj.date = asDateParam(obj.date);
-                    return filterSubstitution(obj) ? ensureTimestamps(obj) : null;
+                    const raw = s as Record<string, unknown>;
+                    const repl = raw.replacementTeacherId ?? raw.replacement_teacher_id;
+                    const obj = ensureTimestamps({
+                        id: asUuid(raw.id) || genId(),
+                        organization_id: orgId,
+                        academic_year: raw.academicYear || raw.academic_year || currentYear,
+                        date: asDateParam(raw.date),
+                        schedule_item_id: asUuid(raw.scheduleItemId ?? raw.schedule_item_id),
+                        original_teacher_id: asUuid(raw.originalTeacherId ?? raw.original_teacher_id),
+                        replacement_teacher_id:
+                            repl === 'conducted' || repl === 'cancelled' ? repl : asUuid(repl),
+                        replacement_room_id: asUuid(raw.replacementRoomId ?? raw.replacement_room_id),
+                        replacement_class_id: asUuid(raw.replacementClassId ?? raw.replacement_class_id),
+                        replacement_subject_id: asUuid(raw.replacementSubjectId ?? raw.replacement_subject_id),
+                        is_merger: Boolean(raw.isMerger ?? raw.is_merger),
+                        lesson_absence_reason: raw.lessonAbsenceReason ?? raw.lesson_absence_reason ?? null,
+                        refusals: Array.isArray(raw.refusals) ? raw.refusals : [],
+                        comment: raw.comment || null,
+                        day_comment: raw.dayComment ?? raw.day_comment ?? null,
+                        is_read: Boolean(raw.isRead ?? raw.is_read)
+                    });
+                    return filterSubstitution(obj) ? obj : null;
                 });
             }
         }
