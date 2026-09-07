@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { LRUCache } from 'lru-cache';
 import { useStaticData, useScheduleData } from '../context/DataContext';
 import { Icon } from '../components/Icons';
-import { Modal, SearchableSelect, ContextMenu, useToast } from '../components/UI';
+import { Modal, ContextMenu, useToast } from '../components/UI';
 import { Shift, DayOfWeek, DAYS, SHIFT_PERIODS, ScheduleItem } from '../types';
 import { formatDateEuropean, generateId } from '../utils/helpers';
 import useMedia from 'use-media';
@@ -25,6 +25,76 @@ interface CellInfo {
     rowId: string;
     colKey: string | number;
 }
+
+const MultiPick: React.FC<{
+    label: string;
+    options: { value: string; label: string }[];
+    values: string[];
+    onChange: (ids: string[]) => void;
+    placeholder?: string;
+}> = ({ label, options, values, onChange, placeholder }) => {
+    const [q, setQ] = useState('');
+    const query = q.trim().toLowerCase();
+    const filtered = options.filter((o) => !query || o.label.toLowerCase().includes(query));
+    const toggle = (id: string) =>
+        onChange(values.includes(id) ? values.filter((x) => x !== id) : [...values, id]);
+    const byId = new Map(options.map((o) => [o.value, o.label]));
+    return (
+        <div>
+            <div className="flex items-center justify-between gap-2 mb-2">
+                <label className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">{label}</label>
+                {values.length > 0 && (
+                    <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-300">
+                        выбрано {values.length}
+                    </span>
+                )}
+            </div>
+            {values.length > 0 && (
+                <div className="flex flex-wrap gap-1 mb-1.5">
+                    {values.map((id) => (
+                        <button
+                            key={id}
+                            type="button"
+                            onClick={() => toggle(id)}
+                            className="px-2 py-0.5 rounded-lg text-[11px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200"
+                        >
+                            {byId.get(id) || id} ×
+                        </button>
+                    ))}
+                </div>
+            )}
+            <input
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                placeholder={placeholder || 'Поиск и отметка нескольких…'}
+                className="w-full border border-slate-200 dark:border-slate-600 p-2.5 rounded-xl text-sm outline-none bg-white dark:bg-slate-700 dark:text-white focus:border-indigo-500 mb-1"
+            />
+            <div className="max-h-28 overflow-y-auto custom-scrollbar rounded-xl border border-slate-100 dark:border-slate-600 divide-y divide-slate-50 dark:divide-slate-700">
+                {filtered.slice(0, 60).map((o) => {
+                    const on = values.includes(o.value);
+                    return (
+                        <button
+                            key={o.value}
+                            type="button"
+                            onClick={() => toggle(o.value)}
+                            className={`w-full text-left px-3 py-1.5 text-sm ${
+                                on
+                                    ? 'bg-indigo-50 dark:bg-indigo-900/30 font-bold text-indigo-700 dark:text-indigo-200'
+                                    : 'text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/50'
+                            }`}
+                        >
+                            {on ? '✓ ' : ''}
+                            {o.label}
+                        </button>
+                    );
+                })}
+                {filtered.length === 0 && (
+                    <div className="px-3 py-2 text-xs text-slate-400">Ничего не найдено</div>
+                )}
+            </div>
+        </div>
+    );
+};
 
 export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: SchedulePageProps) => {
     const { subjects, teachers, classes, rooms, settings } = useStaticData();
@@ -70,6 +140,9 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
     const lastItemRef = useRef<ScheduleItem | null>(null);
     const [repeatDays, setRepeatDays] = useState<DayOfWeek[]>([]);
     const [dayPeriods, setDayPeriods] = useState<Partial<Record<DayOfWeek, number>>>({});
+    const [repeatClassIds, setRepeatClassIds] = useState<string[]>([]);
+    const [repeatSubjectIds, setRepeatSubjectIds] = useState<string[]>([]);
+    const [repeatTeacherIds, setRepeatTeacherIds] = useState<string[]>([]);
 
     const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
 
@@ -440,6 +513,9 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
         setTempItem(item);
         setRepeatDays([item.day as DayOfWeek]);
         setDayPeriods({});
+        setRepeatClassIds(item.classId ? [item.classId] : []);
+        setRepeatSubjectIds(item.subjectId ? [item.subjectId] : []);
+        setRepeatTeacherIds(item.teacherId ? [item.teacherId] : []);
         updateValidation(item);
         setIsEditorOpen(true);
     };
@@ -457,22 +533,59 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
         setTempItem(base);
         setRepeatDays([base.day as DayOfWeek]);
         setDayPeriods({});
+        setRepeatClassIds(base.classId ? [base.classId] : []);
+        setRepeatSubjectIds(base.subjectId ? [base.subjectId] : []);
+        setRepeatTeacherIds(base.teacherId ? [base.teacherId] : []);
         setValidationWarnings([]);
         setIsEditorOpen(true);
     };
+
+    const lessonCombos = useMemo(() => {
+        const days = (repeatDays.length ? repeatDays : tempItem.day ? [tempItem.day as DayOfWeek] : []) as DayOfWeek[];
+        const classIds = repeatClassIds.length ? repeatClassIds : tempItem.classId ? [tempItem.classId] : [];
+        const subjectIds = repeatSubjectIds.length ? repeatSubjectIds : tempItem.subjectId ? [tempItem.subjectId] : [];
+        const teacherIds = repeatTeacherIds.length ? repeatTeacherIds : tempItem.teacherId ? [tempItem.teacherId] : [];
+        const out: Array<Pick<ScheduleItem, 'day' | 'period' | 'classId' | 'subjectId' | 'teacherId' | 'shift'> & Partial<ScheduleItem>> =
+            [];
+        for (const day of days) {
+            const period = dayPeriods[day] ?? tempItem.period ?? 1;
+            for (const classId of classIds) {
+                for (const subjectId of subjectIds) {
+                    for (const teacherId of teacherIds) {
+                        out.push({
+                            day,
+                            period,
+                            classId,
+                            subjectId,
+                            teacherId,
+                            shift: (tempItem.shift as string) || selectedShift,
+                            roomId: tempItem.roomId,
+                            direction: tempItem.direction
+                        });
+                    }
+                }
+            }
+        }
+        return out;
+    }, [
+        repeatDays,
+        dayPeriods,
+        repeatClassIds,
+        repeatSubjectIds,
+        repeatTeacherIds,
+        tempItem,
+        selectedShift
+    ]);
+
     const executeSaveItem = async () => {
         const currentSchedule = scheduleRef.current;
-        const base = tempItem as ScheduleItem;
-        const days = (repeatDays.length ? repeatDays : [base.day as DayOfWeek]).filter(Boolean);
-        const originalId = base.id;
+        const originalId = tempItem.id;
         let newSchedule = [...currentSchedule];
-        days.forEach((day, i) => {
-            const period = dayPeriods[day] ?? base.period;
+        lessonCombos.forEach((combo, i) => {
             const item: ScheduleItem = {
-                ...base,
-                id: i === 0 && originalId ? originalId : generateId(),
-                day,
-                period
+                ...(tempItem as ScheduleItem),
+                ...combo,
+                id: i === 0 && originalId ? originalId : generateId()
             };
             const idx = newSchedule.findIndex((s) => s.id === item.id);
             if (idx >= 0) newSchedule[idx] = item;
@@ -484,53 +597,56 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
     };
 
     const handleSaveItem = async () => {
-        if (!tempItem.subjectId || !tempItem.teacherId || !tempItem.classId) return;
-
-        // Валидация данных перед сохранением
-        const validationErrors: string[] = [];
-
-        // Проверяем корректность периода для выбранной смены
-        if (tempItem.period !== undefined) {
-            const shiftKey = (tempItem.shift || selectedShift) as Shift;
-            const validPeriods = SHIFT_PERIODS[shiftKey] || [];
-            if (!validPeriods.includes(tempItem.period)) {
-                validationErrors.push(`Период ${tempItem.period} недопустим для смены "${shiftKey}"`);
-            }
+        if (lessonCombos.length === 0) {
+            addToast({
+                type: 'warning',
+                title: 'Нечего сохранять',
+                message: 'Выберите хотя бы один день, класс, предмет и учителя.'
+            });
+            return;
         }
-
-        // Проверяем существование связанных данных
-        const teacher = teachersById.get(tempItem.teacherId || '');
-        if (!teacher) validationErrors.push('Выбранный учитель не найден');
-
-        const subject = subjectsById.get(tempItem.subjectId || '');
-        if (!subject) validationErrors.push('Выбранный предмет не найден');
-
-        const classItem = classesById.get(tempItem.classId || '');
-        if (!classItem) validationErrors.push('Выбранный класс не найден');
-
-        if (tempItem.roomId) {
-            const room = roomsById.get(tempItem.roomId);
-            if (!room) validationErrors.push('Выбранный кабинет не найден');
-        }
-
-        if (validationErrors.length > 0) {
-            addToast({ type: 'danger', title: 'Ошибки валидации', message: validationErrors.join('\n') });
+        if (lessonCombos.length > 80) {
+            addToast({
+                type: 'danger',
+                title: 'Слишком много уроков',
+                message: `Получается ${lessonCombos.length} записей. Уменьшите набор дней/классов/предметов/учителей.`
+            });
             return;
         }
 
-        // Проверяем конфликты перед сохранением
-        const conflicts = checkConflicts(tempItem as ScheduleItem);
-        if (conflicts.length > 0) {
-            const conflictNames = {
-                teacher: 'Учитель',
-                class: 'Класс',
-                room: 'Кабинет'
-            };
-            const conflictMessages = conflicts
-                .map((type) => conflictNames[type as keyof typeof conflictNames])
-                .join(', ');
+        const shiftKey = (tempItem.shift || selectedShift) as Shift;
+        const validPeriods = SHIFT_PERIODS[shiftKey] || [];
+        const validationErrors: string[] = [];
+        for (const c of lessonCombos) {
+            if (!validPeriods.includes(c.period)) {
+                validationErrors.push(`Период ${c.period} недопустим для смены "${shiftKey}"`);
+                break;
+            }
+            if (!teachersById.get(c.teacherId)) validationErrors.push('Учитель не найден');
+            if (!subjectsById.get(c.subjectId)) validationErrors.push('Предмет не найден');
+            if (!classesById.get(c.classId)) validationErrors.push('Класс не найден');
+            if (validationErrors.length > 3) break;
+        }
+        if (tempItem.roomId && !roomsById.get(tempItem.roomId)) {
+            validationErrors.push('Кабинет не найден');
+        }
+        if (validationErrors.length > 0) {
+            addToast({ type: 'danger', title: 'Ошибки валидации', message: [...new Set(validationErrors)].join('\n') });
+            return;
+        }
 
-            setSaveConflictMessage(conflictMessages);
+        const conflicted = lessonCombos.filter(
+            (c) =>
+                checkConflicts({
+                    ...(tempItem as ScheduleItem),
+                    ...c,
+                    id: tempItem.id || 'new'
+                }).length > 0
+        );
+        if (conflicted.length > 0) {
+            setSaveConflictMessage(
+                `${conflicted.length} из ${lessonCombos.length} слотов пересекаются с уже стоящими уроками`
+            );
             setSaveConflictModalOpen(true);
             return;
         }
@@ -769,11 +885,17 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
         });
     }
 
-    const recommendedTeachers = tempItem.subjectId
-        ? teachers.filter((t) => t.subjectIds && t.subjectIds.includes(tempItem.subjectId!))
+    const subjectFilterIds = repeatSubjectIds.length
+        ? repeatSubjectIds
+        : tempItem.subjectId
+          ? [tempItem.subjectId]
+          : [];
+    const recommendedTeachers = subjectFilterIds.length
+        ? teachers.filter((t) => t.subjectIds?.some((id) => subjectFilterIds.includes(id)))
         : [];
-    const otherTeachers = tempItem.subjectId
-        ? teachers.filter((t) => !t.subjectIds || !t.subjectIds.includes(tempItem.subjectId!))
+    const recommendedIdSet = new Set(recommendedTeachers.map((t) => t.id));
+    const otherTeachers = subjectFilterIds.length
+        ? teachers.filter((t) => !recommendedIdSet.has(t.id))
         : teachers;
 
     const printTitle = useMemo(() => {
@@ -1451,7 +1573,8 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
                             </div>
                         )}
                         <p className="text-[11px] text-slate-400 mt-1.5">
-                            Если у учителя те же классы в разные дни на разных уроках — отметьте дни и выберите номер урока для каждого.
+                            Отметьте дни и при необходимости разный номер урока. Ниже можно выбрать сразу несколько
+                            классов, предметов и учителей — сохранятся все сочетания.
                         </p>
                     </div>
 
@@ -1466,59 +1589,45 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
                         </div>
                     )}
 
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">
-                            КЛАСС
-                        </label>
-                        <SearchableSelect
-                            options={classes
-                                .filter((c) => c.shift === selectedShift)
-                                .map((c) => ({ value: c.id, label: c.name }))}
-                            value={tempItem.classId || null}
-                            onChange={(val) => {
-                                setTempItem({ ...tempItem, classId: val as string });
-                                updateValidation({ ...tempItem, classId: val as string });
-                            }}
-                            placeholder="Выберите класс"
-                        />
-                    </div>
+                    <MultiPick
+                        label="Классы"
+                        options={classes
+                            .filter((c) => c.shift === selectedShift)
+                            .map((c) => ({ value: c.id, label: c.name }))}
+                        values={repeatClassIds}
+                        onChange={(ids) => {
+                            setRepeatClassIds(ids);
+                            setTempItem({ ...tempItem, classId: ids[0] });
+                            updateValidation({ ...tempItem, classId: ids[0] });
+                        }}
+                        placeholder="Несколько классов — поиск и клик"
+                    />
 
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">
-                            ПРЕДМЕТ
-                        </label>
-                        <SearchableSelect
-                            options={subjects.map((s) => ({ value: s.id, label: s.name }))}
-                            value={tempItem.subjectId || null}
-                            onChange={(val) => {
-                                setTempItem({ ...tempItem, subjectId: val as string });
-                                updateValidation({ ...tempItem, subjectId: val as string });
-                            }}
-                            placeholder="Выберите предмет"
-                        />
-                    </div>
+                    <MultiPick
+                        label="Предметы"
+                        options={subjects.map((s) => ({ value: s.id, label: s.name }))}
+                        values={repeatSubjectIds}
+                        onChange={(ids) => {
+                            setRepeatSubjectIds(ids);
+                            setTempItem({ ...tempItem, subjectId: ids[0] });
+                            updateValidation({ ...tempItem, subjectId: ids[0] });
+                        }}
+                        placeholder="Несколько предметов — поиск и клик"
+                    />
 
-                    <div>
-                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">
-                            УЧИТЕЛЬ
-                        </label>
-                        <SearchableSelect
-                            options={[
-                                {
-                                    label: 'Рекомендуемые',
-                                    options: recommendedTeachers.map((t) => ({ value: t.id, label: t.name }))
-                                },
-                                {
-                                    label: 'Остальные',
-                                    options: otherTeachers.map((t) => ({ value: t.id, label: t.name }))
-                                }
-                            ]}
-                            value={tempItem.teacherId || null}
-                            onChange={(val) => setTempItem({ ...tempItem, teacherId: val as string })}
-                            placeholder="Выберите учителя"
-                            groupBy
-                        />
-                    </div>
+                    <MultiPick
+                        label="Учителя"
+                        options={[
+                            ...recommendedTeachers.map((t) => ({ value: t.id, label: t.name })),
+                            ...otherTeachers.map((t) => ({ value: t.id, label: t.name }))
+                        ]}
+                        values={repeatTeacherIds}
+                        onChange={(ids) => {
+                            setRepeatTeacherIds(ids);
+                            setTempItem({ ...tempItem, teacherId: ids[0] });
+                        }}
+                        placeholder="Несколько учителей — поиск и клик"
+                    />
 
                     <div>
                         <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">
@@ -1553,6 +1662,16 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
                         </select>
                     </div>
 
+                    {lessonCombos.length > 1 && (
+                        <div className="text-xs font-semibold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl px-3 py-2">
+                            Будет создано {lessonCombos.length} уроков
+                            {repeatDays.length > 1 ? ` · ${repeatDays.length} дн.` : ''}
+                            {repeatClassIds.length > 1 ? ` · ${repeatClassIds.length} кл.` : ''}
+                            {repeatSubjectIds.length > 1 ? ` · ${repeatSubjectIds.length} предм.` : ''}
+                            {repeatTeacherIds.length > 1 ? ` · ${repeatTeacherIds.length} уч.` : ''}
+                        </div>
+                    )}
+
                     <div className="flex justify-end gap-2 mt-6">
                         {tempItem.id && (
                             <button
@@ -1563,7 +1682,9 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
                             </button>
                         )}
                         <button onClick={handleSaveItem} className="btn-primary btn-ripple">
-                            {repeatDays.length > 1 ? `Сохранить на ${repeatDays.length} дн.` : 'Сохранить'}
+                            {lessonCombos.length > 1
+                                ? `Сохранить ${lessonCombos.length} ур.`
+                                : 'Сохранить'}
                         </button>
                     </div>
                 </div>
