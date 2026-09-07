@@ -707,7 +707,7 @@ html.dark .app-mobile-more__footer {
 
 .app-mobile-more__actions {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr;
     gap: 8px;
 }
 
@@ -849,6 +849,11 @@ html.app-mobile .schedule-advanced-tools {
 
 html.app-mobile .schedule-advanced-tools.is-open {
     display: flex;
+}
+
+html.app-mobile .subs-lesson-assign {
+    min-height: 44px;
+    min-width: 44px;
 }
 
 /* Compact page padding on mobile shell */

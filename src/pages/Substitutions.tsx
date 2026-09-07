@@ -106,6 +106,11 @@ export const SubstitutionsPage = () => {
     // Mobile state
     const isMobile = useMedia({ maxWidth: 1023 });
     const [mobileTab, setMobileTab] = useState<'lessons' | 'teachers'>('lessons');
+    const [dayCommentOpen, setDayCommentOpen] = useState(false);
+
+    useEffect(() => {
+        if (isMobile) setIsCompactMode(true);
+    }, [isMobile]);
 
     const activeSchedule = useMemo(() => {
         // Construct a partial AppData object that fulfills getScheduleForDate's requirements
@@ -1133,15 +1138,17 @@ export const SubstitutionsPage = () => {
                                 >
                                     <Icon name="ArrowRight" className="rotate-180" size={18} />
                                 </button>
-                                <div className="flex-1 flex flex-col sm:flex-row items-center justify-center gap-2 font-bold text-slate-700 dark:text-slate-200">
-                                    <div className="flex items-center gap-2">
-                                        <Icon name="Calendar" size={18} className="text-indigo-500" />
-                                        <span className="capitalize">{formatDateLong(selectedDate)}</span>
-                                    </div>
+                                <div className="flex-1 flex flex-col sm:flex-row items-center justify-center gap-2 font-bold text-slate-700 dark:text-slate-200 min-w-0">
+                                    {!isMobile && (
+                                        <div className="flex items-center gap-2">
+                                            <Icon name="Calendar" size={18} className="text-indigo-500" />
+                                            <span className="capitalize">{formatDateLong(selectedDate)}</span>
+                                        </div>
+                                    )}
                                     <DateInput
                                         value={selectedDate}
                                         onChange={setSelectedDate}
-                                        className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-dark-800 text-sm font-semibold w-[9.5rem]"
+                                        className="px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-dark-800 text-sm font-semibold w-[9.5rem] max-w-full"
                                     />
                                 </div>
                                 <button
@@ -1188,18 +1195,48 @@ export const SubstitutionsPage = () => {
                             </button>
                         </div>
                     </div>
-                    {/* Day-level comment for all substitutions */}
-                    <div className="mt-4">
-                        <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1 block leading-snug">
-                            Общий комментарий (опционально)
-                        </label>
-                        <textarea
-                            value={dayComment}
-                            onChange={(e) => setDayComment(e.target.value)}
-                            className="w-full mt-1 p-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-sm text-slate-800 dark:text-slate-100 outline-none focus:ring-1 ring-indigo-500"
-                            rows={2}
-                            placeholder='Например: "Замены связаны с педсоветом" — будет показано в отчёте и PNG.'
-                        />
+                    <div className="mt-3 sm:mt-4">
+                        {isMobile ? (
+                            <>
+                                <button
+                                    type="button"
+                                    onClick={() => setDayCommentOpen((v) => !v)}
+                                    className="w-full flex items-center justify-between gap-2 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 py-1"
+                                >
+                                    <span>
+                                        Комментарий к дню
+                                        {dayComment.trim() ? ' · есть' : ''}
+                                    </span>
+                                    <Icon
+                                        name="ChevronRight"
+                                        size={16}
+                                        className={dayCommentOpen ? '-rotate-90' : 'rotate-90'}
+                                    />
+                                </button>
+                                {dayCommentOpen && (
+                                    <textarea
+                                        value={dayComment}
+                                        onChange={(e) => setDayComment(e.target.value)}
+                                        className="w-full mt-1 p-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-sm text-slate-800 dark:text-slate-100 outline-none focus:ring-1 ring-indigo-500"
+                                        rows={2}
+                                        placeholder="Например: педсовет — попадёт в отчёт и PNG"
+                                    />
+                                )}
+                            </>
+                        ) : (
+                            <>
+                                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1 block leading-snug">
+                                    Общий комментарий (опционально)
+                                </label>
+                                <textarea
+                                    value={dayComment}
+                                    onChange={(e) => setDayComment(e.target.value)}
+                                    className="w-full mt-1 p-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-sm text-slate-800 dark:text-slate-100 outline-none focus:ring-1 ring-indigo-500"
+                                    rows={2}
+                                    placeholder='Например: "Замены связаны с педсоветом" — будет показано в отчёте и PNG.'
+                                />
+                            </>
+                        )}
                     </div>
                 </div>
             </div>
@@ -1222,17 +1259,22 @@ export const SubstitutionsPage = () => {
             )}
 
             {/* Mobile Tabs Switcher */}
-            <div className="md:hidden flex bg-white dark:bg-dark-800 p-1 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 shrink-0">
+            <div className="md:hidden flex bg-white dark:bg-dark-800 p-1 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 shrink-0 sticky top-0 z-10">
                 <button
                     onClick={() => setMobileTab('lessons')}
-                    className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${mobileTab === 'lessons' ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
+                    className={`flex-1 min-h-[44px] py-2.5 text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${mobileTab === 'lessons' ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
                 >
                     <Icon name="List" size={18} />
-                    Замены
+                    Уроки
+                    {pendingLessons.length > 0 && (
+                        <span className="min-w-[1.25rem] h-5 px-1 rounded-full bg-red-500 text-white text-[10px] leading-5">
+                            {pendingLessons.length}
+                        </span>
+                    )}
                 </button>
                 <button
                     onClick={() => setMobileTab('teachers')}
-                    className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${mobileTab === 'teachers' ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
+                    className={`flex-1 min-h-[44px] py-2.5 text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${mobileTab === 'teachers' ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400'}`}
                 >
                     <Icon name="Users" size={18} />
                     Учителя
@@ -1244,7 +1286,7 @@ export const SubstitutionsPage = () => {
                 <div
                     className={`w-full md:w-80 flex-col gap-4 ${isMobile && mobileTab !== 'teachers' ? 'hidden' : 'flex'}`}
                 >
-                    <div className="bg-white dark:bg-dark-800 p-4 sm:p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex-1 overflow-hidden flex flex-col min-h-[220px] max-h-[min(52dvh,420px)] md:max-h-none md:h-auto">
+                    <div className="bg-white dark:bg-dark-800 p-4 sm:p-5 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex-1 overflow-hidden flex flex-col min-h-0 md:min-h-[220px] max-h-none">
                         <h3 className="font-bold text-slate-800 dark:text-slate-100 mb-3 sm:mb-4 flex items-center gap-2 min-w-0">
                             <Icon name="UserX" size={18} className="text-red-500 shrink-0" />
                             <span className="truncate">Отсутствующие</span>
@@ -1302,42 +1344,42 @@ export const SubstitutionsPage = () => {
                 <div
                     className={`flex-1 bg-white dark:bg-dark-800 p-6 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col overflow-hidden ${isMobile && mobileTab !== 'lessons' ? 'hidden' : 'flex'}`}
                 >
-                    <div className="flex items-center justify-between mb-4">
-                        <div className="flex bg-slate-100 dark:bg-slate-700 p-1 rounded-xl">
+                    <div className="flex items-center justify-between gap-2 mb-3 sm:mb-4 min-w-0">
+                        <div className="flex flex-1 min-w-0 bg-slate-100 dark:bg-slate-700 p-1 rounded-xl">
                             <button
                                 onClick={() => setActiveTab('pending')}
-                                className={`px-5 py-2.5 text-sm font-bold rounded-lg transition-all ${activeTab === 'pending' ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500'}`}
+                                className={`flex-1 min-h-[40px] px-2 sm:px-5 py-2 text-xs sm:text-sm font-bold rounded-lg transition-all ${activeTab === 'pending' ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500'}`}
                             >
-                                Требуют внимания{' '}
+                                {isMobile ? 'Нужно' : 'Требуют внимания'}{' '}
                                 {pendingLessons.length > 0 && (
-                                    <span className="ml-1 bg-red-500 text-white px-2 py-0.5 rounded-full text-xs">
+                                    <span className="ml-1 bg-red-500 text-white px-1.5 py-0.5 rounded-full text-[10px] sm:text-xs">
                                         {pendingLessons.length}
                                     </span>
                                 )}
                             </button>
                             <button
                                 onClick={() => setActiveTab('resolved')}
-                                className={`px-5 py-2.5 text-sm font-bold rounded-lg transition-all ${activeTab === 'resolved' ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500'}`}
+                                className={`flex-1 min-h-[40px] px-2 sm:px-5 py-2 text-xs sm:text-sm font-bold rounded-lg transition-all ${activeTab === 'resolved' ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500'}`}
                             >
-                                Назначенные{' '}
+                                {isMobile ? 'Готово' : 'Назначенные'}{' '}
                                 {resolvedLessons.length > 0 && (
-                                    <span className="ml-1 bg-emerald-500 text-white px-2 py-0.5 rounded-full text-xs">
+                                    <span className="ml-1 bg-emerald-500 text-white px-1.5 py-0.5 rounded-full text-[10px] sm:text-xs">
                                         {resolvedLessons.length}
                                     </span>
                                 )}
                             </button>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex gap-1 sm:gap-2 shrink-0">
                             <button
                                 onClick={() => setIsCompactMode(!isCompactMode)}
-                                className={`p-3 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 ${isCompactMode ? 'text-indigo-600 bg-indigo-50 dark:bg-indigo-900/30' : 'text-slate-400'}`}
+                                className={`min-h-[40px] min-w-[40px] p-2 sm:p-3 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-700 ${isCompactMode ? 'text-indigo-600 bg-indigo-50 dark:bg-indigo-900/30' : 'text-slate-400'}`}
                                 title="Компактный вид"
                             >
                                 <Icon name={isCompactMode ? 'List' : 'Grid'} size={20} />
                             </button>
                             <button
                                 onClick={() => window.print()}
-                                className="p-3 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-600 print:hidden"
+                                className="hidden md:inline-flex p-3 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-600 print:hidden"
                                 title="Печать"
                             >
                                 <Icon name="Printer" size={20} />
@@ -1347,7 +1389,7 @@ export const SubstitutionsPage = () => {
                                     setManualLessonSearch('');
                                     setManualSearchModalOpen(true);
                                 }}
-                                className="p-3 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-100"
+                                className="min-h-[40px] min-w-[40px] p-2 sm:p-3 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-100"
                             >
                                 <Icon name="Search" size={20} />
                             </button>

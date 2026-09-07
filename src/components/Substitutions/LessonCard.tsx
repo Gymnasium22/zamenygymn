@@ -145,7 +145,7 @@ export const LessonCard: React.FC<LessonCardProps> = ({
                                     day: l.day
                                 })
                             }
-                            className="p-1.5 bg-indigo-100 text-indigo-600 rounded-lg hover:bg-indigo-200"
+                            className="subs-lesson-assign min-h-[40px] min-w-[40px] p-2 sm:p-1.5 bg-indigo-100 text-indigo-600 rounded-lg hover:bg-indigo-200"
                         >
                             <Icon name="Edit" size={14} />
                         </button>

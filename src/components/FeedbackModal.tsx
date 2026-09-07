@@ -3,7 +3,9 @@ import { Icon } from './Icons';
 import { Modal } from './UI';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from './UI';
+import { useStaticData } from '../context/DataContext';
 import { logger } from '../utils/logger';
+import { escapeMarkdown } from '../utils/escapeHtml';
 
 interface FeedbackModalProps {
     isOpen: boolean;
@@ -13,6 +15,7 @@ interface FeedbackModalProps {
 export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose }) => {
     const { user } = useAuth();
     const { addToast } = useToast();
+    const { settings, privateSettings } = useStaticData();
     const [type, setType] = useState<'bug' | 'feature' | 'other'>('bug');
     const [message, setMessage] = useState('');
     const [sending, setSending] = useState(false);
@@ -20,39 +23,41 @@ export const FeedbackModal: React.FC<FeedbackModalProps> = ({ isOpen, onClose })
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!message.trim()) return;
+
+        const token = privateSettings?.telegramToken || import.meta.env.VITE_TELEGRAM_BOT_TOKEN;
+        const chatId = settings?.feedbackChatId || import.meta.env.VITE_FEEDBACK_CHAT_ID;
+        if (!token || !chatId) {
+            addToast({
+                type: 'warning',
+                title: 'Внимание',
+                message: 'Обратная связь не настроена администратором.'
+            });
+            return;
+        }
+
         setSending(true);
+        const typeLabel = type === 'bug' ? 'Ошибка' : type === 'feature' ? 'Идея' : 'Другое';
+        const text =
+            `📬 *Обратная связь*\n\n` +
+            `*Тип:* ${typeLabel}\n` +
+            `*От:* ${escapeMarkdown(user?.email || 'unknown')}\n` +
+            `*Раздел:* ${escapeMarkdown(window.location.pathname)}\n\n` +
+            escapeMarkdown(message.trim());
 
         try {
-            // Send to Telegram if configured, otherwise just log
-            const payload = {
-                type,
-                message: message.trim(),
-                user: user?.email || 'unknown',
-                url: window.location.href,
-                timestamp: new Date().toISOString()
-            };
+            const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'Markdown' })
+            });
+            const result = await response.json();
+            if (!result.ok) throw new Error(result.description || 'Telegram error');
 
-            // Try to send via Telegram bot if token is available
-            const token = import.meta.env.VITE_TELEGRAM_BOT_TOKEN;
-            const chatId = import.meta.env.VITE_FEEDBACK_CHAT_ID;
-            if (token && chatId) {
-                await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        chat_id: chatId,
-                        text: `📝 *Обратная связь*\n\n*Тип:* ${type === 'bug' ? 'Ошибка' : type === 'feature' ? 'Идея' : 'Другое'}\n*От:* ${payload.user}\n*URL:* ${payload.url}\n\n${payload.message}`,
-                        parse_mode: 'Markdown'
-                    })
-                });
-            } else {
-                logger.info('Feedback (no Telegram):', payload);
-            }
-
-            addToast({ type: 'success', title: 'Спасибо!', message: 'Ваше сообщение отправлено.' });
+            addToast({ type: 'success', title: 'Спасибо!', message: 'Сообщение отправлено.' });
             setMessage('');
             onClose();
-        } catch {
+        } catch (err) {
+            logger.error('Feedback send failed', err);
             addToast({ type: 'danger', title: 'Ошибка', message: 'Не удалось отправить сообщение.' });
         } finally {
             setSending(false);

@@ -1616,15 +1616,26 @@ export const DashboardPage = () => {
                                         {formatDateLong(currentDate)}
                                     </p>
                                 </div>
-                                <button
-                                    type="button"
-                                    onClick={() => setIsWidgetModalOpen(true)}
-                                    className="btn-secondary !px-2.5 !py-2 shrink-0"
-                                    title="Настроить рабочий стол"
-                                    aria-label="Настроить"
-                                >
-                                    <Icon name="Settings" size={18} />
-                                </button>
+                                <div className="flex shrink-0 gap-1.5">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsFeedbackModalOpen(true)}
+                                        className="btn-primary !px-2.5 !py-2"
+                                        title="Обратная связь"
+                                        aria-label="Обратная связь"
+                                    >
+                                        <Icon name="Send" size={18} />
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsWidgetModalOpen(true)}
+                                        className="btn-secondary !px-2.5 !py-2"
+                                        title="Настроить рабочий стол"
+                                        aria-label="Настроить"
+                                    >
+                                        <Icon name="Settings" size={18} />
+                                    </button>
+                                </div>
                             </div>
                             {/* Quick actions — one primary task row */}
                             <div className="grid grid-cols-3 gap-2">

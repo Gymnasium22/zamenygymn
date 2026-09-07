@@ -38,8 +38,14 @@ vi.mock('../context/AuthContext', () => ({
 
 vi.mock('../context/DataContext', () => ({
     useStaticData: () => ({
-        settings: { schoolName: 'Гимназия №22' }
+        settings: { schoolName: 'Гимназия №22' },
+        privateSettings: {}
     })
+}));
+
+vi.mock('../components/FeedbackModal', () => ({
+    FeedbackModal: ({ isOpen }: { isOpen: boolean }) =>
+        isOpen ? <div data-testid="feedback-modal">Обратная связь</div> : null
 }));
 
 describe('MobileShell', () => {
@@ -95,5 +101,21 @@ describe('MobileShell', () => {
         fireEvent.click(screen.getByLabelText('Оформление'));
         expect(onOpenCommand).toHaveBeenCalled();
         expect(onOpenAppearance).toHaveBeenCalled();
+    });
+
+    it('открывает обратную связь из шапки и из «Ещё»', () => {
+        render(
+            <MemoryRouter initialEntries={['/dashboard']}>
+                <MobileShell onOpenAppearance={vi.fn()} onOpenCommand={vi.fn()}>
+                    <div />
+                </MobileShell>
+            </MemoryRouter>
+        );
+
+        fireEvent.click(screen.getByLabelText('Обратная связь'));
+        expect(screen.getByTestId('feedback-modal')).toBeInTheDocument();
+        fireEvent.click(screen.getByText('Ещё'));
+        fireEvent.click(screen.getByText('Связь'));
+        expect(screen.getByTestId('feedback-modal')).toBeInTheDocument();
     });
 });

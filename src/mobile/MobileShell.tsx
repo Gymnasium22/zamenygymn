@@ -5,6 +5,7 @@ import { useStaticData } from '../context/DataContext';
 import { Icon } from '../components/Icons';
 import { PageId } from '../types';
 import { getActiveSemester } from '../utils/helpers';
+import { FeedbackModal } from '../components/FeedbackModal';
 import './mobile-app.css';
 
 type NavItem = {
@@ -83,6 +84,7 @@ export const MobileShell: React.FC<MobileShellProps> = ({
     const location = useLocation();
     const navigate = useNavigate();
     const [moreOpen, setMoreOpen] = useState(false);
+    const [feedbackOpen, setFeedbackOpen] = useState(false);
 
     useEffect(() => {
         document.documentElement.classList.add('app-mobile');
@@ -212,6 +214,18 @@ export const MobileShell: React.FC<MobileShellProps> = ({
                         <button
                             type="button"
                             className="app-mobile-icon-btn"
+                            title="Обратная связь"
+                            aria-label="Обратная связь"
+                            onClick={() => {
+                                haptic();
+                                setFeedbackOpen(true);
+                            }}
+                        >
+                            <Icon name="MessageSquare" size={20} />
+                        </button>
+                        <button
+                            type="button"
+                            className="app-mobile-icon-btn"
                             title="Оформление"
                             aria-label="Оформление"
                             onClick={() => {
@@ -281,6 +295,18 @@ export const MobileShell: React.FC<MobileShellProps> = ({
                                     onClick={() => {
                                         haptic();
                                         setMoreOpen(false);
+                                        setFeedbackOpen(true);
+                                    }}
+                                >
+                                    <Icon name="MessageSquare" size={16} />
+                                    Связь
+                                </button>
+                                <button
+                                    type="button"
+                                    className="app-mobile-more__action"
+                                    onClick={() => {
+                                        haptic();
+                                        setMoreOpen(false);
                                         onOpenAppearance();
                                     }}
                                 >
@@ -300,6 +326,8 @@ export const MobileShell: React.FC<MobileShellProps> = ({
                     </div>
                 </div>
             )}
+
+            <FeedbackModal isOpen={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
 
             <nav className="app-mobile-nav no-print" aria-label="Навигация">
                 {primary.map((item) => {
