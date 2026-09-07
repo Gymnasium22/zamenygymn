@@ -64,6 +64,12 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
         cell: null
     });
     const [clipboard, setClipboard] = useState<ScheduleItem | null>(null);
+    const clipboardRef = useRef<ScheduleItem | null>(null);
+    clipboardRef.current = clipboard;
+    const hoverCellRef = useRef<CellInfo | null>(null);
+    const lastItemRef = useRef<ScheduleItem | null>(null);
+    const [repeatDays, setRepeatDays] = useState<DayOfWeek[]>([]);
+    const [dayPeriods, setDayPeriods] = useState<Partial<Record<DayOfWeek, number>>>({});
 
     const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
 
@@ -430,7 +436,10 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
 
     const handleEditItem = (item: ScheduleItem) => {
         if (readOnly) return;
+        lastItemRef.current = item;
         setTempItem(item);
+        setRepeatDays([item.day as DayOfWeek]);
+        setDayPeriods({});
         updateValidation(item);
         setIsEditorOpen(true);
     };
@@ -446,15 +455,29 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
             if (filterId && classesById.has(filterId)) base.classId = filterId;
         }
         setTempItem(base);
+        setRepeatDays([base.day as DayOfWeek]);
+        setDayPeriods({});
         setValidationWarnings([]);
         setIsEditorOpen(true);
     };
     const executeSaveItem = async () => {
         const currentSchedule = scheduleRef.current;
-        const newSchedule = [...currentSchedule];
-        const idx = newSchedule.findIndex((s) => s.id === tempItem.id);
-        if (idx >= 0) newSchedule[idx] = tempItem as ScheduleItem;
-        else newSchedule.push(tempItem as ScheduleItem);
+        const base = tempItem as ScheduleItem;
+        const days = (repeatDays.length ? repeatDays : [base.day as DayOfWeek]).filter(Boolean);
+        const originalId = base.id;
+        let newSchedule = [...currentSchedule];
+        days.forEach((day, i) => {
+            const period = dayPeriods[day] ?? base.period;
+            const item: ScheduleItem = {
+                ...base,
+                id: i === 0 && originalId ? originalId : generateId(),
+                day,
+                period
+            };
+            const idx = newSchedule.findIndex((s) => s.id === item.id);
+            if (idx >= 0) newSchedule[idx] = item;
+            else newSchedule.push(item);
+        });
         await saveCurrentSchedule(newSchedule);
         setIsEditorOpen(false);
         setSaveConflictModalOpen(false);
@@ -525,8 +548,61 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
         if (readOnly) return;
         e.preventDefault();
         e.stopPropagation();
+        if (item) lastItemRef.current = item;
         setContextMenu({ visible: true, x: e.clientX, y: e.clientY, item, cell: cellInfo });
     };
+
+    const pasteIntoCell = useCallback(
+        async (cell: CellInfo) => {
+            const clip = clipboardRef.current;
+            if (!clip || readOnly) return;
+            const newItem = {
+                ...clip,
+                id: generateId(),
+                day: selectedDay,
+                shift: selectedShift,
+                period: cell.colKey
+            } as ScheduleItem;
+            if (viewMode === 'week') {
+                newItem.day = cell.colKey as string;
+                newItem.period = parseInt(String(cell.rowId), 10);
+            }
+            if (viewMode === 'class') newItem.classId = cell.rowId;
+            else if (viewMode === 'teacher') newItem.teacherId = cell.rowId;
+            else if (viewMode === 'subject') newItem.subjectId = cell.rowId;
+
+            await saveCurrentSchedule([...scheduleRef.current, newItem]);
+            addToast({ type: 'success', title: 'Вставлено', message: 'Буфер сохранён — вставьте в другие дни и уроки' });
+        },
+        [readOnly, selectedDay, selectedShift, viewMode, addToast]
+    );
+
+    useEffect(() => {
+        if (readOnly) return;
+        const onKey = (e: KeyboardEvent) => {
+            const el = e.target as HTMLElement | null;
+            const tag = el?.tagName;
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el?.isContentEditable) return;
+            if (isEditorOpen) return;
+            const mod = e.ctrlKey || e.metaKey;
+            if (mod && (e.key === 'c' || e.key === 'C')) {
+                const src = contextMenu.item || lastItemRef.current;
+                if (src) {
+                    e.preventDefault();
+                    setClipboard(src);
+                    addToast({ type: 'info', title: 'Скопировано' });
+                }
+            }
+            if (mod && (e.key === 'v' || e.key === 'V')) {
+                if (clipboardRef.current && hoverCellRef.current) {
+                    e.preventDefault();
+                    pasteIntoCell(hoverCellRef.current);
+                }
+            }
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [readOnly, isEditorOpen, contextMenu.item, pasteIntoCell, addToast]);
 
     const handleDragStart = (e: React.DragEvent, item: ScheduleItem) => {
         if (readOnly) return;
@@ -656,7 +732,14 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
     const contextActions = [];
     if (contextMenu.item) {
         contextActions.push(
-            { label: 'Копировать', icon: 'Copy', onClick: () => setClipboard(contextMenu.item) },
+            {
+                label: 'Копировать',
+                icon: 'Copy',
+                onClick: () => {
+                    setClipboard(contextMenu.item);
+                    addToast({ type: 'info', title: 'Скопировано', message: 'ПКМ по ячейке → Вставить, или Ctrl+V' });
+                }
+            },
             {
                 label: 'Удалить',
                 icon: 'Trash2',
@@ -671,26 +754,7 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
             contextActions.push({
                 label: 'Вставить',
                 icon: 'Clipboard',
-                onClick: async () => {
-                    const newItem = {
-                        ...clipboard,
-                        id: generateId(),
-                        day: selectedDay,
-                        shift: selectedShift,
-                        period: cell.colKey
-                    } as ScheduleItem;
-                    if (viewMode === 'week') {
-                        newItem.day = cell.colKey as string;
-                        newItem.period = parseInt(cell.rowId);
-                    }
-                    if (viewMode === 'class') newItem.classId = cell.rowId;
-                    else if (viewMode === 'teacher') newItem.teacherId = cell.rowId;
-                    else if (viewMode === 'subject') newItem.subjectId = cell.rowId;
-
-                    const newSchedule = [...schedule, newItem];
-                    await saveCurrentSchedule(newSchedule);
-                    setClipboard(null);
-                }
+                onClick: () => pasteIntoCell(cell)
             });
         }
         contextActions.push({
@@ -985,6 +1049,20 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
                     onClose={() => setContextMenu({ ...contextMenu, visible: false })}
                     actions={contextActions}
                 />
+            )}
+            {clipboard && !readOnly && (
+                <div className="mx-0 mb-2 flex items-center gap-2 px-3 py-2 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-200 text-xs font-semibold">
+                    <Icon name="Copy" size={14} />
+                    <span className="truncate flex-1">
+                        Буфер: {classesById.get(clipboard.classId)?.name || 'класс'} ·{' '}
+                        {subjectsById.get(clipboard.subjectId)?.name || 'предмет'} ·{' '}
+                        {teachersById.get(clipboard.teacherId)?.name || 'учитель'}. ПКМ → Вставить или Ctrl+V на ячейке
+                        (день и урок — из ячейки).
+                    </span>
+                    <button type="button" className="shrink-0 underline" onClick={() => setClipboard(null)}>
+                        Сбросить
+                    </button>
+                </div>
             )}
             <div className="bg-white dark:bg-dark-800 p-3 sm:p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-700 mb-4 sm:mb-6 flex flex-col gap-3 no-print w-full min-w-0">
                 {/* Primary row: shift + undo + mobile tools toggle */}
@@ -1284,6 +1362,9 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
                                                             !readOnly ? (e) => handleDragOver(e, cellInfo) : undefined
                                                         }
                                                         onDrop={!readOnly ? (e) => handleDrop(e, cellInfo) : undefined}
+                                                        onMouseEnter={() => {
+                                                            hoverCellRef.current = cellInfo;
+                                                        }}
                                                     >
                                                         {renderScheduleItemsContent(items, colKey, row.id)}
                                                     </td>
@@ -1315,6 +1396,63 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
                         <span>День: {tempItem.day}</span>
                         <span>Урок: {tempItem.period}</span>
                         <span>Смена: {tempItem.shift === Shift.First ? '1 смена' : '2 смена'}</span>
+                    </div>
+
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-2">
+                            Дни (один урок — несколько дней)
+                        </label>
+                        <div className="flex flex-wrap gap-1.5">
+                            {DAYS.map((day) => {
+                                const on = repeatDays.includes(day);
+                                return (
+                                    <button
+                                        key={day}
+                                        type="button"
+                                        onClick={() =>
+                                            setRepeatDays((prev) =>
+                                                on ? prev.filter((d) => d !== day) : [...prev, day]
+                                            )
+                                        }
+                                        className={`min-w-[2.75rem] px-2 py-1.5 rounded-lg text-xs font-bold border ${
+                                            on
+                                                ? 'bg-indigo-600 text-white border-indigo-600'
+                                                : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-600'
+                                        }`}
+                                    >
+                                        {day}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        {repeatDays.length > 1 && (
+                            <div className="mt-2 grid grid-cols-5 gap-1.5">
+                                {repeatDays.map((day) => (
+                                    <label key={day} className="flex flex-col gap-0.5 text-[10px] font-bold text-slate-500">
+                                        {day}
+                                        <select
+                                            className="border border-slate-200 dark:border-slate-600 rounded-lg px-1 py-1 text-xs font-semibold bg-white dark:bg-slate-700 dark:text-white"
+                                            value={dayPeriods[day] ?? tempItem.period ?? 1}
+                                            onChange={(e) =>
+                                                setDayPeriods((prev) => ({
+                                                    ...prev,
+                                                    [day]: Number(e.target.value)
+                                                }))
+                                            }
+                                        >
+                                            {(SHIFT_PERIODS[(tempItem.shift || selectedShift) as Shift] || []).map((p) => (
+                                                <option key={p} value={p}>
+                                                    {p} ур.
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </label>
+                                ))}
+                            </div>
+                        )}
+                        <p className="text-[11px] text-slate-400 mt-1.5">
+                            Если у учителя те же классы в разные дни на разных уроках — отметьте дни и выберите номер урока для каждого.
+                        </p>
                     </div>
 
                     {validationWarnings.length > 0 && (
@@ -1425,7 +1563,7 @@ export const SchedulePage = ({ readOnly: readOnlyProp = false, semester = 1 }: S
                             </button>
                         )}
                         <button onClick={handleSaveItem} className="btn-primary btn-ripple">
-                            Сохранить
+                            {repeatDays.length > 1 ? `Сохранить на ${repeatDays.length} дн.` : 'Сохранить'}
                         </button>
                     </div>
                 </div>

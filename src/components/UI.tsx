@@ -524,15 +524,23 @@ export const ContextMenu = ({ x, y, onClose, actions }: ContextMenuProps) => {
 
     if (x === null || y === null) return null;
 
-    const left = window.innerWidth - x < 200 ? x - 200 : x;
-    const style: React.CSSProperties = { top: y, left };
+    const menuW = 224;
+    const menuH = Math.max(48, actions.length * 44 + 16);
+    let left = x;
+    let top = y;
+    if (typeof window !== 'undefined') {
+        if (left + menuW > window.innerWidth - 8) left = Math.max(8, window.innerWidth - menuW - 8);
+        if (top + menuH > window.innerHeight - 8) top = Math.max(8, window.innerHeight - menuH - 8);
+        if (left < 8) left = 8;
+        if (top < 8) top = 8;
+    }
 
-    return (
+    return createPortal(
         <div
             ref={ref}
             role="menu"
-            className="fixed z-[100] bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl shadow-xl shadow-slate-900/10 dark:shadow-black/50 rounded-2xl border border-slate-200/60 dark:border-slate-700/60 py-2 w-56 context-menu no-print hover:border-indigo-500/30 dark:hover:border-indigo-400/30 transition-all duration-300 animate-slide-down"
-            style={style}
+            className="fixed z-[200] bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl shadow-xl shadow-slate-900/10 dark:shadow-black/50 rounded-2xl border border-slate-200/60 dark:border-slate-700/60 py-2 w-56 context-menu no-print"
+            style={{ top, left }}
         >
             {actions.map((action, index) => (
                 <button
@@ -551,7 +559,8 @@ export const ContextMenu = ({ x, y, onClose, actions }: ContextMenuProps) => {
                     {action.label}
                 </button>
             ))}
-        </div>
+        </div>,
+        document.body
     );
 };
 
