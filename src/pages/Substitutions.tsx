@@ -35,6 +35,7 @@ import {
 } from '../components/Substitutions/Modals';
 import { AssignmentModal } from '../components/Substitutions/AssignmentModal';
 import { offerUndo } from '../components/CloudSaveStatus';
+import { parseTelegramChatIds } from '../utils/telegramChatIds';
 
 export const SubstitutionsPage = () => {
     const { subjects, teachers, classes, rooms, settings, privateSettings, saveStaticData } = useStaticData();
@@ -752,9 +753,19 @@ export const SubstitutionsPage = () => {
     const hasTgShift1 = shiftHasExportableSubs(subsForTelegramDate, Shift.First, getScheduleItemById);
     const hasTgShift2 = shiftHasExportableSubs(subsForTelegramDate, Shift.Second, getScheduleItemById);
 
+    const substitutionChatIds = parseTelegramChatIds(settings.telegramTemplates?.substitutionChatIds);
+
     const requestSendTelegramSummary = () => {
-        if (!privateSettings.telegramToken || !settings.feedbackChatId) {
-            addToast({ type: 'warning', title: 'Ошибка', message: 'Telegram не настроен' });
+        if (!privateSettings.telegramToken) {
+            addToast({ type: 'warning', title: 'Ошибка', message: 'Telegram не настроен: нет токена бота' });
+            return;
+        }
+        if (substitutionChatIds.length === 0) {
+            addToast({
+                type: 'warning',
+                title: 'Куда слать замены?',
+                message: 'В Настройках → Интеграции укажите Chat ID для замен (можно несколько). Обратная связь при этом останется на вашем личном ID.'
+            });
             return;
         }
         if (hasTgShift1 && hasTgShift2) {
@@ -765,14 +776,22 @@ export const SubstitutionsPage = () => {
     };
 
     const sendSummaryToTelegram = async (which: '1' | '2' | 'both') => {
-        if (!privateSettings.telegramToken || !settings.feedbackChatId) {
-            addToast({ type: 'warning', title: 'Ошибка', message: 'Telegram не настроен' });
+        if (!privateSettings.telegramToken) {
+            addToast({ type: 'warning', title: 'Ошибка', message: 'Telegram не настроен: нет токена бота' });
+            return;
+        }
+        const chatIds = parseTelegramChatIds(settings.telegramTemplates?.substitutionChatIds);
+        if (chatIds.length === 0) {
+            addToast({
+                type: 'warning',
+                title: 'Куда слать замены?',
+                message: 'Укажите Chat ID для замен в Настройках → Интеграции.'
+            });
             return;
         }
 
         const dateStr = formatDateEuropean(selectedDate);
         const token = privateSettings.telegramToken;
-        const chatId = settings.feedbackChatId;
         setTgShiftPickOpen(false);
         setIsSendingSummary(true);
         try {
@@ -794,36 +813,40 @@ export const SubstitutionsPage = () => {
             const ready = shots.filter((s) => s.el && (which === 'both' || s.key === which));
             if (ready.length === 0) {
                 const text = generateSubstitutionText();
-                const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        chat_id: chatId,
-                        text,
-                        parse_mode: 'Markdown'
-                    })
-                });
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                const result = await response.json();
-                if (!result.ok) throw new Error(result.description || 'Telegram API error');
+                for (const chatId of chatIds) {
+                    const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            chat_id: chatId,
+                            text,
+                            parse_mode: 'Markdown'
+                        })
+                    });
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    const result = await response.json();
+                    if (!result.ok) throw new Error(result.description || 'Telegram API error');
+                }
                 addToast({
                     type: 'info',
                     title: 'Отправлено текстом',
-                    message: 'На этот день нет листа для картинки — ушла текстовая сводка'
+                    message: `Сводка ушла в ${chatIds.length} чат(а). Картинки не было.`
                 });
                 return;
             }
             for (const shot of ready) {
                 const blob = await exportService.capturePngBlob(shot.el!);
-                await exportService.sendTelegramPhoto(token, chatId, blob, shot.name, shot.caption);
+                for (const chatId of chatIds) {
+                    await exportService.sendTelegramPhoto(token, chatId, blob, shot.name, shot.caption);
+                }
             }
             addToast({
                 type: 'success',
                 title: 'Отправлено',
                 message:
                     ready.length === 2
-                        ? 'В Telegram ушли картинки 1-й и 2-й смены'
-                        : `В Telegram ушла картинка: ${ready[0].caption}`
+                        ? `Картинки 1-й и 2-й смены ушли в ${chatIds.length} чат(а)`
+                        : `${ready[0].caption} — в ${chatIds.length} чат(а)`
             });
         } catch (e) {
             logger.error(e);

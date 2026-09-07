@@ -123,6 +123,8 @@ export interface TelegramTemplates {
     summary: string;
     teacherNotification: string;
     teacherSummary: string;
+    /** Куда слать картинки замен: Chat ID через запятую или с новой строки */
+    substitutionChatIds?: string;
 }
 
 export interface AdminAnnouncement {

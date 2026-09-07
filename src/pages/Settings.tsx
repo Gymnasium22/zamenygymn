@@ -603,6 +603,7 @@ export const SettingsPage = () => {
     // Integrations
     const [telegramToken, setTelegramToken] = useState('');
     const [feedbackChatId, setFeedbackChatId] = useState('');
+    const [substitutionChatIds, setSubstitutionChatIds] = useState('');
     const [adminTelegramChatId, setAdminTelegramChatId] = useState('');
     const [weatherApiKey, setWeatherApiKey] = useState('');
     const [weatherCity, setWeatherCity] = useState('');
@@ -657,6 +658,7 @@ export const SettingsPage = () => {
         if (!settings) return;
         setTelegramToken(privateSettings.telegramToken || '');
         setFeedbackChatId(settings.feedbackChatId || '');
+        setSubstitutionChatIds(settings.telegramTemplates?.substitutionChatIds || '');
         setAdminTelegramChatId(settings.adminTelegramChatId || '');
         setWeatherApiKey(privateSettings.weatherApiKey || '');
         setWeatherCity(settings.weatherCity || 'Minsk,BY');
@@ -722,11 +724,12 @@ export const SettingsPage = () => {
         return (
             telegramToken !== (privateSettings.telegramToken || '') ||
             feedbackChatId !== (settings.feedbackChatId || '') ||
+            substitutionChatIds !== (settings.telegramTemplates?.substitutionChatIds || '') ||
             adminTelegramChatId !== (settings.adminTelegramChatId || '') ||
             weatherApiKey !== (privateSettings.weatherApiKey || '') ||
             weatherCity !== (settings.weatherCity || 'Minsk,BY')
         );
-    }, [telegramToken, feedbackChatId, adminTelegramChatId, weatherApiKey, weatherCity, settings, privateSettings]);
+    }, [telegramToken, feedbackChatId, substitutionChatIds, adminTelegramChatId, weatherApiKey, weatherCity, settings, privateSettings]);
 
     const institutionDirty = useMemo(() => {
         if (!settings) return false;
@@ -800,7 +803,15 @@ export const SettingsPage = () => {
                     feedbackChatId,
                     adminTelegramChatId,
                     weatherCity,
-                    weatherApiKey
+                    weatherApiKey,
+                    telegramTemplates: {
+                        ...(settings.telegramTemplates || {
+                            summary: '',
+                            teacherNotification: '',
+                            teacherSummary: ''
+                        }),
+                        substitutionChatIds
+                    }
                 },
                 privateSettings: {
                     ...privateSettings,
@@ -814,7 +825,7 @@ export const SettingsPage = () => {
         } finally {
             setIsSavingSection(null);
         }
-    }, [settings, privateSettings, telegramToken, feedbackChatId, adminTelegramChatId, weatherApiKey, weatherCity, saveStaticData, addToast]);
+    }, [settings, privateSettings, telegramToken, feedbackChatId, substitutionChatIds, adminTelegramChatId, weatherApiKey, weatherCity, saveStaticData, addToast]);
 
     const saveInstitution = useCallback(async () => {
         setIsSavingSection('institution');
@@ -886,7 +897,11 @@ export const SettingsPage = () => {
             await saveStaticData({
                 settings: {
                     ...settings,
-                    telegramTemplates: templates,
+                    telegramTemplates: {
+                        ...templates,
+                        substitutionChatIds:
+                            substitutionChatIds || settings.telegramTemplates?.substitutionChatIds || ''
+                    },
                     adminAnnouncement: {
                         ...announcement,
                         lastUpdated: new Date().toISOString()
@@ -899,7 +914,7 @@ export const SettingsPage = () => {
         } finally {
             setIsSavingSection(null);
         }
-    }, [settings, templates, announcement, saveStaticData, addToast]);
+    }, [settings, templates, announcement, substitutionChatIds, saveStaticData, addToast]);
 
     const saveWidgetAccess = useCallback(async () => {
         setIsSavingSection('widgets');
@@ -1106,7 +1121,22 @@ export const SettingsPage = () => {
                                             placeholder="-100123456789 или 123456789"
                                         />
                                         <p className="text-[11px] text-slate-400 mt-1">
-                                            ID чата или пользователя для сбора обратной связи.
+                                            Сюда уходит только «Обратная связь» с рабочего стола, не бланк замен.
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">
+                                            Chat ID для замен (фото)
+                                        </label>
+                                        <textarea
+                                            value={substitutionChatIds}
+                                            onChange={(e) => setSubstitutionChatIds(e.target.value)}
+                                            rows={3}
+                                            placeholder={'-1001234567890\n123456789'}
+                                            className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm font-mono outline-none focus:border-indigo-500"
+                                        />
+                                        <p className="text-[11px] text-slate-400 mt-1">
+                                            Куда кнопка Telegram на странице замен шлёт картинки. Несколько ID — с новой строки или через запятую: себе и в общий чат учителей. Бот должен быть участником группы.
                                         </p>
                                     </div>
                                     <div>

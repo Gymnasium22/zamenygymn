@@ -38,15 +38,15 @@ export const TelegramTemplateEditor: React.FC<TelegramTemplateEditorProps> = ({
     templates,
     onChange
 }) => {
-    const [activeTab, setActiveTab] = useState<keyof TelegramTemplates>('summary');
+    const [activeTab, setActiveTab] = useState<(typeof TEMPLATE_META)[number]['key']>('summary');
     const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-    const update = (key: keyof TelegramTemplates, value: string) => {
+    const update = (key: (typeof TEMPLATE_META)[number]['key'], value: string) => {
         onChange({ ...templates, [key]: value });
     };
 
     const activeMeta = TEMPLATE_META.find((t) => t.key === activeTab)!;
-    const currentValue = templates[activeTab];
+    const currentValue = templates[activeTab] || '';
 
     return (
         <div className="space-y-4">
