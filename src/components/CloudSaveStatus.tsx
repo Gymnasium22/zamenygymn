@@ -56,10 +56,12 @@ export const CloudSaveStatus: React.FC<{ compact?: boolean }> = ({ compact }) =>
     return (
         <div
             title={sub}
-            className={`flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-bold ${cls} ${compact ? 'max-w-[11rem]' : ''}`}
+            className={`flex items-center gap-1 rounded-lg font-bold ${cls} ${
+                compact ? 'max-w-[5.5rem] px-1.5 py-1 text-[10px]' : 'gap-1.5 px-2 py-1 text-[11px]'
+            }`}
         >
-            <Icon name={icon} size={13} className={icon === 'Loader' ? 'animate-spin shrink-0' : 'shrink-0'} />
-            <span className="truncate leading-tight">
+            <Icon name={icon} size={compact ? 12 : 13} className={icon === 'Loader' ? 'animate-spin shrink-0' : 'shrink-0'} />
+            <span className="truncate leading-tight min-w-0">
                 {label}
                 {!compact && <span className="font-medium opacity-80"> · {sub}</span>}
             </span>

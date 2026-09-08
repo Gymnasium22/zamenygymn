@@ -175,19 +175,19 @@ body {
     -webkit-backdrop-filter: blur(12px) saturate(1.1) !important;
 }
 
-/* Generic white panels used across pages */
-main .bg-white.dark\:bg-dark-800,
-main .bg-white\/95,
-main .bg-white\/90 {
+/* Generic white panels — desktop only (mobile shell has its own density) */
+html:not(.app-mobile):not(.tg-mini-app) main .bg-white.dark\:bg-dark-800,
+html:not(.app-mobile):not(.tg-mini-app) main .bg-white\/95,
+html:not(.app-mobile):not(.tg-mini-app) main .bg-white\/90 {
     border-color: var(--ds-border) !important;
 }
 
-/* ========== Typography ========== */
-main h1.text-3xl,
-main h1.text-2xl,
-main h1.text-4xl,
-.display-large,
-.display-hero {
+/* ========== Typography (desktop shell) ========== */
+html:not(.app-mobile):not(.tg-mini-app) main h1.text-3xl,
+html:not(.app-mobile):not(.tg-mini-app) main h1.text-2xl,
+html:not(.app-mobile):not(.tg-mini-app) main h1.text-4xl,
+html:not(.app-mobile):not(.tg-mini-app) .display-large,
+html:not(.app-mobile):not(.tg-mini-app) .display-hero {
     letter-spacing: var(--ds-tracking-display) !important;
     font-weight: 700 !important;
     color: var(--ds-ink) !important;
@@ -195,7 +195,7 @@ main h1.text-4xl,
 
 /* Soften ultra-black UI weights on screen (print/export keep heavy type) */
 @media screen {
-    main .font-black {
+    html:not(.app-mobile):not(.tg-mini-app) main .font-black {
         font-weight: 700 !important;
         letter-spacing: -0.03em;
     }
@@ -207,8 +207,8 @@ main h1.text-4xl,
     font-weight: 600;
 }
 
-main label.text-xs.font-bold.uppercase,
-main .text-xs.font-bold.uppercase {
+html:not(.app-mobile):not(.tg-mini-app) main label.text-xs.font-bold.uppercase,
+html:not(.app-mobile):not(.tg-mini-app) main .text-xs.font-bold.uppercase {
     text-transform: none !important;
     letter-spacing: -0.01em !important;
     font-weight: 600 !important;
@@ -311,13 +311,13 @@ select:focus-visible {
     box-shadow: 0 0 0 3px var(--ds-accent-ring), 0 8px 24px color-mix(in srgb, var(--theme-primary-500, #6366f1) 12%, transparent) !important;
 }
 
-/* ========== Tables ========== */
-main table {
+/* ========== Tables (desktop) — mobile sets its own table type scale ========== */
+html:not(.app-mobile):not(.tg-mini-app) main table {
     border-collapse: separate;
     border-spacing: 0;
 }
 
-main table thead th {
+html:not(.app-mobile):not(.tg-mini-app) main table thead th {
     font-weight: 600 !important;
     text-transform: none !important;
     letter-spacing: -0.01em !important;
@@ -327,12 +327,12 @@ main table thead th {
     border-bottom: 1px solid var(--ds-border) !important;
 }
 
-main table tbody td {
+html:not(.app-mobile):not(.tg-mini-app) main table tbody td {
     font-size: 0.875rem !important;
     border-bottom: 1px solid var(--ds-border-soft) !important;
 }
 
-main table tbody tr:hover td {
+html:not(.app-mobile):not(.tg-mini-app) main table tbody tr:hover td {
     background: color-mix(in srgb, var(--theme-primary-500, #6366f1) 4%, transparent);
 }
 
@@ -548,38 +548,38 @@ html.tg-mini-app .btn-primary {
     }
 }
 
-/* ========== Shared page chrome ========== */
+/* ========== Shared page chrome (desktop only) ========== */
 /* Icon badges in headers (Пропуски, etc.) */
-main h1 > div.p-2.rounded-lg,
-main h1 > .p-2.rounded-lg {
+html:not(.app-mobile):not(.tg-mini-app) main h1 > div.p-2.rounded-lg,
+html:not(.app-mobile):not(.tg-mini-app) main h1 > .p-2.rounded-lg {
     border-radius: 12px !important;
     box-shadow: 0 1px 0 rgba(255, 255, 255, 0.5) inset;
 }
 
 /* Soft elevation for common slate/indigo panel rows */
-main .rounded-2xl.border.border-slate-200,
-main .rounded-2xl.border.border-slate-100,
-main .rounded-xl.border.border-slate-200 {
+html:not(.app-mobile):not(.tg-mini-app) main .rounded-2xl.border.border-slate-200,
+html:not(.app-mobile):not(.tg-mini-app) main .rounded-2xl.border.border-slate-100,
+html:not(.app-mobile):not(.tg-mini-app) main .rounded-xl.border.border-slate-200 {
     box-shadow: var(--ds-shadow-xs);
 }
 
 /* Primary CTA row buttons on substitutions / tools */
-main button.bg-blue-600,
-main button.bg-indigo-600 {
+html:not(.app-mobile):not(.tg-mini-app) main button.bg-blue-600,
+html:not(.app-mobile):not(.tg-mini-app) main button.bg-indigo-600 {
     letter-spacing: -0.01em;
     font-weight: 600;
 }
 
 /* Date navigation pill (substitutions etc.) */
-main .bg-slate-50.dark\:bg-slate-700.p-1\.5.rounded-xl.border {
+html:not(.app-mobile):not(.tg-mini-app) main .bg-slate-50.dark\:bg-slate-700.p-1\.5.rounded-xl.border {
     background: color-mix(in srgb, var(--ds-surface) 88%, var(--ds-surface-3)) !important;
     border-color: var(--ds-border) !important;
     box-shadow: var(--ds-shadow-xs);
 }
 
 /* Directory / list cards */
-main .group.rounded-xl.border:hover,
-main button.group.rounded-xl.border:hover {
+html:not(.app-mobile):not(.tg-mini-app) main .group.rounded-xl.border:hover,
+html:not(.app-mobile):not(.tg-mini-app) main button.group.rounded-xl.border:hover {
     border-color: color-mix(in srgb, var(--theme-primary-500, #6366f1) 28%, var(--ds-border));
 }
 
@@ -611,9 +611,9 @@ html.app-mobile .app-mobile-tabbar {
     box-shadow: var(--ds-shadow-lg) !important;
 }
 
-/* Soft indigo secondary buttons used as chips */
-main button.bg-indigo-100,
-main .bg-indigo-100.text-indigo-700 {
+/* Soft indigo secondary buttons used as chips (desktop) */
+html:not(.app-mobile):not(.tg-mini-app) main button.bg-indigo-100,
+html:not(.app-mobile):not(.tg-mini-app) main .bg-indigo-100.text-indigo-700 {
     border: 1px solid color-mix(in srgb, var(--theme-primary-500, #6366f1) 18%, transparent);
 }
 

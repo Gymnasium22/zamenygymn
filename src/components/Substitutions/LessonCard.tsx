@@ -150,7 +150,31 @@ export const LessonCard: React.FC<LessonCardProps> = ({
                             <Icon name="Edit" size={14} />
                         </button>
                     ) : (
-                        <div className="flex gap-1">
+                        <div className="flex gap-1 items-center">
+                            {rep && rep.telegramChatId && !isCancelled && !isConducted && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const roomInfo = isRoomChanged
+                                            ? `${originalRoomName} -> ${replacementRoomName}`
+                                            : originalRoomName;
+                                        onTelegramClick({
+                                            teacherId: rep.id,
+                                            lessonId: l.id,
+                                            roomName: roomInfo,
+                                            className: cls?.name || '?',
+                                            subjectName: subj?.name || '?',
+                                            period: l.period,
+                                            roomChanged: !!isRoomChanged
+                                        });
+                                    }}
+                                    className="min-h-[36px] min-w-[36px] p-1.5 bg-blue-50 text-blue-600 rounded-lg"
+                                    title="Отправить учителю в Telegram"
+                                    aria-label="Отправить учителю в Telegram"
+                                >
+                                    <Icon name="Send" size={14} />
+                                </button>
+                            )}
                             {firstSub && (
                                 <button
                                     onClick={() => onEdit(l, firstSub)}

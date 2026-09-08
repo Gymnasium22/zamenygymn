@@ -8,9 +8,9 @@ html.app-mobile body {
     max-width: 100% !important;
     width: 100% !important;
     position: relative;
-    /* Long RU labels / emails — wrap, never clip horizontally */
-    overflow-wrap: anywhere;
-    word-break: break-word;
+    /* Calm wrapping — avoid “blown apart” RU labels */
+    overflow-wrap: break-word;
+    word-break: normal;
 }
 
 html.app-mobile #root {
@@ -29,11 +29,18 @@ html.app-mobile *::after {
 
 .app-mobile-root {
     --m-header-h: 52px;
-    --m-nav-h: 60px;
+    --m-nav-h: 56px;
     --m-safe-t: env(safe-area-inset-top, 0px);
     --m-safe-b: env(safe-area-inset-bottom, 0px);
     --m-safe-l: env(safe-area-inset-left, 0px);
     --m-safe-r: env(safe-area-inset-right, 0px);
+    /* Compact app-like type scale (does not affect desktop) */
+    --m-fs-caption: 11px;
+    --m-fs-body: 14px;
+    --m-fs-title: 1.0625rem; /* ~17px */
+    --m-fs-display: 1.2rem;
+    --m-fs-table: 0.8125rem;
+    --m-tracking: -0.015em;
     display: flex;
     flex-direction: column;
     height: 100dvh;
@@ -50,6 +57,8 @@ html.app-mobile *::after {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+    font-size: var(--m-fs-body);
+    letter-spacing: var(--m-tracking);
     font-feature-settings: 'ss01' on, 'cv11' on;
     -webkit-font-smoothing: antialiased;
 }
@@ -96,6 +105,9 @@ html.dark .app-mobile-header {
     align-items: center;
     gap: 8px;
     min-height: 44px;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
 }
 
 .app-mobile-header__brand {
@@ -120,9 +132,9 @@ html.dark .app-mobile-header__org {
 }
 
 .app-mobile-header__title {
-    font-size: 1.0625rem;
+    font-size: var(--m-fs-title);
     font-weight: 700;
-    letter-spacing: -0.03em;
+    letter-spacing: -0.02em;
     line-height: 1.25;
     white-space: nowrap;
     overflow: hidden;
@@ -137,13 +149,15 @@ html.dark .app-mobile-header__title {
 .app-mobile-header__actions {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 2px;
     flex-shrink: 0;
+    max-width: min(42%, 11rem);
+    min-width: 0;
 }
 
 .app-mobile-icon-btn {
-    width: 42px;
-    height: 42px;
+    width: 40px;
+    height: 40px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -154,6 +168,17 @@ html.dark .app-mobile-header__title {
     cursor: pointer;
     -webkit-tap-highlight-color: transparent;
     transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
+    flex-shrink: 0;
+}
+
+@media (max-width: 360px) {
+    .app-mobile-icon-btn {
+        width: 36px;
+        height: 36px;
+    }
+    .app-mobile-header__actions {
+        max-width: min(46%, 9.5rem);
+    }
 }
 
 .app-mobile-icon-btn:active {
@@ -213,7 +238,7 @@ html.dark .app-mobile-org-select {
     display: flex;
     flex-direction: column;
     overscroll-behavior-y: contain;
-    padding: 8px 10px 0;
+    padding: 6px 8px 0;
     box-sizing: border-box;
     position: relative;
     left: 0;
@@ -250,7 +275,8 @@ html.dark .app-mobile-org-select {
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior-y: contain;
-    padding-bottom: calc(14px + var(--m-nav-h) + var(--m-safe-b));
+    /* Single bottom inset contract — page pb-* stripped below */
+    padding-bottom: calc(8px + var(--m-nav-h) + var(--m-safe-b));
     box-sizing: border-box;
     margin: 0 !important;
     left: 0 !important;
@@ -272,26 +298,48 @@ html.dark .app-mobile-org-select {
 }
 
 /* Tighter page chrome — still full UI, less “desktop padding” */
+.app-mobile-content .text-4xl {
+    font-size: var(--m-fs-display) !important;
+    line-height: 1.25 !important;
+    letter-spacing: -0.02em !important;
+}
+
 .app-mobile-content .text-3xl {
-    font-size: 1.35rem !important;
-    line-height: 1.3 !important;
+    font-size: var(--m-fs-display) !important;
+    line-height: 1.25 !important;
+    letter-spacing: -0.02em !important;
 }
 
 .app-mobile-content .text-2xl {
-    font-size: 1.2rem !important;
+    font-size: 1.125rem !important;
+    line-height: 1.3 !important;
+    letter-spacing: -0.015em !important;
+}
+
+.app-mobile-content .text-xl {
+    font-size: 1.05rem !important;
     line-height: 1.3 !important;
 }
 
 .app-mobile-content .lg\:p-8,
 .app-mobile-content .p-8,
-.app-mobile-content .p-6 {
-    padding: 0.65rem !important;
+.app-mobile-content .p-6,
+.app-mobile-content .p-5 {
+    padding: 0.55rem !important;
 }
 
+.app-mobile-content .p-4 {
+    padding: 0.5rem !important;
+}
+
+/* Avoid double bottom gap under tab bar */
 .app-mobile-content .pb-20,
 .app-mobile-content .pb-24,
-.app-mobile-content .pb-28 {
-    padding-bottom: 0.5rem !important;
+.app-mobile-content .pb-28,
+html.app-mobile .pb-20,
+html.app-mobile .pb-24,
+html.app-mobile .pb-28 {
+    padding-bottom: 0 !important;
 }
 
 /* Страницы с h-full flex — заполняют viewport, внутренний скролл */
@@ -321,9 +369,12 @@ html.dark .app-mobile-org-select {
 
 /* Заголовки страниц: компактнее, без «десктопных» полей */
 .app-mobile-content h1.text-3xl,
-.app-mobile-content h1.text-2xl {
-    font-size: 1.25rem !important;
-    line-height: 1.3 !important;
+.app-mobile-content h1.text-2xl,
+.app-mobile-content h1.text-4xl {
+    font-size: var(--m-fs-display) !important;
+    line-height: 1.25 !important;
+    letter-spacing: -0.02em !important;
+    font-weight: 700 !important;
 }
 
 /* Убираем лишний правый padding у скролл-зон (мешал на 320px) */
@@ -356,17 +407,51 @@ html.app-mobile .app-mobile-toast-stack {
     z-index: 55 !important;
 }
 
-/* Широкие preview/export — только горизонтальный скролл контейнера, не body */
-html.app-mobile .min-w-\[800px\],
-html.app-mobile .min-w-\[1000px\],
-html.app-mobile [class*='min-w-['] {
-    /* оставляем min-width, но родитель обязан overflow-x-auto */
+/*
+ * Wide text/flex blocks: allow shrink. Keep button/input touch mins intact.
+ */
+html.app-mobile .app-mobile-content .flex > span[class*='min-w-'],
+html.app-mobile .app-mobile-content .flex > div[class*='min-w-'],
+html.app-mobile .app-mobile-content .flex > p[class*='min-w-'] {
+    min-width: 0 !important;
 }
 
 html.app-mobile .overflow-x-auto,
-html.app-mobile .mobile-table-scroll {
-    max-width: 100%;
+html.app-mobile .mobile-table-scroll,
+html.app-mobile .mobile-h-scroll {
+    max-width: 100% !important;
+    width: 100%;
+    min-width: 0 !important;
     overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* Flex ancestors must allow children to shrink or h-scroll never activates */
+html.app-mobile .app-mobile-content .flex,
+html.app-mobile .app-mobile-content .grid {
+    min-width: 0;
+    max-width: 100%;
+}
+
+/* Toolbars: wrap instead of spilling icons past the right edge */
+html.app-mobile .app-mobile-content .flex.flex-nowrap {
+    flex-wrap: wrap !important;
+    max-width: 100%;
+}
+
+html.app-mobile .app-mobile-content .mobile-h-scroll.flex,
+html.app-mobile .app-mobile-content .overflow-x-auto.flex {
+    flex-wrap: nowrap !important;
+}
+
+/* Tables always inside a capped scroller */
+html.app-mobile .app-mobile-content table {
+    max-width: none;
+}
+html.app-mobile .app-mobile-content .overflow-x-auto > table,
+html.app-mobile .app-mobile-content .mobile-table-scroll > table {
+    width: max-content;
+    min-width: 100%;
 }
 
 /* sticky thead внутри таблиц не должен «липнуть» поверх bottom nav:
@@ -385,26 +470,38 @@ html.app-mobile .pull-to-refresh > * {
     padding-bottom: 4px;
 }
 
-html.app-mobile .pb-20 {
-    padding-bottom: 1rem !important;
-}
-
 /* Командная палитра на мобиле — почти full screen */
 html.app-mobile [class*='z-[100]'].fixed.inset-0 {
     padding-top: max(8px, env(safe-area-inset-top)) !important;
 }
 
 .app-mobile-content .gap-6 {
-    gap: 0.85rem !important;
+    gap: 0.65rem !important;
 }
 
 .app-mobile-content .gap-8 {
-    gap: 1rem !important;
+    gap: 0.75rem !important;
+}
+
+.app-mobile-content .gap-4 {
+    gap: 0.55rem !important;
 }
 
 /* Horizontal tables / wide blocks */
 .app-mobile-content table {
-    font-size: 0.8125rem;
+    font-size: var(--m-fs-table);
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.app-mobile-content table thead th {
+    font-size: 0.7rem !important;
+    font-weight: 600 !important;
+    letter-spacing: -0.01em !important;
+}
+
+.app-mobile-content table tbody td {
+    font-size: var(--m-fs-table) !important;
 }
 
 .app-mobile-content .overflow-x-auto,
@@ -434,7 +531,7 @@ html.app-mobile [class*='z-[100]'].fixed.inset-0 {
     align-items: stretch;
     justify-content: space-around;
     min-height: calc(var(--m-nav-h) + var(--m-safe-b));
-    padding: 6px 6px calc(6px + var(--m-safe-b));
+    padding: 4px 4px calc(4px + var(--m-safe-b));
     background: color-mix(in srgb, var(--ds-surface, #fff) 92%, transparent);
     backdrop-filter: blur(22px) saturate(1.25);
     -webkit-backdrop-filter: blur(22px) saturate(1.25);
@@ -870,11 +967,28 @@ html.app-mobile .subs-page {
     height: 100%;
     max-height: 100%;
     overflow: hidden;
-    gap: 0.4rem !important;
+    gap: 0.35rem !important;
 }
 
 html.app-mobile .subs-page .subs-mobile-chrome {
     flex-shrink: 0;
+}
+
+html.app-mobile .subs-page .subs-mobile-chrome .bg-white,
+html.app-mobile .subs-page .subs-mobile-chrome > div:first-child {
+    box-shadow: none;
+}
+
+/* Dense cards inside substitutions list */
+html.app-mobile .subs-page .modern-card,
+html.app-mobile .subs-page .rounded-2xl {
+    border-radius: 12px !important;
+}
+
+/* Dashboard widgets: content height on phone, no stretched empty cards */
+html.app-mobile .app-mobile-content .bento-card {
+    height: auto !important;
+    min-height: 0 !important;
 }
 
 /* Compact page padding on mobile shell */
@@ -898,13 +1012,20 @@ html.app-mobile .app-mobile-content h2,
 html.app-mobile .app-mobile-content h3,
 html.app-mobile .app-mobile-content p,
 html.app-mobile .app-mobile-content label,
-html.app-mobile .app-mobile-content span,
 html.tg-mini-app .tg-shell-content h1,
 html.tg-mini-app .tg-shell-content h2,
 html.tg-mini-app .tg-shell-content h3,
 html.tg-mini-app .tg-shell-content p,
 html.tg-mini-app .tg-shell-content label {
     max-width: 100%;
+    overflow-wrap: break-word;
+    word-break: normal;
+}
+
+/* Only force hard wrap on long unbroken tokens (emails, ids) */
+html.app-mobile .app-mobile-more__user,
+html.app-mobile .app-mobile-content a[href^='mailto'],
+html.app-mobile .app-mobile-content .break-all {
     overflow-wrap: anywhere;
     word-break: break-word;
 }
@@ -929,12 +1050,13 @@ html.tg-mini-app .tg-shell-content .flex.flex-wrap {
     max-width: 100%;
 }
 
-/* Tables: allow soft wrap in cells when not intentionally wide */
+/* Tables: soft wrap without blowing letters apart */
 html.app-mobile .app-mobile-content td,
 html.app-mobile .app-mobile-content th,
 html.tg-mini-app .tg-shell-content td,
 html.tg-mini-app .tg-shell-content th {
-    overflow-wrap: anywhere;
+    overflow-wrap: break-word;
+    word-break: normal;
 }
 
 /* Fixed huge panels on phone */

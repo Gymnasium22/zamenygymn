@@ -1225,60 +1225,68 @@ export const SubstitutionsPage = () => {
     return (
         <div className={`h-full flex flex-col min-h-0 ${isMobile ? 'subs-page gap-2' : 'gap-6'}`}>
             {isMobile ? (
-                <div className="subs-mobile-chrome shrink-0">
-                    <div className="flex items-center gap-1 bg-white dark:bg-dark-800 rounded-xl border border-slate-100 dark:border-slate-700 px-1 py-1">
-                        <button
-                            type="button"
-                            onClick={() => changeDate(-1)}
-                            className="min-h-[40px] min-w-[40px] flex items-center justify-center text-slate-500 rounded-lg"
-                            aria-label="Предыдущий день"
-                        >
-                            <Icon name="ArrowRight" className="rotate-180" size={18} />
-                        </button>
-                        <DateInput
-                            value={selectedDate}
-                            onChange={setSelectedDate}
-                            className="flex-1 min-w-0 px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-sm font-semibold text-center"
-                        />
-                        <button
-                            type="button"
-                            onClick={() => setToday()}
-                            className="px-2 min-h-[40px] text-[11px] font-bold text-indigo-700 dark:text-indigo-300"
-                        >
-                            Сегодня
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => changeDate(1)}
-                            className="min-h-[40px] min-w-[40px] flex items-center justify-center text-slate-500 rounded-lg"
-                            aria-label="Следующий день"
-                        >
-                            <Icon name="ArrowRight" size={18} />
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setMobileToolsOpen((v) => !v)}
-                            className="min-h-[40px] min-w-[40px] flex items-center justify-center text-slate-600 dark:text-slate-300 rounded-lg"
-                            aria-label="Ещё действия"
-                            aria-expanded={mobileToolsOpen}
-                        >
-                            <Icon name="Menu" size={18} />
-                        </button>
-                    </div>
-                    {mobileToolsOpen && (
-                        <div className="mt-1.5 grid grid-cols-3 gap-1.5">
+                <div className="subs-mobile-chrome shrink-0 min-w-0 w-full max-w-full">
+                    <div className="bg-white dark:bg-dark-800 rounded-xl border border-slate-100 dark:border-slate-700 px-1.5 py-1.5 min-w-0 w-full max-w-full space-y-1.5">
+                        <div className="flex items-center gap-1 min-w-0 w-full">
                             <button
                                 type="button"
-                                onClick={() => {
-                                    requestSendTelegramSummary();
-                                    setMobileToolsOpen(false);
-                                }}
-                                disabled={isSendingSummary}
-                                className="h-10 rounded-xl bg-blue-600 text-white text-xs font-bold flex items-center justify-center gap-1 disabled:opacity-50"
+                                onClick={() => changeDate(-1)}
+                                className="h-10 w-10 flex items-center justify-center text-slate-500 rounded-lg shrink-0"
+                                aria-label="Предыдущий день"
                             >
-                                <Icon name="Send" size={14} />
-                                Telegram
+                                <Icon name="ArrowRight" className="rotate-180" size={18} />
                             </button>
+                            <DateInput
+                                value={selectedDate}
+                                onChange={setSelectedDate}
+                                className="flex-1 min-w-0 w-full px-1.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-slate-800 text-[13px] font-semibold text-center"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => changeDate(1)}
+                                className="h-10 w-10 flex items-center justify-center text-slate-500 rounded-lg shrink-0"
+                                aria-label="Следующий день"
+                            >
+                                <Icon name="ArrowRight" size={18} />
+                            </button>
+                        </div>
+                        <div className="flex items-center gap-1.5 min-w-0 w-full">
+                            <button
+                                type="button"
+                                onClick={() => setToday()}
+                                className="h-10 px-2.5 text-[11px] font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/40 rounded-lg shrink-0"
+                                title="Сегодня"
+                            >
+                                Сегодня
+                            </button>
+                            <button
+                                type="button"
+                                onClick={requestSendTelegramSummary}
+                                disabled={isSendingSummary}
+                                className="h-10 flex-1 min-w-0 rounded-lg bg-blue-600 text-white text-[12px] font-bold inline-flex items-center justify-center gap-1.5 disabled:opacity-50"
+                                aria-label="Отправить фото замен в Telegram"
+                                title="Telegram"
+                            >
+                                {isSendingSummary ? (
+                                    <Icon name="Loader" className="animate-spin shrink-0" size={15} />
+                                ) : (
+                                    <Icon name="Send" className="shrink-0" size={15} />
+                                )}
+                                <span className="truncate">Telegram</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setMobileToolsOpen((v) => !v)}
+                                className="h-10 w-10 flex items-center justify-center text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 rounded-lg shrink-0"
+                                aria-label="Ещё действия"
+                                aria-expanded={mobileToolsOpen}
+                            >
+                                <Icon name="Menu" size={18} />
+                            </button>
+                        </div>
+                    </div>
+                    {mobileToolsOpen && (
+                        <div className="mt-1.5 grid grid-cols-2 gap-1.5">
                             <button
                                 type="button"
                                 onClick={() => {
@@ -1304,7 +1312,7 @@ export const SubstitutionsPage = () => {
                             <button
                                 type="button"
                                 onClick={() => setDayCommentOpen((v) => !v)}
-                                className="col-span-3 h-9 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-500 text-xs font-semibold"
+                                className="col-span-2 h-9 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-500 text-xs font-semibold"
                             >
                                 Комментарий к дню{dayComment.trim() ? ' · есть' : ''}
                             </button>

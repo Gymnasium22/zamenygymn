@@ -558,7 +558,7 @@ export const NutritionPage = () => {
                 </div>
 
                 {viewMode === 'day' ? (
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto mobile-table-scroll w-full max-w-full min-w-0">
                         <table className="w-full">
                             <thead className="bg-slate-50 dark:bg-slate-900">
                                 <tr>
@@ -644,7 +644,7 @@ export const NutritionPage = () => {
                         </table>
                     </div>
                 ) : (
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto mobile-table-scroll w-full max-w-full min-w-0">
                         <table className="w-full">
                             <thead className="bg-slate-50 dark:bg-slate-900">
                                 <tr>

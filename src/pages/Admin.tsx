@@ -133,12 +133,12 @@ export const AdminPage = () => {
                             <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-2 tracking-wider">
                                 Свободен после урока №
                             </label>
-                            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-700 p-1 rounded-xl">
+                            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-700 p-1 rounded-xl overflow-x-auto max-w-full min-w-0 mobile-h-scroll">
                                 {periodsForShift.map((num) => (
                                     <button
                                         key={num}
                                         onClick={() => setAfterPeriod(num)}
-                                        className={`w-10 h-10 flex items-center justify-center rounded-lg font-bold text-sm transition-all ${afterPeriod === num ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'}`}
+                                        className={`w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-lg font-bold text-sm transition-all shrink-0 ${afterPeriod === num ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'}`}
                                     >
                                         {num}
                                     </button>
@@ -173,12 +173,12 @@ export const AdminPage = () => {
                             <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase mb-2 tracking-wider">
                                 Урок №
                             </label>
-                            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-700 p-1 rounded-xl">
+                            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-700 p-1 rounded-xl overflow-x-auto max-w-full min-w-0 mobile-h-scroll">
                                 {SHIFT_PERIODS[roomShift].map((num) => (
                                     <button
                                         key={num}
                                         onClick={() => setRoomPeriod(num)}
-                                        className={`w-10 h-10 flex items-center justify-center rounded-lg font-bold text-sm transition-all ${roomPeriod === num ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'}`}
+                                        className={`w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-lg font-bold text-sm transition-all shrink-0 ${roomPeriod === num ? 'bg-white dark:bg-slate-600 shadow text-indigo-600 dark:text-white' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700'}`}
                                     >
                                         {num}
                                     </button>

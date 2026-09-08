@@ -1795,8 +1795,14 @@ export const DashboardPage = () => {
                 </div>
             )}
 
-            {/* Одинаковая мин. высота строк; карточки растягиваются на всю ячейку */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 auto-rows-[minmax(15.5rem,auto)] sm:auto-rows-[minmax(16.5rem,auto)] items-stretch">
+            {/* Desktop: equal row height. Mobile: content-sized cards, no stretch voids */}
+            <div
+                className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 ${
+                    isMobileApp
+                        ? 'auto-rows-auto items-start'
+                        : 'auto-rows-[minmax(15.5rem,auto)] sm:auto-rows-[minmax(16.5rem,auto)] items-stretch'
+                }`}
+            >
                 {filteredWidgets.filter((w) => w.visible).map((widget) => (
                     <div
                         key={widget.id}
@@ -1804,7 +1810,7 @@ export const DashboardPage = () => {
                         onDragStart={!isMobileApp ? (e) => handleDragStart(e, widget.id) : undefined}
                         onDragEnd={!isMobileApp ? handleDragEnd : undefined}
                         onDragOver={!isMobileApp ? (e) => handleDragOver(e, widget.id) : undefined}
-                        className={`transition-all relative group h-full min-h-0 flex flex-col ${isMobileApp ? '' : 'cursor-grab active:cursor-grabbing'} ${draggedWidgetId === widget.id ? 'scale-95 z-50' : ''} ${getColSpanClass(widget.colSpan)}`}
+                        className={`transition-all relative group min-h-0 flex flex-col ${isMobileApp ? '' : 'h-full cursor-grab active:cursor-grabbing'} ${draggedWidgetId === widget.id ? 'scale-95 z-50' : ''} ${getColSpanClass(widget.colSpan)}`}
                     >
                         {/* Ширина виджета — только desktop; на PWA настройка через «Настроить» */}
                         <div className={`absolute bottom-2 right-2 z-20 flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity ${isMobileApp ? 'hidden' : ''}`}>
@@ -1821,7 +1827,13 @@ export const DashboardPage = () => {
                                 <Icon name="Maximize2" size={14} />
                             </button>
                         </div>
-                        <div className="h-full min-h-0 flex flex-col [&>*]:h-full [&>*]:min-h-0">
+                        <div
+                            className={
+                                isMobileApp
+                                    ? 'min-h-0 flex flex-col'
+                                    : 'h-full min-h-0 flex flex-col [&>*]:h-full [&>*]:min-h-0'
+                            }
+                        >
                             {renderWidget(widget)}
                         </div>
                     </div>

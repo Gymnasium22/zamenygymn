@@ -86,7 +86,7 @@ describe('MobileShell', () => {
         expect(screen.getByText('admin@test.local')).toBeInTheDocument();
     });
 
-    it('вызывает onOpenCommand и onOpenAppearance', () => {
+    it('вызывает onOpenCommand из шапки и onOpenAppearance из «Ещё»', () => {
         const onOpenAppearance = vi.fn();
         const onOpenCommand = vi.fn();
         render(
@@ -98,12 +98,14 @@ describe('MobileShell', () => {
         );
 
         fireEvent.click(screen.getByLabelText('Поиск'));
-        fireEvent.click(screen.getByLabelText('Оформление'));
         expect(onOpenCommand).toHaveBeenCalled();
+
+        fireEvent.click(screen.getByText('Ещё'));
+        fireEvent.click(screen.getByText('Тема'));
         expect(onOpenAppearance).toHaveBeenCalled();
     });
 
-    it('открывает обратную связь из шапки и из «Ещё»', () => {
+    it('открывает обратную связь из «Ещё»', () => {
         render(
             <MemoryRouter initialEntries={['/dashboard']}>
                 <MobileShell onOpenAppearance={vi.fn()} onOpenCommand={vi.fn()}>
@@ -112,8 +114,6 @@ describe('MobileShell', () => {
             </MemoryRouter>
         );
 
-        fireEvent.click(screen.getByLabelText('Обратная связь'));
-        expect(screen.getByTestId('feedback-modal')).toBeInTheDocument();
         fireEvent.click(screen.getByText('Ещё'));
         fireEvent.click(screen.getByText('Связь'));
         expect(screen.getByTestId('feedback-modal')).toBeInTheDocument();

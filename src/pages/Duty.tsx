@@ -590,11 +590,11 @@ export const DutyPage = () => {
                     </div>
                 </div>
 
-                <div className="mb-4 flex gap-2 overflow-x-auto custom-scrollbar pb-2">
+                <div className="mb-4 flex gap-2 overflow-x-auto custom-scrollbar pb-2 w-full max-w-full min-w-0 mobile-h-scroll">
                     {dutyZones.map((z) => (
                         <div
                             key={z.id}
-                            className="flex items-center gap-2 bg-slate-50 dark:bg-slate-700 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 shrink-0 max-w-[min(100%,16rem)]"
+                            className="flex items-center gap-2 bg-slate-50 dark:bg-slate-700 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-600 shrink-0 max-w-[14rem]"
                         >
                             <span className="text-sm font-bold text-slate-700 dark:text-slate-300 truncate">
                                 {z.name}{' '}

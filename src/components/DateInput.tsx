@@ -144,7 +144,11 @@ export const DateInput = forwardRef(function DateInput(
         .join(' ');
 
     return (
-        <div className={`relative inline-flex items-center shrink-0 ${wantsFullWidth ? 'w-full' : ''}`}>
+        <div
+            className={`relative inline-flex items-center ${
+                wantsFullWidth ? 'w-full min-w-0 max-w-full flex-1' : 'shrink-0'
+            }`}
+        >
             <input
                 {...props}
                 ref={textRef}

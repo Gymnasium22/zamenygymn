@@ -212,30 +212,7 @@ export const MobileShell: React.FC<MobileShellProps> = ({
                         >
                             <Icon name="Search" size={20} />
                         </button>
-                        <button
-                            type="button"
-                            className="app-mobile-icon-btn"
-                            title="Обратная связь"
-                            aria-label="Обратная связь"
-                            onClick={() => {
-                                haptic();
-                                setFeedbackOpen(true);
-                            }}
-                        >
-                            <Icon name="MessageSquare" size={20} />
-                        </button>
-                        <button
-                            type="button"
-                            className="app-mobile-icon-btn"
-                            title="Оформление"
-                            aria-label="Оформление"
-                            onClick={() => {
-                                haptic();
-                                onOpenAppearance();
-                            }}
-                        >
-                            <Icon name="Sun" size={20} />
-                        </button>
+                        {/* Обратная связь и тема — в листе «Ещё», чтобы шапка не вылезала на узких экранах */}
                     </div>
                 </div>
             </header>
