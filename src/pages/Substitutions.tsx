@@ -355,17 +355,53 @@ export const SubstitutionsPage = () => {
                 (s) => !(s.originalTeacherId === selectedTeacherId && s.date === selectedDate)
             );
 
-            const createdSubs = lessonsToProcess.map((l) => ({
-                id: generateId(),
-                date: selectedDate,
-                scheduleItemId: l.id,
-                originalTeacherId: l.teacherId,
-                replacementTeacherId: batchActionType === 'cancel' ? 'cancelled' : batchReplacementId,
-                lessonAbsenceReason: batchAbsenceReason,
-                dayComment: dayComment || undefined
-            }));
+            const replacementId = batchActionType === 'cancel' ? 'cancelled' : batchReplacementId;
+
+            const teacherBusyAtLesson = (teacherId: string, lesson: ScheduleItem, already: typeof existingSubs) => {
+                if (!teacherId || teacherId === 'cancelled' || teacherId === 'conducted') return false;
+                const busyOwn = activeSchedule.some(
+                    (s) =>
+                        s.teacherId === teacherId &&
+                        s.day === lesson.day &&
+                        s.period === lesson.period &&
+                        s.shift === lesson.shift
+                );
+                if (busyOwn) return true;
+                return already.some((s) => {
+                    if (s.date !== selectedDate) return false;
+                    if (s.replacementTeacherId !== teacherId) return false;
+                    if (s.replacementTeacherId === 'cancelled' || s.replacementTeacherId === 'conducted') return false;
+                    const item = activeSchedule.find((i) => i.id === s.scheduleItemId);
+                    return !!(item && item.period === lesson.period && item.shift === lesson.shift);
+                });
+            };
+
+            const createdSubs: typeof existingSubs = [];
+            let mergerCount = 0;
+            for (const l of lessonsToProcess) {
+                const isMerger =
+                    batchActionType === 'replace' && teacherBusyAtLesson(replacementId, l, [...existingSubs, ...createdSubs]);
+                if (isMerger) mergerCount += 1;
+                createdSubs.push({
+                    id: generateId(),
+                    date: selectedDate,
+                    scheduleItemId: l.id,
+                    originalTeacherId: l.teacherId,
+                    replacementTeacherId: replacementId,
+                    lessonAbsenceReason: batchAbsenceReason,
+                    dayComment: dayComment || undefined,
+                    isMerger
+                });
+            }
             const newSubs = [...existingSubs, ...createdSubs];
             await saveScheduleData({ substitutions: newSubs });
+            if (batchActionType === 'replace' && mergerCount > 0) {
+                addToast({
+                    type: 'info',
+                    title: 'Пакетная замена',
+                    message: `Объединение на ${mergerCount} ур. (заменяющий в это время занят), остальные — обычная замена.`
+                });
+            }
         }
 
         setBatchActionModalOpen(false);
@@ -383,7 +419,8 @@ export const SubstitutionsPage = () => {
         saveScheduleData,
         batchActionType,
         batchReplacementId,
-        dayComment
+        dayComment,
+        addToast
     ]);
 
     const removeAbsence = useCallback(
