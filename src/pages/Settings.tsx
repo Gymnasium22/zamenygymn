@@ -679,7 +679,9 @@ export const SettingsPage = () => {
         setAutoBackup(settings.autoBackup || false);
         setBackupTime(settings.backupTime || '02:00');
         setCalendarEvents(settings.calendarEvents || []);
-        setSessionTimeoutMinutes(settings.sessionTimeoutMinutes || 30);
+        setSessionTimeoutMinutes(
+            typeof settings.sessionTimeoutMinutes === 'number' ? settings.sessionTimeoutMinutes : 30
+        );
         setNutritionLockEnabled(settings.nutritionLockEnabled === true);
         setNutritionLockTime(settings.nutritionLockTime || '10:00');
         setTemplates(
@@ -764,7 +766,7 @@ export const SettingsPage = () => {
     const systemDirty = useMemo(() => {
         if (!settings) return false;
         return (
-            (settings.sessionTimeoutMinutes || 30) !== sessionTimeoutMinutes ||
+            (settings.sessionTimeoutMinutes ?? 30) !== sessionTimeoutMinutes ||
             (settings.nutritionLockEnabled === true) !== nutritionLockEnabled ||
             (settings.nutritionLockTime || '10:00') !== nutritionLockTime
         );
@@ -1821,21 +1823,47 @@ export const SettingsPage = () => {
                                     )}
                                 </div>
                                 <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                                    <div className="flex-1">
-                                        <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">
-                                            Таймаут бездействия, мин
+                                    <div className="flex-1 space-y-3">
+                                        <label className="flex items-center gap-2 cursor-pointer select-none">
+                                            <input
+                                                type="checkbox"
+                                                checked={sessionTimeoutMinutes <= 0}
+                                                onChange={(e) =>
+                                                    setSessionTimeoutMinutes(e.target.checked ? 0 : 30)
+                                                }
+                                                className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500"
+                                            />
+                                            <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                                                Отключить таймаут сессии
+                                            </span>
                                         </label>
-                                        <input
-                                            type="number"
-                                            min={1}
-                                            max={120}
-                                            value={sessionTimeoutMinutes}
-                                            onChange={(e) => setSessionTimeoutMinutes(Math.max(1, Math.min(120, Number(e.target.value) || 1)))}
-                                            className="w-full sm:w-40 border border-slate-200 dark:border-slate-600 p-2.5 rounded-xl text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500"
-                                        />
-                                        <p className="text-[11px] text-slate-400 mt-1">
-                                            Через указанное время неактивности пользователь будет автоматически разлогинен.
-                                        </p>
+                                        {sessionTimeoutMinutes > 0 && (
+                                            <>
+                                                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase mb-1.5">
+                                                    Таймаут бездействия, мин
+                                                </label>
+                                                <input
+                                                    type="number"
+                                                    min={1}
+                                                    max={120}
+                                                    value={sessionTimeoutMinutes}
+                                                    onChange={(e) =>
+                                                        setSessionTimeoutMinutes(
+                                                            Math.max(1, Math.min(120, Number(e.target.value) || 1))
+                                                        )
+                                                    }
+                                                    className="w-full sm:w-40 border border-slate-200 dark:border-slate-600 p-2.5 rounded-xl text-sm bg-white dark:bg-slate-700 dark:text-white outline-none focus:border-indigo-500"
+                                                />
+                                                <p className="text-[11px] text-slate-400 mt-1">
+                                                    Через указанное время неактивности пользователь будет автоматически разлогинен.
+                                                </p>
+                                            </>
+                                        )}
+                                        {sessionTimeoutMinutes <= 0 && (
+                                            <p className="text-[11px] text-slate-400">
+                                                Автоматический выход при бездействии отключён. Сессия останется активной, пока пользователь не выйдет сам.
+                                            </p>
+                                        )}
                                     </div>
                                     <button
                                         onClick={saveSystem}

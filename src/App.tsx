@@ -174,7 +174,7 @@ const Layout = () => {
     }, [logout]);
 
     const { resetTimer } = useSessionTimeout({
-        timeoutMinutes: settings?.sessionTimeoutMinutes || 30,
+        timeoutMinutes: settings?.sessionTimeoutMinutes ?? 30,
         warningMinutes: 2,
         onWarning: handleSessionWarning,
         onTimeout: handleSessionTimeout

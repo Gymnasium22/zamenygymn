@@ -98,7 +98,8 @@ function mapSettings(data: Record<string, unknown>): Settings {
         autoBackup: data.auto_backup as boolean | undefined,
         backupTime: (data.backup_time as string) || undefined,
         googleAppsScriptUrl: (data.google_apps_script_url as string) || undefined,
-        sessionTimeoutMinutes: (data.session_timeout_minutes as number) || undefined,
+        sessionTimeoutMinutes:
+            typeof data.session_timeout_minutes === 'number' ? data.session_timeout_minutes : undefined,
         calendarEvents: (data.calendar_events as Settings['calendarEvents']) || undefined,
         nutritionLockEnabled: data.nutrition_lock_enabled as boolean | undefined,
         nutritionLockTime: (data.nutrition_lock_time as string) || undefined,

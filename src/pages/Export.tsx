@@ -1,4 +1,5 @@
 import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useStaticData, useScheduleData } from '../context/DataContext';
 import { Icon } from '../components/Icons';
 import { DateInput } from '../components/DateInput';
@@ -1603,32 +1604,38 @@ export const ExportPage = () => {
                 />
             )}
 
-            {isMatrixPrintOpen && (
-                <div className="fixed inset-0 z-[100] bg-white flex flex-col">
-                    {/* Toolbar */}
-                    <div className="p-4 border-b flex justify-between items-center bg-slate-50 no-print">
-                        <h2 className="font-bold text-lg text-slate-800">Печать сетки ({matrixGrade}-е классы)</h2>
-                        <div className="flex gap-2">
-                            <button
-                                onClick={() => window.print()}
-                                className="btn-primary btn-ripple flex items-center gap-2"
-                            >
-                                <Icon name="Printer" size={16} /> Печать
-                            </button>
-                            <button
-                                onClick={() => setIsMatrixPrintOpen(false)}
-                                className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg font-bold hover:bg-slate-300"
-                            >
-                                Закрыть
-                            </button>
+            {isMatrixPrintOpen &&
+                createPortal(
+                    <div className="fixed inset-0 z-[100] bg-white flex flex-col">
+                        <div className="p-4 border-b flex justify-between items-center bg-slate-50 no-print">
+                            <h2 className="font-bold text-lg text-slate-800">Печать сетки ({matrixGrade}-е классы)</h2>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => window.print()}
+                                    className="btn-primary btn-ripple flex items-center gap-2"
+                                >
+                                    <Icon name="Printer" size={16} /> Печать
+                                </button>
+                                <button
+                                    onClick={() => setIsMatrixPrintOpen(false)}
+                                    className="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg font-bold hover:bg-slate-300"
+                                >
+                                    Закрыть
+                                </button>
+                            </div>
                         </div>
-                    </div>
-                    {/* Printable Area */}
-                    <div className="flex-1 overflow-auto p-8 custom-scrollbar bg-white">
-                        <MatrixPrintContent classes={classes} matrixGrade={matrixGrade} currentSchedule={getScheduleForExport()} subjects={subjects} rooms={rooms} />
-                    </div>
-                </div>
-            )}
+                        <div className="flex-1 overflow-auto p-8 custom-scrollbar bg-white">
+                            <MatrixPrintContent
+                                classes={classes}
+                                matrixGrade={matrixGrade}
+                                currentSchedule={getScheduleForExport()}
+                                subjects={subjects}
+                                rooms={rooms}
+                            />
+                        </div>
+                    </div>,
+                    document.body
+                )}
 
             <PrintPreviewModal
                 isOpen={previewOpen}

@@ -25,6 +25,10 @@ export const useSessionTimeout = ({
     }, []);
 
     useEffect(() => {
+        if (!timeoutMinutes || timeoutMinutes <= 0) {
+            return;
+        }
+
         const timeoutMs = timeoutMinutes * 60 * 1000;
         const warningMs = warningMinutes * 60 * 1000;
 
