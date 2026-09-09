@@ -12,6 +12,16 @@ import { parseDelimited, pick } from '../utils/csvImport';
 import { offerUndo } from '../components/CloudSaveStatus';
 
 type DirectoryTabId = 'teachers' | 'subjects' | 'classes' | 'rooms';
+type SubjectAssignFilter = 'all' | 'assigned' | 'unassigned';
+type ShiftQuickFilter = 'all' | 'first' | 'second' | 'none';
+
+const normalizeFio = (name: string) =>
+    name
+        .trim()
+        .toLowerCase()
+        .replace(/ё/g, 'е')
+        .replace(/\./g, '')
+        .replace(/\s+/g, ' ');
 
 /** Палитра цветов предметов (фон ячеек расписания + акценты) */
 const SUBJECT_COLOR_PRESETS = [
@@ -56,6 +66,9 @@ export const DirectoryPage = () => {
     const [query, setQuery] = useState('');
     const [sortKey, setSortKey] = useState<'name' | 'parallel' | 'room'>('name');
     const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+    const [onlyDuplicateNames, setOnlyDuplicateNames] = useState(false);
+    const [subjectAssignFilter, setSubjectAssignFilter] = useState<SubjectAssignFilter>('all');
+    const [shiftQuickFilter, setShiftQuickFilter] = useState<ShiftQuickFilter>('all');
     const [usageModal, setUsageModal] = useState<{ id: string; kind: UsageKind; name: string; lines: UsageLine[] } | null>(
         null
     );
@@ -208,11 +221,50 @@ export const DirectoryPage = () => {
         a.localeCompare(b, 'ru', { numeric: true, sensitivity: 'base' }) * (sortDir === 'asc' ? 1 : -1);
     const parallelOf = (name: string) => parseInt(name.replace(/[^\d]/g, ''), 10) || 0;
 
+    const fioCounts = useMemo(() => {
+        const map = new Map<string, number>();
+        teachers.forEach((t) => {
+            const key = normalizeFio(t.name);
+            if (!key) return;
+            map.set(key, (map.get(key) || 0) + 1);
+        });
+        return map;
+    }, [teachers]);
+
+    const duplicateFioCount = useMemo(
+        () => teachers.filter((t) => (fioCounts.get(normalizeFio(t.name)) || 0) > 1).length,
+        [teachers, fioCounts]
+    );
+
     const visibleTeachers = useMemo(() => {
         let list = teachers.filter((t) => !q || t.name.toLowerCase().includes(q));
-        list = [...list].sort((a, b) => cmpName(a.name, b.name));
+        if (onlyDuplicateNames) {
+            list = list.filter((t) => (fioCounts.get(normalizeFio(t.name)) || 0) > 1);
+        }
+        if (subjectAssignFilter === 'assigned') {
+            list = list.filter((t) => (t.subjectIds || []).length > 0);
+        } else if (subjectAssignFilter === 'unassigned') {
+            list = list.filter((t) => !(t.subjectIds || []).length);
+        }
+        if (shiftQuickFilter === 'first') {
+            list = list.filter((t) => t.shifts.includes(Shift.First));
+        } else if (shiftQuickFilter === 'second') {
+            list = list.filter((t) => t.shifts.includes(Shift.Second));
+        } else if (shiftQuickFilter === 'none') {
+            list = list.filter((t) => !t.shifts.length);
+        }
+        list = [...list].sort((a, b) => {
+            if (onlyDuplicateNames) {
+                const byFio = normalizeFio(a.name).localeCompare(normalizeFio(b.name), 'ru');
+                if (byFio) return byFio;
+            }
+            return cmpName(a.name, b.name);
+        });
         return list;
-    }, [teachers, q, sortDir]);
+    }, [teachers, q, sortDir, onlyDuplicateNames, subjectAssignFilter, shiftQuickFilter, fioCounts]);
+
+    const teacherFiltersActive =
+        onlyDuplicateNames || subjectAssignFilter !== 'all' || shiftQuickFilter !== 'all';
 
     const visibleClasses = useMemo(() => {
         let list = classes.filter((c) => !q || c.name.toLowerCase().includes(q) || String(c.grade || '').includes(q));
@@ -478,6 +530,96 @@ export const DirectoryPage = () => {
                     </>
                 )}
             </div>
+            {activeTab === 'teachers' && teachers.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2 mb-4">
+                    {(
+                        [
+                            {
+                                id: 'dupes',
+                                label: 'Одинаковые ФИО',
+                                active: onlyDuplicateNames,
+                                count: duplicateFioCount,
+                                onClick: () => setOnlyDuplicateNames((v) => !v)
+                            },
+                            {
+                                id: 'assigned',
+                                label: 'С предметом',
+                                active: subjectAssignFilter === 'assigned',
+                                count: teachers.filter((t) => (t.subjectIds || []).length > 0).length,
+                                onClick: () =>
+                                    setSubjectAssignFilter((v) => (v === 'assigned' ? 'all' : 'assigned'))
+                            },
+                            {
+                                id: 'unassigned',
+                                label: 'Без предмета',
+                                active: subjectAssignFilter === 'unassigned',
+                                count: teachers.filter((t) => !(t.subjectIds || []).length).length,
+                                onClick: () =>
+                                    setSubjectAssignFilter((v) => (v === 'unassigned' ? 'all' : 'unassigned'))
+                            },
+                            {
+                                id: 's1',
+                                label: '1 смена',
+                                active: shiftQuickFilter === 'first',
+                                count: teachers.filter((t) => t.shifts.includes(Shift.First)).length,
+                                onClick: () => setShiftQuickFilter((v) => (v === 'first' ? 'all' : 'first'))
+                            },
+                            {
+                                id: 's2',
+                                label: '2 смена',
+                                active: shiftQuickFilter === 'second',
+                                count: teachers.filter((t) => t.shifts.includes(Shift.Second)).length,
+                                onClick: () => setShiftQuickFilter((v) => (v === 'second' ? 'all' : 'second'))
+                            },
+                            {
+                                id: 'noshift',
+                                label: 'Без смены',
+                                active: shiftQuickFilter === 'none',
+                                count: teachers.filter((t) => !t.shifts.length).length,
+                                onClick: () => setShiftQuickFilter((v) => (v === 'none' ? 'all' : 'none'))
+                            }
+                        ] as const
+                    ).map((chip) => (
+                        <button
+                            key={chip.id}
+                            type="button"
+                            onClick={chip.onClick}
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border transition ${
+                                chip.active
+                                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
+                                    : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-600 hover:border-indigo-300'
+                            }`}
+                        >
+                            {chip.label}
+                            <span
+                                className={`min-w-[1.25rem] text-center rounded-full px-1.5 py-0.5 text-[10px] ${
+                                    chip.active
+                                        ? 'bg-white/20 text-white'
+                                        : 'bg-slate-100 dark:bg-slate-700 text-slate-500'
+                                }`}
+                            >
+                                {chip.count}
+                            </span>
+                        </button>
+                    ))}
+                    <span className="text-xs text-slate-400 ml-auto">
+                        Показано {visibleTeachers.length} из {teachers.length}
+                    </span>
+                    {teacherFiltersActive && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setOnlyDuplicateNames(false);
+                                setSubjectAssignFilter('all');
+                                setShiftQuickFilter('all');
+                            }}
+                            className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
+                        >
+                            Сбросить фильтры
+                        </button>
+                    )}
+                </div>
+            )}
 
             <div className="flex-1 overflow-y-auto pb-20 custom-scrollbar pr-2">
                 {activeTab === 'teachers' && (
@@ -496,18 +638,49 @@ export const DirectoryPage = () => {
                                 </button>
                             )}
                         </div>
+                    ) : visibleTeachers.length === 0 ? (
+                        <div className="app-mobile-empty modern-card">
+                            <Icon name="Search" size={32} className="text-slate-400" />
+                            <p className="font-bold text-slate-800 dark:text-white text-base">Никого не найдено</p>
+                            <p className="text-sm max-w-xs text-slate-500">
+                                Измените поиск или сбросьте фильтры — в справочнике {teachers.length} учителей.
+                            </p>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setQuery('');
+                                    setOnlyDuplicateNames(false);
+                                    setSubjectAssignFilter('all');
+                                    setShiftQuickFilter('all');
+                                }}
+                                className="btn-primary mt-2 px-4 py-2 text-sm font-bold"
+                            >
+                                Сбросить
+                            </button>
+                        </div>
                     ) : (
                     <StaggerContainer className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {visibleTeachers.map((t) => (
+                        {visibleTeachers.map((t) => {
+                            const dupeN = fioCounts.get(normalizeFio(t.name)) || 0;
+                            const isDupe = dupeN > 1;
+                            const hasSubject = (t.subjectIds || []).length > 0;
+                            return (
                             <div
                                 key={t.id}
-                                className="modern-card p-4 group flex flex-col"
+                                className={`modern-card p-4 group flex flex-col ${
+                                    isDupe ? 'ring-2 ring-amber-400/80 border-amber-200 dark:border-amber-700' : ''
+                                }`}
                             >
                                 <div className="flex justify-between items-start mb-2 gap-2">
                                     <div className="flex items-center gap-3 min-w-0">
                                         <div className="font-bold text-slate-800 dark:text-slate-100 text-lg truncate">
                                             {t.name}
                                         </div>
+                                        {isDupe && (
+                                            <span className="shrink-0 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+                                                совпадение ×{dupeN}
+                                            </span>
+                                        )}
                                     </div>
                                     {canEditDirectory && (
                                     <div className="flex gap-1 shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
@@ -544,7 +717,8 @@ export const DirectoryPage = () => {
                                     )}
                                 </div>
                                 <div className="flex flex-wrap gap-1 mt-auto">
-                                    {t.subjectIds.map((sid) => {
+                                    {hasSubject ? (
+                                        t.subjectIds.map((sid) => {
                                         const s = subjects.find((sub) => sub.id === sid);
                                         return s ? (
                                             <span
@@ -555,10 +729,16 @@ export const DirectoryPage = () => {
                                                 {s.name}
                                             </span>
                                         ) : null;
-                                    })}
+                                        })
+                                    ) : (
+                                        <span className="text-xs px-2 py-1 rounded-md font-medium bg-slate-100 dark:bg-slate-700 text-slate-400">
+                                            Предмет не назначен
+                                        </span>
+                                    )}
                                 </div>
                             </div>
-                        ))}
+                            );
+                        })}
                     </StaggerContainer>
                     )
                 )}
