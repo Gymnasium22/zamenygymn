@@ -32,6 +32,94 @@ import {
 import { escapeHtml, sanitizeColor } from '../utils/escapeHtml';
 import { logger } from '../utils/logger';
 
+/** Язык/литература на плакате: одна строка предмета, в ячейке буква Я или Л. */
+type LangLitMark = 'Я' | 'Л';
+
+function normalizeSubjectName(name: string): string {
+    return name.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function isBelarusianName(name: string): boolean {
+    const n = normalizeSubjectName(name);
+    return n.includes('белорус') || n.includes('беларус');
+}
+
+function isRussianLiterature(name: string): boolean {
+    const n = normalizeSubjectName(name);
+    // «белорусский» содержит «русск» — белорусские предметы сюда не входят
+    if (isBelarusianName(n)) return false;
+    return n.includes('русск') && (n.includes('литератур') || n.includes('літаратур'));
+}
+
+function isRussianLanguage(name: string): boolean {
+    const n = normalizeSubjectName(name);
+    if (isBelarusianName(n)) return false;
+    return n.includes('русск') && n.includes('язык') && !isRussianLiterature(name);
+}
+
+function isBelarusianLiterature(name: string): boolean {
+    const n = normalizeSubjectName(name);
+    return isBelarusianName(n) && (n.includes('литератур') || n.includes('літаратур'));
+}
+
+function isBelarusianLanguage(name: string): boolean {
+    const n = normalizeSubjectName(name);
+    if (n.includes('беларуская мова') || n.includes('белорусская мова')) return true;
+    return isBelarusianName(n) && n.includes('язык') && !isBelarusianLiterature(name);
+}
+
+function isLangLitMergedSubject(name: string): boolean {
+    return (
+        isRussianLanguage(name) ||
+        isRussianLiterature(name) ||
+        isBelarusianLanguage(name) ||
+        isBelarusianLiterature(name)
+    );
+}
+
+function buildMergedLangGroup(
+    title: string,
+    members: Subject[],
+    markOf: (name: string) => LangLitMark | undefined
+): { title: string; subjectIds: string[]; markById: Map<string, LangLitMark> } | null {
+    if (members.length === 0) return null;
+    const markById = new Map<string, LangLitMark>();
+    members.forEach((m) => {
+        const mark = markOf(m.name);
+        if (mark) markById.set(m.id, mark);
+    });
+    return { title, subjectIds: members.map((m) => m.id), markById };
+}
+
+/** Сначала русский язык+лит, затем белорусский язык+лит, остальные предметы как в справочнике. */
+function buildPosterSubjectGroups(subjectList: Subject[]): {
+    title: string;
+    subjectIds: string[];
+    markById: Map<string, LangLitMark>;
+}[] {
+    const groups: { title: string; subjectIds: string[]; markById: Map<string, LangLitMark> }[] = [];
+
+    const russian = buildMergedLangGroup(
+        'Русский язык и литература',
+        subjectList.filter((s) => isRussianLanguage(s.name) || isRussianLiterature(s.name)),
+        (name) => (isRussianLiterature(name) ? 'Л' : isRussianLanguage(name) ? 'Я' : undefined)
+    );
+    const belarusian = buildMergedLangGroup(
+        'Белорусский язык и литература',
+        subjectList.filter((s) => isBelarusianLanguage(s.name) || isBelarusianLiterature(s.name)),
+        (name) => (isBelarusianLiterature(name) ? 'Л' : isBelarusianLanguage(name) ? 'Я' : undefined)
+    );
+
+    if (russian) groups.push(russian);
+    if (belarusian) groups.push(belarusian);
+
+    for (const subject of subjectList) {
+        if (isLangLitMergedSubject(subject.name)) continue;
+        groups.push({ title: subject.name, subjectIds: [subject.id], markById: new Map() });
+    }
+    return groups;
+}
+
 // --- Вынесенные компоненты печати (не пересоздаются на каждый рендер) ---
 
 interface MatrixPrintContentProps {
@@ -408,37 +496,45 @@ export const ExportPage = () => {
             });
             content += `</tr>`;
 
-            subjects.forEach((subject) => {
+            buildPosterSubjectGroups(subjects).forEach((group) => {
                 const filteredTeachers = teachers.filter(
-                    (t) => t.subjectIds.includes(subject.id) && t.shifts.includes(shift)
+                    (t) => t.subjectIds.some((id) => group.subjectIds.includes(id)) && t.shifts.includes(shift)
                 );
                 if (filteredTeachers.length === 0) return;
 
                 filteredTeachers.forEach((teacher, tIndex) => {
                     content += `<tr>`;
                     if (tIndex === 0) {
-                        content += `<td rowspan="${filteredTeachers.length}" class="subject-cell" style="border: 2px solid #000; background-color: #e9d5ff;">${escapeHtml(subject.name)}</td>`;
+                        content += `<td rowspan="${filteredTeachers.length}" class="subject-cell" style="border: 2px solid #000; background-color: #e9d5ff;">${escapeHtml(group.title)}</td>`;
                     }
                     content += `<td class="teacher-cell" style="border-right: 2px solid #000; background-color: #e9d5ff;">${escapeHtml(teacher.name)}</td>`;
 
                     DAYS.forEach((day) => {
                         const cellBg = dayColors[day]?.cell || '#fff';
                         periods.forEach((p) => {
-                            const item = scheduleMap.get(`${teacher.id}|${subject.id}|${day}|${p}|${shift}`);
+                            let item: ScheduleItem | undefined;
+                            let mark: LangLitMark | undefined;
+                            for (const sid of group.subjectIds) {
+                                const found = scheduleMap.get(`${teacher.id}|${sid}|${day}|${p}|${shift}`);
+                                if (found) {
+                                    item = found;
+                                    mark = group.markById.get(sid);
+                                    break;
+                                }
+                            }
 
                             if (item) {
                                 const cls = classesById.get(item.classId);
                                 const r = roomsById.get(item.roomId || '');
                                 const roomName = r ? r.name : item.roomId;
+                                const markHtml = mark ? `<sub>${mark}</sub>` : '';
                                 const room = roomName ? `<sub>${escapeHtml(roomName)}</sub>` : '';
                                 const dir = item.direction
                                     ? ` <span style="font-size:10px">(${escapeHtml(item.direction)})</span>`
                                     : '';
-                                // Убрали индивидуальный цвет предмета, используем цвет дня
                                 const bgColor = cellBg;
-                                content += `<td style="border: 1px solid #000; font-weight: bold; background-color: ${bgColor};">${escapeHtml(cls ? cls.name : '')}${dir}${room}</td>`;
+                                content += `<td style="border: 1px solid #000; font-weight: bold; background-color: ${bgColor};">${escapeHtml(cls ? cls.name : '')}${markHtml}${dir}${room}</td>`;
                             } else {
-                                // Пустые ячейки красим в цвет дня
                                 content += `<td style="border: 1px solid #000; background-color: ${cellBg};"></td>`;
                             }
                         });
@@ -570,34 +666,45 @@ export const ExportPage = () => {
             content += `</tr>`;
 
             // --- DATA ROWS ---
-            subjects.forEach((subject) => {
+            // Русский/белорусский: язык и литература в одном блоке, в ячейке Я или Л
+            buildPosterSubjectGroups(subjects).forEach((group) => {
                 const filteredTeachers = teachers.filter(
-                    (t) => t.subjectIds.includes(subject.id) && t.shifts.includes(shift)
+                    (t) => t.subjectIds.some((id) => group.subjectIds.includes(id)) && t.shifts.includes(shift)
                 );
                 if (filteredTeachers.length === 0) return;
 
                 filteredTeachers.forEach((teacher, tIndex) => {
                     content += `<tr>`;
                     if (tIndex === 0) {
-                        content += `<td rowspan="${filteredTeachers.length}" class="subject-cell" style="border: 3px solid #000; background-color: #e9d5ff;">${escapeHtml(subject.name)}</td>`;
+                        content += `<td rowspan="${filteredTeachers.length}" class="subject-cell" style="border: 3px solid #000; background-color: #e9d5ff;">${escapeHtml(group.title)}</td>`;
                     }
-                    content += `<td class="teacher-cell" style="border-right: 3px solid #000; background-color: #e9d5ff;">${escapeHtml(teacher.name)}</td>`;
+                    content += `<td class="teacher-cell" style="border-right: 3px solid #000; background-color: #e9d5ff; font-weight: bold;">${escapeHtml(teacher.name)}</td>`;
 
                     DAYS.forEach((day) => {
                         const cellBg = dayColors[day]?.cell || '#fff';
                         periods.forEach((p) => {
-                            const item = scheduleMap.get(`${teacher.id}|${subject.id}|${day}|${p}|${shift}`);
+                            let item: ScheduleItem | undefined;
+                            let mark: LangLitMark | undefined;
+                            for (const sid of group.subjectIds) {
+                                const found = scheduleMap.get(`${teacher.id}|${sid}|${day}|${p}|${shift}`);
+                                if (found) {
+                                    item = found;
+                                    mark = group.markById.get(sid);
+                                    break;
+                                }
+                            }
 
                             if (item) {
-                                const cls = classes.find((c) => c.id === item.classId);
-                                const r = rooms.find((rm) => rm.id === item.roomId);
+                                const cls = classes.find((c) => c.id === item!.classId);
+                                const r = rooms.find((rm) => rm.id === item!.roomId);
                                 const roomName = r ? r.name : item.roomId;
+                                const markHtml = mark ? `<sub>${mark}</sub>` : '';
                                 const room = roomName ? `<sub>${escapeHtml(roomName)}</sub>` : '';
                                 const dir = item.direction
-                                    ? ` <span style="font-size:14px">(${escapeHtml(item.direction)})</span>`
+                                    ? ` <span class="dir">(${escapeHtml(item.direction)})</span>`
                                     : '';
 
-                                content += `<td style="border: 1px solid #000; font-weight: bold; background-color: ${cellBg}; height: 60px;">${escapeHtml(cls ? cls.name : '')}${dir}${room}</td>`;
+                                content += `<td class="class-cell" style="border: 1px solid #000; font-weight: bold; background-color: ${cellBg}; height: 72px;">${escapeHtml(cls ? cls.name : '')}${markHtml}${dir}${room}</td>`;
                             } else {
                                 content += `<td style="border: 1px solid #000; background-color: ${cellBg};"></td>`;
                             }
@@ -623,11 +730,13 @@ export const ExportPage = () => {
         `;
 
         const styles = `
-            table { border-collapse: collapse; font-family: Arial, sans-serif; font-size: 16pt; margin-bottom: 40px; width: 100%; }
+            table { border-collapse: collapse; font-family: Arial, sans-serif; font-size: 18pt; margin-bottom: 40px; width: 100%; }
             td, th { border: 2px solid #000; padding: 4px; vertical-align: middle; text-align: center; }
-            .subject-cell { font-weight: bold; vertical-align: middle; background-color: #fff; font-size: 20pt; }
-            .teacher-cell { text-align: left; padding-left: 10px; font-size: 20pt; }
-            sub { font-size: 12pt; vertical-align: sub; }
+            .subject-cell { font-weight: bold; vertical-align: middle; background-color: #fff; font-size: 22pt; }
+            .teacher-cell { text-align: left; padding-left: 10px; font-size: 26pt; font-weight: bold; }
+            .class-cell { font-size: 22pt; font-weight: bold; }
+            .dir { font-size: 16pt; }
+            sub { font-size: 16pt; vertical-align: sub; }
             .doc-table td { border: none !important; padding: 10px; vertical-align: top; font-size: 16pt; }
             .doc-left { text-align: left; }
             .doc-right { text-align: right; }
