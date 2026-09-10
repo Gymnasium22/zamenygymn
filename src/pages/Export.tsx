@@ -771,50 +771,13 @@ export const ExportPage = () => {
         };
 
         const school = escapeHtml(settings?.schoolName || 'УО');
-        const unionChair = escapeHtml(settings?.unionChairName || 'Ю.Г.Миханова');
         const director = escapeHtml(settings?.directorName || 'Н.В.Кисель');
         const secretary = escapeHtml(settings?.secretaryName || 'Е.К.Шунто');
         const year = settings?.currentYear || new Date().getFullYear();
 
-        const splitDocCols = (cols: number) => {
-            const left = Math.max(1, Math.ceil(cols / 2));
-            const right = Math.max(1, cols - left);
-            return { left, right };
-        };
-
-        const headerRows = (cols: number) => {
-            const { left, right } = splitDocCols(cols);
-            return `
-                <tr>
-                    <td colspan="${left}" class="doc-left">СОГЛАСОВАНО</td>
-                    <td colspan="${right}" class="doc-right">УТВЕРЖДАЮ</td>
-                </tr>
-                <tr>
-                    <td colspan="${left}" class="doc-left">Председатель ПК ${school}</td>
-                    <td colspan="${right}" class="doc-right">Директор ${school}</td>
-                </tr>
-                <tr>
-                    <td colspan="${left}" class="doc-left">____________________ ${unionChair}</td>
-                    <td colspan="${right}" class="doc-right">____________________ ${director}</td>
-                </tr>
-                <tr>
-                    <td colspan="${left}" class="doc-left">"__"_ __________ ${year}г.</td>
-                    <td colspan="${right}" class="doc-right">"__" __________ ${year}г.</td>
-                </tr>
-                <tr class="empty-row"><td colspan="${cols}" class="doc-spacer"></td></tr>
-            `;
-        };
-
-        const footerRows = (cols: number) => {
-            const { left, right } = splitDocCols(cols);
-            return `
-                <tr class="empty-row"><td colspan="${cols}" class="doc-spacer"></td></tr>
-                <tr>
-                    <td colspan="${left}" class="doc-left">Секретарь учебной части</td>
-                    <td colspan="${right}" class="doc-right">${secretary}</td>
-                </tr>
-            `;
-        };
+        // A4 portrait: table must be wide enough that FitToPage is limited by width, not height
+        const PAGE_W_PT = 700;
+        const PAGE_H_PT = 770;
 
         const shiftTables = shifts
             .map((shift) => {
@@ -823,35 +786,96 @@ export const ExportPage = () => {
             })
             .filter((s) => s.shiftClasses.length > 0);
 
+        const maxClasses = Math.max(1, ...shiftTables.map((t) => t.shiftClasses.length));
+        const maxPeriods = Math.max(1, ...shiftTables.map((t) => t.periods.length));
+        const dataRows = DAYS.length * maxPeriods;
+        const overheadPt = 4 * 16 + 10 + 22 + 24 + 10 + 22;
+        const sepPt = DAYS.length * 3;
+        const dayColPt = 42;
+        const periodColPt = 32;
+        const classColPt = Math.max(96, Math.floor((PAGE_W_PT - dayColPt - periodColPt) / maxClasses));
+
+        const lessonLine = (lesson: ScheduleItem) => {
+            const sub = subjects.find((s) => s.id === lesson.subjectId);
+            const room = rooms.find((r) => r.id === lesson.roomId);
+            const roomName = room ? room.name : lesson.roomId || '';
+            return [sub?.name || '', roomName].filter(Boolean).join(' ');
+        };
+
+        let maxLineLen = 12;
+        shiftTables.forEach(({ shift, shiftClasses, periods }) => {
+            shiftClasses.forEach((cls) => {
+                DAYS.forEach((day) => {
+                    periods.forEach((period) => {
+                        const lessons = scheduleMap.get(`${day}|${shift}|${cls.id}|${period}`) || [];
+                        lessons.forEach((lesson) => {
+                            maxLineLen = Math.max(maxLineLen, lessonLine(lesson).length);
+                        });
+                    });
+                });
+            });
+        });
+
+        // Arial Narrow: ~0.45em per glyph so "Белорусская литература 70" stays on one line
+        const fontPt = Math.min(
+            13,
+            Math.max(8, Math.floor(classColPt / Math.max(8, maxLineLen * 0.46)))
+        );
+        const lineHPt = Math.max(14, fontPt + 6);
+        const rowHeightPt = Math.max(lineHPt, Math.floor((PAGE_H_PT - overheadPt - sepPt) / dataRows));
+        const headerFontPt = Math.max(9, fontPt);
+
+        const colWidth = (index: number) => (index === 0 ? dayColPt : index === 1 ? periodColPt : classColPt);
+
+        const docCell = (index: number, text: string, align: 'left' | 'right' | 'spacer') => {
+            const cls = align === 'left' ? 'doc-left' : align === 'right' ? 'doc-right' : 'doc-spacer';
+            const w = colWidth(index);
+            const excelW = Math.max(3, Math.round(w / 5.25));
+            return `<td class="${cls}" style="width:${w}pt;mso-width-source:userset;mso-width-alt:${excelW * 256}">${text}</td>`;
+        };
+
+        const headerRows = (cols: number) => {
+            const line = (text: string) => {
+                const tds = Array.from({ length: cols }, (_, i) =>
+                    docCell(i, i === cols - 1 ? text : '', i === cols - 1 ? 'right' : 'spacer')
+                ).join('');
+                return `<tr class="doc-row">${tds}</tr>`;
+            };
+            const spacer = `<tr class="empty-row">${Array.from({ length: cols }, (_, i) => docCell(i, '', 'spacer')).join('')}</tr>`;
+            return `${line('УТВЕРЖДАЮ')}${line(`Директор ${school}`)}${line(`____________________ ${director}`)}${line(`"__" __________ ${year}г.`)}${spacer}`;
+        };
+
+        const footerRows = (cols: number) => {
+            const spacer = `<tr class="empty-row">${Array.from({ length: cols }, (_, i) => docCell(i, '', 'spacer')).join('')}</tr>`;
+            const tds = Array.from({ length: cols }, (_, i) => {
+                if (i === 0) return docCell(i, 'Секретарь учебной части', 'left');
+                if (i === cols - 1) return docCell(i, secretary, 'right');
+                return docCell(i, '', 'spacer');
+            }).join('');
+            return `${spacer}<tr class="doc-row">${tds}</tr>`;
+        };
+
         let content = '';
 
         shiftTables.forEach(({ shift, shiftClasses, periods }, tableIndex) => {
             const cols = 2 + shiftClasses.length;
 
-            content += `<table>`;
-            content += `<col class="col-day" width="355" style="mso-width-source:userset;mso-width-alt:12800;width:50;" />`;
-            content += `<col class="col-period" width="355" style="mso-width-source:userset;mso-width-alt:12800;width:50;" />`;
-            shiftClasses.forEach(() => {
-                content += `<col class="col-class" width="985" style="mso-width-source:userset;mso-width-alt:35840;width:140;" />`;
-            });
-
-            if (tableIndex === 0) {
-                content += headerRows(cols);
-            }
+            content += `<table class="grid-table" style="width:${PAGE_W_PT}pt;">`;
+            content += headerRows(cols);
 
             // Row 1: "1 СМЕНА" merged
-            content += `<tr>`;
-            content += `<td class="doc-spacer"></td>`;
-            content += `<td class="doc-spacer"></td>`;
+            content += `<tr style="height:22pt;">`;
+            content += `<td class="doc-spacer" style="width:${dayColPt}pt;mso-width-alt:${Math.round(dayColPt / 5.25) * 256}"></td>`;
+            content += `<td class="doc-spacer" style="width:${periodColPt}pt;mso-width-alt:${Math.round(periodColPt / 5.25) * 256}"></td>`;
             content += `<td colspan="${shiftClasses.length}" class="shift-header">${shift}</td>`;
             content += `</tr>`;
 
-            // Row 2: Classes
-            content += `<tr>`;
-            content += `<td class="doc-spacer"></td>`;
-            content += `<td class="doc-spacer"></td>`;
+            // Row 2: Classes — widths live here so Excel does not invent extra columns
+            content += `<tr style="height:24pt;">`;
+            content += `<td class="doc-spacer" style="width:${dayColPt}pt;mso-width-alt:${Math.round(dayColPt / 5.25) * 256}"></td>`;
+            content += `<td class="doc-spacer" style="width:${periodColPt}pt;mso-width-alt:${Math.round(periodColPt / 5.25) * 256}"></td>`;
             shiftClasses.forEach((c) => {
-                content += `<td class="class-header">${escapeHtml(c.name)}</td>`;
+                content += `<td class="class-header" style="width:${classColPt}pt;mso-width-alt:${Math.round(classColPt / 5.25) * 256}">${escapeHtml(c.name)}</td>`;
             });
             content += `</tr>`;
 
@@ -860,7 +884,13 @@ export const ExportPage = () => {
                 const colors = dayStyles[day as string] || { label: '#e5e7eb', cell: '#f3f4f6' };
 
                 periods.forEach((period, pIndex) => {
-                    content += `<tr style="height: 128pt;">`;
+                    const lessonsByClass = shiftClasses.map(
+                        (cls) => scheduleMap.get(`${day}|${shift}|${cls.id}|${period}`) || []
+                    );
+                    const linesInRow = Math.max(1, ...lessonsByClass.map((l) => l.length));
+                    const h = rowHeightPt * linesInRow;
+
+                    content += `<tr style="height:${h}pt;">`;
 
                     // Day Column (Merged)
                     if (pIndex === 0) {
@@ -868,22 +898,18 @@ export const ExportPage = () => {
                     }
 
                     // Period Column
-                    content += `<td class="period-cell" style="background-color: ${colors.label};">${period}</td>`;
+                    content += `<td class="period-cell" style="background-color: ${colors.label}; height:${h}pt;">${period}</td>`;
 
                     // Class Columns
-                    shiftClasses.forEach((cls) => {
-                        const lessons = scheduleMap.get(`${day}|${shift}|${cls.id}|${period}`) || [];
+                    shiftClasses.forEach((cls, ci) => {
+                        const lessons = lessonsByClass[ci];
+                        const wrapCls = lessons.length > 1 ? ' wrap-cell' : '';
 
-                        content += `<td class="content-cell" style="background-color: ${colors.cell};">`;
+                        content += `<td class="content-cell${wrapCls}" style="background-color: ${colors.cell}; height:${h}pt;">`;
 
                         lessons.forEach((lesson, i) => {
                             if (i > 0) content += `<br style="mso-data-placement:same-cell;">`;
-                            const sub = subjects.find((s) => s.id === lesson.subjectId);
-                            const room = rooms.find((r) => r.id === lesson.roomId);
-                            const roomName = room ? room.name : lesson.roomId || '';
-                            const line = [escapeHtml(sub?.name || ''), escapeHtml(roomName)]
-                                .filter(Boolean)
-                                .join(' ');
+                            const line = escapeHtml(lessonLine(lesson)).replace(/ /g, '&#160;');
                             content += `<span class="lesson">${line}</span>`;
                         });
 
@@ -897,23 +923,22 @@ export const ExportPage = () => {
                 content += `<tr><td colspan="${2 + shiftClasses.length}" style="height: 3px; background-color: #000000; border: none;"></td></tr>`;
             });
 
-            if (tableIndex === shiftTables.length - 1) {
-                content += footerRows(cols);
+            content += footerRows(cols);
+            content += `</table>`;
+            if (tableIndex < shiftTables.length - 1) {
+                content += `<br style="page-break-before:always; mso-special-character:line-break; page-break-after:always;">`;
             }
-
-            content += `</table><br><br>`;
         });
 
         const styles = `
-            @page { size: A4 portrait; margin: 8mm; }
-            table { border-collapse: collapse; font-family: Arial, sans-serif; font-size: 26pt; margin-bottom: 12px; table-layout: fixed; }
-            td, th { border: 1px solid #000; padding: 8px 10px; vertical-align: middle; text-align: center; font-size: 26pt; line-height: 1.25; }
-            .col-day, .col-period { width: 50; mso-width-source: userset; mso-width-alt: 12800; }
-            .col-class { width: 140; mso-width-source: userset; mso-width-alt: 35840; }
-            .shift-header { font-size: 26pt; font-weight: bold; background-color: #ffffff; text-align: center; vertical-align: middle; border: 2px solid #000; height: 48pt; }
-            .class-header { font-size: 26pt; font-weight: bold; background-color: #ffffff; text-align: center; vertical-align: middle; border: 2px solid #000; height: 48pt; }
+            @page { size: A4 portrait; margin: 6mm; }
+            table { width: ${PAGE_W_PT}pt !important; }
+            table.grid-table { border-collapse: collapse; font-family: "Arial Narrow", Arial, sans-serif; font-size: ${fontPt}pt; table-layout: fixed; width: ${PAGE_W_PT}pt !important; }
+            td, th { border: 1px solid #000; padding: 1px 3px; vertical-align: middle; text-align: center; font-size: ${fontPt}pt; line-height: 1.1; word-break: keep-all; overflow-wrap: normal; mso-char-wrap: 0; }
+            .shift-header { font-size: ${fontPt}pt; font-weight: bold; background-color: #ffffff; text-align: center; vertical-align: middle; border: 2px solid #000; }
+            .class-header { font-size: ${fontPt}pt; font-weight: bold; background-color: #ffffff; text-align: center; vertical-align: middle; border: 2px solid #000; }
             .day-cell { 
-                font-size: 26pt;
+                font-size: ${Math.max(9, fontPt - 2)}pt;
                 font-weight: bold; 
                 text-transform: uppercase; 
                 writing-mode: vertical-lr; 
@@ -922,17 +947,19 @@ export const ExportPage = () => {
                 vertical-align: middle;
                 border: 2px solid #000;
                 mso-rotate: 90;
-                width: 50;
             }
-            .period-cell { font-size: 26pt; font-weight: bold; border: 2px solid #000; text-align: center; vertical-align: middle; width: 50; height: 128pt; }
-            .content-cell { font-size: 26pt; font-weight: bold; border: 1px solid #000; height: 128pt; width: 140; text-align: center; vertical-align: middle; white-space: normal; padding: 8px 10px; line-height: 1.25; }
-            .lesson { font-size: 26pt; font-weight: bold; white-space: nowrap; }
-            .doc-left { border: none !important; text-align: left; vertical-align: top; font-size: 26pt; padding: 8px 10px; white-space: nowrap; line-height: 1.25; }
-            .doc-right { border: none !important; text-align: right; vertical-align: top; font-size: 26pt; padding: 8px 10px; white-space: nowrap; line-height: 1.25; }
+            .period-cell { font-size: ${fontPt}pt; font-weight: bold; border: 2px solid #000; text-align: center; vertical-align: middle; height: ${rowHeightPt}pt; }
+            .content-cell { font-size: ${fontPt}pt; font-weight: bold; font-family: "Arial Narrow", Arial, sans-serif; border: 1px solid #000; height: ${rowHeightPt}pt; width: ${classColPt}pt; text-align: center; vertical-align: middle; mso-wrap-text: false; white-space: nowrap; padding: 1px 3px; line-height: 1.1; }
+            .wrap-cell { mso-wrap-text: true; white-space: normal; }
+            .lesson { font-size: ${fontPt}pt; font-weight: bold; font-family: "Arial Narrow", Arial, sans-serif; white-space: nowrap; mso-wrap-text: false; }
+            .doc-row td { height: 16pt; }
+            .doc-left { border: none !important; text-align: left; vertical-align: top; font-size: ${headerFontPt}pt; padding: 2px 4px; white-space: nowrap; }
+            .doc-right { border: none !important; text-align: right; vertical-align: top; font-size: ${headerFontPt}pt; padding: 2px 4px; white-space: nowrap; }
             .doc-spacer { border: none !important; }
-            .empty-row td { height: 18pt; }
+            .empty-row td { height: 10pt; border: none !important; }
         `;
 
+        const fitHeight = Math.max(1, shiftTables.length);
         const excelPageSetup = `<!--[if gte mso 9]>
 <xml>
  <x:ExcelWorkbook>
@@ -942,16 +969,16 @@ export const ExportPage = () => {
     <x:WorksheetOptions>
      <x:PageSetup>
       <x:Layout x:Orientation="Portrait"/>
-      <x:Header x:Margin="0.15"/>
-      <x:Footer x:Margin="0.15"/>
-      <x:PageMargins x:Bottom="0.4" x:Left="0.3" x:Right="0.3" x:Top="0.4"/>
+      <x:Header x:Margin="0.1"/>
+      <x:Footer x:Margin="0.1"/>
+      <x:PageMargins x:Bottom="0.25" x:Left="0.2" x:Right="0.2" x:Top="0.25"/>
      </x:PageSetup>
      <x:FitToPage/>
      <x:Print>
       <x:ValidPrinterInfo/>
       <x:PaperSizeIndex>9</x:PaperSizeIndex>
       <x:FitWidth>1</x:FitWidth>
-      <x:FitHeight>0</x:FitHeight>
+      <x:FitHeight>${fitHeight}</x:FitHeight>
      </x:Print>
     </x:WorksheetOptions>
    </x:ExcelWorksheet>
