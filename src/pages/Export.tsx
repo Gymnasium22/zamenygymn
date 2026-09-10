@@ -770,26 +770,86 @@ export const ExportPage = () => {
             [DayOfWeek.Friday]: { label: '#bfdbfe', cell: '#dbeafe' } // Blue 200/100
         };
 
+        const school = escapeHtml(settings?.schoolName || 'УО');
+        const unionChair = escapeHtml(settings?.unionChairName || 'Ю.Г.Миханова');
+        const director = escapeHtml(settings?.directorName || 'Н.В.Кисель');
+        const secretary = escapeHtml(settings?.secretaryName || 'Е.К.Шунто');
+        const year = settings?.currentYear || new Date().getFullYear();
+
+        const splitDocCols = (cols: number) => {
+            const left = Math.max(1, Math.ceil(cols / 2));
+            const right = Math.max(1, cols - left);
+            return { left, right };
+        };
+
+        const headerRows = (cols: number) => {
+            const { left, right } = splitDocCols(cols);
+            return `
+                <tr>
+                    <td colspan="${left}" class="doc-left">СОГЛАСОВАНО</td>
+                    <td colspan="${right}" class="doc-right">УТВЕРЖДАЮ</td>
+                </tr>
+                <tr>
+                    <td colspan="${left}" class="doc-left">Председатель ПК ${school}</td>
+                    <td colspan="${right}" class="doc-right">Директор ${school}</td>
+                </tr>
+                <tr>
+                    <td colspan="${left}" class="doc-left">____________________ ${unionChair}</td>
+                    <td colspan="${right}" class="doc-right">____________________ ${director}</td>
+                </tr>
+                <tr>
+                    <td colspan="${left}" class="doc-left">"__"_ __________ ${year}г.</td>
+                    <td colspan="${right}" class="doc-right">"__" __________ ${year}г.</td>
+                </tr>
+                <tr class="empty-row"><td colspan="${cols}" class="doc-spacer"></td></tr>
+            `;
+        };
+
+        const footerRows = (cols: number) => {
+            const { left, right } = splitDocCols(cols);
+            return `
+                <tr class="empty-row"><td colspan="${cols}" class="doc-spacer"></td></tr>
+                <tr>
+                    <td colspan="${left}" class="doc-left">Секретарь учебной части</td>
+                    <td colspan="${right}" class="doc-right">${secretary}</td>
+                </tr>
+            `;
+        };
+
+        const shiftTables = shifts
+            .map((shift) => {
+                const shiftClasses = targetClasses.filter((c) => c.shift === shift);
+                return { shift, shiftClasses, periods: SHIFT_PERIODS[shift as Shift] };
+            })
+            .filter((s) => s.shiftClasses.length > 0);
+
         let content = '';
 
-        shifts.forEach((shift) => {
-            const shiftClasses = targetClasses.filter((c) => c.shift === shift);
-            const periods = SHIFT_PERIODS[shift as Shift];
-            if (shiftClasses.length === 0) return;
+        shiftTables.forEach(({ shift, shiftClasses, periods }, tableIndex) => {
+            const cols = 2 + shiftClasses.length;
 
             content += `<table>`;
+            content += `<col class="col-day" width="355" style="mso-width-source:userset;mso-width-alt:12800;width:50;" />`;
+            content += `<col class="col-period" width="355" style="mso-width-source:userset;mso-width-alt:12800;width:50;" />`;
+            shiftClasses.forEach(() => {
+                content += `<col class="col-class" width="985" style="mso-width-source:userset;mso-width-alt:35840;width:140;" />`;
+            });
+
+            if (tableIndex === 0) {
+                content += headerRows(cols);
+            }
 
             // Row 1: "1 СМЕНА" merged
             content += `<tr>`;
-            content += `<td style="border:none"></td>`;
-            content += `<td style="border:none"></td>`;
+            content += `<td class="doc-spacer"></td>`;
+            content += `<td class="doc-spacer"></td>`;
             content += `<td colspan="${shiftClasses.length}" class="shift-header">${shift}</td>`;
             content += `</tr>`;
 
             // Row 2: Classes
             content += `<tr>`;
-            content += `<td style="border:none"></td>`;
-            content += `<td style="border:none"></td>`;
+            content += `<td class="doc-spacer"></td>`;
+            content += `<td class="doc-spacer"></td>`;
             shiftClasses.forEach((c) => {
                 content += `<td class="class-header">${escapeHtml(c.name)}</td>`;
             });
@@ -800,7 +860,7 @@ export const ExportPage = () => {
                 const colors = dayStyles[day as string] || { label: '#e5e7eb', cell: '#f3f4f6' };
 
                 periods.forEach((period, pIndex) => {
-                    content += `<tr>`;
+                    content += `<tr style="height: 128pt;">`;
 
                     // Day Column (Merged)
                     if (pIndex === 0) {
@@ -821,9 +881,10 @@ export const ExportPage = () => {
                             const sub = subjects.find((s) => s.id === lesson.subjectId);
                             const room = rooms.find((r) => r.id === lesson.roomId);
                             const roomName = room ? room.name : lesson.roomId || '';
-
-                            content += `<span class="subject">${escapeHtml(sub?.name || '')}</span>`;
-                            if (roomName) content += ` <span class="room">${escapeHtml(roomName)}</span>`;
+                            const line = [escapeHtml(sub?.name || ''), escapeHtml(roomName)]
+                                .filter(Boolean)
+                                .join(' ');
+                            content += `<span class="lesson">${line}</span>`;
                         });
 
                         content += `</td>`;
@@ -836,13 +897,23 @@ export const ExportPage = () => {
                 content += `<tr><td colspan="${2 + shiftClasses.length}" style="height: 3px; background-color: #000000; border: none;"></td></tr>`;
             });
 
+            if (tableIndex === shiftTables.length - 1) {
+                content += footerRows(cols);
+            }
+
             content += `</table><br><br>`;
         });
 
         const styles = `
-            .shift-header { font-size: 16pt; font-weight: bold; background-color: #ffffff; text-align: center; border: 2px solid #000; }
-            .class-header { font-size: 12pt; font-weight: bold; background-color: #ffffff; text-align: center; border: 2px solid #000; }
+            @page { size: A4 portrait; margin: 8mm; }
+            table { border-collapse: collapse; font-family: Arial, sans-serif; font-size: 26pt; margin-bottom: 12px; table-layout: fixed; }
+            td, th { border: 1px solid #000; padding: 8px 10px; vertical-align: middle; text-align: center; font-size: 26pt; line-height: 1.25; }
+            .col-day, .col-period { width: 50; mso-width-source: userset; mso-width-alt: 12800; }
+            .col-class { width: 140; mso-width-source: userset; mso-width-alt: 35840; }
+            .shift-header { font-size: 26pt; font-weight: bold; background-color: #ffffff; text-align: center; vertical-align: middle; border: 2px solid #000; height: 48pt; }
+            .class-header { font-size: 26pt; font-weight: bold; background-color: #ffffff; text-align: center; vertical-align: middle; border: 2px solid #000; height: 48pt; }
             .day-cell { 
+                font-size: 26pt;
                 font-weight: bold; 
                 text-transform: uppercase; 
                 writing-mode: vertical-lr; 
@@ -850,15 +921,51 @@ export const ExportPage = () => {
                 text-align: center;
                 vertical-align: middle;
                 border: 2px solid #000;
-                mso-rotate: 90; 
+                mso-rotate: 90;
+                width: 50;
             }
-            .period-cell { font-weight: bold; border: 2px solid #000; }
-            .content-cell { font-weight: bold; border: 1px solid #000; height: 50px; }
-            .subject { font-weight: bold; }
-            .room { font-size: 8pt; font-weight: bold; }
+            .period-cell { font-size: 26pt; font-weight: bold; border: 2px solid #000; text-align: center; vertical-align: middle; width: 50; height: 128pt; }
+            .content-cell { font-size: 26pt; font-weight: bold; border: 1px solid #000; height: 128pt; width: 140; text-align: center; vertical-align: middle; white-space: normal; padding: 8px 10px; line-height: 1.25; }
+            .lesson { font-size: 26pt; font-weight: bold; white-space: nowrap; }
+            .doc-left { border: none !important; text-align: left; vertical-align: top; font-size: 26pt; padding: 8px 10px; white-space: nowrap; line-height: 1.25; }
+            .doc-right { border: none !important; text-align: right; vertical-align: top; font-size: 26pt; padding: 8px 10px; white-space: nowrap; line-height: 1.25; }
+            .doc-spacer { border: none !important; }
+            .empty-row td { height: 18pt; }
         `;
 
-        exportService.saveAsExcel(content, `Сетка_Расписания_${matrixGrade}_параллель.xls`, styles);
+        const excelPageSetup = `<!--[if gte mso 9]>
+<xml>
+ <x:ExcelWorkbook>
+  <x:ExcelWorksheets>
+   <x:ExcelWorksheet>
+    <x:Name>Сетка</x:Name>
+    <x:WorksheetOptions>
+     <x:PageSetup>
+      <x:Layout x:Orientation="Portrait"/>
+      <x:Header x:Margin="0.15"/>
+      <x:Footer x:Margin="0.15"/>
+      <x:PageMargins x:Bottom="0.4" x:Left="0.3" x:Right="0.3" x:Top="0.4"/>
+     </x:PageSetup>
+     <x:FitToPage/>
+     <x:Print>
+      <x:ValidPrinterInfo/>
+      <x:PaperSizeIndex>9</x:PaperSizeIndex>
+      <x:FitWidth>1</x:FitWidth>
+      <x:FitHeight>0</x:FitHeight>
+     </x:Print>
+    </x:WorksheetOptions>
+   </x:ExcelWorksheet>
+  </x:ExcelWorksheets>
+ </x:ExcelWorkbook>
+</xml>
+<![endif]-->`;
+
+        exportService.saveAsExcel(
+            content,
+            `Сетка_Расписания_${matrixGrade}_параллель.xls`,
+            styles,
+            excelPageSetup
+        );
     };
 
     const buildMonthlySubstitutionsHtml = (): { html: string; styles: string; title: string } | null => {

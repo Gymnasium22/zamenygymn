@@ -67,7 +67,7 @@ export const exportService = {
     /**
      * Saves HTML content as an Excel (.xls) file using a standard template.
      */
-    saveAsExcel: (content: string, fileName: string, customStyles?: string) => {
+    saveAsExcel: (content: string, fileName: string, customStyles?: string, extraHead?: string) => {
         const html = `
             <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
             <head>
@@ -85,6 +85,7 @@ export const exportService = {
                     .font-bold { font-weight: bold; }
                     ${customStyles || ''}
                 </style>
+                ${extraHead || ''}
             </head>
             <body>
                 ${content}
