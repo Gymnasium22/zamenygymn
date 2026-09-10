@@ -901,7 +901,7 @@ export const ExportPage = () => {
                     content += `<td class="period-cell" style="background-color: ${colors.label}; height:${h}pt;">${period}</td>`;
 
                     // Class Columns
-                    shiftClasses.forEach((cls, ci) => {
+                    shiftClasses.forEach((_cls, ci) => {
                         const lessons = lessonsByClass[ci];
                         const wrapCls = lessons.length > 1 ? ' wrap-cell' : '';
 
