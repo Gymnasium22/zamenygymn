@@ -207,7 +207,7 @@ export const ROLE_DEFINITIONS: RoleDefinition[] = [
     {
         id: 'admin',
         name: 'Администратор',
-        description: 'Полный доступ ко всем функциям',
+        description: 'Все разделы учреждения, настройки и пользователи',
         defaultPermissions: [
             'view_dashboard',
             'view_schedule',
@@ -257,7 +257,7 @@ export const ROLE_DEFINITIONS: RoleDefinition[] = [
     {
         id: 'teacher',
         name: 'Учитель',
-        description: 'Работа с расписанием, заменами, питанием, пропусками',
+        description: 'Просмотр основных разделов и правка питания',
         defaultPermissions: [
             'view_dashboard',
             'view_schedule',

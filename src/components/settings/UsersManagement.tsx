@@ -10,51 +10,33 @@ import { Modal } from '../UI';
 import { UserProfile, UserRole, Permission, PageId } from '../../types';
 import { ROLE_DEFINITIONS } from '../../constants';
 
-const ALL_PERMISSIONS: { id: Permission; label: string }[] = [
-    { id: 'view_dashboard', label: 'Видеть рабочий стол' },
-    { id: 'view_schedule', label: 'Видеть расписание' },
-    { id: 'edit_schedule', label: 'Редактировать расписание' },
-    { id: 'view_substitutions', label: 'Видеть замены' },
-    { id: 'edit_substitutions', label: 'Редактировать замены' },
-    { id: 'view_duty', label: 'Видеть дежурства' },
-    { id: 'edit_duty', label: 'Редактировать дежурства' },
-    { id: 'view_nutrition', label: 'Видеть питание' },
-    { id: 'edit_nutrition', label: 'Редактировать питание' },
-    { id: 'view_absenteeism', label: 'Видеть пропуски' },
-    { id: 'edit_absenteeism', label: 'Редактировать пропуски' },
-    { id: 'view_bells', label: 'Видеть звонки' },
-    { id: 'edit_bells', label: 'Редактировать звонки' },
-    { id: 'view_directory', label: 'Видеть справочники' },
-    { id: 'edit_directory', label: 'Редактировать справочники' },
-    { id: 'view_reports', label: 'Видеть отчёты' },
-    { id: 'view_export', label: 'Видеть экспорт' },
-    { id: 'view_admin', label: 'Видеть администрирование' },
-    { id: 'view_settings', label: 'Видеть настройки' },
-    { id: 'manage_users', label: 'Управлять пользователями' },
-    { id: 'view_calendar', label: 'Видеть календарь' },
-    { id: 'edit_calendar', label: 'Редактировать календарь' },
-    { id: 'view_planner', label: 'Видеть планер' },
-    { id: 'edit_planner', label: 'Редактировать планер' }
+/** Права, которые код реально проверяет. «Видеть …» не используется: меню строится по разделам. */
+const EDIT_PERMISSIONS: { id: Permission; label: string; hint: string }[] = [
+    { id: 'edit_schedule', label: 'Редактировать расписание', hint: 'Оба полугодия. Учителю правку ещё может включить настройка учреждения.' },
+    { id: 'edit_nutrition', label: 'Редактировать питание', hint: 'Без галочки раздел только для просмотра.' },
+    { id: 'edit_directory', label: 'Редактировать справочники', hint: 'Без галочки справочники только для просмотра.' },
+    { id: 'edit_calendar', label: 'Редактировать календарь', hint: 'Без галочки календарь только для просмотра.' },
+    { id: 'edit_planner', label: 'Редактировать планер', hint: 'Без галочки планер только для просмотра.' }
 ];
 
+/** Пункты меню. Подписи совпадают с боковым меню. */
 const ALL_PAGES: { id: PageId; label: string }[] = [
     { id: 'dashboard', label: 'Рабочий стол' },
-    { id: 'schedule', label: '1 полугодие' },
-    { id: 'schedule2', label: '2 полугодие' },
+    { id: 'schedule', label: 'Расписание · 1 полугодие' },
+    { id: 'schedule2', label: 'Расписание · 2 полугодие' },
     { id: 'substitutions', label: 'Замены' },
     { id: 'duty', label: 'Дежурство' },
     { id: 'nutrition', label: 'Питание' },
     { id: 'absenteeism', label: 'Пропуски' },
     { id: 'bells', label: 'Звонки' },
     { id: 'directory', label: 'Справочники' },
-    { id: 'reports', label: 'Отчёты' },
-    { id: 'export', label: 'Экспорт' },
-    { id: 'admin', label: 'Администрирование' },
+    { id: 'admin', label: 'Администрация' },
     { id: 'calendar', label: 'Календарь' },
     { id: 'planner', label: 'Планер' },
+    { id: 'reports', label: 'Отчёты' },
+    { id: 'export', label: 'Экспорт' },
     { id: 'archive', label: 'Архив' },
-    { id: 'settings', label: 'Настройки' },
-    { id: 'users', label: 'Пользователи' }
+    { id: 'settings', label: 'Настройки' }
 ];
 
 const formatDate = (iso?: string) => {
@@ -156,6 +138,10 @@ export const UsersManagement = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
+            if (!isSuperAdmin && form.role === 'superadmin') {
+                addToast({ type: 'warning', title: 'Недостаточно прав', message: 'Роль суперадминистратора назначает только суперадминистратор' });
+                return;
+            }
             if (editingUser) {
                 await usersService.update(editingUser.id, {
                     displayName: form.displayName,
@@ -649,7 +635,7 @@ export const UsersManagement = () => {
                                     onChange={(e) => setForm((prev) => ({ ...prev, role: e.target.value as UserRole }))}
                                     className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-dark-700 focus:ring-2 focus:ring-indigo-500 outline-none"
                                 >
-                                    {ROLE_DEFINITIONS.map((r) => (
+                                    {ROLE_DEFINITIONS.filter((r) => isSuperAdmin || r.id !== 'superadmin').map((r) => (
                                         <option key={r.id} value={r.id}>
                                             {r.name} — {r.description}
                                         </option>
@@ -716,12 +702,18 @@ export const UsersManagement = () => {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Разрешения</label>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-2 p-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-dark-700/50">
-                            {ALL_PERMISSIONS.map((p) => (
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Правка внутри разделов</label>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2">
+                            Замены, дежурство, звонки, пропуски, отчёты, экспорт и архив правятся всеми, кому открыт раздел.
+                            Пропуски: учитель работает со своими классами, администратор — со всеми. Пользователи и организации
+                            открываются из «Настроек» по роли, отдельной галочки у них нет.
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 p-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-dark-700/50">
+                            {EDIT_PERMISSIONS.map((p) => (
                                 <label
                                     key={p.id}
                                     className="flex items-start gap-2.5 text-sm text-slate-700 dark:text-slate-300 cursor-pointer"
+                                    title={p.hint}
                                 >
                                     <input
                                         type="checkbox"
@@ -729,14 +721,20 @@ export const UsersManagement = () => {
                                         onChange={() => togglePermission(p.id)}
                                         className="mt-0.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
                                     />
-                                    <span>{p.label}</span>
+                                    <span>
+                                        {p.label}
+                                        <span className="block text-[11px] text-slate-400 font-normal">{p.hint}</span>
+                                    </span>
                                 </label>
                             ))}
                         </div>
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Доступные разделы</label>
+                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Доступные разделы</label>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mb-2">
+                            Эти галочки показывают пункты меню. Оба полугодия — один пункт «Расписание»: он виден, если отмечено хотя бы одно.
+                        </p>
                         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-2 p-3 rounded-xl border border-slate-200 dark:border-slate-600 bg-slate-50 dark:bg-dark-700/50">
                             {ALL_PAGES.map((p) => (
                                 <label
