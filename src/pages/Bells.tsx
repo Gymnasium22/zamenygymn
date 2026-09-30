@@ -445,96 +445,112 @@ export const BellsPage = () => {
 
     const getExportContent = () => {
         const safeExportDate = exportDate ? escapeHtml(formatDateEuropean(exportDate)) : '';
+        const badge = (period: number, cancelled: boolean) => `
+            <table cellpadding="0" cellspacing="0" style="width:40px; height:40px; border-collapse:collapse; background:${cancelled ? '#fee2e2' : '#e2e8f0'}; border-radius:20px;">
+                <tr>
+                    <td style="width:40px; height:40px; text-align:center; vertical-align:middle; color:${cancelled ? '#991b1b' : '#475569'}; font-weight:700; font-size:18px; line-height:18px; font-family:Arial, sans-serif; padding:0;">${period}</td>
+                </tr>
+            </table>`;
+        const row = (period: number, bell: { start: string; end: string; cancelled?: boolean }) => {
+            const shell = bell.cancelled
+                ? 'background:#fef2f2; border:1px solid #fecaca;'
+                : 'background:#f8fafc; border:1px solid #e2e8f0;';
+            const middle = bell.cancelled
+                ? `<td style="vertical-align:middle; text-align:left; padding:0 0 0 12px; color:#dc2626; font-weight:700; font-size:14px; line-height:18px; font-family:Arial, sans-serif;">УРОК СНЯТ</td>`
+                : `
+                    <td style="vertical-align:middle; text-align:left; width:110px; padding:0 0 0 8px; color:#0f172a; font-weight:700; font-size:26px; line-height:26px; font-family:Arial, sans-serif;">${escapeHtml(bell.start)}</td>
+                    <td style="vertical-align:middle; text-align:center; width:28px; color:#94a3b8; font-size:22px; line-height:22px; font-family:Arial, sans-serif;">—</td>
+                    <td style="vertical-align:middle; text-align:right; width:110px; color:#0f172a; font-weight:700; font-size:26px; line-height:26px; font-family:Arial, sans-serif;">${escapeHtml(bell.end)}</td>`;
+            return `
+                <tr>
+                    <td style="padding:0 0 10px 0;">
+                        <table cellpadding="0" cellspacing="0" style="width:100%; border-collapse:separate; border-spacing:0; ${shell} border-radius:10px;">
+                            <tr>
+                                <td style="padding:8px 12px;">
+                                    <table cellpadding="0" cellspacing="0" style="width:100%; border-collapse:collapse;">
+                                        <tr>
+                                            <td style="width:40px; vertical-align:middle; padding:0;">${badge(period, !!bell.cancelled)}</td>
+                                            ${middle}
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>`;
+        };
+
+        const column = (shift: Shift) => {
+            const shiftBells = currentPresetBells.filter((b) => b.shift === shift);
+            const headerBg = shift === Shift.First ? '#4f46e5' : '#7c3aed';
+            const lessons = SHIFT_PERIODS[shift]
+                .map((period) => {
+                    const bell = shiftBells.find((b) => b.period === period && b.day === 'default') || {
+                        start: '00:00',
+                        end: '00:00',
+                        cancelled: false
+                    };
+                    return row(period, bell);
+                })
+                .join('');
+            return `
+                <table cellpadding="0" cellspacing="0" style="width:100%; border-collapse:separate; border-spacing:0; background:#ffffff; border:2px solid #e2e8f0; border-radius:16px;">
+                    <tr>
+                        <td style="background:${headerBg}; color:#ffffff; text-align:center; font-weight:700; font-size:16px; line-height:20px; font-family:Arial, sans-serif; padding:14px 12px; text-transform:uppercase;">
+                            ${escapeHtml(shift)}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding:16px 16px 6px 16px;">
+                            <table cellpadding="0" cellspacing="0" style="width:100%; border-collapse:collapse;">
+                                ${lessons}
+                            </table>
+                        </td>
+                    </tr>
+                </table>`;
+        };
 
         return `
-            <div style="font-family: 'Segoe UI', Arial, sans-serif; padding: 10px 40px 20px 40px; background: white; width: 1000px; max-width: 1000px; margin: 0 auto; color: #1e293b; box-sizing: border-box;">
-                <div style="text-align: center; margin-bottom: 25px; padding-top: 10px;">
-                    <h1 style="font-size: 32px; font-weight: 900; text-transform: uppercase; color: #1e293b; margin: 0 0 5px 0; letter-spacing: -0.5px;">
-                        Расписание звонков
-                    </h1>
-                    ${
-                        exportDate
-                            ? `<p style="font-size: 20px; color: #64748b; font-weight: 600; margin: 0;">
-                                на ${safeExportDate}
-                               </p>`
-                            : ''
-                    }
-                    <div style="height: 6px; width: 80px; background: #4f46e5; margin: 15px auto 0; border-radius: 4px;"></div>
-                </div>
-
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px;">
-                    ${[Shift.First, Shift.Second]
-                        .map((shift) => {
-                            const shiftBells = currentPresetBells.filter((b) => b.shift === shift);
-                            return `
-                            <div style="background: #fff; border: 2px solid #e2e8f0; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
-                                <div style="background: ${
-                                    shift === Shift.First ? '#4f46e5' : '#7c3aed'
-                                }; color: white; padding: 12px; text-align: center; font-weight: 800; font-size: 16px; text-transform: uppercase; letter-spacing: 1px;">
-                                    ${shift}
-                                </div>
-                                <div style="padding: 20px;">
-                                    ${SHIFT_PERIODS[shift]
-                                        .map((period) => {
-                                            const bell = shiftBells.find(
-                                                (b) => b.period === period && b.day === 'default'
-                                            ) || {
-                                                start: '00:00',
-                                                end: '00:00',
-                                                cancelled: false
-                                            };
-
-                                            if (bell.cancelled) {
-                                                return `
-                                                <div style="display: flex; align-items: center; margin-bottom: 10px; padding: 8px 12px; background-color: #fef2f2; border: 1px solid #fecaca; border-radius: 10px;">
-                                                    <div style="width: 40px; height: 40px; line-height: 40px; text-align: center; border-radius: 50%; background: #fee2e2; color: #991b1b; font-weight: bold; margin-right: 15px; font-size: 20px; flex-shrink: 0;">${period}</div>
-                                                    <div style="font-weight: 800; color: #dc2626; text-transform: uppercase; font-size: 13px; letter-spacing: 0.5px;">УРОК СНЯТ</div>
-                                                </div>
-                                            `;
-                                            }
-
-                                            return `
-                                            <div style="display: flex; align-items: center; margin-bottom: 10px; padding: 8px 12px; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px;">
-                                                <div style="width: 40px; height: 40px; line-height: 40px; text-align: center; border-radius: 50%; background: #e2e8f0; color: #475569; font-weight: bold; margin-right: 15px; font-size: 20px; flex-shrink: 0;">${period}</div>
-                                                <div style="flex: 1; display: flex; justify-content: space-between; align-items: center; font-weight: bold; font-size: 28px; color: #0f172a; font-variant-numeric: tabular-nums;">
-                                                    <span>${escapeHtml(bell.start)}</span>
-                                                    <span style="color: #cbd5e1; font-weight: normal; margin: 0 10px;">&mdash;</span>
-                                                    <span>${escapeHtml(bell.end)}</span>
-                                                </div>
-                                            </div>
-                                        `;
-                                        })
-                                        .join('')}
-                                </div>
-                            </div>
-                        `;
-                        })
-                        .join('')}
-                </div>
-
-                <div style="margin-top: 40px; padding-top: 15px; border-top: 2px solid #e2e8f0; display: flex; justify-content: space-between; align-items: flex-end;">
-                    <div style="font-size: 12px; font-weight: bold; color: #64748b;">
-                        <div style="text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.5px;">УТВЕРЖДАЮ</div>
-                        <div style="color: #0f172a;">Директор гимназии</div>
-                    </div>
-                    <div style="text-align: right;">
-                         <div style="border-bottom: 2px solid #94a3b8; width: 180px; margin-bottom: 4px;"></div>
-                         <div style="font-size: 10px; color: #94a3b8; text-transform: uppercase;">подпись</div>
-                    </div>
-                </div>
+            <div style="font-family: Arial, sans-serif; padding: 16px 36px 24px 36px; background:#ffffff; width:1000px; color:#1e293b; box-sizing:border-box;">
+                <table cellpadding="0" cellspacing="0" style="width:100%; border-collapse:collapse; margin-bottom:22px;">
+                    <tr>
+                        <td style="text-align:center; padding:8px 0 0 0;">
+                            <div style="font-size:30px; font-weight:700; line-height:36px; color:#1e293b; text-transform:uppercase; font-family:Arial, sans-serif;">Расписание звонков</div>
+                            ${
+                                exportDate
+                                    ? `<div style="font-size:18px; line-height:24px; color:#64748b; font-weight:700; margin-top:6px; font-family:Arial, sans-serif;">на ${safeExportDate}</div>`
+                                    : ''
+                            }
+                            <div style="height:6px; width:80px; background:#4f46e5; margin:14px auto 0 auto; border-radius:4px;"></div>
+                        </td>
+                    </tr>
+                </table>
+                <table cellpadding="0" cellspacing="0" style="width:100%; border-collapse:separate; border-spacing:28px 0;">
+                    <tr>
+                        <td style="width:50%; vertical-align:top;">${column(Shift.First)}</td>
+                        <td style="width:50%; vertical-align:top;">${column(Shift.Second)}</td>
+                    </tr>
+                </table>
+                <table cellpadding="0" cellspacing="0" style="width:100%; border-collapse:collapse; margin-top:28px; border-top:2px solid #e2e8f0;">
+                    <tr>
+                        <td style="padding-top:14px; vertical-align:bottom; text-align:left;">
+                            <div style="font-size:12px; line-height:16px; font-weight:700; color:#64748b; text-transform:uppercase; font-family:Arial, sans-serif;">Утверждаю</div>
+                            <div style="font-size:13px; line-height:18px; font-weight:700; color:#0f172a; margin-top:4px; font-family:Arial, sans-serif;">Директор гимназии</div>
+                        </td>
+                        <td style="padding-top:14px; vertical-align:bottom; text-align:right; width:220px;">
+                            <div style="border-bottom:2px solid #94a3b8; width:180px; height:18px; margin-left:auto;"></div>
+                            <div style="font-size:10px; line-height:14px; color:#94a3b8; text-transform:uppercase; margin-top:4px; font-family:Arial, sans-serif;">подпись</div>
+                        </td>
+                    </tr>
+                </table>
             </div>
         `;
     };
 
     const exportBellsToPng = async () => {
         if (!exportRef.current) return;
-        const { default: html2canvas } = await import('html2canvas');
-        const canvas = await html2canvas(exportRef.current, { scale: 2, backgroundColor: '#ffffff' });
-        const link = document.createElement('a');
-        link.href = canvas.toDataURL('image/png');
         const preset = settings.bellPresets?.find((p) => p.id === selectedPresetId);
-        link.download = `Звонки_${preset?.name || 'Расписание'}.png`;
-        link.click();
+        await exportService.captureAndDownloadPng(exportRef.current, `Звонки_${preset?.name || 'Расписание'}.png`);
     };
 
     const sendBellsToTelegram = async () => {
