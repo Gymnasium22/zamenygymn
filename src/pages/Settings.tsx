@@ -1138,7 +1138,7 @@ export const SettingsPage = () => {
                                             className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm font-mono outline-none focus:border-indigo-500"
                                         />
                                         <p className="text-[11px] text-slate-400 mt-1">
-                                            Куда кнопка Telegram на странице замен шлёт картинки. Несколько ID — с новой строки или через запятую: себе и в общий чат учителей. Бот должен быть участником группы.
+                                            Куда кнопки Telegram на страницах замен и режимов звонков шлют картинки. Несколько ID — с новой строки или через запятую: себе и в общий чат учителей. Бот должен быть участником группы.
                                         </p>
                                     </div>
                                     <div>

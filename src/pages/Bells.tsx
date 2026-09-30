@@ -10,6 +10,8 @@ import { exportService } from '../services/exportService';
 import { DEFAULT_BELLS } from '../constants';
 import { generateId, formatDateISO } from '../utils/helpers';
 import { findShortDayPreset, isShortDayOn } from '../utils/bellsForDate';
+import { parseTelegramChatIds } from '../utils/telegramChatIds';
+import { logger } from '../utils/logger';
 
 
 // Helper functions for time manipulation
@@ -265,7 +267,7 @@ const ShiftTimeline = ({
 };
 
 export const BellsPage = () => {
-    const { settings, saveStaticData } = useStaticData();
+    const { settings, privateSettings, saveStaticData } = useStaticData();
     const { addToast } = useToast();
 
     const [selectedPresetId, setSelectedPresetId] = useState<string>('preset_normal');
@@ -279,6 +281,7 @@ export const BellsPage = () => {
     const [shortDayHint, setShortDayHint] = useState<string | null>(null);
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
     const [exportDate, setExportDate] = useState<string>(new Date().toISOString().split('T')[0]);
+    const [isSendingTelegram, setIsSendingTelegram] = useState(false);
     const exportRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -532,6 +535,45 @@ export const BellsPage = () => {
         const preset = settings.bellPresets?.find((p) => p.id === selectedPresetId);
         link.download = `Звонки_${preset?.name || 'Расписание'}.png`;
         link.click();
+    };
+
+    const sendBellsToTelegram = async () => {
+        if (!exportRef.current) return;
+        if (!privateSettings.telegramToken) {
+            addToast({ type: 'warning', title: 'Ошибка', message: 'Telegram не настроен: нет токена бота' });
+            return;
+        }
+        const chatIds = parseTelegramChatIds(settings.telegramTemplates?.substitutionChatIds);
+        if (chatIds.length === 0) {
+            addToast({
+                type: 'warning',
+                title: 'Куда слать?',
+                message: 'В Настройках → Интеграции укажите Chat ID для замен — туда же уйдёт картинка звонков.'
+            });
+            return;
+        }
+        const preset = settings.bellPresets?.find((p) => p.id === selectedPresetId);
+        const dateStr = exportDate ? formatDateEuropean(exportDate) : '';
+        const fileName = `Звонки_${preset?.name || 'Расписание'}.png`;
+        const caption = [`Расписание звонков`, preset?.name, dateStr].filter(Boolean).join(' · ');
+        setIsSendingTelegram(true);
+        try {
+            await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+            const blob = await exportService.capturePngBlob(exportRef.current);
+            for (const chatId of chatIds) {
+                await exportService.sendTelegramPhoto(privateSettings.telegramToken, chatId, blob, fileName, caption);
+            }
+            addToast({
+                type: 'success',
+                title: 'Отправлено',
+                message: `Картинка звонков ушла в ${chatIds.length} чат(а)`
+            });
+        } catch (e) {
+            logger.error(e);
+            addToast({ type: 'danger', title: 'Ошибка', message: `Не удалось отправить: ${e}` });
+        } finally {
+            setIsSendingTelegram(false);
+        }
     };
 
     const exportBellsToPdf = async () => {
@@ -813,12 +855,26 @@ export const BellsPage = () => {
                                 className="border border-slate-200 dark:border-slate-600 p-2 rounded-xl text-sm font-bold bg-white dark:bg-slate-800 dark:text-white"
                             />
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 flex-wrap justify-center">
                             <button
                                 onClick={exportBellsToPng}
                                 className="px-4 py-2 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition flex items-center gap-2 text-sm shadow-lg shadow-emerald-200 dark:shadow-none"
                             >
                                 <Icon name="Image" size={18} /> Скачать PNG
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => void sendBellsToTelegram()}
+                                disabled={isSendingTelegram}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition flex items-center gap-2 text-sm shadow-lg shadow-blue-200 dark:shadow-none disabled:opacity-50"
+                                aria-label="Отправить PNG звонков в Telegram"
+                            >
+                                {isSendingTelegram ? (
+                                    <Icon name="Loader" className="animate-spin" size={18} />
+                                ) : (
+                                    <Icon name="Send" size={18} />
+                                )}
+                                Telegram
                             </button>
                             <button
                                 onClick={exportBellsToPdf}
