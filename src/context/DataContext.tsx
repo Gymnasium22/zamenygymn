@@ -515,12 +515,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                             err.message?.includes('Conflict') ||
                             err.message?.includes('violates foreign key') ||
                             err.message?.includes('row-level security') ||
-                            err.message?.includes('invalid input syntax');
+                            err.message?.includes('invalid input syntax') ||
+                            err.message?.includes('отменено: запрос удалил бы');
                         if (isDataError) {
                             setSaveStatus('error');
                             setLastSaveError(err.message || err.details || 'целостность данных');
                             handleError.log('Data validation error (not queued):', dbError);
                             const isSchemaError = err.code === 'PGRST204' || err.message?.includes('Could not find');
+                            const isPartialPayloadError = err.message?.includes('отменено: запрос удалил бы');
                             window.dispatchEvent(
                                 new CustomEvent('app-toast', {
                                     detail: {
@@ -528,7 +530,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                                         title: 'Ошибка сохранения',
                                         message: isSchemaError
                                             ? 'В базе данных отсутствуют необходимые колонки. Выполните SQL-миграцию из supabase/migrations/20260629190000_add_settings_columns.sql и перезагрузите страницу.'
-                                            : `Нарушение целостности данных: ${err.message || err.details || 'проверьте связанные записи (классы, расписание, зоны дежурства).'}`
+                                            : isPartialPayloadError
+                                              ? 'Сохранение отменено, чтобы не удалить уже назначенные замены: список был неполным. Обновите страницу и повторите действие.'
+                                              : `Нарушение целостности данных: ${err.message || err.details || 'проверьте связанные записи (классы, расписание, зоны дежурства).'}`
                                     }
                                 })
                             );
@@ -659,51 +663,98 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
         return () => channel.close();
     }, []);
 
+    // История хранит снимки, которые могли устареть: снимок содержит замены на момент
+    // действия, а другие замены, назначенные после него (или в другой вкладке), в нём
+    // отсутствуют. Записывать такой снимок в облако целиком нельзя — syncTable удаляет
+    // строки, которых нет в payload, и назначенные замены бесследно исчезали после
+    // обновления страницы. Поэтому откат/повтор переносит в облако только то, что реально
+    // изменилось относительно текущего состояния, и никогда не удаляет записи.
+    const buildDeltaFromSnapshot = useCallback(
+        (snapshot: AppData, current: AppData): Partial<AppData> => {
+            const delta: Record<string, unknown> = {};
+            const collections: Array<[string, keyof AppData]> = [
+                ['schedule', 'schedule'],
+                ['schedule2', 'schedule2'],
+                ['substitutions', 'substitutions'],
+                ['dutySchedule', 'dutySchedule'],
+                ['nutritionRecords', 'nutritionRecords'],
+                ['absenteeismRecords', 'absenteeismRecords'],
+            ];
+
+            collections.forEach(([key, field]) => {
+                const next = (snapshot[field] as unknown[] | undefined) || [];
+                const prev = (current[field] as unknown[] | undefined) || [];
+                const prevById = new Map<string, unknown>();
+                prev.forEach((item) => {
+                    const id = (item as { id?: string })?.id;
+                    if (id) prevById.set(id, item);
+                });
+                const changed = next.filter((item) => {
+                    const id = (item as { id?: string })?.id;
+                    if (!id) return true;
+                    const before = prevById.get(id);
+                    if (!before) return true;
+                    return JSON.stringify(before) !== JSON.stringify(item);
+                });
+                if (changed.length > 0) delta[key] = changed;
+            });
+
+            const directoryKeys: Array<keyof AppData> = ['teachers', 'subjects', 'classes', 'rooms', 'dutyZones'];
+            directoryKeys.forEach((key) => {
+                const next = (snapshot[key] as unknown[] | undefined) || [];
+                const prev = (current[key] as unknown[] | undefined) || [];
+                if (JSON.stringify(next) !== JSON.stringify(prev)) delta[key as string] = next;
+            });
+
+            if (snapshot.settings && JSON.stringify(snapshot.settings) !== JSON.stringify(current.settings)) {
+                delta.settings = snapshot.settings;
+            }
+
+            return delta as Partial<AppData>;
+        },
+        []
+    );
+
+    const applyHistorySnapshot = useCallback(
+        async (snapshot: AppData, action: string) => {
+            const current = dataRef.current;
+            setInternalData(snapshot);
+            dataRef.current = snapshot;
+            if (isLocalStorageAvailable()) {
+                safeLocalStorageSet(getLocalStorageKey(organizationId), JSON.stringify(snapshot));
+            }
+
+            if (initialData || !user) return;
+            const delta = buildDeltaFromSnapshot(snapshot, current);
+            if (Object.keys(delta).length === 0) return;
+            try {
+                await dataProvider.save(delta, user, organizationId);
+            } catch (e) {
+                handleError.db(e, action);
+            }
+        },
+        [initialData, user, organizationId, dataProvider, buildDeltaFromSnapshot]
+    );
+
     const undo = useCallback(async () => {
         const prev = historyPointerRef.current;
         if (prev > 0) {
             const prevData = historyRef.current[prev - 1];
-            setInternalData(prevData);
-            dataRef.current = prevData;
             setHistoryPointer(prev - 1);
             historyPointerRef.current = prev - 1;
-            // Сохраняем локально
-            if (isLocalStorageAvailable()) {
-                safeLocalStorageSet(getLocalStorageKey(organizationId), JSON.stringify(prevData));
-            }
-
-            if (!initialData && user) {
-                try {
-                    dataProvider.save(prevData, user, organizationId).catch((e) => handleError.db(e, 'отмены изменений'));
-                } catch (e) {
-                    handleError.db(e, 'отмены изменений');
-                }
-            }
+            await applyHistorySnapshot(prevData, 'отмены изменений');
         }
-    }, [initialData, user, organizationId, dataProvider]);
+    }, [applyHistorySnapshot]);
 
     const redo = useCallback(async () => {
         const prev = historyPointerRef.current;
         if (prev < historyRef.current.length - 1) {
             const nextData = historyRef.current[prev + 1];
-            setInternalData(nextData);
-            dataRef.current = nextData;
             setHistoryPointer(prev + 1);
             historyPointerRef.current = prev + 1;
-            // Сохраняем локально
-            if (isLocalStorageAvailable()) {
-                safeLocalStorageSet(getLocalStorageKey(organizationId), JSON.stringify(nextData));
-            }
-
-            if (!initialData && user) {
-                try {
-                    dataProvider.save(nextData, user, organizationId).catch((e) => handleError.db(e, 'повтора изменений'));
-                } catch (e) {
-                    handleError.db(e, 'повтора изменений');
-                }
-            }
+            await applyHistorySnapshot(nextData, 'повтора изменений');
         }
-    }, [initialData, user, organizationId, dataProvider]);
+    }, [applyHistorySnapshot]);
 
     const resetData = useCallback(async () => {
         await saveData(getInitialData());

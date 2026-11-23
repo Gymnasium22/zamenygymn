@@ -144,6 +144,20 @@ const fetchExistingIds = async (tableName: string, ids: string[]): Promise<Set<s
     return found;
 };
 
+/**
+ * Resolve a lesson reference from a non-schedule payload (substitutions, duty, ...).
+ * The value may be a plain string id (`sub_1_2`, legacy seeds) or a UUID that belongs
+ * to another organization. Writing such a value into a UUID FK column aborts the whole
+ * upsert batch, so fall back to a stable seed UUID — the same id the schedule item gets
+ * when it is written by `uuidFromSeed`/`asUuidOrStable`.
+ */
+const resolveScheduleItemRef = (value: unknown): string | null => {
+    if (value == null) return null;
+    const s = String(value).trim();
+    if (!s) return null;
+    return asUuid(s) || uuidFromSeed(s);
+};
+
 export const supabaseDbService = {
     subscribe: (onData: (data: AppData) => void, onError: (error: Error) => void, orgId: string | null) => {
         const loadAll = async () => {
@@ -338,7 +352,7 @@ export const supabaseDbService = {
             tableName: string,
             items: Array<Record<string, unknown>>,
             mapItem: (item: Record<string, unknown>) => Record<string, unknown> | null,
-            options?: { allowEmptyWipe?: boolean }
+            options?: { allowEmptyWipe?: boolean; protectedRows?: boolean }
         ) => {
             if (!items) return;
             const mapped = items.map(mapItem).filter((item): item is Record<string, unknown> => item !== null);
@@ -352,6 +366,26 @@ export const supabaseDbService = {
 
             const existingIds = new Set((existing || []).map((r: Record<string, unknown>) => r.id as string));
             const newIds = new Set(mapped.map((item) => item.id as string).filter(Boolean));
+
+            // `protectedRows`: rows may only be removed by a payload that carries the full
+            // collection. A stale/partial payload (one date, one lesson, a replayed offline
+            // queue item) must never delete rows it simply does not know about — otherwise
+            // assigned substitutions silently vanished and came back "not assigned" after
+            // a page refresh. A handful of genuine removals still goes through.
+            const missingIds = Array.from(existingIds).filter((id) => !newIds.has(id));
+            if (options?.protectedRows && missingIds.length > 0 && !options?.allowEmptyWipe) {
+                const bulkWipe =
+                    missingIds.length > 2 &&
+                    missingIds.length > Math.max(2, Math.ceil(existingIds.size * 0.1));
+                if (bulkWipe) {
+                    logger.error(
+                        `[dbSupabase] Refusing bulk delete on ${tableName}: would remove ${missingIds.length} of ${existingIds.size} rows (payload ${mapped.length})`
+                    );
+                    throw new Error(
+                        `Сохранение ${tableName} отменено: запрос удалил бы ${missingIds.length} из ${existingIds.size} существующих записей. Обновите страницу и повторите.`
+                    );
+                }
+            }
 
             if (mapped.length === 0 && existingIds.size > 0 && !options?.allowEmptyWipe) {
                 logger.error(
@@ -692,13 +726,37 @@ export const supabaseDbService = {
         const existingScheduleItemIds = await fetchExistingIds('schedule_items', substitutionScheduleItemIds);
         existingScheduleItemIds.forEach((id) => scheduleItemIds.add(id));
 
+        // A substitution must never be dropped because of its lesson reference: deleting it
+        // here also removed it from the DB (syncTable deletes rows missing from the payload)
+        // and the assignment came back as "not assigned" after a refresh. Keep the row and
+        // let the FK (`ON DELETE SET NULL`) or a nullable column absorb a stale reference.
         const filterSubstitution = (obj: Record<string, unknown>) => {
             const scheduleItemId = obj.schedule_item_id as string | null;
             if (scheduleItemId && !scheduleItemIds.has(scheduleItemId)) {
-                logger.warn(`Skipping substitution ${obj.id}: schedule_item_id ${scheduleItemId} not found`);
-                return false;
+                logger.warn(
+                    `Substitution ${obj.id}: schedule_item_id ${scheduleItemId} not found — saved with NULL reference`
+                );
+                obj.schedule_item_id = null;
             }
             return true;
+        };
+
+        // Collapse duplicates of the same lesson+date (old code could leave several rows):
+        // keep the most recently touched record so the DB never stores two assignments.
+        const dedupeSubstitutions = <T extends Record<string, unknown>>(rows: T[]): T[] => {
+            const byKey = new Map<string, T>();
+            rows.forEach((row) => {
+                const key = `${row.date ?? ''}|${row.schedule_item_id ?? row.id}`;
+                const prev = byKey.get(key);
+                if (!prev) {
+                    byKey.set(key, row);
+                    return;
+                }
+                const prevTs = String(prev.updated_at ?? '');
+                const nextTs = String(row.updated_at ?? '');
+                byKey.set(key, nextTs >= prevTs ? row : prev);
+            });
+            return Array.from(byKey.values());
         };
 
         if (data.substitutions && (data.schedule || data.schedule2)) {
@@ -707,7 +765,7 @@ export const supabaseDbService = {
 
             await syncTable(
                 'substitutions',
-                data.substitutions as unknown as Record<string, unknown>[],
+                dedupeSubstitutions(data.substitutions as unknown as Record<string, unknown>[]),
                 (s) => {
                     const raw = s as Record<string, unknown>;
                     const repl = raw.replacementTeacherId ?? raw.replacement_teacher_id;
@@ -716,7 +774,7 @@ export const supabaseDbService = {
                         organization_id: orgId,
                         academic_year: raw.academicYear || raw.academic_year || currentYear,
                         date: asDateParam(raw.date),
-                        schedule_item_id: asUuid(raw.scheduleItemId ?? raw.schedule_item_id),
+                        schedule_item_id: resolveScheduleItemRef(raw.scheduleItemId ?? raw.schedule_item_id),
                         original_teacher_id: asUuid(raw.originalTeacherId ?? raw.original_teacher_id),
                         replacement_teacher_id:
                             repl === 'conducted' || repl === 'cancelled' ? repl : asUuid(repl),
@@ -732,36 +790,43 @@ export const supabaseDbService = {
                     });
                     return filterSubstitution(obj) ? obj : null;
                 },
-                { allowEmptyWipe: true }
+                // Only a full restore may drop substitutions; a normal save sends the whole
+                // collection and must not be blocked by the bulk-delete guard.
+                { allowEmptyWipe: isFullRestore, protectedRows: true }
             );
         } else {
             if (data.schedule) await syncScheduleSemester(1, data.schedule);
             if (data.schedule2) await syncScheduleSemester(2, data.schedule2);
             if (data.substitutions) {
-                await syncTable('substitutions', data.substitutions as unknown as Record<string, unknown>[], (s) => {
-                    const raw = s as Record<string, unknown>;
-                    const repl = raw.replacementTeacherId ?? raw.replacement_teacher_id;
-                    const obj = ensureTimestamps({
-                        id: asUuid(raw.id) || genId(),
-                        organization_id: orgId,
-                        academic_year: raw.academicYear || raw.academic_year || currentYear,
-                        date: asDateParam(raw.date),
-                        schedule_item_id: asUuid(raw.scheduleItemId ?? raw.schedule_item_id),
-                        original_teacher_id: asUuid(raw.originalTeacherId ?? raw.original_teacher_id),
-                        replacement_teacher_id:
-                            repl === 'conducted' || repl === 'cancelled' ? repl : asUuid(repl),
-                        replacement_room_id: asUuid(raw.replacementRoomId ?? raw.replacement_room_id),
-                        replacement_class_id: asUuid(raw.replacementClassId ?? raw.replacement_class_id),
-                        replacement_subject_id: asUuid(raw.replacementSubjectId ?? raw.replacement_subject_id),
-                        is_merger: Boolean(raw.isMerger ?? raw.is_merger),
-                        lesson_absence_reason: raw.lessonAbsenceReason ?? raw.lesson_absence_reason ?? null,
-                        refusals: Array.isArray(raw.refusals) ? raw.refusals : [],
-                        comment: raw.comment || null,
-                        day_comment: raw.dayComment ?? raw.day_comment ?? null,
-                        is_read: Boolean(raw.isRead ?? raw.is_read)
-                    });
-                    return filterSubstitution(obj) ? obj : null;
-                });
+                await syncTable(
+                    'substitutions',
+                    dedupeSubstitutions(data.substitutions as unknown as Record<string, unknown>[]),
+                    (s) => {
+                        const raw = s as Record<string, unknown>;
+                        const repl = raw.replacementTeacherId ?? raw.replacement_teacher_id;
+                        const obj = ensureTimestamps({
+                            id: asUuid(raw.id) || genId(),
+                            organization_id: orgId,
+                            academic_year: raw.academicYear || raw.academic_year || currentYear,
+                            date: asDateParam(raw.date),
+                            schedule_item_id: resolveScheduleItemRef(raw.scheduleItemId ?? raw.schedule_item_id),
+                            original_teacher_id: asUuid(raw.originalTeacherId ?? raw.original_teacher_id),
+                            replacement_teacher_id:
+                                repl === 'conducted' || repl === 'cancelled' ? repl : asUuid(repl),
+                            replacement_room_id: asUuid(raw.replacementRoomId ?? raw.replacement_room_id),
+                            replacement_class_id: asUuid(raw.replacementClassId ?? raw.replacement_class_id),
+                            replacement_subject_id: asUuid(raw.replacementSubjectId ?? raw.replacement_subject_id),
+                            is_merger: Boolean(raw.isMerger ?? raw.is_merger),
+                            lesson_absence_reason: raw.lessonAbsenceReason ?? raw.lesson_absence_reason ?? null,
+                            refusals: Array.isArray(raw.refusals) ? raw.refusals : [],
+                            comment: raw.comment || null,
+                            day_comment: raw.dayComment ?? raw.day_comment ?? null,
+                            is_read: Boolean(raw.isRead ?? raw.is_read)
+                        });
+                        return filterSubstitution(obj) ? obj : null;
+                    },
+                    { allowEmptyWipe: isFullRestore, protectedRows: true }
+                );
             }
         }
 
