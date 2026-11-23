@@ -474,10 +474,18 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                 const currentHistory = historyRef.current;
                 const currentPointer = historyPointerRef.current;
 
+                // Инструкции по удалению (например, deletedSubstitutionIds) — это команды для
+                // сохранения, а не часть данных: в состояние и localStorage они не попадают.
+                const { deletedSubstitutionIds, ...stateUpdates } = newData;
+                const dataToPersist: Partial<AppData> =
+                    deletedSubstitutionIds && deletedSubstitutionIds.length > 0
+                        ? { ...stateUpdates, deletedSubstitutionIds }
+                        : stateUpdates;
+
                 // 1. Оптимистичное обновление интерфейса (сразу меняем стейт)
                 // Используем Immer для structural sharing — экономим память в истории
                 const mergedData = produce(currentData, (draft) => {
-                    Object.assign(draft, newData);
+                    Object.assign(draft, stateUpdates);
                 });
                 setInternalData(mergedData);
                 dataRef.current = mergedData;
@@ -497,7 +505,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                 // 3. Пробуем отправить в облако (только для авторизованных и не для публичных данных)
                 if (!initialData && user) {
                     try {
-                        await dataProvider.save(newData, user, organizationId);
+                        await dataProvider.save(dataToPersist, user, organizationId);
                         setSaveStatus(navigator.onLine ? 'saved' : 'offline');
                         setLastSavedAt(Date.now());
                         setLastSaveError(null);
@@ -541,7 +549,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                             throw dbError;
                         } else {
                             // При сетевой/временной ошибке Supabase — в очередь синхронизации, без отката UI
-                            handleError.offline(dbError, 'сохранения данных', newData, organizationId);
+                            handleError.offline(dbError, 'сохранения данных', dataToPersist, organizationId);
                             setSaveStatus('queued');
                             setQueueLength(syncQueue.items.length);
                             // НЕ откатываем интерфейс - данные остались в localStorage и будут синхронизированы позже
@@ -561,7 +569,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode; initialData?: A
                         nutritionRecords: 'nutrition', absenteeismRecords: 'absenteeism',
                         settings: 'settings', bellSchedule: 'bells'
                     };
-                    Object.keys(newData).forEach((key) => {
+                    Object.keys(stateUpdates).forEach((key) => {
                         if (entityMap[key]) {
                             auditLog.log(
                                 user.email || user.id || 'unknown',

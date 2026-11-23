@@ -357,6 +357,11 @@ export interface ScheduleAndSubstitutionDataFields {
     dutySchedule: DutyRecord[];
     nutritionRecords: NutritionRecord[];
     absenteeismRecords: AbsenteeismRecord[];
+    /**
+     * Ids of substitutions the user removed in this action. Only these rows are deleted on the
+     * server — a row that is merely absent from a (possibly stale) snapshot must stay intact.
+     */
+    deletedSubstitutionIds?: string[];
 }
 
 export interface AppData extends StaticAppData {
@@ -367,6 +372,11 @@ export interface AppData extends StaticAppData {
     nutritionRecords: NutritionRecord[]; // New
     absenteeismRecords: AbsenteeismRecord[]; // New
     privateSettings: PrivateSettings; // New
+    /**
+     * Ids of substitutions the user removed in this action. Only these rows are deleted on the
+     * server — a row that is merely absent from a (possibly stale) snapshot must stay intact.
+     */
+    deletedSubstitutionIds?: string[];
 }
 
 export interface CalendarEvent {

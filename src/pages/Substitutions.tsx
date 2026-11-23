@@ -351,6 +351,9 @@ export const SubstitutionsPage = () => {
             const lessonsToProcess = activeSchedule.filter(
                 (s) => s.teacherId === selectedTeacherId && s.day === selectedDayOfWeek
             );
+            const replacedSubs = substitutionsRef.current.filter(
+                (s) => s.originalTeacherId === selectedTeacherId && s.date === selectedDate
+            );
             const existingSubs = substitutionsRef.current.filter(
                 (s) => !(s.originalTeacherId === selectedTeacherId && s.date === selectedDate)
             );
@@ -394,7 +397,10 @@ export const SubstitutionsPage = () => {
                 });
             }
             const newSubs = [...existingSubs, ...createdSubs];
-            await saveScheduleData({ substitutions: newSubs });
+            await saveScheduleData({
+                substitutions: newSubs,
+                deletedSubstitutionIds: replacedSubs.map((s) => s.id)
+            });
             if (batchActionType === 'replace' && mergerCount > 0) {
                 addToast({
                     type: 'info',
@@ -458,6 +464,9 @@ export const SubstitutionsPage = () => {
                 return;
             }
 
+            const replacedSubs = substitutionsRef.current.filter(
+                (s) => s.scheduleItemId === currentSubParams.scheduleItemId && s.date === selectedDate
+            );
             const filteredSubs = substitutionsRef.current.filter(
                 (s) => !(s.scheduleItemId === currentSubParams.scheduleItemId && s.date === selectedDate)
             );
@@ -481,7 +490,12 @@ export const SubstitutionsPage = () => {
 
             filteredSubs.push(subData);
             try {
-                await saveScheduleData({ substitutions: filteredSubs });
+                await saveScheduleData({
+                    substitutions: filteredSubs,
+                    // Заменённая запись того же урока удаляется явно: иначе на сервере остался бы
+                    // старый дубль (другой id, та же пара урок+дата) и «съедал» новую замену.
+                    deletedSubstitutionIds: replacedSubs.map((s) => s.id)
+                });
                 setIsModalOpen(false);
                 setCandidateSearch('');
                 setSelectedRoomId('');
@@ -539,6 +553,9 @@ export const SubstitutionsPage = () => {
                 return;
             }
 
+            const replacedSubs = substitutionsRef.current.filter(
+                (s) => s.scheduleItemId === currentSubParams.scheduleItemId && s.date === selectedDate
+            );
             const newSubs = substitutionsRef.current.filter(
                 (s) => !(s.scheduleItemId === currentSubParams.scheduleItemId && s.date === selectedDate)
             );
@@ -560,7 +577,10 @@ export const SubstitutionsPage = () => {
                 newSubs.push(subData);
             });
 
-            await saveScheduleData({ substitutions: newSubs });
+            await saveScheduleData({
+                substitutions: newSubs,
+                deletedSubstitutionIds: replacedSubs.map((s) => s.id)
+            });
 
             setIsModalOpen(false);
             setCandidateSearch('');
@@ -665,8 +685,14 @@ export const SubstitutionsPage = () => {
 
     const removeSubstitution = useCallback(
         async (id: string) => {
+            const removedSubs = substitutionsRef.current.filter(
+                (s) => s.scheduleItemId === id && s.date === selectedDate
+            );
             const newSubs = substitutionsRef.current.filter((s) => !(s.scheduleItemId === id && s.date === selectedDate));
-            await saveScheduleData({ substitutions: newSubs });
+            await saveScheduleData({
+                substitutions: newSubs,
+                deletedSubstitutionIds: removedSubs.map((s) => s.id)
+            });
             offerUndo('Замена снята', () => undo());
         },
         [selectedDate, saveScheduleData, undo]

@@ -352,7 +352,17 @@ export const supabaseDbService = {
             tableName: string,
             items: Array<Record<string, unknown>>,
             mapItem: (item: Record<string, unknown>) => Record<string, unknown> | null,
-            options?: { allowEmptyWipe?: boolean; protectedRows?: boolean }
+            options?: {
+                allowEmptyWipe?: boolean;
+                protectedRows?: boolean;
+                /** Business key (e.g. date|schedule_item_id) — rows are written one by one and
+                 *  an existing server row with the same key is updated instead of duplicated. */
+                uniqueKey?: (row: Record<string, unknown>) => string | null;
+                /** Column backing `uniqueKey` (used to find the row to update). */
+                uniqueKeyColumn?: string;
+                /** Rows that were removed in the UI. Only these may be deleted from the server. */
+                explicitDeleteIds?: string[];
+            }
         ) => {
             if (!items) return;
             const mapped = items.map(mapItem).filter((item): item is Record<string, unknown> => item !== null);
@@ -397,11 +407,47 @@ export const supabaseDbService = {
             }
 
             if (mapped.length > 0) {
-                const { error: upsertError } = await supabase.from(tableName).upsert(mapped);
-                if (upsertError) throw upsertError;
+                // Rows that change the same lesson+date key are written one by one: if the server
+                // already holds such a row under a different id, a batch upsert would leave the
+                // duplicate behind and the two rows would overwrite each other in the UI.
+                if (options?.uniqueKey) {
+                    const seenKeys = new Set<string>();
+                    for (const row of mapped) {
+                        const key = options.uniqueKey(row);
+                        if (!key || !seenKeys.has(key)) {
+                            if (key) seenKeys.add(key);
+                            const { error: rowError } = await supabase.from(tableName).upsert(row);
+                            if (rowError) throw rowError;
+                            continue;
+                        }
+                        const { data: updatedRows, error: updateError } = await supabase
+                            .from(tableName)
+                            .update(row)
+                            .eq('organization_id', orgId)
+                            .eq(options.uniqueKeyColumn as string, row[options.uniqueKeyColumn as string])
+                            .select('id');
+                        if (updateError) throw updateError;
+                        if (!updatedRows || updatedRows.length === 0) {
+                            const { error: insertError } = await supabase.from(tableName).upsert(row);
+                            if (insertError) throw insertError;
+                        }
+                    }
+                } else {
+                    const { error: upsertError } = await supabase.from(tableName).upsert(mapped);
+                    if (upsertError) throw upsertError;
+                }
             }
 
-            const idsToDelete = Array.from(existingIds).filter((id) => !newIds.has(id));
+            // With an explicit delete list (substitutions) only rows the user actually removed
+            // in this action are deleted. Deleting everything that is merely absent from the
+            // payload is what made one assignment disappear on every save: the client snapshot
+            // may be stale (a realtime refetch in flight, a replayed offline queue item,
+            // another device), and the missing row was treated as "removed".
+            const idsToDelete = options?.explicitDeleteIds
+                ? Array.from(new Set(options.explicitDeleteIds)).filter(
+                      (id) => existingIds.has(id) && !newIds.has(id)
+                  )
+                : Array.from(existingIds).filter((id) => !newIds.has(id));
             const DIRECTORY_TABLES = new Set(['teachers', 'subjects', 'classes', 'rooms']);
             if (DIRECTORY_TABLES.has(tableName) && idsToDelete.length > 0 && !options?.allowEmptyWipe) {
                 const looksLikeSeed =
@@ -759,6 +805,22 @@ export const supabaseDbService = {
             return Array.from(byKey.values());
         };
 
+        // A substitution is identified by its lesson + date, not by its client id. The payload
+        // therefore also carries the ids of the rows the user explicitly removed (`deletedIds`);
+        // everything else that is merely absent from the payload stays untouched on the server.
+        const substitutionKey = (row: Record<string, unknown>): string | null => {
+            const lesson = row.schedule_item_id as string | null;
+            if (!lesson) return null;
+            return `${row.date ?? ''}|${lesson}`;
+        };
+        const substitutionSyncOptions = {
+            uniqueKey: substitutionKey,
+            uniqueKeyColumn: 'schedule_item_id',
+            explicitDeleteIds: Array.isArray((data as Record<string, unknown>).deletedSubstitutionIds)
+                ? ((data as Record<string, unknown>).deletedSubstitutionIds as string[])
+                : []
+        };
+
         if (data.substitutions && (data.schedule || data.schedule2)) {
             if (data.schedule) await syncScheduleSemester(1, data.schedule);
             if (data.schedule2) await syncScheduleSemester(2, data.schedule2);
@@ -790,9 +852,8 @@ export const supabaseDbService = {
                     });
                     return filterSubstitution(obj) ? obj : null;
                 },
-                // Only a full restore may drop substitutions; a normal save sends the whole
-                // collection and must not be blocked by the bulk-delete guard.
-                { allowEmptyWipe: isFullRestore, protectedRows: true }
+                // A normal save sends the whole collection; only a full restore may drop rows.
+                { allowEmptyWipe: isFullRestore, protectedRows: true, ...substitutionSyncOptions }
             );
         } else {
             if (data.schedule) await syncScheduleSemester(1, data.schedule);
@@ -825,7 +886,7 @@ export const supabaseDbService = {
                         });
                         return filterSubstitution(obj) ? obj : null;
                     },
-                    { allowEmptyWipe: isFullRestore, protectedRows: true }
+                    { allowEmptyWipe: isFullRestore, protectedRows: true, ...substitutionSyncOptions }
                 );
             }
         }
