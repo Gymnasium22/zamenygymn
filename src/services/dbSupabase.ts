@@ -71,6 +71,33 @@ const asOrder = (value: unknown): number | null => {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/** Columns that are refreshed on every write and therefore never mark a row as "changed". */
+const VOLATILE_COLUMNS = new Set(['created_at', 'updated_at']);
+
+/** Compare the values that actually go to the server, ignoring key order and timestamps. */
+const sameRowContent = (a: Record<string, unknown>, b: Record<string, unknown>): boolean => {
+    const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+    for (const key of keys) {
+        if (VOLATILE_COLUMNS.has(key)) continue;
+        const va = a[key] ?? null;
+        const vb = b[key] ?? null;
+        if (va === vb) continue;
+        if (va && vb && typeof va === 'object' && typeof vb === 'object') {
+            if (JSON.stringify(va) === JSON.stringify(vb)) continue;
+        }
+        return false;
+    }
+    return true;
+};
+
+/**
+ * PostgREST sends the whole statement as one request body. A save of the substitution list
+ * on a busy day easily reaches a few hundred rows (each with refusals/comment text), which
+ * over a mobile connection becomes a multi-megabyte body — the "Сохранение…" indicator then
+ * hangs for many seconds. Split large writes into chunks.
+ */
+const WRITE_CHUNK_SIZE = 200;
+
 /** Empty string is not a valid UUID — sending it makes PostgREST reject the whole batch. */
 const asUuid = (value: unknown): string | null => {
     if (typeof value !== 'string') return null;
@@ -135,14 +162,21 @@ const fetchExistingIds = async (tableName: string, ids: string[]): Promise<Set<s
 
     const chunkSize = 100;
     const found = new Set<string>();
-    for (let i = 0; i < uniqueIds.length; i += chunkSize) {
-        const chunk = uniqueIds.slice(i, i + chunkSize);
-        const { data: rows, error } = await supabase.from(tableName).select('id').in('id', chunk);
+    // Chunks are independent — run them in parallel instead of one round-trip after another.
+    const chunks: string[][] = [];
+    for (let i = 0; i < uniqueIds.length; i += chunkSize) chunks.push(uniqueIds.slice(i, i + chunkSize));
+    const results = await Promise.all(
+        chunks.map((chunk) => supabase.from(tableName).select('id').in('id', chunk))
+    );
+    results.forEach(({ data: rows, error }) => {
         if (error) throw error;
         (rows || []).forEach((r: Record<string, unknown>) => found.add(r.id as string));
-    }
+    });
     return found;
 };
+
+/** Rows already stored on the server, used to skip unchanged writes. */
+type ExistingRow = { id: string } & Record<string, unknown>;
 
 /**
  * Resolve a lesson reference from a non-schedule payload (substitutions, duty, ...).
@@ -355,8 +389,8 @@ export const supabaseDbService = {
             options?: {
                 allowEmptyWipe?: boolean;
                 protectedRows?: boolean;
-                /** Business key (e.g. date|schedule_item_id) — rows are written one by one and
-                 *  an existing server row with the same key is updated instead of duplicated. */
+                /** Business key (e.g. date|schedule_item_id) — rows are matched against the server
+                 *  by this key, so an existing row is updated instead of duplicated. */
                 uniqueKey?: (row: Record<string, unknown>) => string | null;
                 /** Column backing `uniqueKey` (used to find the row to update). */
                 uniqueKeyColumn?: string;
@@ -365,16 +399,27 @@ export const supabaseDbService = {
             }
         ) => {
             if (!items) return;
+            const startedAt = Date.now();
             const mapped = items.map(mapItem).filter((item): item is Record<string, unknown> => item !== null);
 
+            // When rows are matched by business key we need their current content as well, so
+            // that rows the user did not touch are not re-sent. That turns a save of one lesson
+            // into a single small write instead of re-uploading every substitution of the year.
+            const needsContent = !!options?.uniqueKey;
+            const existingColumns = needsContent ? '*:id' : 'id';
             const { data: existing, error: fetchError } = await supabase
                 .from(tableName)
-                .select('id')
+                .select(existingColumns)
                 .eq('organization_id', orgId);
 
             if (fetchError) throw fetchError;
 
-            const existingIds = new Set((existing || []).map((r: Record<string, unknown>) => r.id as string));
+            const existingRows = (existing || []) as unknown as ExistingRow[];
+            const existingById = new Map<string, ExistingRow>();
+            existingRows.forEach((row) => {
+                if (row && typeof row.id === 'string') existingById.set(row.id, row);
+            });
+            const existingIds = new Set(existingById.keys());
             const newIds = new Set(mapped.map((item) => item.id as string).filter(Boolean));
 
             // `protectedRows`: rows may only be removed by a payload that carries the full
@@ -407,34 +452,82 @@ export const supabaseDbService = {
             }
 
             if (mapped.length > 0) {
-                // Rows that change the same lesson+date key are written one by one: if the server
-                // already holds such a row under a different id, a batch upsert would leave the
-                // duplicate behind and the two rows would overwrite each other in the UI.
+                // Rows are matched against the server by their business key (lesson + date) and
+                // written in bulk. The previous version awaited one round-trip per row — a save
+                // of the whole substitution list issued ~95 sequential HTTP POSTs and the
+                // «Сохранение — отправка в облако» badge hung for many seconds.
                 if (options?.uniqueKey) {
-                    const seenKeys = new Set<string>();
+                    const uniqueKey = options.uniqueKey;
+                    const uniqueKeyColumn = options.uniqueKeyColumn as string;
+
+                    // Group server rows by the same business key to find duplicates / existing rows.
+                    const existingByKey = new Map<string, ExistingRow>();
+                    existingRows.forEach((row) => {
+                        const key = uniqueKey(row);
+                        if (!key) return;
+                        const prev = existingByKey.get(key);
+                        // Prefer the most recently updated row (the one the UI would show).
+                        if (!prev || String(row.updated_at ?? '') >= String(prev.updated_at ?? '')) {
+                            existingByKey.set(key, row);
+                        }
+                    });
+
+                    const toWrite: Array<{ row: Record<string, unknown>; byKey: boolean }> = [];
+                    const writtenKeys = new Set<string>();
                     for (const row of mapped) {
-                        const key = options.uniqueKey(row);
-                        if (!key || !seenKeys.has(key)) {
-                            if (key) seenKeys.add(key);
-                            const { error: rowError } = await supabase.from(tableName).upsert(row);
-                            if (rowError) throw rowError;
+                        const key = uniqueKey(row);
+                        const target = key ? existingByKey.get(key) : undefined;
+
+                        if (target) {
+                            // Same lesson+date already stored: reuse its id so no duplicate appears,
+                            // and skip the write when nothing but the timestamp would change.
+                            row.id = target.id;
+                            if (sameRowContent(row, target)) {
+                                if (key) writtenKeys.add(key);
+                                continue;
+                            }
+                        } else if (key && writtenKeys.has(key)) {
+                            // Second row for the same key inside one payload — update the first.
+                            toWrite.push({ row, byKey: true });
                             continue;
                         }
-                        const { data: updatedRows, error: updateError } = await supabase
-                            .from(tableName)
-                            .update(row)
-                            .eq('organization_id', orgId)
-                            .eq(options.uniqueKeyColumn as string, row[options.uniqueKeyColumn as string])
-                            .select('id');
-                        if (updateError) throw updateError;
-                        if (!updatedRows || updatedRows.length === 0) {
-                            const { error: insertError } = await supabase.from(tableName).upsert(row);
-                            if (insertError) throw insertError;
-                        }
+
+                        if (key) writtenKeys.add(key);
+                        toWrite.push({ row, byKey: false });
+                    }
+
+                    if (toWrite.length > 0) {
+                        logger.log(`[DB Save] ${tableName}: writing ${toWrite.length} of ${mapped.length} rows`);
+                    }
+
+                    for (let i = 0; i < toWrite.length; i += WRITE_CHUNK_SIZE) {
+                        const chunk = toWrite.slice(i, i + WRITE_CHUNK_SIZE);
+                        const plain = chunk.filter((w) => !w.byKey).map((w) => w.row);
+                        const byKey = chunk.filter((w) => w.byKey).map((w) => w.row);
+
+                        await Promise.all([
+                            plain.length > 0
+                                ? (async () => {
+                                      const { error } = await supabase.from(tableName).upsert(plain);
+                                      if (error) throw error;
+                                  })()
+                                : Promise.resolve(),
+                            ...byKey.map(async (row) => {
+                                const { error } = await supabase
+                                    .from(tableName)
+                                    .update(row)
+                                    .eq('organization_id', orgId)
+                                    .eq(uniqueKeyColumn, row[uniqueKeyColumn] as string);
+                                if (error) throw error;
+                            })
+                        ]);
                     }
                 } else {
-                    const { error: upsertError } = await supabase.from(tableName).upsert(mapped);
-                    if (upsertError) throw upsertError;
+                    for (let i = 0; i < mapped.length; i += WRITE_CHUNK_SIZE) {
+                        const chunk = mapped.slice(i, i + WRITE_CHUNK_SIZE);
+                        const { error: upsertError } = await supabase.from(tableName).upsert(chunk);
+                        if (upsertError) throw upsertError;
+                    }
                 }
             }
 
@@ -473,6 +566,10 @@ export const supabaseDbService = {
                     .in('id', idsToDelete);
                 if (deleteError) throw deleteError;
             }
+
+            logger.log(
+                `[DB Save] ${tableName}: ${mapped.length} rows, ${idsToDelete.length} deleted in ${Date.now() - startedAt}ms`
+            );
         };
 
         // 1. Reference tables (must be saved BEFORE schedule_items because of FK constraints)
@@ -728,6 +825,7 @@ export const supabaseDbService = {
                     .in('id', idsToDelete);
                 if (deleteError) throw deleteError;
             }
+            logger.log(`[DB Save] schedule_items (${semester}): ${items.length} rows, ${idsToDelete.length} deleted`);
         };
 
         // During full imports, skip rows that reference classes/subjects/teachers/rooms
@@ -821,74 +919,40 @@ export const supabaseDbService = {
                 : []
         };
 
-        if (data.substitutions && (data.schedule || data.schedule2)) {
-            if (data.schedule) await syncScheduleSemester(1, data.schedule);
-            if (data.schedule2) await syncScheduleSemester(2, data.schedule2);
+        const mapSubstitution = (s: Record<string, unknown>): Record<string, unknown> | null => {
+            const repl = s.replacementTeacherId ?? s.replacement_teacher_id;
+            const obj = ensureTimestamps({
+                id: asUuid(s.id) || genId(),
+                organization_id: orgId,
+                academic_year: s.academicYear || s.academic_year || currentYear,
+                date: asDateParam(s.date),
+                schedule_item_id: resolveScheduleItemRef(s.scheduleItemId ?? s.schedule_item_id),
+                original_teacher_id: asUuid(s.originalTeacherId ?? s.original_teacher_id),
+                replacement_teacher_id: repl === 'conducted' || repl === 'cancelled' ? repl : asUuid(repl),
+                replacement_room_id: asUuid(s.replacementRoomId ?? s.replacement_room_id),
+                replacement_class_id: asUuid(s.replacementClassId ?? s.replacement_class_id),
+                replacement_subject_id: asUuid(s.replacementSubjectId ?? s.replacement_subject_id),
+                is_merger: Boolean(s.isMerger ?? s.is_merger),
+                lesson_absence_reason: s.lessonAbsenceReason ?? s.lesson_absence_reason ?? null,
+                refusals: Array.isArray(s.refusals) ? s.refusals : [],
+                comment: s.comment || null,
+                day_comment: s.dayComment ?? s.day_comment ?? null,
+                is_read: Boolean(s.isRead ?? s.is_read)
+            });
+            return filterSubstitution(obj) ? obj : null;
+        };
 
+        if (data.schedule) await syncScheduleSemester(1, data.schedule);
+        if (data.schedule2) await syncScheduleSemester(2, data.schedule2);
+
+        if (data.substitutions) {
             await syncTable(
                 'substitutions',
                 dedupeSubstitutions(data.substitutions as unknown as Record<string, unknown>[]),
-                (s) => {
-                    const raw = s as Record<string, unknown>;
-                    const repl = raw.replacementTeacherId ?? raw.replacement_teacher_id;
-                    const obj = ensureTimestamps({
-                        id: asUuid(raw.id) || genId(),
-                        organization_id: orgId,
-                        academic_year: raw.academicYear || raw.academic_year || currentYear,
-                        date: asDateParam(raw.date),
-                        schedule_item_id: resolveScheduleItemRef(raw.scheduleItemId ?? raw.schedule_item_id),
-                        original_teacher_id: asUuid(raw.originalTeacherId ?? raw.original_teacher_id),
-                        replacement_teacher_id:
-                            repl === 'conducted' || repl === 'cancelled' ? repl : asUuid(repl),
-                        replacement_room_id: asUuid(raw.replacementRoomId ?? raw.replacement_room_id),
-                        replacement_class_id: asUuid(raw.replacementClassId ?? raw.replacement_class_id),
-                        replacement_subject_id: asUuid(raw.replacementSubjectId ?? raw.replacement_subject_id),
-                        is_merger: Boolean(raw.isMerger ?? raw.is_merger),
-                        lesson_absence_reason: raw.lessonAbsenceReason ?? raw.lesson_absence_reason ?? null,
-                        refusals: Array.isArray(raw.refusals) ? raw.refusals : [],
-                        comment: raw.comment || null,
-                        day_comment: raw.dayComment ?? raw.day_comment ?? null,
-                        is_read: Boolean(raw.isRead ?? raw.is_read)
-                    });
-                    return filterSubstitution(obj) ? obj : null;
-                },
+                mapSubstitution,
                 // A normal save sends the whole collection; only a full restore may drop rows.
                 { allowEmptyWipe: isFullRestore, protectedRows: true, ...substitutionSyncOptions }
             );
-        } else {
-            if (data.schedule) await syncScheduleSemester(1, data.schedule);
-            if (data.schedule2) await syncScheduleSemester(2, data.schedule2);
-            if (data.substitutions) {
-                await syncTable(
-                    'substitutions',
-                    dedupeSubstitutions(data.substitutions as unknown as Record<string, unknown>[]),
-                    (s) => {
-                        const raw = s as Record<string, unknown>;
-                        const repl = raw.replacementTeacherId ?? raw.replacement_teacher_id;
-                        const obj = ensureTimestamps({
-                            id: asUuid(raw.id) || genId(),
-                            organization_id: orgId,
-                            academic_year: raw.academicYear || raw.academic_year || currentYear,
-                            date: asDateParam(raw.date),
-                            schedule_item_id: resolveScheduleItemRef(raw.scheduleItemId ?? raw.schedule_item_id),
-                            original_teacher_id: asUuid(raw.originalTeacherId ?? raw.original_teacher_id),
-                            replacement_teacher_id:
-                                repl === 'conducted' || repl === 'cancelled' ? repl : asUuid(repl),
-                            replacement_room_id: asUuid(raw.replacementRoomId ?? raw.replacement_room_id),
-                            replacement_class_id: asUuid(raw.replacementClassId ?? raw.replacement_class_id),
-                            replacement_subject_id: asUuid(raw.replacementSubjectId ?? raw.replacement_subject_id),
-                            is_merger: Boolean(raw.isMerger ?? raw.is_merger),
-                            lesson_absence_reason: raw.lessonAbsenceReason ?? raw.lesson_absence_reason ?? null,
-                            refusals: Array.isArray(raw.refusals) ? raw.refusals : [],
-                            comment: raw.comment || null,
-                            day_comment: raw.dayComment ?? raw.day_comment ?? null,
-                            is_read: Boolean(raw.isRead ?? raw.is_read)
-                        });
-                        return filterSubstitution(obj) ? obj : null;
-                    },
-                    { allowEmptyWipe: isFullRestore, protectedRows: true, ...substitutionSyncOptions }
-                );
-            }
         }
 
         // 5. Bell schedule (low priority, wrapped in try/catch because id column is uuid type)
