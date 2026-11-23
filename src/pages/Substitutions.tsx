@@ -802,8 +802,15 @@ export const SubstitutionsPage = () => {
             const subj = subjects.find((s) => s.id === item.subjectId);
             const origT = teachers.find((t) => t.id === sub.originalTeacherId);
             const repT = teachers.find((t) => t.id === sub.replacementTeacherId);
-            const roomObj = rooms.find((r) => r.id === (sub.replacementRoomId || item.roomId));
-            const roomName = roomObj ? roomObj.name : sub.replacementRoomId || item.roomId || '—';
+            // У подгрупп кабинеты могут отличаться — собираем кабинеты по всем строкам урока.
+            const groupRoomNames = groupSubs
+                .map((x) => {
+                    const roomId = x.replacementRoomId || item.roomId;
+                    return rooms.find((r) => r.id === roomId)?.name || roomId;
+                })
+                .filter((n): n is string => Boolean(n))
+                .filter((n, idx, arr) => arr.indexOf(n) === idx);
+            const roomName = groupRoomNames.length > 0 ? groupRoomNames.join(', ') : '—';
 
             text += `🔹 **${item.period} урок** | ${escapeMarkdown(cls?.name)} | ${escapeMarkdown(subj?.name)}\n`;
             text += `❌ ${escapeMarkdown(origT?.name)}\n`;

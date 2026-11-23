@@ -144,11 +144,28 @@ export const SubstitutionExportSheet = React.forwardRef<HTMLDivElement, Substitu
                                 const subj = subjectsById.get(s.subjectId);
                                 const t1 = teachersById.get(sub.originalTeacherId);
 
+                                // При объединении с классом на подгруппах кабинеты у подгрупп разные —
+                                // показываем все кабинеты замены.
+                                const roomNamesOf = (ids: (string | undefined)[]) =>
+                                    ids
+                                        .filter((id): id is string => Boolean(id))
+                                        .map((id) => roomsById.get(id)?.name || id)
+                                        .filter((name, idx, arr) => arr.indexOf(name) === idx);
+
                                 const newRoomId = sub.replacementRoomId;
                                 const oldRoomObj = s.roomId ? roomsById.get(s.roomId) : null;
                                 const oldRoomName = oldRoomObj ? oldRoomObj.name : s.roomId || '—';
+                                const replacementRoomNames = roomNamesOf(lessonSubs.map((ls) => ls.replacementRoomId));
                                 const newRoomObj = newRoomId ? roomsById.get(newRoomId) : null;
-                                const newRoomName = newRoomObj ? newRoomObj.name : newRoomId || '—';
+                                const newRoomName =
+                                    replacementRoomNames.length > 0
+                                        ? replacementRoomNames.join(', ')
+                                        : newRoomObj
+                                          ? newRoomObj.name
+                                          : newRoomId || '—';
+                                const isRoomChangedMulti =
+                                    replacementRoomNames.length > 0 &&
+                                    replacementRoomNames.some((name) => name !== oldRoomName);
 
                                 const isCancelled = sub.replacementTeacherId === 'cancelled';
                                 const dayReason = t1?.absenceReasons?.[exportDate];
@@ -260,9 +277,9 @@ export const SubstitutionExportSheet = React.forwardRef<HTMLDivElement, Substitu
                                             )}
                                         </td>
                                         <td
-                                            className={`py-3 px-2 text-right font-mono font-black ${newRoomId ? 'text-indigo-600' : 'text-slate-700'}`}
+                                            className={`py-3 px-2 text-right font-mono font-black ${isRoomChangedMulti ? 'text-indigo-600' : 'text-slate-700'}`}
                                         >
-                                            {newRoomId && newRoomId !== s.roomId ? (
+                                            {isRoomChangedMulti ? (
                                                 <div className="flex items-center justify-end gap-2 text-xl whitespace-nowrap">
                                                     <span className="text-slate-400 decoration-4 text-xl">
                                                         {oldRoomName}
@@ -273,7 +290,9 @@ export const SubstitutionExportSheet = React.forwardRef<HTMLDivElement, Substitu
                                                     </span>
                                                 </div>
                                             ) : (
-                                                <span className="text-xl">{oldRoomName}</span>
+                                                <span className="text-xl">
+                                                    {replacementRoomNames.length > 0 ? newRoomName : oldRoomName}
+                                                </span>
                                             )}
                                         </td>
                                     </tr>

@@ -1096,11 +1096,25 @@ export const ExportPage = () => {
                     }
 
                     const originalRoomId = scheduleItem.roomId;
-                    const replacementRoomId = firstSub.replacementRoomId;
-                    const actualRoomId = replacementRoomId || originalRoomId;
-                    const roomObj = rooms.find((r) => r.id === actualRoomId);
-                    const roomName = roomObj ? roomObj.name : actualRoomId || '-';
-                    const roomDisplay = replacementRoomId ? `${roomName} (Замена каб.)` : roomName;
+                    const replacementRoomIds = subs
+                        .map((s) => s.replacementRoomId)
+                        .filter((id): id is string => Boolean(id));
+                    const roomNameOf = (id?: string) => {
+                        if (!id) return '-';
+                        const roomObj = rooms.find((r) => r.id === id);
+                        return roomObj ? roomObj.name : id;
+                    };
+                    // Кабинеты подгрупп при объединении могут отличаться — перечисляем все.
+                    const replacementRoomNames = replacementRoomIds
+                        .map(roomNameOf)
+                        .filter((n, idx, arr) => arr.indexOf(n) === idx);
+                    const originalRoomName = roomNameOf(originalRoomId);
+                    const roomName =
+                        replacementRoomNames.length > 0 ? replacementRoomNames.join(', ') : originalRoomName;
+                    const roomDisplay =
+                        replacementRoomNames.length > 0
+                            ? `${originalRoomName} → ${roomName} (Замена каб.)`
+                            : roomName;
 
                     return `
                     <tr>

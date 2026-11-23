@@ -78,15 +78,35 @@ export const LessonCard: React.FC<LessonCardProps> = ({
     const cls = classes.find((c) => c.id === l.classId);
 
     const originalRoomName = rooms.find((r) => r.id === l.roomId)?.name || l.roomId || '—';
-    const replacementRoomId = firstSub?.replacementRoomId;
-    const replacementRoomName = replacementRoomId
-        ? rooms.find((r) => r.id === replacementRoomId)?.name || replacementRoomId
-        : null;
-    const isRoomChanged = replacementRoomId && replacementRoomId !== l.roomId;
+
+    // Кабинеты берём по каждой строке замены отдельно: при объединении с классом на подгруппах
+    // подгруппы сидят в разных кабинетах, и на карточке должны быть видны все кабинеты замены.
+    const roomNameOf = (id?: string | null) => (id ? rooms.find((r) => r.id === id)?.name || id : null);
+    const roomEntries = subs
+        .map((s) => ({ sub: s, name: roomNameOf(s.replacementRoomId) }))
+        .filter((e): e is { sub: Substitution; name: string } => Boolean(e.name));
+    const uniqueRoomNames = roomEntries
+        .map((e) => e.name)
+        .filter((name, idx, arr) => arr.indexOf(name) === idx);
+
+    const replacementRoomName = uniqueRoomNames.length > 0 ? uniqueRoomNames.join(', ') : null;
+    const isRoomChanged =
+        uniqueRoomNames.length > 0 && uniqueRoomNames.some((name) => name !== originalRoomName);
 
     const isCancelled = firstSub?.replacementTeacherId === 'cancelled';
     const isConducted = firstSub?.replacementTeacherId === 'conducted';
     const comment = firstSub?.comment;
+
+    // У каждого заменяющего свой кабинет (у подгрупп он может отличаться).
+    const telegramRoomFor = (sub: Substitution | null | undefined) => {
+        const own = roomNameOf(sub?.replacementRoomId);
+        if (!own) return originalRoomName;
+        return own !== originalRoomName ? `${originalRoomName} -> ${own}` : own;
+    };
+    const telegramRoomChangedFor = (sub: Substitution | null | undefined) => {
+        const own = roomNameOf(sub?.replacementRoomId);
+        return Boolean(own && own !== originalRoomName);
+    };
 
     if (isCompactMode) {
         return (
@@ -139,7 +159,7 @@ export const LessonCard: React.FC<LessonCardProps> = ({
                         </div>
                     ) : (
                         <div className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded font-bold text-slate-500">
-                            {originalRoomName}
+                            {replacementRoomName && !isRoomChanged ? replacementRoomName : originalRoomName}
                         </div>
                     )}
 
@@ -172,17 +192,14 @@ export const LessonCard: React.FC<LessonCardProps> = ({
                                             key={e.teacher.id}
                                             type="button"
                                             onClick={() => {
-                                                const roomInfo = isRoomChanged
-                                                    ? `${originalRoomName} -> ${replacementRoomName}`
-                                                    : originalRoomName;
                                                 onTelegramClick({
                                                     teacherId: e.teacher.id,
                                                     lessonId: l.id,
-                                                    roomName: roomInfo,
+                                                    roomName: telegramRoomFor(e.sub),
                                                     className: cls?.name || '?',
                                                     subjectName: subj?.name || '?',
                                                     period: l.period,
-                                                    roomChanged: !!isRoomChanged
+                                                    roomChanged: telegramRoomChangedFor(e.sub)
                                                 });
                                             }}
                                             className="min-h-[36px] min-w-[36px] p-1.5 bg-blue-50 text-blue-600 rounded-lg"
@@ -255,7 +272,7 @@ export const LessonCard: React.FC<LessonCardProps> = ({
                             </div>
                         ) : (
                             <div className="text-xs font-mono bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded inline-block font-bold">
-                                {originalRoomName}
+                                {replacementRoomName && !isRoomChanged ? replacementRoomName : originalRoomName}
                             </div>
                         )}
                     </div>
@@ -313,17 +330,14 @@ export const LessonCard: React.FC<LessonCardProps> = ({
                                     <button
                                         key={e.teacher.id}
                                         onClick={() => {
-                                            const roomInfo = isRoomChanged
-                                                ? `${originalRoomName} -> ${replacementRoomName}`
-                                                : originalRoomName;
                                             onTelegramClick({
                                                 teacherId: e.teacher.id,
                                                 lessonId: l.id,
-                                                roomName: roomInfo,
+                                                roomName: telegramRoomFor(e.sub),
                                                 className: cls?.name || '?',
                                                 subjectName: subj?.name || '?',
                                                 period: l.period,
-                                                roomChanged: !!isRoomChanged
+                                                roomChanged: telegramRoomChangedFor(e.sub)
                                             });
                                         }}
                                         className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
