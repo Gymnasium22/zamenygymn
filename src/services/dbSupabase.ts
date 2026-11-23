@@ -28,6 +28,39 @@ const fromSnakeCase = (obj: Record<string, unknown>): Record<string, unknown> =>
     return result;
 };
 
+// A substitution is identified by its lesson + date, not by its client id. The payload
+// therefore also carries the ids of the rows the user explicitly removed (`deletedIds`);
+// everything else that is merely absent from the payload stays untouched on the server.
+// При объединении с классом на подгруппах у одного урока несколько заменяющих учителей —
+// учитель входит в ключ, иначе две строки склеиваются в одну и один учитель теряется.
+export const substitutionKey = (row: Record<string, unknown>): string | null => {
+    const lesson = row.schedule_item_id as string | null;
+    if (!lesson) return null;
+    const teacher = row.replacement_teacher_id as string | null;
+    const base = `${row.date ?? ''}|${lesson}`;
+    return teacher ? `${base}|${teacher}` : base;
+};
+
+// Collapse duplicates of the same lesson+date+teacher (old code could leave several rows):
+// keep the most recently touched record so the DB never stores two assignments.
+// Исключение — объединение с классом на подгруппах: там на один урок приходится по строке
+// на каждую подгруппу (разные заменяющие учителя), такие строки не схлопываются.
+export const dedupeSubstitutions = <T extends Record<string, unknown>>(rows: T[]): T[] => {
+    const byKey = new Map<string, T>();
+    rows.forEach((row) => {
+        const key = substitutionKey(row) ?? `${row.date ?? ''}|${row.schedule_item_id ?? row.id}`;
+        const prev = byKey.get(key);
+        if (!prev) {
+            byKey.set(key, row);
+            return;
+        }
+        const prevTs = String(prev.updated_at ?? '');
+        const nextTs = String(row.updated_at ?? '');
+        byKey.set(key, nextTs >= prevTs ? row : prev);
+    });
+    return Array.from(byKey.values());
+};
+
 
 /** Postgres DATE / ISO → YYYY-MM-DD for the app */
 const toDateOnly = (value: unknown): string | undefined => {
@@ -479,15 +512,23 @@ export const supabaseDbService = {
                         const target = key ? existingByKey.get(key) : undefined;
 
                         if (target) {
-                            // Same lesson+date already stored: reuse its id so no duplicate appears,
-                            // and skip the write when nothing but the timestamp would change.
+                            // Same business key already stored: reuse its id so no duplicate
+                            // appears, and skip the write when nothing but the timestamp changes.
                             row.id = target.id;
                             if (sameRowContent(row, target)) {
                                 if (key) writtenKeys.add(key);
                                 continue;
                             }
                         } else if (key && writtenKeys.has(key)) {
-                            // Second row for the same key inside one payload — update the first.
+                            // Second row for the same key inside one payload. Update the row this
+                            // save just wrote for that key — `.eq(uniqueKeyColumn, …)` would touch
+                            // every row sharing that column (all subgroups of one lesson).
+                            const first = toWrite.find((w) => !w.byKey && key === uniqueKey(w.row));
+                            if (first) {
+                                row.id = first.row.id;
+                                first.row = row;
+                                continue;
+                            }
                             toWrite.push({ row, byKey: true });
                             continue;
                         }
@@ -885,32 +926,6 @@ export const supabaseDbService = {
             return true;
         };
 
-        // Collapse duplicates of the same lesson+date (old code could leave several rows):
-        // keep the most recently touched record so the DB never stores two assignments.
-        const dedupeSubstitutions = <T extends Record<string, unknown>>(rows: T[]): T[] => {
-            const byKey = new Map<string, T>();
-            rows.forEach((row) => {
-                const key = `${row.date ?? ''}|${row.schedule_item_id ?? row.id}`;
-                const prev = byKey.get(key);
-                if (!prev) {
-                    byKey.set(key, row);
-                    return;
-                }
-                const prevTs = String(prev.updated_at ?? '');
-                const nextTs = String(row.updated_at ?? '');
-                byKey.set(key, nextTs >= prevTs ? row : prev);
-            });
-            return Array.from(byKey.values());
-        };
-
-        // A substitution is identified by its lesson + date, not by its client id. The payload
-        // therefore also carries the ids of the rows the user explicitly removed (`deletedIds`);
-        // everything else that is merely absent from the payload stays untouched on the server.
-        const substitutionKey = (row: Record<string, unknown>): string | null => {
-            const lesson = row.schedule_item_id as string | null;
-            if (!lesson) return null;
-            return `${row.date ?? ''}|${lesson}`;
-        };
         const substitutionSyncOptions = {
             uniqueKey: substitutionKey,
             uniqueKeyColumn: 'schedule_item_id',

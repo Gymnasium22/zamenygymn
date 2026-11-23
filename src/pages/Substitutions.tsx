@@ -489,6 +489,34 @@ export const SubstitutionsPage = () => {
             };
 
             filteredSubs.push(subData);
+
+            // Объединение с классом, разбитым на подгруппы: у присоединяемого класса два урока
+            // (по одному на подгруппу) с разными учителями — на каждого нужна своя строка замены,
+            // иначе на карточке останется только один заменяющий учитель.
+            if (isMerger) {
+                const mergedLessons = activeSchedule.filter(
+                    (s) =>
+                        s.classId !== item.classId &&
+                        s.day === item.day &&
+                        s.period === item.period &&
+                        s.shift === item.shift &&
+                        s.id !== item.id &&
+                        s.teacherId === replacementId
+                );
+                mergedLessons.forEach((lesson) => {
+                    const extraSub: Substitution = {
+                        ...subData,
+                        id: generateId(),
+                        originalTeacherId: lesson.teacherId,
+                        replacementTeacherId: lesson.teacherId,
+                        replacementClassId: lesson.classId,
+                        replacementSubjectId: lesson.subjectId,
+                        replacementRoomId: lesson.roomId || subData.replacementRoomId,
+                        refusals: []
+                    };
+                    filteredSubs.push(extraSub);
+                });
+            }
             try {
                 await saveScheduleData({
                     substitutions: filteredSubs,
@@ -762,6 +790,14 @@ export const SubstitutionsPage = () => {
             const item = activeSchedule.find((i) => i.id === sub.scheduleItemId);
             if (!item) return;
 
+            // Объединение с классом на подгруппах даёт несколько строк замены на один урок —
+            // перечисляем всех заменяющих учителей.
+            const groupSubs = sortedSubs.filter((x) => x.scheduleItemId === sub.scheduleItemId);
+            const repNames = groupSubs
+                .map((x) => teachers.find((t) => t.id === x.replacementTeacherId)?.name)
+                .filter((n): n is string => Boolean(n))
+                .filter((n, idx, arr) => arr.indexOf(n) === idx);
+
             const cls = classes.find((c) => c.id === item.classId);
             const subj = subjects.find((s) => s.id === item.subjectId);
             const origT = teachers.find((t) => t.id === sub.originalTeacherId);
@@ -772,13 +808,15 @@ export const SubstitutionsPage = () => {
             text += `🔹 **${item.period} урок** | ${escapeMarkdown(cls?.name)} | ${escapeMarkdown(subj?.name)}\n`;
             text += `❌ ${escapeMarkdown(origT?.name)}\n`;
 
-            if (sub.isMerger) {
-                text += `✅ ОБЪЕДИНЕНИЕ: ${escapeMarkdown(repT?.name)}\n`;
+            const repList = escapeMarkdown(repNames.length > 0 ? repNames.join(', ') : repT?.name);
+
+            if (sub.isMerger || repNames.length > 1) {
+                text += `✅ ОБЪЕДИНЕНИЕ: ${repList}\n`;
             } else if (sub.replacementClassId) {
                 const swapCls = classes.find((c) => c.id === sub.replacementClassId);
                 text += `✅ ОБМЕН УРОКАМИ: ${escapeMarkdown(swapCls?.name)}\n`;
             } else {
-                text += `✅ ${escapeMarkdown(repT?.name)}\n`;
+                text += `✅ ${repList}\n`;
             }
             text += `🚪 Каб. ${escapeMarkdown(roomName)}\n\n`;
         });

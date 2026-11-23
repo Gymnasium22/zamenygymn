@@ -4,6 +4,10 @@
 -- и того же урока: старая и новая. После перезагрузки страница показывала то одну, то
 -- другую, и часть назначенных замен выглядела как «не назначенные».
 --
+-- ВАЖНО: при объединении с классом, разбитым на подгруппы, у одного урока законно
+-- несколько заменяющих учителей — по строке на подгруппу. Поэтому ключ включает
+-- заменяющего учителя: (организация, дата, урок, заменяющий учитель).
+--
 -- 1) Удаляем дубли, оставляя самую свежую запись (по updated_at, затем по created_at).
 -- 2) Ставим частичный уникальный индекс (строки без привязки к уроку не ограничиваем —
 --    они появляются, если урок удалили из расписания, и удалять их автоматически нельзя).
@@ -13,7 +17,7 @@ WITH ranked AS (
     SELECT
         id,
         ROW_NUMBER() OVER (
-            PARTITION BY organization_id, date, schedule_item_id
+            PARTITION BY organization_id, date, schedule_item_id, replacement_teacher_id
             ORDER BY updated_at DESC NULLS LAST, created_at DESC NULLS LAST, id
         ) AS rn
     FROM public.substitutions
@@ -27,8 +31,8 @@ WHERE s.id = r.id
 -- 2. Частичный уникальный индекс
 DROP INDEX IF EXISTS public.substitutions_unique_lesson_date_idx;
 CREATE UNIQUE INDEX substitutions_unique_lesson_date_idx
-    ON public.substitutions (organization_id, date, schedule_item_id)
+    ON public.substitutions (organization_id, date, schedule_item_id, replacement_teacher_id)
     WHERE schedule_item_id IS NOT NULL;
 
 COMMENT ON INDEX public.substitutions_unique_lesson_date_idx IS
-    'Одна замена на пару (организация, дата, урок) — не даёт дублям «перетирать» назначенную замену.';
+    'Одна замена на (организация, дата, урок, заменяющий учитель) — не даёт дублям «перетирать» назначенную замену, при этом объединение с классом на подгруппах сохраняет всех учителей.';

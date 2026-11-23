@@ -61,6 +61,18 @@ export const LessonCard: React.FC<LessonCardProps> = ({
         firstSub && !['conducted', 'cancelled'].includes(firstSub.replacementTeacherId)
             ? teachers.find((t) => t.id === firstSub.replacementTeacherId)
             : null;
+
+    // Объединение с классом, разбитым на подгруппы, даёт по строке замены на каждую подгруппу
+    // (разные учителя при одном и том же уроке) — показываем всех заменяющих.
+    const repEntries = subs
+        .filter((s) => s.replacementTeacherId && !['conducted', 'cancelled'].includes(s.replacementTeacherId))
+        .map((s) => ({ sub: s, teacher: teachers.find((t) => t.id === s.replacementTeacherId) }))
+        .filter((e): e is { sub: Substitution; teacher: Teacher } => Boolean(e.teacher));
+    const uniqueReps = repEntries.filter(
+        (e, idx) => repEntries.findIndex((o) => o.teacher.id === e.teacher.id) === idx
+    );
+    const isMergedGroup = uniqueReps.length > 1 || Boolean(firstSub?.isMerger);
+    const repName = uniqueReps.length > 0 ? uniqueReps.map((e) => e.teacher.name).join(', ') : rep?.name;
     const orig = teachers.find((t) => t.id === l.teacherId);
     const subj = subjects.find((s) => s.id === l.subjectId);
     const cls = classes.find((c) => c.id === l.classId);
@@ -111,7 +123,7 @@ export const LessonCard: React.FC<LessonCardProps> = ({
                             <span
                                 className={`font-bold ${isCancelled ? 'text-red-600' : isConducted ? 'text-blue-600' : 'text-emerald-600'}`}
                             >
-                                {isCancelled ? 'СНЯТ' : isConducted ? 'ПРОВЕДЕН' : rep?.name}
+                                {isCancelled ? 'СНЯТ' : isConducted ? 'ПРОВЕДЕН' : repName}
                             </span>
                         )}
                     </div>
@@ -151,30 +163,35 @@ export const LessonCard: React.FC<LessonCardProps> = ({
                         </button>
                     ) : (
                         <div className="flex gap-1 items-center">
-                            {rep && rep.telegramChatId && !isCancelled && !isConducted && (
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        const roomInfo = isRoomChanged
-                                            ? `${originalRoomName} -> ${replacementRoomName}`
-                                            : originalRoomName;
-                                        onTelegramClick({
-                                            teacherId: rep.id,
-                                            lessonId: l.id,
-                                            roomName: roomInfo,
-                                            className: cls?.name || '?',
-                                            subjectName: subj?.name || '?',
-                                            period: l.period,
-                                            roomChanged: !!isRoomChanged
-                                        });
-                                    }}
-                                    className="min-h-[36px] min-w-[36px] p-1.5 bg-blue-50 text-blue-600 rounded-lg"
-                                    title="Отправить учителю в Telegram"
-                                    aria-label="Отправить учителю в Telegram"
-                                >
-                                    <Icon name="Send" size={14} />
-                                </button>
-                            )}
+                            {!isCancelled &&
+                                !isConducted &&
+                                (uniqueReps.length > 0 ? uniqueReps : rep ? [{ sub: firstSub!, teacher: rep }] : [])
+                                    .filter((e) => e.teacher.telegramChatId)
+                                    .map((e) => (
+                                        <button
+                                            key={e.teacher.id}
+                                            type="button"
+                                            onClick={() => {
+                                                const roomInfo = isRoomChanged
+                                                    ? `${originalRoomName} -> ${replacementRoomName}`
+                                                    : originalRoomName;
+                                                onTelegramClick({
+                                                    teacherId: e.teacher.id,
+                                                    lessonId: l.id,
+                                                    roomName: roomInfo,
+                                                    className: cls?.name || '?',
+                                                    subjectName: subj?.name || '?',
+                                                    period: l.period,
+                                                    roomChanged: !!isRoomChanged
+                                                });
+                                            }}
+                                            className="min-h-[36px] min-w-[36px] p-1.5 bg-blue-50 text-blue-600 rounded-lg"
+                                            title={`Отправить в Telegram: ${e.teacher.name}`}
+                                            aria-label={`Отправить в Telegram: ${e.teacher.name}`}
+                                        >
+                                            <Icon name="Send" size={14} />
+                                        </button>
+                                    ))}
                             {firstSub && (
                                 <button
                                     onClick={() => onEdit(l, firstSub)}
@@ -275,8 +292,8 @@ export const LessonCard: React.FC<LessonCardProps> = ({
                             <span className="text-blue-600 font-bold text-sm">ПРОВЕДЕН</span>
                         ) : (
                             <div className="flex flex-col items-end">
-                                <span className="text-emerald-600 font-bold text-base">{rep?.name || 'Замена'}</span>
-                                {firstSub?.isMerger && (
+                                <span className="text-emerald-600 font-bold text-base">{repName || 'Замена'}</span>
+                                {isMergedGroup && (
                                     <span className="text-[10px] text-purple-500 font-bold">ОБЪЕДИНЕНИЕ</span>
                                 )}
                             </div>
@@ -288,28 +305,34 @@ export const LessonCard: React.FC<LessonCardProps> = ({
                             </span>
                         )}
 
-                        {rep && rep.telegramChatId && !isCancelled && !isConducted && (
-                            <button
-                                onClick={() => {
-                                    const roomInfo = isRoomChanged
-                                        ? `${originalRoomName} -> ${replacementRoomName}`
-                                        : originalRoomName;
-                                    onTelegramClick({
-                                        teacherId: rep.id,
-                                        lessonId: l.id,
-                                        roomName: roomInfo,
-                                        className: cls?.name || '?',
-                                        subjectName: subj?.name || '?',
-                                        period: l.period,
-                                        roomChanged: !!isRoomChanged
-                                    });
-                                }}
-                                className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
-                                title="Отправить учителю в Telegram"
-                            >
-                                <Icon name="Send" size={16} />
-                            </button>
-                        )}
+                        {!isCancelled &&
+                            !isConducted &&
+                            (uniqueReps.length > 0 ? uniqueReps : rep ? [{ sub: firstSub!, teacher: rep }] : [])
+                                .filter((e) => e.teacher.telegramChatId)
+                                .map((e) => (
+                                    <button
+                                        key={e.teacher.id}
+                                        onClick={() => {
+                                            const roomInfo = isRoomChanged
+                                                ? `${originalRoomName} -> ${replacementRoomName}`
+                                                : originalRoomName;
+                                            onTelegramClick({
+                                                teacherId: e.teacher.id,
+                                                lessonId: l.id,
+                                                roomName: roomInfo,
+                                                className: cls?.name || '?',
+                                                subjectName: subj?.name || '?',
+                                                period: l.period,
+                                                roomChanged: !!isRoomChanged
+                                            });
+                                        }}
+                                        className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+                                        title={`Отправить в Telegram: ${e.teacher.name}`}
+                                        aria-label={`Отправить в Telegram: ${e.teacher.name}`}
+                                    >
+                                        <Icon name="Send" size={16} />
+                                    </button>
+                                ))}
 
                         {firstSub && (
                             <button
