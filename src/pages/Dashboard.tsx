@@ -1058,6 +1058,7 @@ export const DashboardPage = () => {
         switch (widget.id) {
             case 'today': {
                 const todaySubsCount = substitutions.filter((s) => s.date === todayStr).length;
+                const todayRoomCount = substitutions.filter((s) => s.date === todayStr && s.type === 'room').length;
                 const absentNames = occupancyStats.absentTeachersList.slice(0, 4);
                 const lessonHint =
                     schoolStatus.type === 'lesson' && schoolStatus.bell
@@ -1071,7 +1072,10 @@ export const DashboardPage = () => {
                             </div>
                             <div className="min-w-0">
                                 <h3 className="font-bold text-sm sm:text-base text-slate-800 dark:text-white">Сегодня</h3>
-                                <p className="text-[10px] sm:text-[11px] font-semibold text-indigo-600 dark:text-indigo-300 truncate">{lessonHint}</p>
+                                <p className="text-[10px] sm:text-[11px] font-semibold text-indigo-600 dark:text-indigo-300 truncate">
+                                    {lessonHint}
+                                    {todayRoomCount > 0 ? ` · кабинетов: ${todayRoomCount}` : ''}
+                                </p>
                             </div>
                         </div>
                         <div className="grid grid-cols-3 gap-1.5 mb-2 sm:mb-3">

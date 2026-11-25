@@ -36,6 +36,15 @@ import {
 import { AssignmentModal } from '../components/Substitutions/AssignmentModal';
 import { offerUndo } from '../components/CloudSaveStatus';
 import { parseTelegramChatIds } from '../utils/telegramChatIds';
+import {
+    getMergeTargetLessons,
+    getRoomConflicts,
+    getTargetLessonConflicts,
+    isTeacherBusyAtSlot,
+    SubstitutionConflict
+} from '../utils/substitutionValidation';
+import { formatRoomArrow, isRoomSubstitution, roomLabel } from '../utils/roomSubstitution';
+import { FreeRoomDayModal, LessonPickModal, RoomChangeModal } from '../components/Substitutions/RoomChangeModals';
 
 export const SubstitutionsPage = () => {
     const { subjects, teachers, classes, rooms, settings, privateSettings, saveStaticData } = useStaticData();
@@ -103,6 +112,10 @@ export const SubstitutionsPage = () => {
     const [batchActionType, setBatchActionType] = useState<'cancel' | 'replace' | null>(null);
     const [batchReplacementId, setBatchReplacementId] = useState<string>('');
     const [batchAbsenceReason, setBatchAbsenceReason] = useState<string>('Болезнь');
+    const [roomLesson, setRoomLesson] = useState<ScheduleItem | null>(null);
+    const [roomEditSub, setRoomEditSub] = useState<Substitution | null>(null);
+    const [dayRoomOpen, setDayRoomOpen] = useState(false);
+    const [lessonPickOpen, setLessonPickOpen] = useState(false);
 
     // New: common comment for all substitutions on the selected date
     const [dayComment, setDayComment] = useState<string>('');
@@ -145,6 +158,108 @@ export const SubstitutionsPage = () => {
     const subjectsById = useMemo(() => new Map(subjects.map((s) => [s.id, s])), [subjects]);
     const teachersById = useMemo(() => new Map(teachers.map((t) => [t.id, t])), [teachers]);
     const roomsById = useMemo(() => new Map(rooms.map((r) => [r.id, r])), [rooms]);
+
+    const formatSubstitutionConflict = useCallback(
+        (conflict: SubstitutionConflict): string => {
+            const className = conflict.classId
+                ? classesById.get(conflict.classId)?.name || conflict.classId
+                : '';
+            const roomName = conflict.roomId
+                ? roomsById.get(conflict.roomId)?.name || conflict.roomId
+                : '';
+            const teacherName = conflict.teacherId
+                ? teachersById.get(conflict.teacherId)?.name || conflict.teacherId
+                : '';
+            const occupiedClass = conflict.occupiedByClassId
+                ? classesById.get(conflict.occupiedByClassId)?.name || conflict.occupiedByClassId
+                : '';
+            const occupiedTeacher = conflict.occupiedByTeacherId
+                ? teachersById.get(conflict.occupiedByTeacherId)?.name || conflict.occupiedByTeacherId
+                : '';
+
+            switch (conflict.type) {
+                case 'room-busy': {
+                    const occupiedBy = [occupiedClass, occupiedTeacher].filter(Boolean).join(', ');
+                    return `Кабинет ${roomName || '—'} уже занят${occupiedBy ? `: ${occupiedBy}` : ''}.`;
+                }
+                case 'target-cancelled':
+                    return `Урок класса ${className || '—'} отменён — объединение невозможно.`;
+                case 'target-missing':
+                    return className
+                        ? `У класса ${className} нет урока в это время — объединение невозможно.`
+                        : 'У заменяющего учителя нет урока в это время — объединение невозможно.';
+                case 'target-teacher-absent':
+                    return `Учитель класса ${className || '—'}${teacherName ? ` (${teacherName})` : ''} отмечен как отсутствующий — объединение невозможно.`;
+            }
+        },
+        [classesById, roomsById, teachersById]
+    );
+
+    const showSubstitutionConflicts = useCallback(
+        (conflicts: SubstitutionConflict[], title: string) => {
+            if (conflicts.length === 0) return;
+            const messages = Array.from(new Set(conflicts.map(formatSubstitutionConflict)));
+            const extra = messages.length > 3 ? ` И ещё ${messages.length - 3}.` : '';
+            addToast({
+                type: 'warning',
+                title,
+                message: messages.slice(0, 3).join(' ') + extra
+            });
+        },
+        [addToast, formatSubstitutionConflict]
+    );
+
+    const getAssignmentConflicts = useCallback(
+        (item: ScheduleItem, replacementId: string, isMerger: boolean, replacedSubs: Substitution[]) => {
+            const mergeTargetLessons = isMerger
+                ? getMergeTargetLessons(
+                      activeSchedule,
+                      substitutionsRef.current,
+                      selectedDate,
+                      item,
+                      replacementId
+                  )
+                : [];
+            const conflicts: SubstitutionConflict[] = [];
+
+            if (replacementId !== 'cancelled' && replacementId !== 'conducted') {
+                if (isMerger && mergeTargetLessons.length === 0) {
+                    conflicts.push({ type: 'target-missing', teacherId: replacementId });
+                } else if (mergeTargetLessons.length > 0) {
+                    conflicts.push(
+                        ...getTargetLessonConflicts(
+                            mergeTargetLessons,
+                            selectedDate,
+                            substitutionsRef.current,
+                            teachers
+                        )
+                    );
+                }
+
+                const roomIds = (isMerger
+                    ? [selectedRoomId || item.roomId, ...mergeTargetLessons.map((lesson) => lesson.roomId)]
+                    : [selectedRoomId || item.roomId]
+                ).filter((roomId): roomId is string => Boolean(roomId));
+
+                if (roomIds.length > 0) {
+                    conflicts.push(
+                        ...getRoomConflicts(
+                            activeSchedule,
+                            substitutionsRef.current,
+                            selectedDate,
+                            item,
+                            roomIds,
+                            new Set([item.id, ...mergeTargetLessons.map((lesson) => lesson.id)]),
+                            new Set(replacedSubs.map((sub) => sub.id))
+                        )
+                    );
+                }
+            }
+
+            return { conflicts, mergeTargetLessons };
+        },
+        [activeSchedule, selectedDate, selectedRoomId, teachers]
+    );
 
     const subsForTelegramDate = useMemo(
         () => substitutions.filter((s) => s.date === selectedDate),
@@ -333,7 +448,131 @@ export const SubstitutionsPage = () => {
     };
 
     const confirmBatchAction = useCallback(async () => {
-        // 1. Mark as absent first if not already done (optional, but good for consistency)
+        if (!selectedDayOfWeek || !batchActionType) {
+            setBatchActionModalOpen(false);
+            return;
+        }
+
+        const lessonsToProcess = activeSchedule.filter(
+            (s) => s.teacherId === selectedTeacherId && s.day === selectedDayOfWeek
+        );
+        const replacedSubs = substitutionsRef.current.filter(
+            (s) => s.originalTeacherId === selectedTeacherId && s.date === selectedDate
+        );
+        const existingSubs = substitutionsRef.current.filter(
+            (s) => !(s.originalTeacherId === selectedTeacherId && s.date === selectedDate)
+        );
+
+        const replacementId = batchActionType === 'cancel' ? 'cancelled' : batchReplacementId;
+        const excludeSubstitutionIds = new Set(replacedSubs.map((s) => s.id));
+        const createdSubs: Substitution[] = [];
+        const conflicts: SubstitutionConflict[] = [];
+        let mergerCount = 0;
+
+        for (const lesson of lessonsToProcess) {
+            const slot = { day: lesson.day, period: lesson.period, shift: lesson.shift };
+            const substitutionsForCheck = [...existingSubs, ...createdSubs];
+            const isMerger =
+                batchActionType === 'replace' &&
+                isTeacherBusyAtSlot(activeSchedule, substitutionsForCheck, selectedDate, replacementId, slot);
+            const targetLessons = isMerger
+                ? getMergeTargetLessons(
+                      activeSchedule,
+                      substitutionsForCheck,
+                      selectedDate,
+                      lesson,
+                      replacementId
+                  )
+                : [];
+
+            if (isMerger) {
+                mergerCount += 1;
+                if (targetLessons.length === 0) {
+                    conflicts.push({ type: 'target-missing', teacherId: replacementId });
+                } else {
+                    conflicts.push(
+                        ...getTargetLessonConflicts(targetLessons, selectedDate, substitutionsForCheck, teachers)
+                    );
+                }
+
+                const targetRoomIds = Array.from(
+                    new Set(
+                        [lesson.roomId, ...targetLessons.map((target) => target.roomId)].filter(
+                            (roomId): roomId is string => Boolean(roomId)
+                        )
+                    )
+                );
+                if (targetRoomIds.length > 0) {
+                    conflicts.push(
+                        ...getRoomConflicts(
+                            activeSchedule,
+                            substitutionsForCheck,
+                            selectedDate,
+                            slot,
+                            targetRoomIds,
+                            new Set([lesson.id, ...targetLessons.map((target) => target.id)]),
+                            excludeSubstitutionIds
+                        )
+                    );
+                }
+            } else if (batchActionType === 'replace' && lesson.roomId) {
+                conflicts.push(
+                    ...getRoomConflicts(
+                        activeSchedule,
+                        substitutionsForCheck,
+                        selectedDate,
+                        slot,
+                        [lesson.roomId],
+                        new Set([lesson.id]),
+                        excludeSubstitutionIds
+                    )
+                );
+            }
+
+            const baseSub: Substitution = {
+                id: generateId(),
+                date: selectedDate,
+                scheduleItemId: lesson.id,
+                originalTeacherId: lesson.teacherId,
+                replacementTeacherId: replacementId,
+                lessonAbsenceReason: batchAbsenceReason,
+                dayComment: dayComment || undefined,
+                isMerger
+            };
+            excludeSubstitutionIds.add(baseSub.id);
+            createdSubs.push(baseSub);
+
+            if (isMerger) {
+                targetLessons
+                    .filter((target) => target.teacherId !== lesson.teacherId)
+                    .forEach((target) => {
+                        const extraSub: Substitution = {
+                            id: generateId(),
+                            date: selectedDate,
+                            scheduleItemId: lesson.id,
+                            originalTeacherId: target.teacherId,
+                            replacementTeacherId: target.teacherId,
+                            replacementClassId: target.classId,
+                            replacementSubjectId: target.subjectId,
+                            replacementRoomId: target.roomId,
+                            lessonAbsenceReason: batchAbsenceReason,
+                            dayComment: dayComment || undefined,
+                            isMerger: true,
+                            refusals: []
+                        };
+                        excludeSubstitutionIds.add(extraSub.id);
+                        createdSubs.push(extraSub);
+                    });
+            }
+        }
+
+        if (conflicts.length > 0) {
+            showSubstitutionConflicts(conflicts, 'Пакетная замена не сохранена');
+            return;
+        }
+
+        // Отмечаем отсутствие только после успешной проверки — иначе конфликт
+        // оставлял бы учителя отсутствующим без созданных замен.
         const updatedTeachers = [...teachers];
         const tIndex = updatedTeachers.findIndex((x) => x.id === selectedTeacherId);
         if (tIndex !== -1) {
@@ -346,68 +585,18 @@ export const SubstitutionsPage = () => {
             await saveStaticData({ teachers: updatedTeachers });
         }
 
-        // 2. Perform Batch Action
-        if (selectedDayOfWeek && batchActionType) {
-            const lessonsToProcess = activeSchedule.filter(
-                (s) => s.teacherId === selectedTeacherId && s.day === selectedDayOfWeek
-            );
-            const replacedSubs = substitutionsRef.current.filter(
-                (s) => s.originalTeacherId === selectedTeacherId && s.date === selectedDate
-            );
-            const existingSubs = substitutionsRef.current.filter(
-                (s) => !(s.originalTeacherId === selectedTeacherId && s.date === selectedDate)
-            );
+        const newSubs = [...existingSubs, ...createdSubs];
+        await saveScheduleData({
+            substitutions: newSubs,
+            deletedSubstitutionIds: replacedSubs.map((s) => s.id)
+        });
 
-            const replacementId = batchActionType === 'cancel' ? 'cancelled' : batchReplacementId;
-
-            const teacherBusyAtLesson = (teacherId: string, lesson: ScheduleItem, already: typeof existingSubs) => {
-                if (!teacherId || teacherId === 'cancelled' || teacherId === 'conducted') return false;
-                const busyOwn = activeSchedule.some(
-                    (s) =>
-                        s.teacherId === teacherId &&
-                        s.day === lesson.day &&
-                        s.period === lesson.period &&
-                        s.shift === lesson.shift
-                );
-                if (busyOwn) return true;
-                return already.some((s) => {
-                    if (s.date !== selectedDate) return false;
-                    if (s.replacementTeacherId !== teacherId) return false;
-                    if (s.replacementTeacherId === 'cancelled' || s.replacementTeacherId === 'conducted') return false;
-                    const item = activeSchedule.find((i) => i.id === s.scheduleItemId);
-                    return !!(item && item.period === lesson.period && item.shift === lesson.shift);
-                });
-            };
-
-            const createdSubs: typeof existingSubs = [];
-            let mergerCount = 0;
-            for (const l of lessonsToProcess) {
-                const isMerger =
-                    batchActionType === 'replace' && teacherBusyAtLesson(replacementId, l, [...existingSubs, ...createdSubs]);
-                if (isMerger) mergerCount += 1;
-                createdSubs.push({
-                    id: generateId(),
-                    date: selectedDate,
-                    scheduleItemId: l.id,
-                    originalTeacherId: l.teacherId,
-                    replacementTeacherId: replacementId,
-                    lessonAbsenceReason: batchAbsenceReason,
-                    dayComment: dayComment || undefined,
-                    isMerger
-                });
-            }
-            const newSubs = [...existingSubs, ...createdSubs];
-            await saveScheduleData({
-                substitutions: newSubs,
-                deletedSubstitutionIds: replacedSubs.map((s) => s.id)
+        if (batchActionType === 'replace' && mergerCount > 0) {
+            addToast({
+                type: 'info',
+                title: 'Пакетная замена',
+                message: `Объединение на ${mergerCount} ур. (заменяющий в это время занят), остальные — обычная замена.`
             });
-            if (batchActionType === 'replace' && mergerCount > 0) {
-                addToast({
-                    type: 'info',
-                    title: 'Пакетная замена',
-                    message: `Объединение на ${mergerCount} ур. (заменяющий в это время занят), остальные — обычная замена.`
-                });
-            }
         }
 
         setBatchActionModalOpen(false);
@@ -426,7 +615,8 @@ export const SubstitutionsPage = () => {
         batchActionType,
         batchReplacementId,
         dayComment,
-        addToast
+        addToast,
+        showSubstitutionConflicts
     ]);
 
     const removeAbsence = useCallback(
@@ -467,9 +657,22 @@ export const SubstitutionsPage = () => {
             const replacedSubs = substitutionsRef.current.filter(
                 (s) => s.scheduleItemId === currentSubParams.scheduleItemId && s.date === selectedDate
             );
-            const filteredSubs = substitutionsRef.current.filter(
-                (s) => !(s.scheduleItemId === currentSubParams.scheduleItemId && s.date === selectedDate)
+            const removedSubs = replacedSubs.filter((s) => !isRoomSubstitution(s));
+            const filteredSubs = substitutionsRef.current.filter((s) => !removedSubs.some((row) => row.id === s.id));
+
+            const { conflicts, mergeTargetLessons } = getAssignmentConflicts(
+                item,
+                replacementId,
+                isMerger,
+                replacedSubs
             );
+            if (conflicts.length > 0) {
+                showSubstitutionConflicts(
+                    conflicts,
+                    isMerger ? 'Объединение не сохранено' : 'Замена не сохранена'
+                );
+                return;
+            }
 
             const subData = {
                 id: generateId(),
@@ -494,35 +697,28 @@ export const SubstitutionsPage = () => {
             // (по одному на подгруппу) с разными учителями — на каждого нужна своя строка замены,
             // иначе на карточке останется только один заменяющий учитель.
             if (isMerger) {
-                const mergedLessons = activeSchedule.filter(
-                    (s) =>
-                        s.classId !== item.classId &&
-                        s.day === item.day &&
-                        s.period === item.period &&
-                        s.shift === item.shift &&
-                        s.id !== item.id &&
-                        s.teacherId === replacementId
-                );
-                mergedLessons.forEach((lesson) => {
-                    const extraSub: Substitution = {
-                        ...subData,
-                        id: generateId(),
-                        originalTeacherId: lesson.teacherId,
-                        replacementTeacherId: lesson.teacherId,
-                        replacementClassId: lesson.classId,
-                        replacementSubjectId: lesson.subjectId,
-                        replacementRoomId: lesson.roomId || subData.replacementRoomId,
-                        refusals: []
-                    };
-                    filteredSubs.push(extraSub);
-                });
+                mergeTargetLessons
+                    .filter((lesson) => lesson.teacherId !== item.teacherId)
+                    .forEach((lesson) => {
+                        const extraSub: Substitution = {
+                            ...subData,
+                            id: generateId(),
+                            originalTeacherId: lesson.teacherId,
+                            replacementTeacherId: lesson.teacherId,
+                            replacementClassId: lesson.classId,
+                            replacementSubjectId: lesson.subjectId,
+                            replacementRoomId: lesson.roomId || subData.replacementRoomId,
+                            refusals: []
+                        };
+                        filteredSubs.push(extraSub);
+                    });
             }
             try {
                 await saveScheduleData({
                     substitutions: filteredSubs,
                     // Заменённая запись того же урока удаляется явно: иначе на сервере остался бы
                     // старый дубль (другой id, та же пара урок+дата) и «съедал» новую замену.
-                    deletedSubstitutionIds: replacedSubs.map((s) => s.id)
+                    deletedSubstitutionIds: removedSubs.map((s) => s.id)
                 });
                 setIsModalOpen(false);
                 setCandidateSearch('');
@@ -551,7 +747,9 @@ export const SubstitutionsPage = () => {
             substitutionComment,
             dayComment,
             saveScheduleData,
-            addToast
+            addToast,
+            showSubstitutionConflicts,
+            getAssignmentConflicts
         ]
     );
 
@@ -577,7 +775,12 @@ export const SubstitutionsPage = () => {
             );
 
             if (targetLessons.length === 0) {
-                addToast({ type: 'warning', title: 'Внимание', message: 'Уроки для объединения не найдены.' });
+                const targetClassName = classesById.get(targetClassId)?.name || 'выбранного класса';
+                addToast({
+                    type: 'warning',
+                    title: 'Объединение не сохранено',
+                    message: `У класса ${targetClassName} нет урока в это время — объединение невозможно.`
+                });
                 return;
             }
 
@@ -587,6 +790,37 @@ export const SubstitutionsPage = () => {
             const newSubs = substitutionsRef.current.filter(
                 (s) => !(s.scheduleItemId === currentSubParams.scheduleItemId && s.date === selectedDate)
             );
+
+            const conflicts = getTargetLessonConflicts(
+                targetLessons,
+                selectedDate,
+                substitutionsRef.current,
+                teachers
+            );
+            const targetRoomIds = Array.from(
+                new Set(
+                    targetLessons
+                        .map((lesson) => lesson.roomId)
+                        .filter((roomId): roomId is string => Boolean(roomId))
+                )
+            );
+            if (targetRoomIds.length > 0) {
+                conflicts.push(
+                    ...getRoomConflicts(
+                        activeSchedule,
+                        substitutionsRef.current,
+                        selectedDate,
+                        currentSubParams,
+                        targetRoomIds,
+                        new Set([currentSubParams.scheduleItemId, ...targetLessons.map((lesson) => lesson.id)]),
+                        new Set(replacedSubs.map((sub) => sub.id))
+                    )
+                );
+            }
+            if (conflicts.length > 0) {
+                showSubstitutionConflicts(conflicts, 'Объединение не сохранено');
+                return;
+            }
 
             targetLessons.forEach((lesson) => {
                 const subData = {
@@ -621,10 +855,13 @@ export const SubstitutionsPage = () => {
             selectedDate,
             selectedDayOfWeek,
             activeSchedule,
+            teachers,
+            classesById,
             lessonAbsenceReason,
             saveScheduleData,
             addToast,
-            dayComment
+            dayComment,
+            showSubstitutionConflicts
         ]
     );
 
@@ -713,10 +950,13 @@ export const SubstitutionsPage = () => {
 
     const removeSubstitution = useCallback(
         async (id: string) => {
-            const removedSubs = substitutionsRef.current.filter(
+            const rows = substitutionsRef.current.filter(
                 (s) => s.scheduleItemId === id && s.date === selectedDate
             );
-            const newSubs = substitutionsRef.current.filter((s) => !(s.scheduleItemId === id && s.date === selectedDate));
+            const nonRoom = rows.filter((s) => !isRoomSubstitution(s));
+            const removedSubs = nonRoom.length > 0 ? nonRoom : rows;
+            const removedIds = new Set(removedSubs.map((s) => s.id));
+            const newSubs = substitutionsRef.current.filter((s) => !removedIds.has(s.id));
             await saveScheduleData({
                 substitutions: newSubs,
                 deletedSubstitutionIds: removedSubs.map((s) => s.id)
@@ -726,7 +966,170 @@ export const SubstitutionsPage = () => {
         [selectedDate, saveScheduleData, undo]
     );
 
+    const removeRoomChange = useCallback(
+        async (lessonId: string) => {
+            const removedSubs = substitutionsRef.current.filter(
+                (s) => s.scheduleItemId === lessonId && s.date === selectedDate && isRoomSubstitution(s)
+            );
+            if (removedSubs.length === 0) return;
+            const removedIds = new Set(removedSubs.map((s) => s.id));
+            await saveScheduleData({
+                substitutions: substitutionsRef.current.filter((s) => !removedIds.has(s.id)),
+                deletedSubstitutionIds: removedSubs.map((s) => s.id)
+            });
+            offerUndo('Смена кабинета снята', () => undo());
+        },
+        [selectedDate, saveScheduleData, undo]
+    );
+
+    const removeDayRoomChanges = useCallback(async () => {
+        const removedSubs = substitutionsRef.current.filter(
+            (s) => s.date === selectedDate && s.type === 'room' && s.roomChangeScope === 'day'
+        );
+        if (removedSubs.length === 0) return;
+        const removedIds = new Set(removedSubs.map((s) => s.id));
+        await saveScheduleData({
+            substitutions: substitutionsRef.current.filter((s) => !removedIds.has(s.id)),
+            deletedSubstitutionIds: removedSubs.map((s) => s.id)
+        });
+        offerUndo('Смены кабинетов за день сняты', () => undo());
+    }, [selectedDate, saveScheduleData, undo]);
+
+    const roomSchedule = activeSchedule.length > 0 ? activeSchedule : [...schedule1, ...schedule2];
+
+    const openRoomChange = (lesson: ScheduleItem) => {
+        const existing = substitutionsRef.current.find(
+            (s) => s.scheduleItemId === lesson.id && s.date === selectedDate && isRoomSubstitution(s)
+        );
+        setRoomEditSub(existing || null);
+        setRoomLesson(lesson);
+        setLessonPickOpen(false);
+    };
+
+    const saveRoomChange = useCallback(
+        async (payload: {
+            replacementRoomId?: string;
+            reason: string;
+            comment: string;
+            source: 'auto' | 'manual';
+            conflict: boolean;
+            cancelLesson: boolean;
+            clearRoom: boolean;
+        }) => {
+            if (!roomLesson) return;
+            const existing = substitutionsRef.current.find(
+                (s) => s.scheduleItemId === roomLesson.id && s.date === selectedDate && isRoomSubstitution(s)
+            );
+            const next = substitutionsRef.current.filter((s) => s.id !== existing?.id);
+            if (payload.cancelLesson) {
+                next.push({
+                    id: generateId(),
+                    date: selectedDate,
+                    scheduleItemId: roomLesson.id,
+                    originalTeacherId: roomLesson.teacherId,
+                    replacementTeacherId: 'cancelled',
+                    type: 'cancel',
+                    lessonAbsenceReason: payload.reason || undefined,
+                    comment: payload.comment || undefined,
+                    dayComment: dayComment || undefined
+                });
+            } else {
+                next.push({
+                    id: existing?.id || generateId(),
+                    date: selectedDate,
+                    scheduleItemId: roomLesson.id,
+                    originalTeacherId: roomLesson.teacherId,
+                    replacementTeacherId: roomLesson.teacherId,
+                    type: 'room',
+                    originalRoomId: roomLesson.roomId,
+                    replacementRoomId: payload.clearRoom ? undefined : payload.replacementRoomId,
+                    roomChangeReason: payload.reason || undefined,
+                    roomChangeScope: 'lesson',
+                    roomChangeSource: payload.source,
+                    roomConflict: payload.conflict || undefined,
+                    comment: payload.comment || undefined,
+                    dayComment: dayComment || undefined
+                });
+            }
+            await saveScheduleData({
+                substitutions: next,
+                deletedSubstitutionIds: existing && payload.cancelLesson ? [existing.id] : []
+            });
+            setRoomLesson(null);
+            setRoomEditSub(null);
+        },
+        [roomLesson, selectedDate, dayComment, saveScheduleData]
+    );
+
+    const applyDayRoomRelease = useCallback(
+        async (payload: {
+            roomId: string;
+            reason: string;
+            comment: string;
+            rows: {
+                lesson: ScheduleItem;
+                action: 'suggest' | 'manual' | 'clear' | 'cancel' | 'later';
+                roomId: string;
+                source: 'auto' | 'manual';
+                conflict: boolean;
+            }[];
+        }) => {
+            const touched = new Set(payload.rows.map((row) => row.lesson.id));
+            const removed = substitutionsRef.current.filter(
+                (s) =>
+                    s.date === selectedDate &&
+                    touched.has(s.scheduleItemId) &&
+                    (isRoomSubstitution(s) || (payload.rows.some((row) => row.lesson.id === s.scheduleItemId && row.action === 'cancel') && s.replacementTeacherId === 'cancelled'))
+            );
+            const removedIds = new Set(removed.map((s) => s.id));
+            const next = substitutionsRef.current.filter((s) => !removedIds.has(s.id));
+            payload.rows.forEach((row) => {
+                if ((row.action === 'manual' || row.action === 'suggest') && !row.roomId) return;
+                if (row.action === 'cancel') {
+                    next.push({
+                        id: generateId(),
+                        date: selectedDate,
+                        scheduleItemId: row.lesson.id,
+                        originalTeacherId: row.lesson.teacherId,
+                        replacementTeacherId: 'cancelled',
+                        type: 'cancel',
+                        lessonAbsenceReason: payload.reason || undefined,
+                        comment: payload.comment || undefined,
+                        dayComment: dayComment || undefined
+                    });
+                    return;
+                }
+                next.push({
+                    id: generateId(),
+                    date: selectedDate,
+                    scheduleItemId: row.lesson.id,
+                    originalTeacherId: row.lesson.teacherId,
+                    replacementTeacherId: row.lesson.teacherId,
+                    type: 'room',
+                    originalRoomId: payload.roomId,
+                    replacementRoomId: row.action === 'clear' ? undefined : row.roomId,
+                    roomChangeReason: payload.reason || undefined,
+                    roomChangeScope: 'day',
+                    roomChangeSource: row.source,
+                    roomConflict: row.conflict || undefined,
+                    comment: payload.comment || undefined,
+                    dayComment: dayComment || undefined
+                });
+            });
+            await saveScheduleData({
+                substitutions: next,
+                deletedSubstitutionIds: removed.map((s) => s.id)
+            });
+            setDayRoomOpen(false);
+        },
+        [selectedDate, dayComment, saveScheduleData]
+    );
+
     const handleEditSubstitution = (lesson: ScheduleItem, sub: Substitution) => {
+        if (isRoomSubstitution(sub)) {
+            openRoomChange(lesson);
+            return;
+        }
         // Pre-fill parameters for the modal
         setCurrentSubParams({
             scheduleItemId: lesson.id,
@@ -787,21 +1190,26 @@ export const SubstitutionsPage = () => {
             if (processedIds.has(sub.scheduleItemId)) return;
             processedIds.add(sub.scheduleItemId);
 
-            const item = activeSchedule.find((i) => i.id === sub.scheduleItemId);
+            const item = getScheduleItemById(sub.scheduleItemId);
             if (!item) return;
 
-            // Объединение с классом на подгруппах даёт несколько строк замены на один урок —
-            // перечисляем всех заменяющих учителей.
             const groupSubs = sortedSubs.filter((x) => x.scheduleItemId === sub.scheduleItemId);
-            const repNames = groupSubs
+            const roomRows = groupSubs.filter(isRoomSubstitution);
+            const teacherRows = groupSubs.filter((row) => !isRoomSubstitution(row));
+            const repNames = teacherRows
                 .map((x) => teachers.find((t) => t.id === x.replacementTeacherId)?.name)
                 .filter((n): n is string => Boolean(n))
                 .filter((n, idx, arr) => arr.indexOf(n) === idx);
 
             const cls = classes.find((c) => c.id === item.classId);
             const subj = subjects.find((s) => s.id === item.subjectId);
-            const origT = teachers.find((t) => t.id === sub.originalTeacherId);
-            const repT = teachers.find((t) => t.id === sub.replacementTeacherId);
+            const lead = teacherRows[0] || sub;
+            const origT = teachers.find((t) => t.id === lead.originalTeacherId);
+            const repT = teachers.find((t) => t.id === lead.replacementTeacherId);
+            const fromRoom = roomLabel(rooms, roomRows[0]?.originalRoomId || item.roomId);
+            const toRoom = roomRows.length
+                ? roomLabel(rooms, roomRows[0].replacementRoomId)
+                : roomLabel(rooms, lead.replacementRoomId || item.roomId);
             // У подгрупп кабинеты могут отличаться — собираем кабинеты по всем строкам урока.
             const groupRoomNames = groupSubs
                 .map((x) => {
@@ -813,19 +1221,28 @@ export const SubstitutionsPage = () => {
             const roomName = groupRoomNames.length > 0 ? groupRoomNames.join(', ') : '—';
 
             text += `🔹 **${item.period} урок** | ${escapeMarkdown(cls?.name)} | ${escapeMarkdown(subj?.name)}\n`;
+            if (teacherRows.length === 0 && roomRows.length > 0) {
+                text += `🚪 ${escapeMarkdown(formatRoomArrow(fromRoom, toRoom))}\n`;
+                if (roomRows[0].roomChangeReason) text += `${escapeMarkdown(roomRows[0].roomChangeReason)}\n`;
+                if (roomRows[0].roomConflict) text += `конфликт кабинета\n`;
+                text += '\n';
+                return;
+            }
             text += `❌ ${escapeMarkdown(origT?.name)}\n`;
 
             const repList = escapeMarkdown(repNames.length > 0 ? repNames.join(', ') : repT?.name);
 
-            if (sub.isMerger || repNames.length > 1) {
+            if (lead.isMerger || repNames.length > 1) {
                 text += `✅ ОБЪЕДИНЕНИЕ: ${repList}\n`;
-            } else if (sub.replacementClassId) {
-                const swapCls = classes.find((c) => c.id === sub.replacementClassId);
+            } else if (lead.replacementClassId) {
+                const swapCls = classes.find((c) => c.id === lead.replacementClassId);
                 text += `✅ ОБМЕН УРОКАМИ: ${escapeMarkdown(swapCls?.name)}\n`;
             } else {
                 text += `✅ ${repList}\n`;
             }
-            text += `🚪 Каб. ${escapeMarkdown(roomName)}\n\n`;
+            text += roomRows.length
+                ? `🚪 ${escapeMarkdown(formatRoomArrow(fromRoom, toRoom))}\n\n`
+                : `🚪 Каб. ${escapeMarkdown(roomName)}\n\n`;
         });
 
         return text;
@@ -1040,10 +1457,14 @@ export const SubstitutionsPage = () => {
                 const finalRoomId = replacementRoomId || originalRoomId;
                 const finalRoomName = rooms.find((r) => r.id === finalRoomId)?.name || finalRoomId || '—';
 
-                const roomChangeIndicator =
-                    replacementRoomId && replacementRoomId !== originalRoomId ? ' (Смена каб.)' : '';
+                const fromName = rooms.find((r) => r.id === (sub.originalRoomId || originalRoomId))?.name || 'без кабинета';
+                const toName = sub.type === 'room' ? roomLabel(rooms, sub.replacementRoomId) : finalRoomName;
+                const roomLine =
+                    sub.type === 'room' || (replacementRoomId && replacementRoomId !== originalRoomId)
+                        ? formatRoomArrow(fromName, toName)
+                        : `Каб. ${finalRoomName}`;
 
-                messageBody += `🔹 *${item.period} урок* | ${escapeMarkdown(cls)}\n📖 ${escapeMarkdown(subj)}\n🚪 Каб. ${escapeMarkdown(finalRoomName)}${roomChangeIndicator}\n\n`;
+                messageBody += `🔹 *${item.period} урок* | ${escapeMarkdown(cls)}\n📖 ${escapeMarkdown(subj)}\n🚪 ${escapeMarkdown(roomLine)}\n\n`;
             });
 
             let template = settings.telegramTemplates?.teacherSummary;
@@ -1317,6 +1738,19 @@ export const SubstitutionsPage = () => {
 
         let isMerger = false;
         if (isBusy) {
+            const item = currentSubParams
+                ? activeSchedule.find((lesson) => lesson.id === currentSubParams.scheduleItemId)
+                : undefined;
+            if (item) {
+                const replacedSubs = substitutionsRef.current.filter(
+                    (sub) => sub.scheduleItemId === item.id && sub.date === selectedDate
+                );
+                const { conflicts } = getAssignmentConflicts(item, teacherId, true, replacedSubs);
+                if (conflicts.length > 0) {
+                    showSubstitutionConflicts(conflicts, 'Объединение не сохранено');
+                    return;
+                }
+            }
             if (!window.confirm('Этот учитель занят. Назначить ОБЪЕДИНЕНИЕ классов?')) return;
             isMerger = true;
         }
@@ -1497,6 +1931,29 @@ export const SubstitutionsPage = () => {
                                 <Icon name="Copy" className="shrink-0" size={18} />
                                 <span className="truncate">Копия</span>
                             </button>
+                            <button
+                                type="button"
+                                onClick={() => setLessonPickOpen(true)}
+                                className="h-11 flex-1 min-w-[8rem] px-3 rounded-xl bg-white dark:bg-slate-800 border border-indigo-200 text-indigo-700 font-semibold text-sm"
+                            >
+                                Изменить кабинет
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setDayRoomOpen(true)}
+                                className="h-11 flex-1 min-w-[8rem] px-3 rounded-xl bg-white dark:bg-slate-800 border border-indigo-200 text-indigo-700 font-semibold text-sm"
+                            >
+                                Освободить кабинет на весь день
+                            </button>
+                            {substitutions.some((s) => s.date === selectedDate && s.type === 'room' && s.roomChangeScope === 'day') && (
+                                <button
+                                    type="button"
+                                    onClick={() => void removeDayRoomChanges()}
+                                    className="h-11 flex-1 min-w-[8rem] px-3 rounded-xl bg-rose-50 text-rose-700 font-semibold text-sm"
+                                >
+                                    Снять смены кабинетов за день
+                                </button>
+                            )}
                             <button
                                 onClick={() => setIsHistoryModalOpen(true)}
                                 className="h-11 flex-1 min-w-[5.5rem] px-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-1.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 transition-colors"
@@ -1695,6 +2152,8 @@ export const SubstitutionsPage = () => {
                                     setIsModalOpen(true);
                                 }}
                                 onRemove={removeSubstitution}
+                                onRemoveRoom={removeRoomChange}
+                                onChangeRoom={openRoomChange}
                                 onTelegramClick={handleTelegramClick}
                             />
                         ))}
@@ -2044,6 +2503,55 @@ export const SubstitutionsPage = () => {
                 onClose={() => setTelegramChoiceOpen(false)}
                 onConfirm={confirmSendTelegram}
             />
+            {roomLesson && (
+                <RoomChangeModal
+                    lesson={roomLesson}
+                    date={selectedDate}
+                    existing={roomEditSub}
+                    dayNameMissing={!selectedDayOfWeek}
+                    vacation={isVacationDate}
+                    data={{
+                        rooms,
+                        classes,
+                        teachers,
+                        subjects,
+                        schedule: roomSchedule,
+                        substitutions
+                    }}
+                    onClose={() => {
+                        setRoomLesson(null);
+                        setRoomEditSub(null);
+                    }}
+                    onSave={(payload) => void saveRoomChange(payload)}
+                />
+            )}
+            {dayRoomOpen && (
+                <FreeRoomDayModal
+                    date={selectedDate}
+                    dayName={selectedDayOfWeek}
+                    vacation={isVacationDate}
+                    data={{
+                        rooms,
+                        classes,
+                        teachers,
+                        subjects,
+                        schedule: roomSchedule,
+                        substitutions
+                    }}
+                    onClose={() => setDayRoomOpen(false)}
+                    onApply={(payload) => void applyDayRoomRelease(payload)}
+                />
+            )}
+            {lessonPickOpen && (
+                <LessonPickModal
+                    lessons={[...roomSchedule]
+                        .filter((lesson) => !selectedDayOfWeek || lesson.day === selectedDayOfWeek)
+                        .sort((a, b) => a.period - b.period)}
+                    data={{ rooms, classes, teachers, subjects, schedule: roomSchedule, substitutions }}
+                    onClose={() => setLessonPickOpen(false)}
+                    onPick={openRoomChange}
+                />
+            )}
             <QuickViewScheduleModal
                 teacherId={viewScheduleTeacherId}
                 onClose={() => setViewScheduleTeacherId(null)}

@@ -46,6 +46,12 @@ const mapSubstitution = (raw: Record<string, unknown>): Substitution => ({
     refusals: (raw.refusals as string[]) || [],
     comment: (raw.comment as string) || undefined,
     dayComment: (raw.day_comment as string) || undefined,
+    type: (raw.sub_type as Substitution['type']) || undefined,
+    originalRoomId: (raw.original_room_id as string) || undefined,
+    roomChangeReason: (raw.room_change_reason as string) || undefined,
+    roomChangeScope: (raw.room_change_scope as Substitution['roomChangeScope']) || undefined,
+    roomChangeSource: (raw.room_change_source as Substitution['roomChangeSource']) || undefined,
+    roomConflict: Boolean(raw.room_conflict),
     isRead: (raw.is_read as boolean) || false,
     organizationId: raw.organization_id as string
 });

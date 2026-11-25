@@ -1,6 +1,7 @@
 import React from 'react';
 import { Icon } from '../Icons';
 import { ScheduleItem, Substitution, SubstitutionParams, Teacher, Subject, ClassEntity, Room, Shift } from '../../types';
+import { isRoomSubstitution, roomLabel } from '../../utils/roomSubstitution';
 
 interface LessonCardProps {
     lesson: ScheduleItem;
@@ -20,6 +21,8 @@ interface LessonCardProps {
     onEdit: (lesson: ScheduleItem, sub: Substitution) => void;
     onAssign: (params: SubstitutionParams) => void;
     onRemove: (id: string) => void;
+    onChangeRoom: (lesson: ScheduleItem) => void;
+    onRemoveRoom: (lessonId: string) => void;
     onTelegramClick: (params: TelegramClickParams) => void;
 }
 
@@ -51,11 +54,16 @@ export const LessonCard: React.FC<LessonCardProps> = ({
     onEdit,
     onAssign,
     onRemove,
+    onChangeRoom,
+    onRemoveRoom,
     onTelegramClick
 }) => {
     const subs = substitutions.filter((s) => s.scheduleItemId === l.id && s.date === selectedDate);
-    const hasSubs = subs.length > 0;
-    const firstSub = hasSubs ? subs[0] : null;
+    const roomSub = subs.find(isRoomSubstitution) || null;
+    const teacherSubs = subs.filter((s) => !isRoomSubstitution(s));
+    const displaySubs = teacherSubs.length > 0 ? teacherSubs : subs;
+    const hasSubs = displaySubs.length > 0;
+    const firstSub = hasSubs ? displaySubs[0] : null;
 
     const rep =
         firstSub && !['conducted', 'cancelled'].includes(firstSub.replacementTeacherId)
@@ -64,7 +72,7 @@ export const LessonCard: React.FC<LessonCardProps> = ({
 
     // Объединение с классом, разбитым на подгруппы, даёт по строке замены на каждую подгруппу
     // (разные учителя при одном и том же уроке) — показываем всех заменяющих.
-    const repEntries = subs
+    const repEntries = displaySubs
         .filter((s) => s.replacementTeacherId && !['conducted', 'cancelled'].includes(s.replacementTeacherId))
         .map((s) => ({ sub: s, teacher: teachers.find((t) => t.id === s.replacementTeacherId) }))
         .filter((e): e is { sub: Substitution; teacher: Teacher } => Boolean(e.teacher));
@@ -82,16 +90,18 @@ export const LessonCard: React.FC<LessonCardProps> = ({
     // Кабинеты берём по каждой строке замены отдельно: при объединении с классом на подгруппах
     // подгруппы сидят в разных кабинетах, и на карточке должны быть видны все кабинеты замены.
     const roomNameOf = (id?: string | null) => (id ? rooms.find((r) => r.id === id)?.name || id : null);
-    const roomEntries = subs
-        .map((s) => ({ sub: s, name: roomNameOf(s.replacementRoomId) }))
+    const roomEntries = (roomSub ? [roomSub] : displaySubs)
+        .map((s) => ({ sub: s, name: roomSub && !roomSub.replacementRoomId ? 'без кабинета' : roomNameOf(s.replacementRoomId) }))
         .filter((e): e is { sub: Substitution; name: string } => Boolean(e.name));
     const uniqueRoomNames = roomEntries
         .map((e) => e.name)
         .filter((name, idx, arr) => arr.indexOf(name) === idx);
 
     const replacementRoomName = uniqueRoomNames.length > 0 ? uniqueRoomNames.join(', ') : null;
-    const isRoomChanged =
-        uniqueRoomNames.length > 0 && uniqueRoomNames.some((name) => name !== originalRoomName);
+    const isRoomChanged = Boolean(roomSub) || (uniqueRoomNames.length > 0 && uniqueRoomNames.some((name) => name !== originalRoomName));
+    const roomArrow = roomSub
+        ? `${roomLabel(rooms, roomSub.originalRoomId || l.roomId)} → ${roomLabel(rooms, roomSub.replacementRoomId)}`
+        : null;
 
     const isCancelled = firstSub?.replacementTeacherId === 'cancelled';
     const isConducted = firstSub?.replacementTeacherId === 'conducted';
@@ -151,7 +161,12 @@ export const LessonCard: React.FC<LessonCardProps> = ({
                 </div>
 
                 <div className="flex items-center gap-2">
-                    {isRoomChanged ? (
+                    {roomArrow ? (
+                        <div className="flex items-center gap-1 text-[10px] bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100">
+                            <span className="font-bold text-indigo-700">{roomArrow}</span>
+                            {roomSub?.roomConflict && <span className="text-rose-600">конфликт</span>}
+                        </div>
+                    ) : isRoomChanged ? (
                         <div className="flex items-center gap-1 text-[10px] bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100">
                             <span className="line-through text-slate-400">{originalRoomName}</span>
                             <Icon name="ArrowRight" size={8} className="text-indigo-400" />
@@ -164,6 +179,7 @@ export const LessonCard: React.FC<LessonCardProps> = ({
                     )}
 
                     {!isResolved ? (
+                        <>
                         <button
                             onClick={() =>
                                 onAssign({
@@ -181,6 +197,10 @@ export const LessonCard: React.FC<LessonCardProps> = ({
                         >
                             <Icon name="Edit" size={14} />
                         </button>
+                        <button type="button" onClick={() => onChangeRoom(l)} className="min-h-[40px] min-w-[40px] p-2 text-indigo-600" title="Изменить кабинет">
+                            <Icon name="DoorOpen" size={14} />
+                        </button>
+                        </>
                     ) : (
                         <div className="flex gap-1 items-center">
                             {!isCancelled &&
@@ -215,6 +235,24 @@ export const LessonCard: React.FC<LessonCardProps> = ({
                                     className="p-1.5 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-slate-100"
                                 >
                                     <Icon name="Edit" size={14} />
+                                </button>
+                            )}
+                            <button
+                                type="button"
+                                onClick={() => onChangeRoom(l)}
+                                className="p-1.5 text-indigo-500 rounded-lg hover:bg-indigo-50"
+                                title="Изменить кабинет"
+                            >
+                                <Icon name="DoorOpen" size={14} />
+                            </button>
+                            {roomSub && teacherSubs.length > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={() => onRemoveRoom(l.id)}
+                                    className="p-1.5 text-rose-400 rounded-lg"
+                                    title="Снять смену кабинета"
+                                >
+                                    <Icon name="X" size={14} />
                                 </button>
                             )}
                             <button
@@ -260,7 +298,13 @@ export const LessonCard: React.FC<LessonCardProps> = ({
                         {l.shift === Shift.First ? '1 смена' : '2 смена'}
                     </div>
                     <div className="mt-1">
-                        {isRoomChanged ? (
+                        {roomArrow ? (
+                            <div className="text-xs font-mono font-black text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-1 rounded">
+                                {roomArrow}
+                                {roomSub?.roomConflict ? ' · конфликт кабинета' : ''}
+                                {roomSub?.roomChangeReason ? ` · ${roomSub.roomChangeReason}` : ''}
+                            </div>
+                        ) : isRoomChanged ? (
                             <div className="flex items-center justify-end gap-1.5 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-1 rounded border border-indigo-100 dark:border-indigo-800">
                                 <span className="text-xs font-mono font-bold text-slate-400 line-through decoration-red-400">
                                     {originalRoomName}
@@ -284,6 +328,7 @@ export const LessonCard: React.FC<LessonCardProps> = ({
                     {orig?.name}
                 </div>
                 {!isResolved ? (
+                    <div className="flex items-center gap-2">
                     <button
                         onClick={() =>
                             onAssign({
@@ -301,6 +346,14 @@ export const LessonCard: React.FC<LessonCardProps> = ({
                     >
                         Заменить
                     </button>
+                    <button
+                        type="button"
+                        onClick={() => onChangeRoom(l)}
+                        className="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-xl text-sm font-bold"
+                    >
+                        Изменить кабинет
+                    </button>
+                    </div>
                 ) : (
                     <div className="flex items-center gap-3 justify-end">
                         {isCancelled ? (
@@ -359,8 +412,26 @@ export const LessonCard: React.FC<LessonCardProps> = ({
                         )}
 
                         <button
+                            type="button"
+                            onClick={() => onChangeRoom(l)}
+                            className="px-3 py-2 text-indigo-700 bg-indigo-50 rounded-lg text-sm font-bold"
+                        >
+                            Изменить кабинет
+                        </button>
+                        {roomSub && (
+                            <button
+                                type="button"
+                                onClick={() => onRemoveRoom(l.id)}
+                                className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg"
+                                title="Снять смену кабинета"
+                            >
+                                <Icon name="X" size={18} />
+                            </button>
+                        )}
+                        <button
                             onClick={() => onRemove(l.id)}
                             className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                            title={teacherSubs.length > 0 ? 'Снять замену учителя' : 'Снять замену'}
                         >
                             <Icon name="X" size={18} />
                         </button>

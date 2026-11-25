@@ -5,6 +5,7 @@ import { exportService } from '../services/exportService';
 import { escapeCsv } from '../utils/csv';
 import { BarChart } from '../components/UI';
 import { DAYS, Substitution, Settings } from '../types';
+import { isRoomSubstitution } from '../utils/roomSubstitution';
 import { DateInput } from '../components/DateInput';
 import { getActiveSemester, formatDateEuropean } from '../utils/helpers';
 
@@ -278,11 +279,13 @@ export const ReportsPage = () => {
             (s) => isRealTeacherId(s.replacementTeacherId) && s.replacementTeacherId !== s.originalTeacherId
         ).length;
         const totalCancelled = periodSubs.filter((s) => s.replacementTeacherId === 'cancelled').length;
+        const roomChanges = periodSubs.filter(isRoomSubstitution).length;
         return {
             teachersWithLoad: withLoad.length,
             avgWeekly,
             totalTaken,
             totalCancelled,
+            roomChanges,
             shown: filteredSortedRows.length
         };
     }, [tariffData, periodSubs, filteredSortedRows.length]);
@@ -602,6 +605,8 @@ export const ReportsPage = () => {
                     Замены и рейтинг: <span className="font-semibold text-slate-700 dark:text-slate-300">{periodRange.label}</span>
                     {' · '}
                     Нагрузка из расписания: {selectedSemester === 1 ? '1-е' : '2-е'} полугодие
+                    {' · '}
+                    Смен кабинета: {summary.roomChanges}. На часы учителя они не влияют.
                 </p>
 
                 {/* Сводка */}

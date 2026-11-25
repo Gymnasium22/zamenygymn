@@ -248,13 +248,14 @@ const SubstitutionsTable = ({ items }: { items: ArchivedSubstitution[] }) => (
                     <th className="text-left px-4 py-3 font-bold">Предмет</th>
                     <th className="text-left px-4 py-3 font-bold">Кого заменяют</th>
                     <th className="text-left px-4 py-3 font-bold">Замена</th>
+                    <th className="text-left px-4 py-3 font-bold">Кабинет</th>
                     <th className="text-left px-4 py-3 font-bold">Комментарий</th>
                 </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {items.length === 0 && (
                     <tr>
-                        <td colSpan={6} className="px-4 py-8 text-center text-slate-500 dark:text-slate-400">
+                        <td colSpan={7} className="px-4 py-8 text-center text-slate-500 dark:text-slate-400">
                             Нет данных
                         </td>
                     </tr>
@@ -272,9 +273,16 @@ const SubstitutionsTable = ({ items }: { items: ArchivedSubstitution[] }) => (
                             {item.originalTeacherName}
                         </td>
                         <td className="px-4 py-2.5 text-slate-700 dark:text-slate-300">
-                            {item.replacementTeacherName}
+                            {item.type === 'room' ? 'Кабинет' : item.replacementTeacherName}
                         </td>
-                        <td className="px-4 py-2.5 text-slate-700 dark:text-slate-300">{item.comment || '—'}</td>
+                        <td className="px-4 py-2.5 text-slate-700 dark:text-slate-300">
+                            {item.type === 'room' || item.replacementRoomName
+                                ? `${item.roomName || item.originalRoomId || '—'} → ${item.replacementRoomName || 'без кабинета'}${item.roomConflict ? ' · конфликт кабинета' : ''}`
+                                : item.roomName || '—'}
+                        </td>
+                        <td className="px-4 py-2.5 text-slate-700 dark:text-slate-300">
+                            {item.roomChangeReason || item.comment || '—'}
+                        </td>
                     </tr>
                 ))}
             </tbody>

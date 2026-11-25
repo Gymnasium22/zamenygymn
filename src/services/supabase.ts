@@ -163,6 +163,12 @@ export type DbTables = {
     comment: string | null;
     day_comment: string | null;
     is_read: boolean;
+    sub_type: string | null;
+    original_room_id: string | null;
+    room_change_reason: string | null;
+    room_change_scope: string | null;
+    room_change_source: string | null;
+    room_conflict: boolean;
     created_at: string;
     updated_at: string;
   };

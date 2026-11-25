@@ -73,6 +73,8 @@ export interface ScheduleItem {
     academicYear?: number; // Year when this schedule was created (e.g., 2026)
 }
 
+export type SubstitutionKind = 'teacher' | 'room' | 'cancel' | 'merge';
+
 export interface Substitution {
     id: string;
     date: string; // ISO Date
@@ -80,6 +82,14 @@ export interface Substitution {
     originalTeacherId: string;
     replacementTeacherId: string; // 'conducted', 'cancelled', or teacherId. If purely room change, can be originalTeacherId
     replacementRoomId?: string; // New field for room substitution
+    /** teacher — замена учителя, room — только кабинет, cancel — урок снят, merge — объединение */
+    type?: SubstitutionKind;
+    originalRoomId?: string;
+    roomChangeReason?: string;
+    roomChangeScope?: 'lesson' | 'day';
+    roomChangeSource?: 'auto' | 'manual';
+    /** Администратор сохранил занятый кабинет осознанно */
+    roomConflict?: boolean;
     lessonAbsenceReason?: string; // NEW: Reason for lesson-specific absence
     isMerger?: boolean; // NEW: Flag for merged classes
     refusals?: string[]; // IDs of teachers who refused

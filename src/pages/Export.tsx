@@ -16,6 +16,7 @@ import {
     Room
 } from '../types';
 import { formatDateISO, formatDateEuropean, formatMonthLong, getActiveSemester, getDateOrToday } from '../utils/helpers';
+import { formatRoomArrow, isRoomSubstitution, roomLabel } from '../utils/roomSubstitution';
 import { exportService } from '../services/exportService';
 import { useToast } from '../components/UI';
 import { SanitaryScheduleTab } from '../components/SanitaryScheduleTab';
@@ -1016,6 +1017,7 @@ export const ExportPage = () => {
             subj: Subject | undefined;
             origTeacher: Teacher | undefined;
             reason: string;
+            roomSub?: Substitution;
         }
 
         const groupedSubs = new Map<string, Substitution[]>();
@@ -1030,7 +1032,8 @@ export const ExportPage = () => {
         const noRecordSubs: SubstitutionDetail[] = [];
 
         groupedSubs.forEach((subsGroup) => {
-            const firstSub = subsGroup[0];
+            const firstSub = subsGroup.find((row) => !isRoomSubstitution(row)) || subsGroup[0];
+            const roomSub = subsGroup.find(isRoomSubstitution);
             const scheduleItem = getScheduleItemById(firstSub.scheduleItemId);
             if (!scheduleItem) return;
 
@@ -1040,16 +1043,17 @@ export const ExportPage = () => {
 
             let reason = firstSub.lessonAbsenceReason || origTeacher?.absenceReasons?.[firstSub.date] || '';
 
-            if (
+            if (roomSub || (
                 firstSub.replacementTeacherId === firstSub.originalTeacherId &&
                 firstSub.replacementRoomId &&
                 !firstSub.replacementClassId
-            )
-                reason = 'Смена кабинета';
+            ))
+                reason = roomSub?.roomChangeReason || 'Смена кабинета';
+            if (roomSub?.roomConflict) reason += ' · конфликт кабинета';
             if (firstSub.replacementClassId && firstSub.replacementSubjectId && !firstSub.isMerger)
                 reason = 'Обмен уроками';
 
-            const detail: SubstitutionDetail = { subs: subsGroup, scheduleItem, cls, subj, origTeacher, reason };
+            const detail: SubstitutionDetail = { subs: subsGroup, scheduleItem, cls, subj, origTeacher, reason, roomSub };
 
             if (reason === 'Без записи') {
                 noRecordSubs.push(detail);
@@ -1063,7 +1067,7 @@ export const ExportPage = () => {
         const renderRowsLocal = (items: SubstitutionDetail[]) => {
             return items
                 .map((item) => {
-                    const { subs, scheduleItem, cls, subj, origTeacher, reason } = item;
+                    const { subs, scheduleItem, cls, subj, origTeacher, reason, roomSub } = item;
                     const firstSub = subs[0];
                     const dateStr = formatDateEuropean(firstSub.date);
 
@@ -1111,8 +1115,9 @@ export const ExportPage = () => {
                     const originalRoomName = roomNameOf(originalRoomId);
                     const roomName =
                         replacementRoomNames.length > 0 ? replacementRoomNames.join(', ') : originalRoomName;
-                    const roomDisplay =
-                        replacementRoomNames.length > 0
+                    const roomDisplay = roomSub
+                        ? `${formatRoomArrow(roomLabel(rooms, roomSub.originalRoomId || originalRoomId), roomLabel(rooms, roomSub.replacementRoomId))}${roomSub.roomChangeScope === 'day' ? ' (весь день)' : ''}`
+                        : replacementRoomNames.length > 0
                             ? `${originalRoomName} → ${roomName} (Замена каб.)`
                             : roomName;
 

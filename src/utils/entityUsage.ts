@@ -47,7 +47,7 @@ export function findEntityUsage(
             (kind === 'teacher' &&
                 (s.originalTeacherId === id || s.replacementTeacherId === id)) ||
             (kind === 'class' && s.replacementClassId === id) ||
-            (kind === 'room' && s.replacementRoomId === id) ||
+            (kind === 'room' && (s.replacementRoomId === id || s.originalRoomId === id)) ||
             (kind === 'subject' && s.replacementSubjectId === id);
         if (hit) {
             lines.push({

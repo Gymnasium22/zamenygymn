@@ -9,6 +9,7 @@ import {
     Teacher
 } from '../types';
 import { getDateOrToday } from '../utils/helpers';
+import { formatRoomArrow, isRoomSubstitution, roomLabel } from '../utils/roomSubstitution';
 
 interface ReportHeaderProps {
     exportDate: string;
@@ -137,7 +138,8 @@ export const SubstitutionExportSheet = React.forwardRef<HTMLDivElement, Substitu
                         <tbody className="divide-y divide-slate-100">
                             {uniqueLessonIds.map((lessonId) => {
                                 const lessonSubs = shiftSubs.filter((s) => s.scheduleItemId === lessonId);
-                                const sub = lessonSubs[0];
+                                const sub = lessonSubs.find((row) => !isRoomSubstitution(row)) || lessonSubs[0];
+                                const roomSub = lessonSubs.find(isRoomSubstitution);
                                 const s = getScheduleItemById(lessonId);
                                 if (!s) return null;
                                 const cls = classesById.get(s.classId);
@@ -184,10 +186,11 @@ export const SubstitutionExportSheet = React.forwardRef<HTMLDivElement, Substitu
                                     ? subjectsById.get(sub.replacementSubjectId)
                                     : null;
 
-                                const isRoomChangeOnly =
+                                const isRoomChangeOnly = Boolean(roomSub) || (
                                     sub.replacementTeacherId === sub.originalTeacherId &&
                                     newRoomId &&
-                                    !swappedClass;
+                                    !swappedClass
+                                );
                                 const isSwap = swappedClass && swappedSubj && !sub.isMerger;
                                 const isTeacherPresent = sub.replacementTeacherId === sub.originalTeacherId;
                                 const rowComment = sub.comment;
@@ -279,7 +282,15 @@ export const SubstitutionExportSheet = React.forwardRef<HTMLDivElement, Substitu
                                         <td
                                             className={`py-3 px-2 text-right font-mono font-black ${isRoomChangedMulti ? 'text-indigo-600' : 'text-slate-700'}`}
                                         >
-                                            {isRoomChangedMulti ? (
+                                            {roomSub ? (
+                                                <div className="text-right text-indigo-700 font-black">
+                                                    {formatRoomArrow(
+                                                        roomLabel(Array.from(roomsById.values()), roomSub.originalRoomId || s.roomId),
+                                                        roomLabel(Array.from(roomsById.values()), roomSub.replacementRoomId)
+                                                    )}
+                                                    {roomSub.roomConflict ? ' · конфликт кабинета' : ''}
+                                                </div>
+                                            ) : isRoomChangedMulti ? (
                                                 <div className="flex items-center justify-end gap-2 text-xl whitespace-nowrap">
                                                     <span className="text-slate-400 decoration-4 text-xl">
                                                         {oldRoomName}

@@ -34,11 +34,14 @@ const fromSnakeCase = (obj: Record<string, unknown>): Record<string, unknown> =>
 // При объединении с классом на подгруппах у одного урока несколько заменяющих учителей —
 // учитель входит в ключ, иначе две строки склеиваются в одну и один учитель теряется.
 export const substitutionKey = (row: Record<string, unknown>): string | null => {
-    const lesson = row.schedule_item_id as string | null;
+    const lesson = (row.schedule_item_id ?? row.scheduleItemId) as string | null;
     if (!lesson) return null;
-    const teacher = row.replacement_teacher_id as string | null;
+    const teacher = (row.replacement_teacher_id ?? row.replacementTeacherId) as string | null;
+    const kind = String(row.sub_type ?? row.type ?? '');
     const base = `${row.date ?? ''}|${lesson}`;
-    return teacher ? `${base}|${teacher}` : base;
+    const teacherPart = teacher ? `|${teacher}` : '';
+    const typePart = kind ? `|${kind}` : '';
+    return `${base}${teacherPart}${typePart}`;
 };
 
 // Collapse duplicates of the same lesson+date+teacher (old code could leave several rows):
@@ -330,6 +333,8 @@ export const supabaseDbService = {
                     substitutions: (substitutionsRes.data || []).map((s: Record<string, unknown>) => {
                         const obj = fromSnakeCase(s) as Record<string, unknown>;
                         obj.date = toDateOnly(obj.date) || obj.date;
+                        if (s.sub_type) obj.type = s.sub_type;
+                        obj.roomConflict = Boolean(s.room_conflict);
                         return { ...obj, id: s.id } as Substitution;
                     }),
                     dutySchedule: (dutyRes.data || []).map((d: Record<string, unknown>) => ({ ...fromSnakeCase(d), id: d.id })) as DutyRecord[],
@@ -952,7 +957,13 @@ export const supabaseDbService = {
                 refusals: Array.isArray(s.refusals) ? s.refusals : [],
                 comment: s.comment || null,
                 day_comment: s.dayComment ?? s.day_comment ?? null,
-                is_read: Boolean(s.isRead ?? s.is_read)
+                is_read: Boolean(s.isRead ?? s.is_read),
+                sub_type: s.type ?? s.sub_type ?? null,
+                original_room_id: (s.originalRoomId ?? s.original_room_id) || null,
+                room_change_reason: s.roomChangeReason ?? s.room_change_reason ?? null,
+                room_change_scope: s.roomChangeScope ?? s.room_change_scope ?? null,
+                room_change_source: s.roomChangeSource ?? s.room_change_source ?? null,
+                room_conflict: Boolean(s.roomConflict ?? s.room_conflict)
             });
             return filterSubstitution(obj) ? obj : null;
         };

@@ -161,6 +161,13 @@ export const supabaseSubstitutionsService = {
                 is_merger: sub.isMerger || false,
                 lesson_absence_reason: sub.lessonAbsenceReason || null,
                 refusals: sub.refusals || [],
+                comment: sub.comment || null,
+                sub_type: sub.type || null,
+                original_room_id: sub.originalRoomId || null,
+                room_change_reason: sub.roomChangeReason || null,
+                room_change_scope: sub.roomChangeScope || null,
+                room_change_source: sub.roomChangeSource || null,
+                room_conflict: Boolean(sub.roomConflict),
                 organization_id: sub.organizationId || null,
                 academic_year: year
             })
@@ -182,6 +189,13 @@ export const supabaseSubstitutionsService = {
         if (changes.isMerger !== undefined) updates.is_merger = changes.isMerger;
         if (changes.lessonAbsenceReason !== undefined) updates.lesson_absence_reason = changes.lessonAbsenceReason || null;
         if (changes.refusals !== undefined) updates.refusals = changes.refusals;
+        if (changes.comment !== undefined) updates.comment = changes.comment || null;
+        if (changes.type !== undefined) updates.sub_type = changes.type || null;
+        if (changes.originalRoomId !== undefined) updates.original_room_id = changes.originalRoomId || null;
+        if (changes.roomChangeReason !== undefined) updates.room_change_reason = changes.roomChangeReason || null;
+        if (changes.roomChangeScope !== undefined) updates.room_change_scope = changes.roomChangeScope || null;
+        if (changes.roomChangeSource !== undefined) updates.room_change_source = changes.roomChangeSource || null;
+        if (changes.roomConflict !== undefined) updates.room_conflict = changes.roomConflict;
         updates.updated_at = new Date().toISOString();
 
         const { error } = await supabase.from('substitutions').update(updates).eq('id', id);
@@ -207,6 +221,13 @@ function mapSubstitution(data: Record<string, unknown>): Substitution {
         isMerger: (data.is_merger as boolean) || false,
         lessonAbsenceReason: (data.lesson_absence_reason as string) || undefined,
         refusals: (data.refusals as string[]) || [],
+        comment: (data.comment as string) || undefined,
+        type: (data.sub_type as Substitution['type']) || undefined,
+        originalRoomId: (data.original_room_id as string) || undefined,
+        roomChangeReason: (data.room_change_reason as string) || undefined,
+        roomChangeScope: (data.room_change_scope as Substitution['roomChangeScope']) || undefined,
+        roomChangeSource: (data.room_change_source as Substitution['roomChangeSource']) || undefined,
+        roomConflict: Boolean(data.room_conflict),
         organizationId: data.organization_id as string
     };
 }

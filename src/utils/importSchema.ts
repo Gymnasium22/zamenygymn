@@ -46,7 +46,15 @@ const SubstitutionSchema = z.object({
     originalTeacherId: z.string().optional(),
     replacementTeacherId: z.string().optional(),
     date: z.string().optional(),
-    isMerger: z.boolean().optional()
+    isMerger: z.boolean().optional(),
+    type: z.enum(['teacher', 'room', 'cancel', 'merge']).optional(),
+    originalRoomId: z.string().optional(),
+    replacementRoomId: z.string().optional(),
+    roomChangeReason: z.string().optional(),
+    roomChangeScope: z.enum(['lesson', 'day']).optional(),
+    roomChangeSource: z.enum(['auto', 'manual']).optional(),
+    roomConflict: z.boolean().optional(),
+    comment: z.string().optional()
 });
 
 const BellSchema = z.object({
