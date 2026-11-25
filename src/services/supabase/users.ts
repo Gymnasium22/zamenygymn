@@ -2,6 +2,8 @@ import { supabase } from '../supabase';
 import { UserProfile, UserRole, Permission, PageId } from '../../types';
 import { getRoleDefaults } from '../users';
 
+const PROFILE_TIMEOUT_MS = 15000;
+
 export const supabaseUsersService = {
     subscribe: (uid: string, onNext: (profile: UserProfile | null) => void, onError?: (error: Error) => void) => {
         const channelName = `profiles_changes_${uid}_${Date.now()}`;
@@ -38,12 +40,20 @@ export const supabaseUsersService = {
     },
 
     getById: async (uid: string): Promise<UserProfile | null> => {
-        const { data, error } = await supabase.from('profiles').select('*').eq('id', uid).single();
-        if (error) {
-            if (error.code === 'PGRST116') return null;
-            throw error;
+        let timeout: ReturnType<typeof setTimeout>;
+        const timeoutPromise = new Promise<never>((_, reject) => {
+            timeout = setTimeout(() => reject(new Error('Превышено время ожидания загрузки профиля')), PROFILE_TIMEOUT_MS);
+        });
+        try {
+            const { data, error } = await Promise.race([supabase.from('profiles').select('*').eq('id', uid).single(), timeoutPromise]);
+            if (error) {
+                if (error.code === 'PGRST116') return null;
+                throw error;
+            }
+            return data ? mapProfile(data) : null;
+        } finally {
+            clearTimeout(timeout!);
         }
-        return data ? mapProfile(data) : null;
     },
 
     create: async (params: {

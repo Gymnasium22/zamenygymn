@@ -2204,6 +2204,7 @@ export const SubstitutionsPage = () => {
                 substitutionComment={substitutionComment}
                 setSubstitutionComment={setSubstitutionComment}
                 activeReplacementId={activeReplacementId}
+                isEditing={Boolean(currentSubParams?.isEditing)}
                 classes={classes}
             />
 

@@ -31,6 +31,7 @@ interface AuthContextType {
     permissions: Permission[];
     allowedPages: PageId[];
     loading: boolean;
+    authError: string | null;
     isBlocked: boolean;
     logout: () => Promise<void>;
     hasPermission: (permission: Permission) => boolean;
@@ -78,6 +79,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [organizations, setOrganizations] = useState<Organization[]>([]);
     const [currentOrganizationId, setCurrentOrganizationId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
+    const [authError, setAuthError] = useState<string | null>(null);
     const [isBlocked, setIsBlocked] = useState(false);
     const [auditMode] = useState(isMobileAuditMode);
 
@@ -297,48 +299,63 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         console.log('[AuthContext] Starting auth state subscription');
 
-        const unsubscribe = authAdapter.onAuthStateChanged(async (currentUser) => {
-            console.log('[AuthContext] Auth state changed:', currentUser ? { id: currentUser.id, email: currentUser.email } : null);
-            setUser(currentUser);
+        const unsubscribe = authAdapter.onAuthStateChanged(
+            async (currentUser) => {
+                console.log('[AuthContext] Auth state changed:', currentUser ? { id: currentUser.id, email: currentUser.email } : null);
+                setUser(currentUser);
+                setAuthError(null);
 
-            if (unsubProfile) {
-                unsubProfile();
-                unsubProfile = null;
-            }
+                if (unsubProfile) {
+                    unsubProfile();
+                    unsubProfile = null;
+                }
 
-            if (currentUser) {
-                const usersService = authAdapter.getUsersService();
-                const uid = currentUser.id;
-                console.log('[AuthContext] User found, subscribing to profile for uid:', uid);
+                if (currentUser) {
+                    const usersService = authAdapter.getUsersService();
+                    const uid = currentUser.id;
+                    console.log('[AuthContext] User found, subscribing to profile for uid:', uid);
 
-                usersService.updateLastLogin(uid).catch(() => {});
+                    usersService.updateLastLogin(uid).catch(() => {});
 
-                unsubProfile = usersService.subscribe(
-                    uid,
-                    async (loadedProfile) => {
-                        console.log('[AuthContext] Profile loaded:', loadedProfile);
-                        await applyProfile(loadedProfile);
-                        setLoading(false);
-                    },
-                    (error) => {
-                        console.error('[AuthContext] Profile subscription error:', error);
-                        setProfile(null);
-                        setRole(null);
-                        setIsBlocked(false);
-                        setCurrentOrganizationId(null);
-                        setLoading(false);
-                    }
-                );
-            } else {
-                console.log('[AuthContext] No user, setting loading false');
+                    unsubProfile = usersService.subscribe(
+                        uid,
+                        async (loadedProfile) => {
+                            console.log('[AuthContext] Profile loaded:', loadedProfile);
+                            await applyProfile(loadedProfile);
+                            setLoading(false);
+                        },
+                        (error) => {
+                            console.error('[AuthContext] Profile subscription error:', error);
+                            setProfile(null);
+                            setRole(null);
+                            setIsBlocked(false);
+                            setCurrentOrganizationId(null);
+                            setAuthError('Не удалось получить права доступа. Проверьте сеть и попробуйте ещё раз.');
+                            setLoading(false);
+                        }
+                    );
+                } else {
+                    console.log('[AuthContext] No user, setting loading false');
+                    setProfile(null);
+                    setRole(null);
+                    setIsBlocked(false);
+                    setCurrentOrganizationId(null);
+                    setOrganizations([]);
+                    setLoading(false);
+                }
+            },
+            (error) => {
+                console.error('[AuthContext] Auth initialization error:', error);
+                setUser(null);
                 setProfile(null);
                 setRole(null);
                 setIsBlocked(false);
                 setCurrentOrganizationId(null);
                 setOrganizations([]);
+                setAuthError('Не удалось проверить авторизацию. Проверьте сеть и попробуйте ещё раз.');
                 setLoading(false);
             }
-        });
+        );
 
         return () => {
             unsubscribe();
@@ -376,6 +393,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 permissions: profile?.permissions || [],
                 allowedPages: auditMode ? AUDIT_ALL_PAGES : profile?.allowedPages || [],
                 loading,
+                authError,
                 isBlocked,
                 logout,
                 hasPermission,

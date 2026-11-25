@@ -6,9 +6,26 @@ export interface UnifiedUser {
     email?: string | null;
 }
 
+const AUTH_TIMEOUT_MS = 15000;
+
+const withTimeout = <T>(promise: Promise<T>): Promise<T> =>
+    new Promise((resolve, reject) => {
+        const timeout = window.setTimeout(() => reject(new Error('Превышено время ожидания авторизации')), AUTH_TIMEOUT_MS);
+        promise.then(
+            (value) => {
+                window.clearTimeout(timeout);
+                resolve(value);
+            },
+            (error) => {
+                window.clearTimeout(timeout);
+                reject(error);
+            }
+        );
+    });
+
 export interface AuthAdapter {
     getCurrentUser: () => Promise<UnifiedUser | null>;
-    onAuthStateChanged: (callback: (user: UnifiedUser | null) => void) => () => void;
+    onAuthStateChanged: (callback: (user: UnifiedUser | null) => void, onError?: (error: Error) => void) => () => void;
     signIn: (email: string, password: string) => Promise<{ user: UnifiedUser | null; error: Error | null }>;
     signOut: () => Promise<void>;
     getUsersService: () => typeof supabaseUsersService;
@@ -16,23 +33,25 @@ export interface AuthAdapter {
 
 export const authAdapter: AuthAdapter = {
     getCurrentUser: async () => {
-        const { data } = await supabase.auth.getUser();
+        const { data } = await withTimeout(supabase.auth.getUser());
         return data.user ? { id: data.user.id, email: data.user.email || '' } : null;
     },
-    onAuthStateChanged: (callback) => {
+    onAuthStateChanged: (callback, onError) => {
         let currentUser: UnifiedUser | null = null;
 
         // Immediately check current user — onAuthStateChange only fires on changes, not initial state
-        supabase.auth.getUser().then(({ data: userData }) => {
-            if (userData.user) {
-                const newUser = { id: userData.user.id, email: userData.user.email || '' };
-                currentUser = newUser;
-                callback(newUser);
-            } else {
-                currentUser = null;
-                callback(null);
-            }
-        });
+        withTimeout(supabase.auth.getUser())
+            .then(({ data: userData }) => {
+                if (userData.user) {
+                    const newUser = { id: userData.user.id, email: userData.user.email || '' };
+                    currentUser = newUser;
+                    callback(newUser);
+                } else {
+                    currentUser = null;
+                    callback(null);
+                }
+            })
+            .catch(onError);
 
         const { data } = supabase.auth.onAuthStateChange((_event, session) => {
             if (session?.user) {

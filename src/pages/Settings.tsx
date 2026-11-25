@@ -3,7 +3,7 @@ import { useStaticData, useScheduleData, useData } from '../context/DataContext'
 import { useAuth } from '../context/AuthContext';
 import { Icon } from '../components/Icons';
 import { DateInput } from '../components/DateInput';
-import { useToast } from '../components/UI';
+import { Modal, useToast } from '../components/UI';
 import {
     TelegramTemplates,
     AdminAnnouncement,
@@ -40,6 +40,14 @@ type SettingsSection =
     | 'system'
     | 'users'
     | 'organizations';
+
+type SkippedImportRow = {
+    type: 'schedule' | 'substitution';
+    id: string;
+    semester?: 1 | 2;
+    date?: string;
+    reason: string;
+};
 
 const SECTIONS: { id: SettingsSection; label: string; icon: string }[] = [
     { id: 'integrations', label: 'Интеграции', icon: 'Plug' },
@@ -384,6 +392,8 @@ export const SettingsPage = () => {
 
     // Full DB Import / Export refs and states
     const dbFileInputRef = useRef<HTMLInputElement>(null);
+    const [skippedImportRows, setSkippedImportRows] = useState<SkippedImportRow[]>([]);
+    const [importReportOpen, setImportReportOpen] = useState(false);
 
     const fullAppData: AppData = useMemo(
         () => ({
@@ -491,19 +501,19 @@ export const SettingsPage = () => {
                 const rawJson = JSON.parse(ev.target?.result as string);
                 const json = stripDangerousKeys(rawJson) as AppDataImport;
 
-                const rawScheduleCount = (json.schedule?.length || 0) + (json.schedule2?.length || 0);
-                const rawSubstitutionCount = json.substitutions?.length || 0;
+                const skippedRows: SkippedImportRow[] = [];
 
                 // Normalize legacy import data before validation:
                 // - old backups often stored room name/number as roomId instead of room.id
                 // - some schedule items may reference deleted classes
                 // - some substitutions may reference deleted schedule items/teachers
                 const classIds = new Set((json.classes || []).map((c) => c.id));
+                const subjectIds = new Set((json.subjects || []).map((s) => s.id));
                 const roomIds = new Set((json.rooms || []).map((r) => r.id));
                 const roomByName = new Map((json.rooms || []).map((r) => [r.name, r.id]));
                 const teacherIds = new Set((json.teachers || []).map((t) => t.id));
 
-                const normalizeSchedule = (items: typeof json.schedule): typeof json.schedule => {
+                const normalizeSchedule = (items: typeof json.schedule, semester: 1 | 2): typeof json.schedule => {
                     if (!items) return undefined;
                     return items
                         .map((item) => {
@@ -512,11 +522,31 @@ export const SettingsPage = () => {
                             }
                             return item;
                         })
-                        .filter((item) => !item.classId || classIds.has(item.classId)) as typeof json.schedule;
+                        .filter((item) => {
+                            if (item.classId && !classIds.has(item.classId)) {
+                                skippedRows.push({
+                                    type: 'schedule',
+                                    id: item.id,
+                                    semester,
+                                    reason: `Не найден класс с ID «${item.classId}»`
+                                });
+                                return false;
+                            }
+                            let reason: string | undefined;
+                            if (item.subjectId && !subjectIds.has(item.subjectId)) {
+                                reason = `Не найден предмет с ID «${item.subjectId}»`;
+                            } else if (item.teacherId && !teacherIds.has(item.teacherId)) {
+                                reason = `Не найден учитель с ID «${item.teacherId}»`;
+                            } else if (item.roomId && !roomIds.has(item.roomId)) {
+                                reason = `Не найден кабинет с ID «${item.roomId}»`;
+                            }
+                            if (reason) skippedRows.push({ type: 'schedule', id: item.id, semester, reason });
+                            return true;
+                        }) as typeof json.schedule;
                 };
 
-                json.schedule = normalizeSchedule(json.schedule);
-                json.schedule2 = normalizeSchedule(json.schedule2);
+                json.schedule = normalizeSchedule(json.schedule, 1);
+                json.schedule2 = normalizeSchedule(json.schedule2, 2);
 
                 const scheduleItemIds = new Set([
                     ...(json.schedule || []).map((s) => s.id),
@@ -524,22 +554,28 @@ export const SettingsPage = () => {
                 ]);
 
                 json.substitutions = (json.substitutions || []).filter((sub) => {
-                    if (sub.scheduleItemId && !scheduleItemIds.has(sub.scheduleItemId)) return false;
-                    if (sub.originalTeacherId && !teacherIds.has(sub.originalTeacherId)) return false;
+                    const row = { type: 'substitution' as const, id: sub.id, date: sub.date };
+                    if (sub.scheduleItemId && !scheduleItemIds.has(sub.scheduleItemId)) {
+                        skippedRows.push({ ...row, reason: `Не найден урок с ID «${sub.scheduleItemId}»` });
+                        return false;
+                    }
+                    if (sub.originalTeacherId && !teacherIds.has(sub.originalTeacherId)) {
+                        skippedRows.push({ ...row, reason: `Не найден исходный учитель с ID «${sub.originalTeacherId}»` });
+                        return false;
+                    }
                     if (
                         sub.replacementTeacherId &&
                         !['conducted', 'cancelled'].includes(sub.replacementTeacherId) &&
                         !teacherIds.has(sub.replacementTeacherId)
                     ) {
+                        skippedRows.push({ ...row, reason: `Не найден замещающий учитель с ID «${sub.replacementTeacherId}»` });
                         return false;
                     }
                     return true;
                 }) as typeof json.substitutions;
 
-                const normalizedScheduleCount = (json.schedule?.length || 0) + (json.schedule2?.length || 0);
-                const normalizedSubstitutionCount = json.substitutions?.length || 0;
-                const skippedSchedule = rawScheduleCount - normalizedScheduleCount;
-                const skippedSubstitutions = rawSubstitutionCount - normalizedSubstitutionCount;
+                const skippedSchedule = skippedRows.filter((row) => row.type === 'schedule').length;
+                const skippedSubstitutions = skippedRows.filter((row) => row.type === 'substitution').length;
 
                 const validationErrors = validateImportData(json);
                 if (validationErrors.length > 0) {
@@ -573,6 +609,8 @@ export const SettingsPage = () => {
                         // dependency order (reference tables → schedule items → substitutions).
                         await saveData(mergedData);
                         if (skippedSchedule > 0 || skippedSubstitutions > 0) {
+                            setSkippedImportRows(skippedRows);
+                            setImportReportOpen(true);
                             addToast({
                                 type: 'warning',
                                 title: 'Импорт выполнен с потерями',
@@ -2006,6 +2044,43 @@ export const SettingsPage = () => {
                 onConfirm={handleReset}
                 onCancel={() => setConfirmResetOpen(false)}
             />
+
+            <Modal
+                isOpen={importReportOpen}
+                onClose={() => setImportReportOpen(false)}
+                title="Пропущенные строки импорта"
+                maxWidth="max-w-2xl"
+                footer={
+                    <button
+                        onClick={() => setImportReportOpen(false)}
+                        className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 transition"
+                    >
+                        Понятно
+                    </button>
+                }
+            >
+                <p className="text-sm text-slate-600 dark:text-slate-300 mb-4">
+                    Эти строки не были импортированы из-за ссылок на отсутствующие данные. Всего пропущено: {skippedImportRows.length}.
+                </p>
+                <div className="space-y-3">
+                    {skippedImportRows.map((row, index) => (
+                        <div
+                            key={`${row.type}-${row.id}-${index}`}
+                            className="p-3 rounded-xl border border-amber-200 dark:border-amber-900 bg-amber-50/50 dark:bg-amber-900/10"
+                        >
+                            <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+                                <span className="text-sm font-bold text-slate-800 dark:text-white">
+                                    {row.type === 'schedule'
+                                        ? `Урок (${row.semester}-е полугодие)`
+                                        : `Замена${row.date ? ` от ${formatDateEuropean(row.date)}` : ''}`}
+                                </span>
+                                <code className="text-xs text-slate-500 dark:text-slate-400 break-all">ID: {row.id}</code>
+                            </div>
+                            <p className="text-sm text-amber-800 dark:text-amber-300">{row.reason}</p>
+                        </div>
+                    ))}
+                </div>
+            </Modal>
 
         </div>
     );

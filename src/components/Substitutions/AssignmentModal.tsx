@@ -57,6 +57,7 @@ interface AssignmentModalProps {
     substitutionComment: string;
     setSubstitutionComment: (val: string) => void;
     activeReplacementId: string | null;
+    isEditing: boolean;
     classes: ClassEntity[];
 }
 
@@ -86,6 +87,7 @@ export const AssignmentModal: React.FC<AssignmentModalProps> = ({
     substitutionComment,
     setSubstitutionComment,
     activeReplacementId,
+    isEditing,
     classes
 }) => (
     <Modal isOpen={isOpen} onClose={onClose} title="Управление заменой" maxWidth="max-w-2xl">
@@ -264,11 +266,25 @@ export const AssignmentModal: React.FC<AssignmentModalProps> = ({
                         <p className="text-slate-500 text-base mb-8 max-w-sm">
                             Урок будет отмечен как отмененный в расписании и отобразится красным цветом.
                         </p>
+                        {isEditing && (
+                            <div className="w-full max-w-sm text-left mb-6">
+                                <label className="block text-xs font-bold text-slate-400 uppercase mb-2">
+                                    Комментарий к этой замене (Опционально)
+                                </label>
+                                <textarea
+                                    value={substitutionComment}
+                                    onChange={(e) => setSubstitutionComment(e.target.value)}
+                                    className="w-full border border-slate-200 p-2.5 rounded-xl text-sm bg-white dark:bg-slate-700 dark:text-white font-medium outline-none focus:ring-2 ring-indigo-500"
+                                    rows={2}
+                                    placeholder="Краткий комментарий, который будет виден в списке замен и на PNG."
+                                />
+                            </div>
+                        )}
                         <button
                             onClick={() => onAssign('cancelled')}
                             className="px-8 py-4 bg-red-600 text-white rounded-xl font-bold text-lg hover:bg-red-700 shadow-lg shadow-red-200 hover:shadow-xl transition-all"
                         >
-                            Подтвердить отмену
+                            {isEditing ? 'Сохранить изменения' : 'Подтвердить отмену'}
                         </button>
                     </div>
                 )}

@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { logger } from '../utils/logger';
 
 export const LoginPage = () => {
-    const { user, role, loading: authLoading, isBlocked, allowedPages } = useAuth();
+    const { user, role, loading: authLoading, authError, isBlocked, allowedPages } = useAuth();
     const navigate = useNavigate();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -29,6 +29,14 @@ export const LoginPage = () => {
             setError('Ваш аккаунт заблокирован. Обратитесь к администратору.');
         }
     }, [authLoading, user, isBlocked]);
+
+    useEffect(() => {
+        if (authError) {
+            setError(authError);
+            setSubmitted(false);
+            setLoading(false);
+        }
+    }, [authError]);
 
     useEffect(() => {
         if (submitted && !loading && !authLoading && !role) {
