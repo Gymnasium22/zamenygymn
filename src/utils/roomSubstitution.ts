@@ -131,20 +131,19 @@ export const listRoomOptions = (
         .sort((a, b) => Number(a.busy) - Number(b.busy) || a.room.name.localeCompare(b.room.name, 'ru'));
 };
 
-export const suggestFreeRoom = (
+const rankFreeRooms = (
     lesson: ScheduleItem,
     classes: ClassEntity[],
     rooms: Room[],
     options: RoomOption[],
-    avoidRoomIds: string[] = []
-): Room | null => {
+    avoidRoomIds: string[]
+): Room[] => {
     const current = lesson.roomId;
     const cls = classes.find((item) => item.id === lesson.classId);
     const origin = rooms.find((room) => room.id === current);
     const free = options.filter(
         (option) => !option.busy && option.room.id !== current && !avoidRoomIds.includes(option.room.id)
     );
-    if (free.length === 0) return null;
     const score = (room: Room) => {
         let value = 0;
         if (origin?.type && room.type === origin.type) value += 4;
@@ -152,10 +151,27 @@ export const suggestFreeRoom = (
         if (cls?.studentsCount && room.capacity && room.capacity >= cls.studentsCount) value += 1;
         return value;
     };
-    return [...free].sort(
-        (a, b) => score(b.room) - score(a.room) || a.room.name.localeCompare(b.room.name, 'ru')
-    )[0].room;
+    return [...free]
+        .sort((a, b) => score(b.room) - score(a.room) || a.room.name.localeCompare(b.room.name, 'ru'))
+        .map((option) => option.room);
 };
+
+export const suggestFreeRooms = (
+    lesson: ScheduleItem,
+    classes: ClassEntity[],
+    rooms: Room[],
+    options: RoomOption[],
+    count: number,
+    avoidRoomIds: string[] = []
+): Room[] => rankFreeRooms(lesson, classes, rooms, options, avoidRoomIds).slice(0, Math.max(0, count));
+
+export const suggestFreeRoom = (
+    lesson: ScheduleItem,
+    classes: ClassEntity[],
+    rooms: Room[],
+    options: RoomOption[],
+    avoidRoomIds: string[] = []
+): Room | null => suggestFreeRooms(lesson, classes, rooms, options, 1, avoidRoomIds)[0] || null;
 
 export interface DayRoomLesson {
     lesson: ScheduleItem;

@@ -116,6 +116,7 @@ export const SubstitutionsPage = () => {
     const [roomEditSub, setRoomEditSub] = useState<Substitution | null>(null);
     const [dayRoomOpen, setDayRoomOpen] = useState(false);
     const [lessonPickOpen, setLessonPickOpen] = useState(false);
+    const [roomActionsOpen, setRoomActionsOpen] = useState(false);
 
     // New: common comment for all substitutions on the selected date
     const [dayComment, setDayComment] = useState<string>('');
@@ -1931,29 +1932,66 @@ export const SubstitutionsPage = () => {
                                 <Icon name="Copy" className="shrink-0" size={18} />
                                 <span className="truncate">Копия</span>
                             </button>
-                            <button
-                                type="button"
-                                onClick={() => setLessonPickOpen(true)}
-                                className="h-11 flex-1 min-w-[8rem] px-3 rounded-xl bg-white dark:bg-slate-800 border border-indigo-200 text-indigo-700 font-semibold text-sm"
-                            >
-                                Изменить кабинет
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setDayRoomOpen(true)}
-                                className="h-11 flex-1 min-w-[8rem] px-3 rounded-xl bg-white dark:bg-slate-800 border border-indigo-200 text-indigo-700 font-semibold text-sm"
-                            >
-                                Освободить кабинет на весь день
-                            </button>
-                            {substitutions.some((s) => s.date === selectedDate && s.type === 'room' && s.roomChangeScope === 'day') && (
+                            <div className="relative flex-1 min-w-[7rem]">
+                                {roomActionsOpen && (
+                                    <button
+                                        type="button"
+                                        aria-label="Закрыть меню кабинетов"
+                                        className="fixed inset-0 z-40 cursor-default"
+                                        onClick={() => setRoomActionsOpen(false)}
+                                    />
+                                )}
                                 <button
                                     type="button"
-                                    onClick={() => void removeDayRoomChanges()}
-                                    className="h-11 flex-1 min-w-[8rem] px-3 rounded-xl bg-rose-50 text-rose-700 font-semibold text-sm"
+                                    onClick={() => setRoomActionsOpen((open) => !open)}
+                                    className="relative z-50 h-11 w-full px-3 rounded-xl bg-white dark:bg-slate-800 border border-indigo-200 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300 font-semibold text-sm flex items-center justify-center gap-1.5"
+                                    aria-expanded={roomActionsOpen}
+                                    aria-haspopup="menu"
                                 >
-                                    Снять смены кабинетов за день
+                                    <Icon name="DoorOpen" className="shrink-0" size={18} />
+                                    <span className="truncate">Кабинеты</span>
+                                    <Icon name="ChevronRight" className="rotate-90 shrink-0" size={14} />
                                 </button>
-                            )}
+                                {roomActionsOpen && (
+                                    <div className="absolute right-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-xl" role="menu">
+                                        <button
+                                            type="button"
+                                            role="menuitem"
+                                            onClick={() => {
+                                                setRoomActionsOpen(false);
+                                                setLessonPickOpen(true);
+                                            }}
+                                            className="w-full px-4 py-3 text-left text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-slate-700 transition-colors"
+                                        >
+                                            Изменить кабинет
+                                        </button>
+                                        <button
+                                            type="button"
+                                            role="menuitem"
+                                            onClick={() => {
+                                                setRoomActionsOpen(false);
+                                                setDayRoomOpen(true);
+                                            }}
+                                            className="w-full px-4 py-3 text-left text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-slate-700 transition-colors"
+                                        >
+                                            Освободить кабинет на весь день
+                                        </button>
+                                        {substitutions.some((s) => s.date === selectedDate && s.type === 'room' && s.roomChangeScope === 'day') && (
+                                            <button
+                                                type="button"
+                                                role="menuitem"
+                                                onClick={() => {
+                                                    setRoomActionsOpen(false);
+                                                    void removeDayRoomChanges();
+                                                }}
+                                                className="w-full border-t border-slate-200 dark:border-slate-700 px-4 py-3 text-left text-sm font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 transition-colors"
+                                            >
+                                                Снять смены кабинетов за день
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
                             <button
                                 onClick={() => setIsHistoryModalOpen(true)}
                                 className="h-11 flex-1 min-w-[5.5rem] px-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-1.5 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 transition-colors"

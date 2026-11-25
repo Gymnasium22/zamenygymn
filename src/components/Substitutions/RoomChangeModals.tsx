@@ -1,15 +1,15 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Modal } from '../UI';
 import { Icon } from '../Icons';
 import { ClassEntity, Room, ScheduleItem, Subject, Substitution, Teacher } from '../../types';
 import {
     DayRoomLesson,
     describeRoomConflict,
-    formatRoomArrow,
     lessonsTouchingRoom,
     listRoomOptions,
     roomLabel,
-    suggestFreeRoom
+    suggestFreeRoom,
+    suggestFreeRooms
 } from '../../utils/roomSubstitution';
 
 interface Lookup {
@@ -26,6 +26,8 @@ const names = (lesson: ScheduleItem, data: Lookup) => ({
     teacherName: data.teachers.find((item) => item.id === lesson.teacherId)?.name || 'учитель удалён',
     subjectName: data.subjects.find((item) => item.id === lesson.subjectId)?.name || 'предмет удалён'
 });
+
+const inputClass = 'w-full rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2';
 
 export const RoomChangeModal = ({
     lesson,
@@ -59,7 +61,7 @@ export const RoomChangeModal = ({
     const [comment, setComment] = useState(existing?.comment || '');
     const [source, setSource] = useState<'auto' | 'manual'>(existing?.roomChangeSource || 'manual');
     const [clearRoom, setClearRoom] = useState(Boolean(existing?.type === 'room' && !existing.replacementRoomId));
-    const [suggested, setSuggested] = useState<string | null>(null);
+    const [commentOpen, setCommentOpen] = useState(Boolean(existing?.comment));
 
     const excludeIds = existing ? [existing.id] : [];
     const options = useMemo(
@@ -77,6 +79,11 @@ export const RoomChangeModal = ({
             ),
         [data, date, lesson, existing?.id]
     );
+    const recommendations = useMemo(
+        () => suggestFreeRooms(lesson, data.classes, data.rooms, options, 3),
+        [lesson, data.classes, data.rooms, options]
+    );
+    const recommendationIds = new Set(recommendations.map((room) => room.id));
     const selectedConflict =
         roomId && !clearRoom
             ? describeRoomConflict(
@@ -93,15 +100,16 @@ export const RoomChangeModal = ({
             : null;
     const meta = names(lesson, data);
     const fromName = roomLabel(data.rooms, lesson.roomId);
-
-    const pickAuto = () => {
-        const room = suggestFreeRoom(lesson, data.classes, data.rooms, options);
-        setSuggested(room ? room.id : '');
-        if (room) {
-            setRoomId(room.id);
-            setClearRoom(false);
-            setSource('auto');
-        }
+    const origin = data.rooms.find((room) => room.id === lesson.roomId);
+    const recommendationHint = (room: Room) => {
+        if (origin?.type && room.type === origin.type) return 'тот же тип';
+        if (origin?.floor != null && room.floor === origin.floor) return 'тот же этаж';
+        return 'свободен';
+    };
+    const selectRoom = (id: string, nextSource: 'auto' | 'manual') => {
+        setRoomId(id);
+        setClearRoom(false);
+        setSource(nextSource);
     };
 
     return (
@@ -109,28 +117,11 @@ export const RoomChangeModal = ({
             isOpen
             onClose={onClose}
             title="Изменить кабинет"
-            maxWidth="max-w-xl"
+            maxWidth="max-w-2xl"
             footer={
                 <div className="flex flex-wrap gap-2 justify-end">
-                    <button type="button" onClick={onClose} className="px-3 py-2 rounded-lg text-sm font-semibold text-slate-600">
+                    <button type="button" onClick={onClose} className="px-3 py-2 rounded-lg text-sm font-semibold text-slate-600 dark:text-slate-300">
                         Закрыть
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() =>
-                            onSave({
-                                replacementRoomId: undefined,
-                                reason,
-                                comment,
-                                source,
-                                conflict: false,
-                                cancelLesson: true,
-                                clearRoom: false
-                            })
-                        }
-                        className="px-3 py-2 rounded-lg text-sm font-bold bg-rose-50 text-rose-700"
-                    >
-                        Отменить урок
                     </button>
                     <button
                         type="button"
@@ -148,18 +139,32 @@ export const RoomChangeModal = ({
                         }
                         className="px-3 py-2 rounded-lg text-sm font-bold bg-indigo-600 text-white disabled:opacity-40"
                     >
-                        Сохранить замену кабинета
+                        Сохранить
                     </button>
                 </div>
             }
         >
-            <div className="space-y-3 text-sm">
-                <p className="text-slate-600 dark:text-slate-300">
-                    {meta.className}, {lesson.period} урок, {meta.subjectName}, {meta.teacherName}. Учитель, класс, предмет и время не меняются.
-                </p>
-                <p>
-                    Текущий кабинет: <b>{fromName}</b>
-                </p>
+            <div className="space-y-4 text-sm">
+                <div>
+                    <p className="text-slate-600 dark:text-slate-300">
+                        {meta.className} · {lesson.period} урок · {meta.subjectName} · {meta.teacherName}
+                    </p>
+                    <div className="mt-3 flex items-center gap-3 rounded-xl bg-slate-50 dark:bg-slate-800/70 px-4 py-3">
+                        <Icon name="DoorOpen" size={22} className="text-slate-400" />
+                        {roomId && !clearRoom ? (
+                            <div className="flex flex-wrap items-center gap-2 text-lg">
+                                <span className="text-slate-400 line-through">{fromName}</span>
+                                <Icon name="ArrowRight" size={18} className="text-slate-400" />
+                                <strong className="text-indigo-600 dark:text-indigo-400">{roomLabel(data.rooms, roomId)}</strong>
+                            </div>
+                        ) : (
+                            <div>
+                                <div className="text-xs text-slate-500">Текущий кабинет</div>
+                                <div className="text-xl font-bold text-slate-800 dark:text-white">{fromName}</div>
+                            </div>
+                        )}
+                    </div>
+                </div>
                 {(vacation || dayNameMissing) && (
                     <p className="text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
                         {dayNameMissing
@@ -167,63 +172,116 @@ export const RoomChangeModal = ({
                             : 'Дата попадает на каникулы или вне семестра. Замена кабинета всё равно сохранится на эту дату.'}
                     </p>
                 )}
-                <button type="button" onClick={pickAuto} className="px-3 py-2 rounded-lg bg-indigo-50 text-indigo-700 font-bold">
-                    Подобрать свободный кабинет
-                </button>
-                {suggested === '' && <p className="text-amber-700">Свободного кабинета нет. Можно оставить урок без кабинета, отменить урок или выбрать кабинет вручную.</p>}
-                {suggested && (
-                    <p className="text-indigo-700">
-                        Предложение: {formatRoomArrow(fromName, roomLabel(data.rooms, suggested))}. Можно принять его или выбрать другой кабинет.
-                    </p>
-                )}
-                <label className="block font-semibold">Новый кабинет</label>
-                <select
-                    value={clearRoom ? '' : roomId}
-                    onChange={(event) => {
-                        setRoomId(event.target.value);
-                        setClearRoom(false);
-                        setSource('manual');
-                    }}
-                    className="w-full rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2"
-                >
-                    <option value="">Выберите кабинет</option>
-                    {options.map((option) => (
-                        <option key={option.room.id} value={option.room.id}>
-                            {option.room.name}
-                            {option.busy ? ' — занят' : ' — свободен'}
-                        </option>
-                    ))}
-                </select>
-                <label className="flex items-center gap-2">
-                    <input
-                        type="checkbox"
-                        checked={clearRoom}
-                        onChange={(event) => {
-                            setClearRoom(event.target.checked);
-                            if (event.target.checked) setSource('manual');
-                        }}
-                    />
-                    Оставить урок без кабинета
-                </label>
+
+                <section>
+                    <h3 className="font-semibold text-slate-800 dark:text-slate-100">Рекомендуемые кабинеты</h3>
+                    {recommendations.length > 0 ? (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                            {recommendations.map((room) => (
+                                <button
+                                    key={room.id}
+                                    type="button"
+                                    onClick={() => selectRoom(room.id, 'auto')}
+                                    className={`rounded-xl border px-3 py-2 text-left transition ${
+                                        roomId === room.id && !clearRoom
+                                            ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30'
+                                            : 'border-indigo-200 dark:border-indigo-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/20'
+                                    }`}
+                                >
+                                    <span className="block font-bold text-indigo-700 dark:text-indigo-300">{room.name}</span>
+                                    <span className="block text-xs text-slate-500">{recommendationHint(room)}</span>
+                                </button>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300">
+                            Свободных кабинетов нет. Можно выбрать занятый кабинет с конфликтом или оставить урок без кабинета.
+                        </p>
+                    )}
+                </section>
+
+                <section>
+                    <h3 className="font-semibold text-slate-800 dark:text-slate-100">Все кабинеты</h3>
+                    <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-56 overflow-y-auto pr-1">
+                        {options.filter((option) => !recommendationIds.has(option.room.id)).map((option) => (
+                            <button
+                                key={option.room.id}
+                                type="button"
+                                title={option.conflictText || 'Кабинет свободен'}
+                                onClick={() => selectRoom(option.room.id, 'manual')}
+                                className={`min-w-0 rounded-lg border px-3 py-2 text-left ${
+                                    roomId === option.room.id && !clearRoom
+                                        ? 'border-indigo-500 ring-1 ring-indigo-500'
+                                        : option.busy
+                                          ? 'border-slate-200 dark:border-slate-700 opacity-60 hover:opacity-90'
+                                          : 'border-emerald-200 bg-emerald-50/60 dark:border-emerald-800 dark:bg-emerald-900/10'
+                                }`}
+                            >
+                                <span className="block font-semibold text-slate-800 dark:text-slate-100">{option.room.name}</span>
+                                <span className={`block truncate text-xs ${option.busy ? 'text-rose-600 dark:text-rose-300' : 'text-emerald-700 dark:text-emerald-300'}`}>
+                                    {option.busy ? option.conflictText.replace(/^Кабинет занят:\s*/, '').replace(/\.$/, '') : 'свободен'}
+                                </span>
+                            </button>
+                        ))}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setClearRoom(true);
+                                setSource('manual');
+                            }}
+                            className={`rounded-lg border border-dashed px-3 py-2 text-left font-semibold ${
+                                clearRoom
+                                    ? 'border-indigo-500 bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300'
+                                    : 'border-slate-300 text-slate-600 dark:border-slate-600 dark:text-slate-300'
+                            }`}
+                        >
+                            Без кабинета
+                        </button>
+                    </div>
+                </section>
                 {selectedConflict && (
-                    <p className="text-rose-700 bg-rose-50 rounded-lg px-3 py-2">
+                    <p className="text-rose-700 bg-rose-50 dark:bg-rose-900/20 dark:text-rose-300 rounded-lg px-3 py-2">
                         {selectedConflict} Сохранение возможно, запись будет помечена «конфликт кабинета».
                     </p>
                 )}
-                <label className="block font-semibold">Причина замены кабинета</label>
-                <input
-                    value={reason}
-                    onChange={(event) => setReason(event.target.value)}
-                    className="w-full rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2"
-                    placeholder="Мероприятие в кабинете"
-                />
-                <label className="block font-semibold">Комментарий</label>
-                <textarea
-                    value={comment}
-                    onChange={(event) => setComment(event.target.value)}
-                    rows={2}
-                    className="w-full rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2"
-                />
+
+                <section>
+                    <label className="block font-semibold" htmlFor="room-change-reason">Причина замены кабинета</label>
+                    <div className="my-2 flex gap-2">
+                        {['Мероприятие', 'Ремонт'].map((value) => (
+                            <button
+                                key={value}
+                                type="button"
+                                onClick={() => setReason(value)}
+                                className={`rounded-full px-3 py-1 text-xs font-semibold ${reason === value ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-200'}`}
+                            >
+                                {value}
+                            </button>
+                        ))}
+                    </div>
+                    <input
+                        id="room-change-reason"
+                        value={reason}
+                        onChange={(event) => setReason(event.target.value)}
+                        className={inputClass}
+                        placeholder="Например, мероприятие в кабинете"
+                    />
+                </section>
+                {commentOpen ? (
+                    <label className="block">
+                        <span className="font-semibold">Комментарий</span>
+                        <textarea
+                            value={comment}
+                            onChange={(event) => setComment(event.target.value)}
+                            rows={2}
+                            className={`${inputClass} mt-1`}
+                        />
+                    </label>
+                ) : (
+                    <button type="button" onClick={() => setCommentOpen(true)} className="font-semibold text-indigo-600 dark:text-indigo-400">
+                        + Комментарий
+                    </button>
+                )}
             </div>
         </Modal>
     );
@@ -267,21 +325,7 @@ export const FreeRoomDayModal = ({
         () => lessonsTouchingRoom(data.schedule, data.substitutions, date, dayName, roomId),
         [data.schedule, data.substitutions, date, dayName, roomId]
     );
-
-    useEffect(() => {
-        setRows(
-            touching.map((row) => ({
-                lessonId: row.lesson.id,
-                action: row.cancelled ? 'later' : 'later',
-                roomId: '',
-                source: 'manual'
-            }))
-        );
-    }, [roomId, touching.map((row) => row.lesson.id).join('|')]);
-
-    const update = (lessonId: string, patch: Partial<DayRowState>) => {
-        setRows((prev) => prev.map((row) => (row.lessonId === lessonId ? { ...row, ...patch } : row)));
-    };
+    const touchingKey = touching.map((row) => row.lesson.id).join('|');
 
     const suggestAll = () => {
         const taken: string[] = [];
@@ -311,6 +355,14 @@ export const FreeRoomDayModal = ({
         setRows(next);
     };
 
+    useEffect(() => {
+        suggestAll();
+    }, [roomId, touchingKey]);
+
+    const update = (lessonId: string, patch: Partial<DayRowState>) => {
+        setRows((prev) => prev.map((row) => (row.lessonId === lessonId ? { ...row, ...patch } : row)));
+    };
+
     const prepared = touching.map((row) => {
         const state = rows.find((item) => item.lessonId === row.lesson.id);
         const action = state?.action || 'later';
@@ -332,6 +384,13 @@ export const FreeRoomDayModal = ({
                 : false;
         return { row, action, chosen, conflict, source: state?.source || 'manual' };
     });
+    const activeRows = prepared.filter((item) => !item.row.cancelled);
+    const summary = {
+        moved: activeRows.filter((item) => (item.action === 'suggest' || item.action === 'manual') && item.chosen).length,
+        clear: activeRows.filter((item) => item.action === 'clear').length,
+        cancel: activeRows.filter((item) => item.action === 'cancel').length,
+        later: activeRows.filter((item) => item.action === 'later').length
+    };
 
     return (
         <Modal
@@ -340,33 +399,38 @@ export const FreeRoomDayModal = ({
             title="Освободить кабинет на весь день"
             maxWidth="max-w-3xl"
             footer={
-                <div className="flex justify-end gap-2">
-                    <button type="button" onClick={onClose} className="px-3 py-2 text-sm font-semibold text-slate-600">
-                        Закрыть
-                    </button>
-                    <button
-                        type="button"
-                        disabled={!roomId}
-                        onClick={() =>
-                            onApply({
-                                roomId,
-                                reason,
-                                comment,
-                                rows: prepared
-                                    .filter((item) => item.action !== 'later' && !item.row.cancelled)
-                                    .map((item) => ({
-                                        lesson: item.row.lesson,
-                                        action: item.action,
-                                        roomId: item.chosen,
-                                        source: item.action === 'manual' ? 'manual' : item.source,
-                                        conflict: item.conflict
-                                    }))
-                            })
-                        }
-                        className="px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm font-bold disabled:opacity-40"
-                    >
-                        Применить ко всем урокам
-                    </button>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                        Переедут: {summary.moved} · Без кабинета: {summary.clear} · Отменено: {summary.cancel} · Отложено: {summary.later}
+                    </p>
+                    <div className="flex gap-2">
+                        <button type="button" onClick={onClose} className="px-3 py-2 text-sm font-semibold text-slate-600 dark:text-slate-300">
+                            Закрыть
+                        </button>
+                        <button
+                            type="button"
+                            disabled={!roomId}
+                            onClick={() =>
+                                onApply({
+                                    roomId,
+                                    reason,
+                                    comment,
+                                    rows: prepared
+                                        .filter((item) => item.action !== 'later' && !item.row.cancelled)
+                                        .map((item) => ({
+                                            lesson: item.row.lesson,
+                                            action: item.action,
+                                            roomId: item.chosen,
+                                            source: item.action === 'manual' ? 'manual' : item.source,
+                                            conflict: item.conflict
+                                        }))
+                                })
+                            }
+                            className="px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm font-bold disabled:opacity-40"
+                        >
+                            Применить ко всем урокам
+                        </button>
+                    </div>
                 </div>
             }
         >
@@ -374,16 +438,10 @@ export const FreeRoomDayModal = ({
                 <div className="grid sm:grid-cols-2 gap-3">
                     <label className="block">
                         <span className="font-semibold">Кабинет</span>
-                        <select
-                            value={roomId}
-                            onChange={(event) => setRoomId(event.target.value)}
-                            className="mt-1 w-full rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2"
-                        >
+                        <select value={roomId} onChange={(event) => setRoomId(event.target.value)} className={`${inputClass} mt-1`}>
                             <option value="">Выберите кабинет</option>
                             {data.rooms.map((room) => (
-                                <option key={room.id} value={room.id}>
-                                    {room.name}
-                                </option>
+                                <option key={room.id} value={room.id}>{room.name}</option>
                             ))}
                         </select>
                     </label>
@@ -394,38 +452,25 @@ export const FreeRoomDayModal = ({
                 </div>
                 {!dayName && <p className="text-amber-700">Выходной: уроков в расписании нет.</p>}
                 {vacation && <p className="text-amber-700">Дата в каникулы или вне семестра. Список строится по расписанию этого времени года, если оно есть.</p>}
-                <input
-                    value={reason}
-                    onChange={(event) => setReason(event.target.value)}
-                    placeholder="Причина"
-                    className="w-full rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2"
-                />
-                <textarea
-                    value={comment}
-                    onChange={(event) => setComment(event.target.value)}
-                    placeholder="Комментарий"
-                    rows={2}
-                    className="w-full rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2"
-                />
-                <button type="button" onClick={suggestAll} disabled={!roomId} className="px-3 py-2 rounded-lg bg-indigo-50 text-indigo-700 font-bold disabled:opacity-40">
-                    Подобрать кабинеты
-                </button>
-                <p className="text-slate-500">Подбор только предлагает кабинет. Сохранение происходит по кнопке «Применить ко всем урокам». Для каждого урока создаётся отдельная запись.</p>
-                <div className="space-y-2 max-h-[50vh] overflow-y-auto">
-                    {prepared.map(({ row, action, chosen, conflict }) => (
-                        <DayLessonRow
-                            key={row.lesson.id}
-                            row={row}
-                            data={data}
-                            action={action}
-                            chosen={chosen}
-                            conflict={conflict}
-                            date={date}
-                            onChange={update}
-                        />
-                    ))}
-                    {roomId && prepared.length === 0 && <p>В этом кабинете на выбранную дату уроков нет.</p>}
+                <div className="grid sm:grid-cols-2 gap-2">
+                    <input value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Причина" className={inputClass} />
+                    <input value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Комментарий" className={inputClass} />
                 </div>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs text-slate-500">Предложения можно изменить. Для каждого урока создаётся отдельная запись.</p>
+                    <button type="button" onClick={suggestAll} disabled={!roomId} className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 disabled:opacity-40">
+                        <Icon name="RefreshCw" size={13} /> Обновить предложения
+                    </button>
+                </div>
+                <div className="space-y-2 max-h-[45vh] overflow-y-auto pr-1">
+                    {prepared.map(({ row, action, chosen, conflict }) => (
+                        <DayLessonRow key={row.lesson.id} row={row} data={data} action={action} chosen={chosen} conflict={conflict} date={date} onChange={update} />
+                    ))}
+                    {roomId && prepared.length === 0 && <p className="text-slate-500">В этом кабинете на выбранную дату уроков нет.</p>}
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 sm:hidden">
+                    Переедут: {summary.moved} · Без кабинета: {summary.clear} · Отменено: {summary.cancel} · Отложено: {summary.later}
+                </p>
             </div>
         </Modal>
     );
@@ -448,62 +493,71 @@ const DayLessonRow = ({
     date: string;
     onChange: (lessonId: string, patch: Partial<DayRowState>) => void;
 }) => {
+    const [menuOpen, setMenuOpen] = useState(false);
+    const menuRef = useRef<HTMLDivElement>(null);
     const meta = names(row.lesson, data);
-    const options = listRoomOptions(
-        data.rooms,
-        data.schedule,
-        data.substitutions,
-        date,
-        row.lesson,
-        data.classes,
-        data.teachers,
-        data.subjects
-    );
-    return (
-        <div className="border border-slate-200 dark:border-slate-700 rounded-xl p-3">
-            <div className="font-semibold">
-                {row.lesson.period} урок · {row.lesson.shift} · {meta.className} · {meta.subjectName} · {meta.teacherName}
+    const options = listRoomOptions(data.rooms, data.schedule, data.substitutions, date, row.lesson, data.classes, data.teachers, data.subjects);
+
+    useEffect(() => {
+        if (!menuOpen) return;
+        const close = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) setMenuOpen(false);
+        };
+        document.addEventListener('mousedown', close);
+        return () => document.removeEventListener('mousedown', close);
+    }, [menuOpen]);
+
+    if (row.cancelled) {
+        return (
+            <div className="rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2 opacity-55">
+                <span className="font-semibold">{row.lesson.period} урок · {meta.className} · {meta.teacherName}</span>
+                <span className="ml-2 text-xs text-rose-600">урок уже снят</span>
             </div>
-            {row.cancelled && <p className="text-rose-600 mt-1">Урок уже снят. Новый кабинет не нужен, кабинет на этот урок свободен.</p>}
-            {!row.cancelled && (
-                <div className="mt-2 flex flex-wrap gap-2 items-center">
-                    <select
-                        value={action === 'manual' || action === 'suggest' ? chosen : ''}
-                        onChange={(event) =>
-                            onChange(row.lesson.id, {
-                                action: 'manual',
-                                roomId: event.target.value,
-                                source: 'manual'
-                            })
-                        }
-                        className="rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1"
-                    >
-                        <option value="">Кабинет вручную</option>
-                        {options.map((option) => (
-                            <option key={option.room.id} value={option.room.id}>
-                                {option.room.name}
-                                {option.busy ? ' — занят' : ' — свободен'}
-                            </option>
-                        ))}
-                    </select>
-                    <button type="button" className="px-2 py-1 rounded-lg bg-slate-100" onClick={() => onChange(row.lesson.id, { action: 'clear', roomId: '', source: 'manual' })}>
-                        Без кабинета
-                    </button>
-                    <button type="button" className="px-2 py-1 rounded-lg bg-rose-50 text-rose-700" onClick={() => onChange(row.lesson.id, { action: 'cancel', roomId: '', source: 'manual' })}>
-                        Отменить урок
-                    </button>
-                    <button type="button" className="px-2 py-1 rounded-lg bg-slate-50" onClick={() => onChange(row.lesson.id, { action: 'later', roomId: '', source: 'manual' })}>
-                        Выбрать позже
-                    </button>
-                    {action === 'suggest' && chosen && (
-                        <span className="text-indigo-700">Предложение: {roomLabel(data.rooms, chosen)}</span>
-                    )}
-                    {action === 'clear' && <span>Урок останется без кабинета</span>}
-                    {action === 'cancel' && <span className="text-rose-700">Урок будет снят</span>}
-                    {!chosen && action === 'later' && <span className="text-amber-700">Свободный кабинет не выбран</span>}
-                    {conflict && <span className="text-rose-700">Конфликт кабинета — можно сохранить с пометкой</span>}
-                </div>
-            )}
+        );
+    }
+
+    const badge = action === 'clear' ? 'без кабинета' : action === 'cancel' ? 'урок снят' : action === 'later' ? 'позже' : '';
+    const menuAction = (nextAction: DayAction) => {
+        onChange(row.lesson.id, { action: nextAction, roomId: '', source: 'manual' });
+        setMenuOpen(false);
+    };
+
+    return (
+        <div className="relative flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-700 px-3 py-2">
+            <div className="min-w-0 flex-1 truncate">
+                <span className="font-semibold">{row.lesson.period} урок · {meta.className} · {meta.teacherName}</span>
+                <Icon name="ArrowRight" size={13} className="mx-2 inline text-slate-400" />
+                <span className={conflict ? 'font-semibold text-rose-600' : 'text-indigo-700 dark:text-indigo-300'}>
+                    {(action === 'suggest' || action === 'manual') && chosen ? roomLabel(data.rooms, chosen) : '—'}
+                </span>
+                {badge && <span className={`ml-2 rounded-full bg-slate-100 dark:bg-slate-700 px-2 py-0.5 text-xs ${action === 'cancel' ? 'text-rose-600' : 'text-slate-500 dark:text-slate-300'}`}>{badge}</span>}
+                {conflict && <span className="ml-2 text-xs font-semibold text-rose-600">конфликт</span>}
+            </div>
+            <select
+                aria-label={`Кабинет для урока ${row.lesson.period}`}
+                value={action === 'manual' || action === 'suggest' ? chosen : ''}
+                onChange={(event) => onChange(row.lesson.id, { action: 'manual', roomId: event.target.value, source: 'manual' })}
+                className="w-28 shrink-0 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1 text-xs"
+            >
+                <option value="">Выбрать</option>
+                {options.map((option) => (
+                    <option key={option.room.id} value={option.room.id}>
+                        {option.room.name}{option.busy ? ' — занят' : ''}
+                    </option>
+                ))}
+            </select>
+            <div className="relative shrink-0" ref={menuRef}>
+                <button type="button" aria-label="Другие действия" onClick={() => setMenuOpen((open) => !open)} className="rounded-md px-2 py-1 text-lg leading-none text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700">
+                    ⋯
+                </button>
+                {menuOpen && (
+                    <div className="absolute right-0 top-full z-20 mt-1 w-44 rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 p-1 shadow-lg">
+                        <button type="button" onClick={() => menuAction('clear')} className="block w-full rounded-md px-3 py-2 text-left hover:bg-slate-100 dark:hover:bg-slate-700">Без кабинета</button>
+                        <button type="button" onClick={() => menuAction('cancel')} className="block w-full rounded-md px-3 py-2 text-left text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20">Отменить урок</button>
+                        <button type="button" onClick={() => menuAction('later')} className="block w-full rounded-md px-3 py-2 text-left hover:bg-slate-100 dark:hover:bg-slate-700">Выбрать позже</button>
+                    </div>
+                )}
+            </div>
         </div>
     );
 };
@@ -518,23 +572,62 @@ export const LessonPickModal = ({
     data: Lookup;
     onClose: () => void;
     onPick: (lesson: ScheduleItem) => void;
-}) => (
-    <Modal isOpen onClose={onClose} title="Урок для смены кабинета" maxWidth="max-w-lg">
-        <div className="space-y-2 max-h-[60vh] overflow-y-auto">
-            {lessons.length === 0 && <p className="text-sm text-slate-500">На эту дату уроков нет.</p>}
-            {lessons.map((lesson) => {
-                const meta = names(lesson, data);
-                return (
-                    <button
-                        key={lesson.id}
-                        type="button"
-                        onClick={() => onPick(lesson)}
-                        className="w-full text-left px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 hover:bg-indigo-50"
-                    >
-                        <Icon name="DoorOpen" size={14} /> {lesson.period} урок · {meta.className} · {meta.subjectName} · {roomLabel(data.rooms, lesson.roomId)}
-                    </button>
-                );
-            })}
-        </div>
-    </Modal>
-);
+}) => {
+    const [query, setQuery] = useState('');
+    const filtered = useMemo(() => {
+        const needle = query.trim().toLocaleLowerCase('ru');
+        return lessons.filter((lesson) => {
+            if (!needle) return true;
+            const meta = names(lesson, data);
+            return [meta.className, meta.teacherName, meta.subjectName].some((value) => value.toLocaleLowerCase('ru').includes(needle));
+        });
+    }, [lessons, data, query]);
+    const shifts = ['1 смена', '2 смена'];
+
+    return (
+        <Modal isOpen onClose={onClose} title="Урок для смены кабинета" maxWidth="max-w-lg">
+            <div className="relative">
+                <Icon name="Search" size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder="Класс, учитель или предмет"
+                    className={`${inputClass} pl-9`}
+                />
+            </div>
+            <div className="mt-3 space-y-4 max-h-[55vh] overflow-y-auto pr-1">
+                {lessons.length === 0 && <p className="text-sm text-slate-500">На эту дату уроков нет.</p>}
+                {lessons.length > 0 && filtered.length === 0 && <p className="text-sm text-slate-500">По вашему запросу ничего не найдено.</p>}
+                {shifts.map((shift) => {
+                    const shiftLessons = filtered.filter((lesson) => lesson.shift === shift).sort((a, b) => a.period - b.period);
+                    if (shiftLessons.length === 0) return null;
+                    return (
+                        <section key={shift}>
+                            <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400">{shift}</h3>
+                            <div className="space-y-2">
+                                {shiftLessons.map((lesson) => {
+                                    const meta = names(lesson, data);
+                                    return (
+                                        <button
+                                            key={lesson.id}
+                                            type="button"
+                                            onClick={() => onPick(lesson)}
+                                            className="w-full rounded-xl border border-slate-200 dark:border-slate-700 px-3 py-2.5 text-left hover:border-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20"
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <Icon name="DoorOpen" size={16} className="shrink-0 text-indigo-500" />
+                                                <span className="font-bold text-slate-800 dark:text-slate-100">{lesson.period} урок · {meta.className}</span>
+                                                <span className="ml-auto shrink-0 text-xs text-slate-500">{roomLabel(data.rooms, lesson.roomId)}</span>
+                                            </div>
+                                            <div className="mt-1 pl-6 text-xs text-slate-500 dark:text-slate-400">{meta.subjectName} · {meta.teacherName}</div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </section>
+                    );
+                })}
+            </div>
+        </Modal>
+    );
+};

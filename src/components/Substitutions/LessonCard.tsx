@@ -162,15 +162,27 @@ export const LessonCard: React.FC<LessonCardProps> = ({
 
                 <div className="flex items-center gap-2">
                     {roomArrow ? (
-                        <div className="flex items-center gap-1 text-[10px] bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100">
-                            <span className="font-bold text-indigo-700">{roomArrow}</span>
-                            {roomSub?.roomConflict && <span className="text-rose-600">конфликт</span>}
+                        <div
+                            className="flex items-center gap-1 text-xs bg-indigo-50 dark:bg-indigo-900/30 px-1.5 py-0.5 rounded border border-indigo-100 dark:border-indigo-800"
+                            title={roomSub?.roomChangeReason || undefined}
+                        >
+                            <span className="text-slate-400 line-through">{roomLabel(rooms, roomSub?.originalRoomId || l.roomId)}</span>
+                            <Icon name="ArrowRight" size={10} className="text-indigo-400" />
+                            <span className="font-bold text-indigo-700 dark:text-indigo-300">{roomLabel(rooms, roomSub?.replacementRoomId)}</span>
+                            {roomSub?.roomConflict && (
+                                <Icon
+                                    name="AlertTriangle"
+                                    size={12}
+                                    className="text-rose-600 shrink-0"
+                                    title={`Конфликт кабинета${roomSub.roomChangeReason ? `: ${roomSub.roomChangeReason}` : ''}`}
+                                />
+                            )}
                         </div>
                     ) : isRoomChanged ? (
-                        <div className="flex items-center gap-1 text-[10px] bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100">
-                            <span className="line-through text-slate-400">{originalRoomName}</span>
-                            <Icon name="ArrowRight" size={8} className="text-indigo-400" />
-                            <span className="font-bold text-indigo-700">{replacementRoomName}</span>
+                        <div className="flex items-center gap-1 text-xs bg-indigo-50 dark:bg-indigo-900/30 px-1.5 py-0.5 rounded border border-indigo-100 dark:border-indigo-800">
+                            <span className="text-slate-400 line-through">{originalRoomName}</span>
+                            <Icon name="ArrowRight" size={10} className="text-indigo-400" />
+                            <span className="font-bold text-indigo-700 dark:text-indigo-300">{replacementRoomName}</span>
                         </div>
                     ) : (
                         <div className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded font-bold text-slate-500">
@@ -299,14 +311,29 @@ export const LessonCard: React.FC<LessonCardProps> = ({
                     </div>
                     <div className="mt-1">
                         {roomArrow ? (
-                            <div className="text-xs font-mono font-black text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-1 rounded">
-                                {roomArrow}
-                                {roomSub?.roomConflict ? ' · конфликт кабинета' : ''}
-                                {roomSub?.roomChangeReason ? ` · ${roomSub.roomChangeReason}` : ''}
+                            <div
+                                className="flex items-center justify-end gap-1.5 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-1 rounded border border-indigo-100 dark:border-indigo-800"
+                                title={roomSub?.roomChangeReason || undefined}
+                            >
+                                <span className="text-xs font-mono text-slate-400 line-through">
+                                    {roomLabel(rooms, roomSub?.originalRoomId || l.roomId)}
+                                </span>
+                                <Icon name="ArrowRight" size={10} className="text-indigo-400" />
+                                <span className="text-xs font-mono font-black text-indigo-700 dark:text-indigo-300">
+                                    {roomLabel(rooms, roomSub?.replacementRoomId)}
+                                </span>
+                                {roomSub?.roomConflict && (
+                                    <Icon
+                                        name="AlertTriangle"
+                                        size={14}
+                                        className="text-rose-600 shrink-0"
+                                        title={`Конфликт кабинета${roomSub.roomChangeReason ? `: ${roomSub.roomChangeReason}` : ''}`}
+                                    />
+                                )}
                             </div>
                         ) : isRoomChanged ? (
                             <div className="flex items-center justify-end gap-1.5 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-1 rounded border border-indigo-100 dark:border-indigo-800">
-                                <span className="text-xs font-mono font-bold text-slate-400 line-through decoration-red-400">
+                                <span className="text-xs font-mono text-slate-400 line-through">
                                     {originalRoomName}
                                 </span>
                                 <Icon name="ArrowRight" size={10} className="text-indigo-400" />

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ScheduleItem, Substitution } from '../types';
-import { effectiveRoomId, isRoomSubstitution, lessonsTouchingRoom, suggestFreeRoom, listRoomOptions } from '../utils/roomSubstitution';
+import { effectiveRoomId, isRoomSubstitution, lessonsTouchingRoom, suggestFreeRoom, suggestFreeRooms, listRoomOptions } from '../utils/roomSubstitution';
 
 const lesson = (patch: Partial<ScheduleItem>): ScheduleItem => ({
     id: 'l1',
@@ -51,6 +51,18 @@ describe('room substitution', () => {
         expect(free210?.busy).toBe(false);
         const suggested = suggestFreeRoom(target, classes, rooms, options);
         expect(suggested?.id).toBe('r210');
+    });
+
+    it('предлагает несколько свободных кабинетов по убыванию скоринга', () => {
+        const extendedRooms = [...rooms, { id: 'r205', name: '205', type: 'спорт', floor: 2 }];
+        const options = extendedRooms.map((room) => ({ room, busy: false, conflictText: '' }));
+        expect(suggestFreeRooms(lesson({}), classes, extendedRooms, options, 3).map((room) => room.id)).toEqual(['r210', 'r205', 'r101']);
+    });
+
+    it('ограничивает количество рекомендаций и учитывает исключения', () => {
+        const options = rooms.map((room) => ({ room, busy: false, conflictText: '' }));
+        expect(suggestFreeRooms(lesson({}), classes, rooms, options, 2, ['r210'])).toEqual([rooms[2]]);
+        expect(suggestFreeRooms(lesson({}), classes, rooms, options, 0)).toEqual([]);
     });
 
     it('на весь день берёт уроки кабинета и пропускает уже перенесённые', () => {
