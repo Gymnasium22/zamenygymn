@@ -8,6 +8,7 @@ import { DAYS, ScheduleItem, ClassEntity, Substitution, SubstitutionParams, Shif
 import { exportService } from '../services/exportService';
 import {
     SubstitutionExportSheet,
+    RoomChangeExportSheet,
     shiftHasExportableSubs
 } from '../components/SubstitutionExportSheet';
 import {
@@ -53,6 +54,8 @@ export const SubstitutionsPage = () => {
     substitutionsRef.current = substitutions;
     const tgPrintRef1 = useRef<HTMLDivElement>(null);
     const tgPrintRef2 = useRef<HTMLDivElement>(null);
+    const tgRoomPrintRef1 = useRef<HTMLDivElement>(null);
+    const tgRoomPrintRef2 = useRef<HTMLDivElement>(null);
     const settingsRef = useRef(settings);
     settingsRef.current = settings;
     const { addToast } = useToast();
@@ -64,6 +67,7 @@ export const SubstitutionsPage = () => {
     const [activeTab, setActiveTab] = useState<'pending' | 'resolved'>('pending');
     const [subMode, setSubMode] = useState<'teacher' | 'cancel' | 'advanced'>('teacher');
     const [isSendingSummary, setIsSendingSummary] = useState(false);
+    const [isSendingRoomSummary, setIsSendingRoomSummary] = useState(false);
     const [tgShiftPickOpen, setTgShiftPickOpen] = useState(false);
 
     // Modal State
@@ -265,6 +269,11 @@ export const SubstitutionsPage = () => {
     const subsForTelegramDate = useMemo(
         () => substitutions.filter((s) => s.date === selectedDate),
         [substitutions, selectedDate]
+    );
+
+    const roomSubsForTelegramDate = useMemo(
+        () => subsForTelegramDate.filter(isRoomSubstitution),
+        [subsForTelegramDate]
     );
 
     const isVacationDate = useMemo(() => {
@@ -1168,7 +1177,7 @@ export const SubstitutionsPage = () => {
     };
 
     // --- TEXT GENERATION FOR TELEGRAM/COPY ---
-    const generateSubstitutionContent = () => {
+    const generateSubstitutionContent = (includeRoomOnly = true) => {
         const subs = substitutions.filter(
             (s) =>
                 s.date === selectedDate &&
@@ -1221,6 +1230,8 @@ export const SubstitutionsPage = () => {
                 .filter((n, idx, arr) => arr.indexOf(n) === idx);
             const roomName = groupRoomNames.length > 0 ? groupRoomNames.join(', ') : '—';
 
+            // Чистые смены кабинетов не включаем в сводку замен учителей — они уходят отдельной отправкой.
+            if (!includeRoomOnly && teacherRows.length === 0 && roomRows.length > 0) return;
             text += `🔹 **${item.period} урок** | ${escapeMarkdown(cls?.name)} | ${escapeMarkdown(subj?.name)}\n`;
             if (teacherRows.length === 0 && roomRows.length > 0) {
                 text += `🚪 ${escapeMarkdown(formatRoomArrow(fromRoom, toRoom))}\n`;
@@ -1249,8 +1260,8 @@ export const SubstitutionsPage = () => {
         return text;
     };
 
-    const generateSubstitutionText = () => {
-        const content = generateSubstitutionContent();
+    const generateSubstitutionText = (includeRoomOnly = true) => {
+        const content = generateSubstitutionContent(includeRoomOnly);
         const dateStr = formatDateEuropean(selectedDate);
 
         // Use template if available
@@ -1276,8 +1287,10 @@ export const SubstitutionsPage = () => {
         }
     };
 
-    const hasTgShift1 = shiftHasExportableSubs(subsForTelegramDate, Shift.First, getScheduleItemById);
-    const hasTgShift2 = shiftHasExportableSubs(subsForTelegramDate, Shift.Second, getScheduleItemById);
+    const hasTgShift1 = shiftHasExportableSubs(subsForTelegramDate, Shift.First, getScheduleItemById, false);
+    const hasTgShift2 = shiftHasExportableSubs(subsForTelegramDate, Shift.Second, getScheduleItemById, false);
+    const hasRoomShift1 = shiftHasExportableSubs(roomSubsForTelegramDate, Shift.First, getScheduleItemById);
+    const hasRoomShift2 = shiftHasExportableSubs(roomSubsForTelegramDate, Shift.Second, getScheduleItemById);
 
     const substitutionChatIds = parseTelegramChatIds(settings.telegramTemplates?.substitutionChatIds);
 
@@ -1338,7 +1351,7 @@ export const SubstitutionsPage = () => {
             ];
             const ready = shots.filter((s) => s.el && (which === 'both' || s.key === which));
             if (ready.length === 0) {
-                const text = generateSubstitutionText();
+                const text = generateSubstitutionText(false);
                 for (const chatId of chatIds) {
                     const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
                         method: 'POST',
@@ -1379,6 +1392,97 @@ export const SubstitutionsPage = () => {
             addToast({ type: 'danger', title: 'Ошибка', message: `Не удалось отправить: ${e}` });
         } finally {
             setIsSendingSummary(false);
+        }
+    };
+
+    // Отдельная отправка: только смены кабинетов, без замен учителей. Обе непустые смены сразу.
+    const sendRoomChangesToTelegram = async () => {
+        if (!privateSettings.telegramToken) {
+            addToast({ type: 'warning', title: 'Ошибка', message: 'Telegram не настроен: нет токена бота' });
+            return;
+        }
+        const chatIds = parseTelegramChatIds(settings.telegramTemplates?.substitutionChatIds);
+        if (chatIds.length === 0) {
+            addToast({
+                type: 'warning',
+                title: 'Куда слать замены?',
+                message: 'Укажите Chat ID для замен в Настройках → Интеграции.'
+            });
+            return;
+        }
+        if (!hasRoomShift1 && !hasRoomShift2) {
+            addToast({ type: 'info', title: 'Нет замен кабинетов', message: 'На выбранную дату смен кабинетов нет.' });
+            return;
+        }
+
+        const dateStr = formatDateEuropean(selectedDate);
+        const token = privateSettings.telegramToken;
+        setIsSendingRoomSummary(true);
+        try {
+            await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+            const shots = [
+                { key: '1', el: tgRoomPrintRef1.current, has: hasRoomShift1 },
+                { key: '2', el: tgRoomPrintRef2.current, has: hasRoomShift2 }
+            ];
+            const ready = shots.filter((s) => s.has && s.el);
+            if (ready.length === 0) {
+                // Текстовый fallback, если PNG-листы ещё не смонтировались.
+                let text = `🚪 **ЗАМЕНЫ КАБИНЕТОВ НА ${dateStr}**\n\n`;
+                const seen = new Set<string>();
+                roomSubsForTelegramDate.forEach((sub) => {
+                    if (seen.has(sub.scheduleItemId)) return;
+                    seen.add(sub.scheduleItemId);
+                    const item = getScheduleItemById(sub.scheduleItemId);
+                    if (!item) return;
+                    const cls = classes.find((c) => c.id === item.classId)?.name;
+                    const subj = subjects.find((s) => s.id === item.subjectId)?.name;
+                    const teacher = teachers.find((t) => t.id === sub.originalTeacherId)?.name;
+                    const from = roomLabel(rooms, sub.originalRoomId || item.roomId);
+                    const to = roomLabel(rooms, sub.replacementRoomId);
+                    text += `🔹 **${item.period} урок** | ${escapeMarkdown(cls)} | ${escapeMarkdown(subj)}\n`;
+                    text += `${escapeMarkdown(teacher || '')}: ${escapeMarkdown(formatRoomArrow(from, to))}\n`;
+                    if (sub.roomChangeReason) text += `${escapeMarkdown(sub.roomChangeReason)}\n`;
+                    text += '\n';
+                });
+                for (const chatId of chatIds) {
+                    const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'Markdown' })
+                    });
+                    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                    const result = await response.json();
+                    if (!result.ok) throw new Error(result.description || 'Telegram API error');
+                }
+                addToast({
+                    type: 'info',
+                    title: 'Отправлено текстом',
+                    message: `Смены кабинетов ушли в ${chatIds.length} чат(а). Картинки не было.`
+                });
+                return;
+            }
+            for (const shot of ready) {
+                const blob = await exportService.capturePngBlob(shot.el!);
+                for (const chatId of chatIds) {
+                    await exportService.sendTelegramPhoto(
+                        token,
+                        chatId,
+                        blob,
+                        `Кабинеты_${selectedDate}_${shot.key}смена.png`,
+                        `Замены кабинетов на ${dateStr} · ${shot.key} смена`
+                    );
+                }
+            }
+            addToast({
+                type: 'success',
+                title: 'Отправлено',
+                message: `Смены кабинетов ушли в ${chatIds.length} чат(а)`
+            });
+        } catch (e) {
+            logger.error(e);
+            addToast({ type: 'danger', title: 'Ошибка', message: `Не удалось отправить: ${e}` });
+        } finally {
+            setIsSendingRoomSummary(false);
         }
     };
 
@@ -1976,6 +2080,23 @@ export const SubstitutionsPage = () => {
                                         >
                                             Освободить кабинет на весь день
                                         </button>
+                                        <button
+                                            type="button"
+                                            role="menuitem"
+                                            disabled={isSendingRoomSummary}
+                                            onClick={() => {
+                                                setRoomActionsOpen(false);
+                                                void sendRoomChangesToTelegram();
+                                            }}
+                                            className="w-full px-4 py-3 text-left text-sm font-semibold text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors flex items-center gap-2 disabled:opacity-50"
+                                        >
+                                            {isSendingRoomSummary ? (
+                                                <Icon name="Loader" className="animate-spin shrink-0" size={16} />
+                                            ) : (
+                                                <Icon name="Send" className="shrink-0" size={16} />
+                                            )}
+                                            Отправить кабинеты в Telegram
+                                        </button>
                                         {substitutions.some((s) => s.date === selectedDate && s.type === 'room' && s.roomChangeScope === 'day') && (
                                             <button
                                                 type="button"
@@ -2468,7 +2589,7 @@ export const SubstitutionsPage = () => {
                 className="pointer-events-none"
                 style={{ position: 'fixed', left: -12000, top: 0, width: 1000 }}
             >
-                {shiftHasExportableSubs(subsForTelegramDate, Shift.First, getScheduleItemById) && (
+                {shiftHasExportableSubs(subsForTelegramDate, Shift.First, getScheduleItemById, false) && (
                     <SubstitutionExportSheet
                         ref={tgPrintRef1}
                         exportDate={selectedDate}
@@ -2480,15 +2601,43 @@ export const SubstitutionsPage = () => {
                         subjectsById={subjectsById}
                         teachersById={teachersById}
                         roomsById={roomsById}
+                        includeRoomOnly={false}
                     />
                 )}
-                {shiftHasExportableSubs(subsForTelegramDate, Shift.Second, getScheduleItemById) && (
+                {shiftHasExportableSubs(subsForTelegramDate, Shift.Second, getScheduleItemById, false) && (
                     <SubstitutionExportSheet
                         ref={tgPrintRef2}
                         exportDate={selectedDate}
                         dayComment={dayComment}
                         shift={Shift.Second}
                         substitutions={subsForTelegramDate}
+                        getScheduleItemById={getScheduleItemById}
+                        classesById={classesById}
+                        subjectsById={subjectsById}
+                        teachersById={teachersById}
+                        roomsById={roomsById}
+                        includeRoomOnly={false}
+                    />
+                )}
+                {hasRoomShift1 && (
+                    <RoomChangeExportSheet
+                        ref={tgRoomPrintRef1}
+                        exportDate={selectedDate}
+                        shift={Shift.First}
+                        substitutions={roomSubsForTelegramDate}
+                        getScheduleItemById={getScheduleItemById}
+                        classesById={classesById}
+                        subjectsById={subjectsById}
+                        teachersById={teachersById}
+                        roomsById={roomsById}
+                    />
+                )}
+                {hasRoomShift2 && (
+                    <RoomChangeExportSheet
+                        ref={tgRoomPrintRef2}
+                        exportDate={selectedDate}
+                        shift={Shift.Second}
+                        substitutions={roomSubsForTelegramDate}
                         getScheduleItemById={getScheduleItemById}
                         classesById={classesById}
                         subjectsById={subjectsById}

@@ -14,16 +14,21 @@ import { formatRoomArrow, isRoomSubstitution, roomLabel } from '../utils/roomSub
 interface ReportHeaderProps {
     exportDate: string;
     dayComment?: string;
+    title?: string;
 }
 
-export const SubstitutionReportHeader = ({ exportDate, dayComment }: ReportHeaderProps) => {
+export const SubstitutionReportHeader = ({
+    exportDate,
+    dayComment,
+    title = 'Замена Учителей'
+}: ReportHeaderProps) => {
     const { settings } = useStaticData();
     return (
         <div className="border-b-2 border-slate-800 pb-4 mb-6">
             <div className="flex justify-between items-end gap-4">
                 <div>
                     <h1 className="text-3xl font-black uppercase tracking-tight mb-1 text-slate-800">
-                        Замена Учителей
+                        {title}
                     </h1>
                     <p className="text-sm font-bold text-slate-500 uppercase tracking-wider">
                         {settings?.schoolName || 'Учреждение образования'} • Официальный документ
@@ -65,6 +70,7 @@ export interface SubstitutionExportSheetProps {
     subjectsById: Map<string, Subject>;
     teachersById: Map<string, Teacher>;
     roomsById: Map<string, Room>;
+    includeRoomOnly?: boolean;
 }
 
 export const SubstitutionExportSheet = React.forwardRef<HTMLDivElement, SubstitutionExportSheetProps>(
@@ -78,7 +84,8 @@ export const SubstitutionExportSheet = React.forwardRef<HTMLDivElement, Substitu
             classesById,
             subjectsById,
             teachersById,
-            roomsById
+            roomsById,
+            includeRoomOnly = true
         },
         ref
     ) {
@@ -89,8 +96,9 @@ export const SubstitutionExportSheet = React.forwardRef<HTMLDivElement, Substitu
                         const s = getScheduleItemById(sub.scheduleItemId);
                         return s && s.shift === shift;
                     })
-                    .filter((sub) => sub.replacementTeacherId !== 'conducted'),
-            [substitutions, getScheduleItemById, shift]
+                    .filter((sub) => sub.replacementTeacherId !== 'conducted')
+                    .filter((sub) => includeRoomOnly || !isRoomSubstitution(sub)),
+            [substitutions, getScheduleItemById, shift, includeRoomOnly]
         );
 
         const uniqueLessonIds = useMemo(
@@ -318,13 +326,140 @@ export const SubstitutionExportSheet = React.forwardRef<HTMLDivElement, Substitu
     }
 );
 
+export type RoomChangeExportSheetProps = Omit<SubstitutionExportSheetProps, 'dayComment' | 'includeRoomOnly'>;
+
+export const RoomChangeExportSheet = React.forwardRef<HTMLDivElement, RoomChangeExportSheetProps>(
+    function RoomChangeExportSheet(
+        {
+            exportDate,
+            shift,
+            substitutions,
+            getScheduleItemById,
+            classesById,
+            subjectsById,
+            teachersById,
+            roomsById
+        },
+        ref
+    ) {
+        const shiftSubs = useMemo(
+            () =>
+                substitutions.filter((sub) => {
+                    if (!isRoomSubstitution(sub)) return false;
+                    const s = getScheduleItemById(sub.scheduleItemId);
+                    return s && s.shift === shift;
+                }),
+            [substitutions, getScheduleItemById, shift]
+        );
+
+        const uniqueLessonIds = useMemo(
+            () =>
+                Array.from(new Set(shiftSubs.map((s) => s.scheduleItemId))).sort((idA, idB) => {
+                    const itemA = getScheduleItemById(idA);
+                    const itemB = getScheduleItemById(idB);
+                    return (itemA?.period ?? 0) - (itemB?.period ?? 0);
+                }),
+            [shiftSubs, getScheduleItemById]
+        );
+
+        if (shiftSubs.length === 0) return null;
+
+        const rooms = Array.from(roomsById.values());
+
+        return (
+            <div ref={ref} className="bg-white p-8 min-w-[800px] max-w-[1000px] shadow-xl text-slate-900">
+                <SubstitutionReportHeader exportDate={exportDate} title="Замена кабинетов" />
+                <div>
+                    <div className="text-xl font-bold bg-slate-100 text-slate-700 p-2 mb-2 uppercase tracking-wide border-l-4 border-indigo-500">
+                        {shift}
+                    </div>
+                    <table className="w-full text-left border-collapse">
+                        <thead>
+                            <tr className="border-b border-slate-200">
+                                <th className="py-3 px-2 font-black text-slate-400 text-xs uppercase tracking-wider w-16 text-center">
+                                    Урок
+                                </th>
+                                <th className="py-3 px-2 font-black text-slate-400 text-xs uppercase tracking-wider w-24">
+                                    Класс
+                                </th>
+                                <th className="py-3 px-2 font-black text-slate-400 text-xs uppercase tracking-wider">
+                                    Предмет
+                                </th>
+                                <th className="py-3 px-2 font-black text-slate-400 text-xs uppercase tracking-wider w-1/5">
+                                    Учитель
+                                </th>
+                                <th className="py-3 px-2 font-black text-slate-400 text-xs uppercase tracking-wider w-1/4">
+                                    Кабинет
+                                </th>
+                                <th className="py-3 px-2 font-black text-slate-400 text-xs uppercase tracking-wider w-1/5">
+                                    Причина
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {uniqueLessonIds.map((lessonId) => {
+                                const lessonSubs = shiftSubs.filter((s) => s.scheduleItemId === lessonId);
+                                const sub = lessonSubs[0];
+                                const s = getScheduleItemById(lessonId);
+                                if (!s) return null;
+                                const cls = classesById.get(s.classId);
+                                const subj = subjectsById.get(s.subjectId);
+                                const teacher = teachersById.get(sub.originalTeacherId);
+                                const fromRoom = roomLabel(rooms, sub.originalRoomId || s.roomId);
+                                const toRooms = lessonSubs
+                                    .map((row) => roomLabel(rooms, row.replacementRoomId))
+                                    .filter((name, idx, arr) => arr.indexOf(name) === idx);
+
+                                return (
+                                    <tr key={String(lessonId)}>
+                                        <td className="py-3 px-2 text-center font-bold text-slate-800 text-lg">
+                                            {s.period}
+                                        </td>
+                                        <td className="py-3 px-2 font-bold text-slate-700">{cls?.name}</td>
+                                        <td className="py-3 px-2">
+                                            <div className="font-semibold text-slate-800">{subj?.name}</div>
+                                            {s.direction && (
+                                                <div className="text-[10px] text-slate-500 bg-slate-100 inline-block px-1 rounded mt-0.5">
+                                                    {s.direction}
+                                                </div>
+                                            )}
+                                        </td>
+                                        <td className="py-3 px-2 text-sm font-semibold text-slate-800">{teacher?.name}</td>
+                                        <td className="py-3 px-2 text-indigo-700 font-black">
+                                            {formatRoomArrow(fromRoom, toRooms.join(', '))}
+                                            {lessonSubs.some((row) => row.roomConflict) && (
+                                                <div className="text-[10px] font-bold uppercase mt-0.5">конфликт</div>
+                                            )}
+                                        </td>
+                                        <td className="py-3 px-2 text-sm text-slate-700">
+                                            {sub.roomChangeReason}
+                                            {sub.comment && (
+                                                <div className="mt-1 text-[10px] text-slate-500 italic max-w-xs">
+                                                    {sub.comment}
+                                                </div>
+                                            )}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+                <SubstitutionReportFooter />
+            </div>
+        );
+    }
+);
+
 export function shiftHasExportableSubs(
     substitutions: Substitution[],
     shift: string,
-    getScheduleItemById: (id: string) => ScheduleItem | undefined
+    getScheduleItemById: (id: string) => ScheduleItem | undefined,
+    includeRoomOnly = true
 ) {
     return substitutions.some((sub) => {
         if (sub.replacementTeacherId === 'conducted') return false;
+        if (!includeRoomOnly && isRoomSubstitution(sub)) return false;
         const s = getScheduleItemById(sub.scheduleItemId);
         return s && s.shift === shift;
     });
