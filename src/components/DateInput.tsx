@@ -54,9 +54,12 @@ export const DateInput = forwardRef(function DateInput(
     const textRef = useRef<HTMLInputElement>(null);
     const nativeRef = useRef<HTMLInputElement>(null);
     const [text, setText] = useState(() => toDisplay(type, value));
+    const [error, setError] = useState('');
 
     useEffect(() => {
         setText(toDisplay(type, value));
+        setError('');
+        textRef.current?.setCustomValidity('');
     }, [value, type]);
 
     useImperativeHandle(ref, () => {
@@ -75,49 +78,52 @@ export const DateInput = forwardRef(function DateInput(
         return el;
     });
 
-    const commit = (raw: string) => {
-        if (type === 'date') {
-            const iso = toDateISO(raw);
-            if (!raw.trim()) {
-                onChange('');
-                setText('');
-                return;
-            }
-            if (iso && isValidDateString(iso)) {
-                onChange(iso);
-                setText(formatDateEuropean(iso));
-            } else {
-                setText(toDisplay(type, value));
-            }
-            return;
-        }
-        if (type === 'month') {
-            const iso = toMonthISO(raw);
-            if (!raw.trim()) {
-                onChange('');
-                setText('');
-                return;
-            }
-            if (iso && isValidMonthString(iso)) {
-                onChange(iso);
-                setText(formatMonthEuropean(iso));
-            } else {
-                setText(toDisplay(type, value));
-            }
-            return;
-        }
-        const hm = formatTimeHM(raw);
+    const clearError = () => {
+        setError('');
+        textRef.current?.setCustomValidity('');
+    };
+
+    const showError = (message: string): false => {
+        setError(message);
+        textRef.current?.setCustomValidity(message);
+        return false;
+    };
+
+    const commit = (raw: string): boolean => {
         if (!raw.trim()) {
             onChange('');
             setText('');
-            return;
+            clearError();
+            return true;
         }
-        if (hm && /^\d{2}:\d{2}$/.test(hm)) {
-            onChange(hm);
-            setText(hm);
-        } else {
-            setText(toDisplay(type, value));
+        if (type === 'date') {
+            const iso = toDateISO(raw);
+            if (!iso || !isValidDateString(iso)) {
+                return showError('Введите существующую дату в формате ДД.ММ.ГГГГ');
+            }
+            onChange(iso);
+            setText(formatDateEuropean(iso));
+            clearError();
+            return true;
         }
+        if (type === 'month') {
+            const iso = toMonthISO(raw);
+            if (!iso || !isValidMonthString(iso)) {
+                return showError('Введите месяц в формате ММ.ГГГГ');
+            }
+            onChange(iso);
+            setText(formatMonthEuropean(iso));
+            clearError();
+            return true;
+        }
+        const hm = formatTimeHM(raw);
+        if (!hm || !/^\d{2}:\d{2}$/.test(hm)) {
+            return showError('Введите время в формате ЧЧ:ММ');
+        }
+        onChange(hm);
+        setText(hm);
+        clearError();
+        return true;
     };
 
     const ph =
@@ -131,6 +137,7 @@ export const DateInput = forwardRef(function DateInput(
     const inputClass = [
         className,
         showPickerButton ? 'pr-9' : '',
+        error ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : '',
         // if caller didn't set width, use a sensible compact size
         !/\bw-/.test(className) && !/\bmin-w-/.test(className)
             ? type === 'date'
@@ -159,26 +166,33 @@ export const DateInput = forwardRef(function DateInput(
                 placeholder={ph}
                 maxLength={maxLen}
                 value={text}
-                title={
-                    type === 'date'
-                        ? 'Формат: ДД.ММ.ГГГГ'
-                        : type === 'month'
-                          ? 'Формат: ММ.ГГГГ'
-                          : 'Формат: ЧЧ:ММ (24 часа)'
-                }
+                aria-invalid={error ? true : undefined}
+                title={error || (type === 'date'
+                    ? 'Формат: ДД.ММ.ГГГГ'
+                    : type === 'month'
+                      ? 'Формат: ММ.ГГГГ'
+                      : 'Формат: ЧЧ:ММ (24 часа)')}
                 onChange={(e: ChangeEvent<HTMLInputElement>) => {
                     setText(e.target.value);
+                    clearError();
                 }}
                 onBlur={() => commit(text)}
                 onKeyDown={(e) => {
                     if (e.key === 'Enter') {
                         e.preventDefault();
-                        commit(text);
-                        (e.target as HTMLInputElement).blur();
+                        if (commit(text)) (e.target as HTMLInputElement).blur();
                     }
                 }}
                 className={inputClass}
             />
+            {error && (
+                <span
+                    role="alert"
+                    className="absolute left-0 top-full z-20 mt-1 whitespace-nowrap rounded bg-red-600 px-2 py-1 text-xs text-white shadow"
+                >
+                    {error}
+                </span>
+            )}
             {showPickerButton && (
                 <div
                     className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-slate-400 dark:text-slate-500"
@@ -192,6 +206,7 @@ export const DateInput = forwardRef(function DateInput(
                         value={value || ''}
                         onChange={(e) => {
                             const v = e.target.value;
+                            clearError();
                             if (type === 'time') {
                                 onChange(formatTimeHM(v));
                                 setText(formatTimeHM(v));

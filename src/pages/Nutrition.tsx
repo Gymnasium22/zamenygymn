@@ -5,7 +5,7 @@ import { DateInput } from '../components/DateInput';
 import { Icon } from '../components/Icons';
 import { Modal, useToast, SearchableSelect } from '../components/UI';
 import { NutritionRecord } from '../types';
-import { formatDateISO, formatDateEuropean, formatMonthLong, BY_LOCALE, generateId, getDateOrToday, getMonthOrNow } from '../utils/helpers';
+import { formatDateISO, formatDateEuropean, formatMonthLong, BY_LOCALE, generateId, getDateOrToday, getMonthOrNow, parseDateSafe } from '../utils/helpers';
 import { exportService } from '../services/exportService';
 
 /** День заблокирован для редактирования (не-админ) после настроенного времени */
@@ -74,8 +74,8 @@ export const NutritionPage = () => {
     const recordsForMonth = useMemo(() => {
         const [year, month] = selectedMonth.split('-').map(Number);
         return nutritionRecords.filter((r) => {
-            const recordDate = getDateOrToday(r.date);
-            return recordDate.getFullYear() === year && recordDate.getMonth() + 1 === month;
+            const recordDate = parseDateSafe(r.date);
+            return recordDate?.getFullYear() === year && recordDate.getMonth() + 1 === month;
         });
     }, [nutritionRecords, selectedMonth]);
 

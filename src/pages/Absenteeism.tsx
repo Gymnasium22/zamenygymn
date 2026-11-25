@@ -5,7 +5,7 @@ import { DateInput } from '../components/DateInput';
 import { Icon } from '../components/Icons';
 import { Modal, useToast } from '../components/UI';
 import { AbsenteeismRecord, StudentAbsence } from '../types';
-import { formatDateISO, formatDateEuropean, formatMonthLong, generateId, getMonthOrNow, getDateOrToday } from '../utils/helpers';
+import { formatDateISO, formatDateEuropean, formatMonthLong, generateId, getMonthOrNow, parseDateSafe } from '../utils/helpers';
 import DOMPurify from 'dompurify';
 
 export const AbsenteeismPage = () => {
@@ -47,8 +47,8 @@ export const AbsenteeismPage = () => {
     const recordsForMonth = useMemo(() => {
         const [year, month] = selectedMonth.split('-').map(Number);
         return absenteeismRecords.filter((r) => {
-            const recordDate = getDateOrToday(r.date);
-            return recordDate.getFullYear() === year && recordDate.getMonth() + 1 === month;
+            const recordDate = parseDateSafe(r.date);
+            return recordDate?.getFullYear() === year && recordDate.getMonth() + 1 === month;
         });
     }, [absenteeismRecords, selectedMonth]);
 

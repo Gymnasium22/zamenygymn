@@ -15,8 +15,9 @@ import {
     Teacher,
     Room
 } from '../types';
-import { formatDateISO, formatDateEuropean, formatMonthLong, getActiveSemester, getDateOrToday } from '../utils/helpers';
+import { formatDateISO, formatDateEuropean, formatMonthLong, getActiveSemester, parseDateSafe } from '../utils/helpers';
 import { formatRoomArrow, isRoomSubstitution, roomLabel } from '../utils/roomSubstitution';
+import { filterSubstitutionsByMonth, formatReplacementStatuses } from '../utils/substitutionReporting';
 import { exportService } from '../services/exportService';
 import { useToast } from '../components/UI';
 import { SanitaryScheduleTab } from '../components/SanitaryScheduleTab';
@@ -997,22 +998,15 @@ export const ExportPage = () => {
     };
 
     const buildMonthlySubstitutionsHtml = (): { html: string; styles: string; title: string } | null => {
-        const targetDate = getDateOrToday(exportDate);
-        const targetMonth = targetDate.getUTCMonth();
-        const targetYear = targetDate.getUTCFullYear();
+        const targetDate = parseDateSafe(exportDate);
+        if (!targetDate) return null;
 
-        const monthlySubs = substitutions
-            .filter((s) => {
-                const sDate = getDateOrToday(s.date);
-                return sDate.getUTCMonth() === targetMonth && sDate.getUTCFullYear() === targetYear;
-            })
-            .sort((a, b) => getDateOrToday(a.date).getTime() - getDateOrToday(b.date).getTime());
-
+        const monthlySubs = filterSubstitutionsByMonth(substitutions, targetDate);
         if (monthlySubs.length === 0) return null;
 
         interface SubstitutionDetail {
             subs: Substitution[];
-            scheduleItem: ScheduleItem;
+            scheduleItem?: ScheduleItem;
             cls: ClassEntity | undefined;
             subj: Subject | undefined;
             origTeacher: Teacher | undefined;
@@ -1035,10 +1029,9 @@ export const ExportPage = () => {
             const firstSub = subsGroup.find((row) => !isRoomSubstitution(row)) || subsGroup[0];
             const roomSub = subsGroup.find(isRoomSubstitution);
             const scheduleItem = getScheduleItemById(firstSub.scheduleItemId);
-            if (!scheduleItem) return;
 
-            const cls = classes.find((c) => c.id === scheduleItem.classId);
-            const subj = subjects.find((s) => s.id === scheduleItem.subjectId);
+            const cls = classes.find((c) => c.id === scheduleItem?.classId);
+            const subj = subjects.find((s) => s.id === scheduleItem?.subjectId);
             const origTeacher = teachers.find((t) => t.id === firstSub.originalTeacherId);
 
             let reason = firstSub.lessonAbsenceReason || origTeacher?.absenceReasons?.[firstSub.date] || '';
@@ -1052,6 +1045,9 @@ export const ExportPage = () => {
             if (roomSub?.roomConflict) reason += ' · конфликт кабинета';
             if (firstSub.replacementClassId && firstSub.replacementSubjectId && !firstSub.isMerger)
                 reason = 'Обмен уроками';
+            if (!scheduleItem) {
+                reason = [reason, 'Урок удалён из расписания'].filter(Boolean).join(' · ');
+            }
 
             const detail: SubstitutionDetail = { subs: subsGroup, scheduleItem, cls, subj, origTeacher, reason, roomSub };
 
@@ -1068,38 +1064,10 @@ export const ExportPage = () => {
             return items
                 .map((item) => {
                     const { subs, scheduleItem, cls, subj, origTeacher, reason, roomSub } = item;
-                    const firstSub = subs[0];
+                    const firstSub = subs.find((row) => !isRoomSubstitution(row)) || subs[0];
                     const dateStr = formatDateEuropean(firstSub.date);
-
-                    let repTeacherName = '';
-
-                    if (firstSub.replacementTeacherId === 'conducted') repTeacherName = 'Урок проведен';
-                    else if (firstSub.replacementTeacherId === 'cancelled') repTeacherName = 'Урок снят';
-                    else {
-                        const names = subs
-                            .map((s) => {
-                                const t = teachers.find((x) => x.id === s.replacementTeacherId);
-                                return t ? t.name : 'Неизвестно';
-                            })
-                            .join(', ');
-
-                        repTeacherName = names;
-
-                        if (firstSub.isMerger) {
-                            let suffix = ' (Объединение)';
-                            if (firstSub.replacementClassId) {
-                                const swappedClass = classes.find((c) => c.id === firstSub.replacementClassId);
-                                if (swappedClass) suffix = ` (Объединение с ${swappedClass.name})`;
-                            }
-                            repTeacherName += suffix;
-                        } else if (firstSub.replacementClassId && firstSub.replacementSubjectId) {
-                            const swappedClass = classes.find((c) => c.id === firstSub.replacementClassId);
-                            const swappedSubj = subjects.find((s) => s.id === firstSub.replacementSubjectId);
-                            repTeacherName += ` (Урок ${swappedClass?.name || '?'} ${swappedSubj?.name || '?'})`;
-                        }
-                    }
-
-                    const originalRoomId = scheduleItem.roomId;
+                    const repTeacherName = formatReplacementStatuses(subs, teachers, classes, subjects);
+                    const originalRoomId = scheduleItem?.roomId || firstSub.originalRoomId;
                     const replacementRoomIds = subs
                         .map((s) => s.replacementRoomId)
                         .filter((id): id is string => Boolean(id));
@@ -1124,11 +1092,11 @@ export const ExportPage = () => {
                     return `
                     <tr>
                         <td>${dateStr}</td>
-                        <td>${scheduleItem.period}</td>
-                        <td>${scheduleItem.shift}</td>
-                        <td>${cls?.name || '?'}</td>
-                        <td>${subj?.name || '?'}</td>
-                        <td>${origTeacher?.name || '?'}</td>
+                        <td>${scheduleItem?.period ?? '—'}</td>
+                        <td>${scheduleItem?.shift ?? '—'}</td>
+                        <td>${cls?.name || '—'}</td>
+                        <td>${subj?.name || '—'}</td>
+                        <td>${origTeacher?.name || 'Неизвестно'}</td>
                         <td>${repTeacherName}</td>
                         <td>${roomDisplay}</td>
                         <td>${reason}</td>
@@ -1176,45 +1144,50 @@ export const ExportPage = () => {
             { name: string; total: number; withoutRecord: number; merger: number; other: number; illness: number }
         >();
 
-        monthlySubs.forEach((sub) => {
-            if (
-                sub.replacementTeacherId === 'conducted' ||
-                sub.replacementTeacherId === 'cancelled' ||
-                sub.replacementTeacherId === sub.originalTeacherId
-            ) {
-                return;
-            }
+        groupedSubs.forEach((subsGroup) => {
+            const countedTeacherIds = new Set<string>();
+            subsGroup.forEach((sub) => {
+                if (
+                    sub.replacementTeacherId === 'conducted' ||
+                    sub.replacementTeacherId === 'cancelled' ||
+                    sub.replacementTeacherId === sub.originalTeacherId ||
+                    countedTeacherIds.has(sub.replacementTeacherId)
+                ) {
+                    return;
+                }
 
-            const teacher = teachers.find((t) => t.id === sub.replacementTeacherId);
-            if (!teacher) return;
+                const teacher = teachers.find((t) => t.id === sub.replacementTeacherId);
+                if (!teacher) return;
+                countedTeacherIds.add(teacher.id);
 
-            const stats = teacherStats.get(teacher.id) || {
-                name: teacher.name,
-                total: 0,
-                withoutRecord: 0,
-                merger: 0,
-                other: 0,
-                illness: 0
-            };
+                const stats = teacherStats.get(teacher.id) || {
+                    name: teacher.name,
+                    total: 0,
+                    withoutRecord: 0,
+                    merger: 0,
+                    other: 0,
+                    illness: 0
+                };
 
-            const origTeacher = teachers.find((t) => t.id === sub.originalTeacherId);
-            let reason = sub.lessonAbsenceReason || origTeacher?.absenceReasons?.[sub.date] || '';
+                const origTeacher = teachers.find((t) => t.id === sub.originalTeacherId);
+                let reason = sub.lessonAbsenceReason || origTeacher?.absenceReasons?.[sub.date] || '';
 
-            if (sub.replacementClassId && sub.replacementSubjectId && !sub.isMerger) reason = 'Обмен уроками';
+                if (sub.replacementClassId && sub.replacementSubjectId && !sub.isMerger) reason = 'Обмен уроками';
 
-            stats.total++;
+                stats.total++;
 
-            if (sub.isMerger) {
-                stats.merger++;
-            } else if (reason === 'Болезнь') {
-                stats.illness++;
-            } else if (reason === 'Без записи') {
-                stats.withoutRecord++;
-            } else {
-                stats.other++;
-            }
+                if (sub.isMerger) {
+                    stats.merger++;
+                } else if (reason === 'Болезнь') {
+                    stats.illness++;
+                } else if (reason === 'Без записи') {
+                    stats.withoutRecord++;
+                } else {
+                    stats.other++;
+                }
 
-            teacherStats.set(teacher.id, stats);
+                teacherStats.set(teacher.id, stats);
+            });
         });
 
         const statsArray = Array.from(teacherStats.values()).sort((a, b) => a.name.localeCompare(b.name));
@@ -1288,18 +1261,12 @@ export const ExportPage = () => {
     };
 
     const buildRefusalsHtml = (): { html: string; title: string } | null => {
-        const targetDate = getDateOrToday(exportDate);
-        const targetMonth = targetDate.getUTCMonth();
-        const targetYear = targetDate.getUTCFullYear();
+        const targetDate = parseDateSafe(exportDate);
+        if (!targetDate) return null;
 
-        const refusalsData = substitutions
-            .filter((s) => {
-                const sDate = getDateOrToday(s.date);
-                const inMonth = sDate.getUTCMonth() === targetMonth && sDate.getUTCFullYear() === targetYear;
-                const hasRefusals = s.refusals && s.refusals.length > 0;
-                return inMonth && hasRefusals;
-            })
-            .sort((a, b) => getDateOrToday(a.date).getTime() - getDateOrToday(b.date).getTime());
+        const refusalsData = filterSubstitutionsByMonth(substitutions, targetDate).filter(
+            (sub) => sub.refusals && sub.refusals.length > 0
+        );
 
         if (refusalsData.length === 0) return null;
 

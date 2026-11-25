@@ -8,6 +8,7 @@ import { DAYS, Substitution, Settings } from '../types';
 import { isRoomSubstitution } from '../utils/roomSubstitution';
 import { DateInput } from '../components/DateInput';
 import { getActiveSemester, formatDateEuropean } from '../utils/helpers';
+import { countUniqueSubstitutionLessons } from '../utils/substitutionReporting';
 
 const PLAN_WEEKS = 4;
 
@@ -216,15 +217,15 @@ export const ReportsPage = () => {
             const weeklyHours = weeklyLessons.length;
             const plan4w = weeklyHours * PLAN_WEEKS;
 
-            let subsTaken = 0;
-            let replacedAway = 0;
-            let cancelled = 0;
-            for (const s of periodSubs) {
-                const c = classifySubForTeacher(s, t.id);
-                if (c.taken) subsTaken += 1;
-                if (c.replacedAway) replacedAway += 1;
-                if (c.cancelled) cancelled += 1;
-            }
+            const subsTaken = countUniqueSubstitutionLessons(periodSubs, (s) => classifySubForTeacher(s, t.id).taken);
+            const replacedAway = countUniqueSubstitutionLessons(
+                periodSubs,
+                (s) => classifySubForTeacher(s, t.id).replacedAway
+            );
+            const cancelled = countUniqueSubstitutionLessons(
+                periodSubs,
+                (s) => classifySubForTeacher(s, t.id).cancelled
+            );
 
             // Оценка: 4 недельных нагрузки + проведённые замены − уроки, отданные другому.
             // Отмены не вычитаем из «оценки работы» — показываем отдельно.
@@ -275,11 +276,12 @@ export const ReportsPage = () => {
         const withLoad = tariffData.filter((r) => r.weeklyHours > 0);
         const totalWeekly = withLoad.reduce((s, r) => s + r.weeklyHours, 0);
         const avgWeekly = withLoad.length ? Math.round((totalWeekly / withLoad.length) * 10) / 10 : 0;
-        const totalTaken = periodSubs.filter(
+        const totalTaken = countUniqueSubstitutionLessons(
+            periodSubs,
             (s) => isRealTeacherId(s.replacementTeacherId) && s.replacementTeacherId !== s.originalTeacherId
-        ).length;
-        const totalCancelled = periodSubs.filter((s) => s.replacementTeacherId === 'cancelled').length;
-        const roomChanges = periodSubs.filter(isRoomSubstitution).length;
+        );
+        const totalCancelled = countUniqueSubstitutionLessons(periodSubs, (s) => s.replacementTeacherId === 'cancelled');
+        const roomChanges = countUniqueSubstitutionLessons(periodSubs, isRoomSubstitution);
         return {
             teachersWithLoad: withLoad.length,
             avgWeekly,
@@ -306,27 +308,23 @@ export const ReportsPage = () => {
 
     const ratings = useMemo(() => {
         const heroes = teachers
-            .map((t) => {
-                let count = 0;
-                for (const s of periodSubs) {
-                    if (classifySubForTeacher(s, t.id).taken) count += 1;
-                }
-                return { name: t.name, count };
-            })
+            .map((t) => ({
+                name: t.name,
+                count: countUniqueSubstitutionLessons(periodSubs, (s) => classifySubForTeacher(s, t.id).taken)
+            }))
             .filter((h) => h.count > 0)
             .sort((a, b) => b.count - a.count)
             .slice(0, 5);
 
         // «Снятые уроки» — та же логика, что в тарификации (замена другим + отмена)
         const removed = teachers
-            .map((t) => {
-                let count = 0;
-                for (const s of periodSubs) {
-                    const c = classifySubForTeacher(s, t.id);
-                    if (c.replacedAway || c.cancelled) count += 1;
-                }
-                return { name: t.name, count };
-            })
+            .map((t) => ({
+                name: t.name,
+                count: countUniqueSubstitutionLessons(periodSubs, (s) => {
+                    const classification = classifySubForTeacher(s, t.id);
+                    return classification.replacedAway || classification.cancelled;
+                })
+            }))
             .filter((h) => h.count > 0)
             .sort((a, b) => b.count - a.count)
             .slice(0, 5);
