@@ -86,7 +86,7 @@ export interface Substitution {
     type?: SubstitutionKind;
     originalRoomId?: string;
     roomChangeReason?: string;
-    roomChangeScope?: 'lesson' | 'day';
+    roomChangeScope?: 'lesson' | 'day' | 'quarantine';
     roomChangeSource?: 'auto' | 'manual';
     /** Администратор сохранил занятый кабинет осознанно */
     roomConflict?: boolean;

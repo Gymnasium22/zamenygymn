@@ -51,7 +51,7 @@ const SubstitutionSchema = z.object({
     originalRoomId: z.string().optional(),
     replacementRoomId: z.string().optional(),
     roomChangeReason: z.string().optional(),
-    roomChangeScope: z.enum(['lesson', 'day']).optional(),
+    roomChangeScope: z.enum(['lesson', 'day', 'quarantine']).optional(),
     roomChangeSource: z.enum(['auto', 'manual']).optional(),
     roomConflict: z.boolean().optional(),
     comment: z.string().optional()

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ScheduleItem, Substitution } from '../types';
-import { effectiveRoomId, isRoomSubstitution, lessonsTouchingRoom, suggestFreeRoom, suggestFreeRooms, listRoomOptions } from '../utils/roomSubstitution';
+import { effectiveRoomId, isRoomSubstitution, lessonsTouchingRoom, suggestFreeRoom, suggestFreeRooms, listRoomOptions, buildClassQuarantinePlan } from '../utils/roomSubstitution';
 
 const lesson = (patch: Partial<ScheduleItem>): ScheduleItem => ({
     id: 'l1',
@@ -73,5 +73,73 @@ describe('room substitution', () => {
         expect(rows.map((row) => row.lesson.id)).toEqual([]);
         const back = lessonsTouchingRoom([b], [sub({ scheduleItemId: 'b', type: 'room', originalRoomId: 'r210', replacementRoomId: 'r204' })], '2026-11-25', 'Пн', 'r204');
         expect(back.map((row) => row.lesson.id)).toEqual(['b']);
+    });
+});
+
+
+describe('карантин класса', () => {
+    const qRooms = [
+        { id: 'r101', name: '101', type: 'обычный', floor: 1, capacity: 30 },
+        { id: 'r205', name: '205', type: 'обычный', floor: 2 },
+        { id: 'r301', name: '301', type: 'обычный', floor: 3 }
+    ];
+    const qClasses = [
+        { id: 'c7v', name: '7В', shift: '1 смена', studentsCount: 25 },
+        { id: 'c5a', name: '5А', shift: '1 смена', studentsCount: 20 }
+    ];
+    const qDate = '2026-11-25';
+
+    it('прямой обмен: выезжающий получает кабинет класса в том же слоте', () => {
+        const classLesson = lesson({ id: 'cl1', classId: 'c7v', period: 1, roomId: 'r205' });
+        const other = lesson({ id: 'ev1', classId: 'c5a', teacherId: 't2', period: 1, roomId: 'r101' });
+        const plan = buildClassQuarantinePlan([classLesson, other], [], qDate, 'Пн', 'c7v', 'r101', qRooms, qClasses);
+        expect(plan.moves).toEqual([
+            { lesson: classLesson, kind: 'class', fromRoomId: 'r205', toRoomId: 'r101' },
+            { lesson: other, kind: 'evicted', fromRoomId: 'r101', toRoomId: 'r205' }
+        ]);
+    });
+
+    it('без урока класса в слоте выезжающий получает свободный в слоте кабинет класса', () => {
+        const c1l = lesson({ id: 'cl1', classId: 'c7v', period: 1, roomId: 'r205' });
+        const c2l = lesson({ id: 'cl2', classId: 'c7v', period: 2, roomId: 'r301' });
+        const evicted = lesson({ id: 'ev1', classId: 'c5a', teacherId: 't2', period: 3, roomId: 'r101' });
+        const staying = lesson({ id: 'st1', classId: 'c5a', teacherId: 't3', period: 3, roomId: 'r301' });
+        const plan = buildClassQuarantinePlan([c1l, c2l, evicted, staying], [], qDate, 'Пн', 'c7v', 'r101', qRooms, qClasses);
+        expect(plan.moves.find((m) => m.kind === 'evicted')?.toRoomId).toBe('r205');
+    });
+
+    it('если все кабинеты класса в слоте заняты — строка требует ручного выбора', () => {
+        const classLesson = lesson({ id: 'cl1', classId: 'c7v', period: 1, roomId: 'r205' });
+        const evicted = lesson({ id: 'ev1', classId: 'c5a', teacherId: 't2', period: 2, roomId: 'r101' });
+        const staying = lesson({ id: 'st1', classId: 'c5a', teacherId: 't3', period: 2, roomId: 'r205' });
+        const plan = buildClassQuarantinePlan([classLesson, evicted, staying], [], qDate, 'Пн', 'c7v', 'r101', qRooms, qClasses);
+        expect(plan.moves.find((m) => m.kind === 'evicted')?.needsManual).toBe(true);
+    });
+
+    it('не садит подгруппы в один кабинет и предупреждает', () => {
+        const a = lesson({ id: 'cl1', classId: 'c7v', period: 1, roomId: 'r205', subjectId: 'math' });
+        const b = lesson({ id: 'cl2', classId: 'c7v', period: 1, roomId: 'r301', subjectId: 'eng' });
+        const plan = buildClassQuarantinePlan([a, b], [], qDate, 'Пн', 'c7v', 'r101', qRooms, qClasses);
+        expect(plan.moves).toEqual([]);
+        expect(plan.warnings.join(' ')).toContain('несколько уроков');
+    });
+
+    it('пропускает отменённые уроки класса и кабинета', () => {
+        const classLesson = lesson({ id: 'cl1', classId: 'c7v', period: 1, roomId: 'r205' });
+        const cancelledClass = lesson({ id: 'cl2', classId: 'c7v', period: 2, roomId: 'r301' });
+        const cancelledEvicted = lesson({ id: 'ev1', classId: 'c5a', teacherId: 't2', period: 1, roomId: 'r101' });
+        const subs = [
+            sub({ id: 's2', scheduleItemId: 'cl2', type: 'cancel', replacementTeacherId: 'cancelled' }),
+            sub({ id: 's3', scheduleItemId: 'ev1', type: 'cancel', replacementTeacherId: 'cancelled' })
+        ];
+        const plan = buildClassQuarantinePlan([classLesson, cancelledClass, cancelledEvicted], subs, qDate, 'Пн', 'c7v', 'r101', qRooms, qClasses);
+        expect(plan.moves.map((m) => m.lesson.id)).toEqual(['cl1']);
+    });
+
+    it('предупреждает, если кабинет меньше класса', () => {
+        const smallTarget = { id: 'r101', name: '101', type: 'обычный', floor: 1, capacity: 10 };
+        const classLesson = lesson({ id: 'cl1', classId: 'c7v', period: 1, roomId: 'r205' });
+        const plan = buildClassQuarantinePlan([classLesson], [], qDate, 'Пн', 'c7v', 'r101', [smallTarget, ...qRooms.slice(1)], qClasses);
+        expect(plan.warnings.join(' ')).toContain('мест');
     });
 });

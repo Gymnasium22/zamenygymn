@@ -45,7 +45,7 @@ import {
     SubstitutionConflict
 } from '../utils/substitutionValidation';
 import { formatRoomArrow, isRoomSubstitution, roomLabel } from '../utils/roomSubstitution';
-import { FreeRoomDayModal, LessonPickModal, RoomChangeModal } from '../components/Substitutions/RoomChangeModals';
+import { FreeRoomDayModal, LessonPickModal, RoomChangeModal, ClassQuarantineModal } from '../components/Substitutions/RoomChangeModals';
 
 export const SubstitutionsPage = () => {
     const { subjects, teachers, classes, rooms, settings, privateSettings, saveStaticData } = useStaticData();
@@ -119,6 +119,7 @@ export const SubstitutionsPage = () => {
     const [roomLesson, setRoomLesson] = useState<ScheduleItem | null>(null);
     const [roomEditSub, setRoomEditSub] = useState<Substitution | null>(null);
     const [dayRoomOpen, setDayRoomOpen] = useState(false);
+    const [classQuarantineOpen, setClassQuarantineOpen] = useState(false);
     const [lessonPickOpen, setLessonPickOpen] = useState(false);
     const [roomActionsOpen, setRoomActionsOpen] = useState(false);
 
@@ -994,7 +995,7 @@ export const SubstitutionsPage = () => {
 
     const removeDayRoomChanges = useCallback(async () => {
         const removedSubs = substitutionsRef.current.filter(
-            (s) => s.date === selectedDate && s.type === 'room' && s.roomChangeScope === 'day'
+            (s) => s.date === selectedDate && s.type === 'room' && (s.roomChangeScope === 'day' || s.roomChangeScope === 'quarantine')
         );
         if (removedSubs.length === 0) return;
         const removedIds = new Set(removedSubs.map((s) => s.id));
@@ -1131,6 +1132,48 @@ export const SubstitutionsPage = () => {
                 deletedSubstitutionIds: removed.map((s) => s.id)
             });
             setDayRoomOpen(false);
+        },
+        [selectedDate, dayComment, saveScheduleData]
+    );
+
+    // Карантин класса: одним батчем, существующие смены кабинетов у затронутых уроков заменяются.
+    const applyClassQuarantine = useCallback(
+        async (payload: {
+            classId: string;
+            roomId: string;
+            reason: string;
+            comment: string;
+            rows: { lesson: ScheduleItem; kind: 'class' | 'evicted'; roomId: string; source: 'auto' | 'manual'; conflict: boolean }[];
+        }) => {
+            const touched = new Set(payload.rows.map((row) => row.lesson.id));
+            const removed = substitutionsRef.current.filter(
+                (s) => s.date === selectedDate && touched.has(s.scheduleItemId) && isRoomSubstitution(s)
+            );
+            const removedIds = new Set(removed.map((s) => s.id));
+            const next = substitutionsRef.current.filter((s) => !removedIds.has(s.id));
+            payload.rows.forEach((row) => {
+                next.push({
+                    id: generateId(),
+                    date: selectedDate,
+                    scheduleItemId: row.lesson.id,
+                    originalTeacherId: row.lesson.teacherId,
+                    replacementTeacherId: row.lesson.teacherId,
+                    type: 'room',
+                    originalRoomId: row.kind === 'evicted' ? payload.roomId : row.lesson.roomId,
+                    replacementRoomId: row.roomId,
+                    roomChangeReason: payload.reason || undefined,
+                    roomChangeScope: 'quarantine',
+                    roomChangeSource: row.source,
+                    roomConflict: row.conflict || undefined,
+                    comment: payload.comment || undefined,
+                    dayComment: dayComment || undefined
+                });
+            });
+            await saveScheduleData({
+                substitutions: next,
+                deletedSubstitutionIds: removed.map((s) => s.id)
+            });
+            setClassQuarantineOpen(false);
         },
         [selectedDate, dayComment, saveScheduleData]
     );
@@ -2083,6 +2126,17 @@ export const SubstitutionsPage = () => {
                                         <button
                                             type="button"
                                             role="menuitem"
+                                            onClick={() => {
+                                                setRoomActionsOpen(false);
+                                                setClassQuarantineOpen(true);
+                                            }}
+                                            className="w-full px-4 py-3 text-left text-sm font-semibold text-slate-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-slate-700 transition-colors"
+                                        >
+                                            Карантин класса…
+                                        </button>
+                                        <button
+                                            type="button"
+                                            role="menuitem"
                                             disabled={isSendingRoomSummary}
                                             onClick={() => {
                                                 setRoomActionsOpen(false);
@@ -2097,7 +2151,7 @@ export const SubstitutionsPage = () => {
                                             )}
                                             Отправить кабинеты в Telegram
                                         </button>
-                                        {substitutions.some((s) => s.date === selectedDate && s.type === 'room' && s.roomChangeScope === 'day') && (
+                                        {substitutions.some((s) => s.date === selectedDate && s.type === 'room' && (s.roomChangeScope === 'day' || s.roomChangeScope === 'quarantine')) && (
                                             <button
                                                 type="button"
                                                 role="menuitem"
@@ -2728,6 +2782,23 @@ export const SubstitutionsPage = () => {
                     }}
                     onClose={() => setDayRoomOpen(false)}
                     onApply={(payload) => void applyDayRoomRelease(payload)}
+                />
+            )}
+            {classQuarantineOpen && (
+                <ClassQuarantineModal
+                    date={selectedDate}
+                    dayName={selectedDayOfWeek}
+                    vacation={isVacationDate}
+                    data={{
+                        rooms,
+                        classes,
+                        teachers,
+                        subjects,
+                        schedule: roomSchedule,
+                        substitutions
+                    }}
+                    onClose={() => setClassQuarantineOpen(false)}
+                    onApply={(payload) => void applyClassQuarantine(payload)}
                 />
             )}
             {lessonPickOpen && (

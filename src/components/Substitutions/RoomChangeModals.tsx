@@ -4,7 +4,9 @@ import { Icon } from '../Icons';
 import { ClassEntity, Room, ScheduleItem, Subject, Substitution, Teacher } from '../../types';
 import {
     DayRoomLesson,
+    buildClassQuarantinePlan,
     describeRoomConflict,
+    effectiveRoomId,
     lessonsTouchingRoom,
     listRoomOptions,
     roomLabel,
@@ -627,6 +629,216 @@ export const LessonPickModal = ({
                         </section>
                     );
                 })}
+            </div>
+        </Modal>
+    );
+};
+
+
+export const ClassQuarantineModal = ({
+    date,
+    dayName,
+    vacation,
+    data,
+    onClose,
+    onApply
+}: {
+    date: string;
+    dayName: string | null;
+    vacation: boolean;
+    data: Lookup;
+    onClose: () => void;
+    onApply: (payload: {
+        classId: string;
+        roomId: string;
+        reason: string;
+        comment: string;
+        rows: { lesson: ScheduleItem; kind: 'class' | 'evicted'; roomId: string; source: 'auto' | 'manual'; conflict: boolean }[];
+    }) => void;
+}) => {
+    const [classId, setClassId] = useState('');
+    const [roomId, setRoomId] = useState('');
+    const [reason, setReason] = useState('');
+    const [comment, setComment] = useState('');
+    const [manual, setManual] = useState<Record<string, string>>({});
+
+    const className = data.classes.find((c) => c.id === classId)?.name || '';
+    const plan = useMemo(
+        () =>
+            buildClassQuarantinePlan(
+                data.schedule,
+                data.substitutions,
+                date,
+                dayName,
+                classId,
+                roomId,
+                data.rooms,
+                data.classes
+            ),
+        [data, date, dayName, classId, roomId]
+    );
+    useEffect(() => setManual({}), [classId, roomId]);
+    useEffect(() => {
+        if (className && (!reason || reason.startsWith('Карантин'))) setReason(`Карантин ${className}`);
+    }, [className]);
+
+    // Занятость слота ПОСЛЕ переселений — для ручного выбора кабинета выезжающим урокам.
+    const occupiedAfterPlan = (lesson: ScheduleItem): Set<string> => {
+        const busy = new Set<string>();
+        data.schedule
+            .filter((l) => l.day === dayName && l.shift === lesson.shift && l.period === lesson.period)
+            .forEach((l) => {
+                const current = effectiveRoomId(l, data.substitutions.filter((s) => s.date === date && s.scheduleItemId === l.id));
+                if (current === undefined) return; // урок снят
+                const move = plan.moves.find((m) => m.lesson.id === l.id);
+                const finalRoom = move ? move.toRoomId || manual[l.id] || null : current;
+                if (finalRoom) busy.add(finalRoom);
+            });
+        return busy;
+    };
+
+    const rows = plan.moves.map((move) => ({
+        move,
+        chosen: move.toRoomId || manual[move.lesson.id] || '',
+        source: (move.toRoomId ? 'auto' : 'manual') as 'auto' | 'manual'
+    }));
+    const classCount = rows.filter((r) => r.move.kind === 'class').length;
+    const evictedRows = rows.filter((r) => r.move.kind === 'evicted');
+    const skipped = evictedRows.filter((r) => !r.chosen).length;
+    const applicable = rows.filter((r) => r.chosen);
+
+    return (
+        <Modal
+            isOpen
+            onClose={onClose}
+            title="Карантин класса"
+            maxWidth="max-w-3xl"
+            footer={
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                        Уроков класса: {classCount} · Выезжают из кабинета: {evictedRows.length - skipped}
+                        {skipped > 0 ? ` · Пропущено: ${skipped}` : ''}
+                    </p>
+                    <div className="flex gap-2">
+                        <button type="button" onClick={onClose} className="px-3 py-2 text-sm font-semibold text-slate-600 dark:text-slate-300">
+                            Закрыть
+                        </button>
+                        <button
+                            type="button"
+                            disabled={applicable.length === 0}
+                            onClick={() =>
+                                onApply({
+                                    classId,
+                                    roomId,
+                                    reason,
+                                    comment,
+                                    rows: applicable.map((r) => ({
+                                        lesson: r.move.lesson,
+                                        kind: r.move.kind,
+                                        roomId: r.chosen,
+                                        source: r.source,
+                                        conflict: false
+                                    }))
+                                })
+                            }
+                            className="px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm font-bold disabled:opacity-40"
+                        >
+                            Применить
+                        </button>
+                    </div>
+                </div>
+            }
+        >
+            <div className="space-y-3 text-sm">
+                <div className="grid sm:grid-cols-2 gap-3">
+                    <label className="block">
+                        <span className="font-semibold">Класс на карантине</span>
+                        <select value={classId} onChange={(event) => setClassId(event.target.value)} className={`${inputClass} mt-1`}>
+                            <option value="">Выберите класс</option>
+                            {data.classes.map((cls) => (
+                                <option key={cls.id} value={cls.id}>{cls.name}</option>
+                            ))}
+                        </select>
+                    </label>
+                    <label className="block">
+                        <span className="font-semibold">Кабинет на весь день</span>
+                        <select value={roomId} onChange={(event) => setRoomId(event.target.value)} className={`${inputClass} mt-1`}>
+                            <option value="">Выберите кабинет</option>
+                            {data.rooms.map((room) => (
+                                <option key={room.id} value={room.id}>{room.name}</option>
+                            ))}
+                        </select>
+                    </label>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Дата: {date}. Все уроки класса переедут в выбранный кабинет, а чужие уроки из него — в кабинеты, которые класс освобождает.
+                </p>
+                {!dayName && <p className="text-amber-700">Выходной: уроков в расписании нет.</p>}
+                {vacation && <p className="text-amber-700">Дата в каникулы или вне семестра. Список строится по расписанию этого времени года, если оно есть.</p>}
+                <div className="grid sm:grid-cols-2 gap-2">
+                    <input value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Причина" className={inputClass} />
+                    <input value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Комментарий" className={inputClass} />
+                </div>
+                {plan.warnings.map((warning, index) => (
+                    <p key={index} className="rounded-lg bg-amber-50 dark:bg-amber-900/20 px-3 py-2 text-amber-700 dark:text-amber-300">
+                        {warning}
+                    </p>
+                ))}
+                {classId && roomId && plan.moves.length === 0 && (
+                    <p className="text-slate-500">Нечего переселять: у класса нет уроков в других кабинетах, а в выбранном кабинете нет чужих уроков.</p>
+                )}
+                <div className="space-y-2 max-h-[45vh] overflow-y-auto pr-1">
+                    {rows.map(({ move, chosen }) => {
+                        const meta = names(move.lesson, data);
+                        const fromName = roomLabel(data.rooms, move.fromRoomId);
+                        const freeRooms = move.needsManual
+                            ? data.rooms.filter((room) => room.id !== roomId && !occupiedAfterPlan(move.lesson).has(room.id))
+                            : [];
+                        return (
+                            <div
+                                key={move.lesson.id}
+                                className={`flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 ${
+                                    move.kind === 'class'
+                                        ? 'border-indigo-200 dark:border-indigo-800 bg-indigo-50/50 dark:bg-indigo-900/10'
+                                        : 'border-slate-200 dark:border-slate-700'
+                                }`}
+                            >
+                                <div className="min-w-0 flex-1">
+                                    <span className="font-semibold">
+                                        {move.kind === 'evicted' && <span className="mr-1 text-slate-400">↳</span>}
+                                        {move.lesson.period} урок · {meta.className} · {meta.subjectName} · {meta.teacherName}
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-slate-400 line-through">{fromName}</span>
+                                    <Icon name="ArrowRight" size={13} className="text-slate-400" />
+                                    {move.needsManual ? (
+                                        freeRooms.length > 0 ? (
+                                            <select
+                                                aria-label={`Кабинет для урока ${move.lesson.period}`}
+                                                value={chosen}
+                                                onChange={(event) => setManual((prev) => ({ ...prev, [move.lesson.id]: event.target.value }))}
+                                                className="w-32 rounded-md border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1 text-xs"
+                                            >
+                                                <option value="">Выбрать свободный</option>
+                                                {freeRooms.map((room) => (
+                                                    <option key={room.id} value={room.id}>{room.name}</option>
+                                                ))}
+                                            </select>
+                                        ) : (
+                                            <span className="text-xs text-amber-700 dark:text-amber-300">свободных нет — пропустим</span>
+                                        )
+                                    ) : (
+                                        <span className="font-bold text-indigo-700 dark:text-indigo-300">{roomLabel(data.rooms, chosen)}</span>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Прямой обмен в том же уроке — в приоритете. Строки без выбранного кабинета не сохраняются.
+                </p>
             </div>
         </Modal>
     );

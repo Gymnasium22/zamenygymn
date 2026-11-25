@@ -1116,7 +1116,7 @@ export const ExportPage = () => {
                     const roomName =
                         replacementRoomNames.length > 0 ? replacementRoomNames.join(', ') : originalRoomName;
                     const roomDisplay = roomSub
-                        ? `${formatRoomArrow(roomLabel(rooms, roomSub.originalRoomId || originalRoomId), roomLabel(rooms, roomSub.replacementRoomId))}${roomSub.roomChangeScope === 'day' ? ' (весь день)' : ''}`
+                        ? `${formatRoomArrow(roomLabel(rooms, roomSub.originalRoomId || originalRoomId), roomLabel(rooms, roomSub.replacementRoomId))}${roomSub.roomChangeScope === 'day' ? ' (весь день)' : roomSub.roomChangeScope === 'quarantine' ? ' (карантин)' : ''}`
                         : replacementRoomNames.length > 0
                             ? `${originalRoomName} → ${roomName} (Замена каб.)`
                             : roomName;
